@@ -1,0 +1,74 @@
+{
+  "sorcery": {
+    "subtitle": "subtitles.loki.sorcery",
+    "sounds": [
+      {
+        "name": "loki:sorcery",
+        "stream": false
+      }
+    ]
+  },
+  "illusion": {
+    "subtitle": "subtitles.loki.illusion",
+    "sounds": [
+      {
+        "name": "loki:illusion",
+        "stream": false
+      }
+    ]
+  },
+  "teleport": {
+    "subtitle": "subtitles.loki.teleport",
+    "sounds": [
+      {
+        "name": "loki:teleport",
+        "stream": false
+      }
+    ]
+  },
+  "time_slip": {
+    "subtitle": "subtitles.loki.time_slip",
+    "sounds": [
+      {
+        "name": "loki:time_slip",
+        "stream": false
+      }
+    ]
+  },
+  "time_stop": {
+    "subtitle": "subtitles.loki.time_stop",
+    "sounds": [
+      {
+        "name": "loki:time_stop",
+        "stream": false
+      }
+    ]
+  },
+  "time_resume": {
+    "subtitle": "subtitles.loki.time_resume",
+    "sounds": [
+      {
+        "name": "loki:time_resume",
+        "stream": false
+      }
+    ]
+  },
+  "ascend": {
+    "subtitle": "subtitles.loki.ascend",
+    "sounds": [
+      {
+        "name": "loki:ascend",
+        "stream": true
+      }
+    ]
+  },
+  "conjure": {
+    "subtitle": "subtitles.loki.conjure",
+    "sounds": [
+      {
+        "name": "loki:conjure",
+        "stream": false
+      }
+    ]
+  }
+}

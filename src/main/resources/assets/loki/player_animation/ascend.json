@@ -1,0 +1,111 @@
+{
+  "version": 3,
+  "name": "ascend",
+  "author": "LokiGPT",
+  "description": "Layered upper-body gesture; locomotion remains available.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 140,
+    "stopTick": 140,
+    "isLoop": false,
+    "returnTick": 10,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 25,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -10,
+          "yaw": -7,
+          "roll": -8
+        },
+        "leftArm": {
+          "pitch": -9,
+          "yaw": 7,
+          "roll": 8
+        },
+        "torso": {
+          "pitch": -2,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 60,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -18,
+          "yaw": -10,
+          "roll": -15
+        },
+        "leftArm": {
+          "pitch": -18,
+          "yaw": 10,
+          "roll": 15
+        },
+        "torso": {
+          "pitch": -2,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 100,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -15,
+          "yaw": -8,
+          "roll": -10
+        },
+        "leftArm": {
+          "pitch": -14,
+          "yaw": 8,
+          "roll": 10
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 140,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="All Rights Reserved"
+[[mods]]
+modId="loki"
+version="0.1.0"
+displayName="Loki — Glorious Purpose"
+authors="21M4rco"
+description='''Deception, sorcery and temporal mastery. Become the keeper of time.'''
+[[dependencies.loki]]
+modId="forge"
+mandatory=true
+versionRange="[47.4.10,)"
+ordering="NONE"
+side="BOTH"
+[[dependencies.loki]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.20.2)"
+ordering="NONE"
+side="BOTH"
+[[dependencies.loki]]
+modId="playeranimator"
+mandatory=true
+versionRange="[1.0.2,)"
+ordering="AFTER"
+side="CLIENT"

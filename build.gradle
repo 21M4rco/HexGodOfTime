@@ -1,0 +1,38 @@
+plugins {
+    id 'java'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'org.spongepowered.mixin' version '0.7.+'
+}
+group = 'com.loki'
+version = '0.1.0'
+base { archivesName = 'loki' }
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+minecraft {
+    mappings channel: 'official', version: '1.20.1'
+    copyIdeResources = true
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'info'
+            mods { loki { source sourceSets.main } }
+        }
+        client {}
+        server { args '--nogui' }
+        gameTestServer { property 'forge.enabledGameTestNamespaces', 'loki' }
+    }
+}
+repositories {
+    maven { url = 'https://cursemaven.com/'; content { includeGroup 'curse.maven' } }
+    mavenCentral()
+}
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.20.1-47.4.10'
+    implementation(fg.deobf('curse.maven:playeranimator-658587:4587214')) { transitive = false }
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+mixin { add sourceSets.main, 'loki.refmap.json'; config 'loki.mixins.json' }
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+jar {
+    manifest { attributes('MixinConfigs': 'loki.mixins.json') }
+    finalizedBy 'reobfJar'
+}

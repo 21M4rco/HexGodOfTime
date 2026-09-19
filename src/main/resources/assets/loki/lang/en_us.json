@@ -1,0 +1,23 @@
+{
+  "itemGroup.loki": "Loki \u2014 Glorious Purpose",
+  "entity.loki.projection": "Loki",
+  "entity.loki.spell": "Sorcery",
+  "key.categories.loki": "Loki",
+  "item.loki.dagger": "Conjured Dagger",
+  "item.loki.laevateinn": "Laevateinn",
+  "item.loki.time_stick": "TVA Time Stick",
+  "key.loki.mastery": "Mastery Archive",
+  "key.loki.select": "Select Ability",
+  "key.loki.primary": "Cast Ability",
+  "key.loki.secondary": "Alternate Action",
+  "key.loki.transform": "Glorious Purpose",
+  "key.loki.release": "Release / Resume Time",
+  "subtitles.loki.sorcery": "Sorcery",
+  "subtitles.loki.illusion": "Illusion",
+  "subtitles.loki.teleport": "Teleport",
+  "subtitles.loki.time_slip": "Time slip",
+  "subtitles.loki.time_stop": "Time stop",
+  "subtitles.loki.time_resume": "Time resume",
+  "subtitles.loki.ascend": "Ascend",
+  "subtitles.loki.conjure": "Conjure"
+}
