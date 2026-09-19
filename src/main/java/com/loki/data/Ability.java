@@ -5,6 +5,7 @@ public enum Ability {
     PROJECTION_SWAP(MISCHIEF,120,0,100,"Sleight of Place","Swap with your nearest projection. Secondary: place a projection at your aim."),
     MASQUERADE(MISCHIEF,240,0,100,"Masquerade","Borrow a humanoid appearance. Secondary: remove your disguise."),
     MIRAGE(MISCHIEF,430,0,260,"Court of Lies","Scatter independent decoys and briefly vanish."),
+    FALSE_TERRAIN(MISCHIEF,650,0,240,"Borrowed Reality","Place false stonework in chosen viewers' sight. It has no physical collision."),
     BOLT(SORCERY,0,0,16,"Emerald Spark","A precise magical bolt. Secondary: a charged impact."),
     PUSH(SORCERY,70,0,70,"Sovereign Push","Repel nearby threats without destroying the landscape."),
     TELEKINESIS(SORCERY,140,0,35,"Invisible Hand","Aim to hold an entity. Secondary: throw. Utility: release."),

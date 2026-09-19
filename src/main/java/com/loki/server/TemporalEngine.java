@@ -17,10 +17,12 @@ public final class TemporalEngine {
     private static final List<Field> FIELDS=new ArrayList<>();
     private static final Map<UUID,Frozen> FROZEN=new HashMap<>();
     private static final Map<UUID,Long> PLAYER_GRACE=new HashMap<>();
-    private static final Set<UUID> SLOWED=new HashSet<>();
+    private static final Map<UUID,Entity> SLOWED=new HashMap<>();
+    private static final UUID DILATION_SPEED=UUID.fromString("65b293d4-1384-446d-902c-7a261ca31cf2");
     private static final int MAX_FIELDS=64,MAX_ENTITIES_PER_FIELD=192;
     public static boolean frozen(Entity e) {return FROZEN.containsKey(e.getUUID());}
-    public static boolean skipTick(Entity e) {return frozen(e)||(SLOWED.contains(e.getUUID())&&Math.floorMod(e.level().getGameTime()+e.getId(),5)!=0);}
+    public static boolean skipTick(Entity e) {return frozen(e)||(SLOWED.containsKey(e.getUUID())&&Math.floorMod(e.level().getGameTime()+e.getId(),5)!=0);}
+    public static boolean slowed(Entity e) {return SLOWED.containsKey(e.getUUID());}
     public static boolean owns(ServerPlayer p) {return FIELDS.stream().anyMatch(f->f.owner.equals(p.getUUID()));}
     public static boolean field(ServerPlayer p,boolean stop,Entity target,int ticks) {
         if(FIELDS.size()>=MAX_FIELDS)return false;
@@ -38,16 +40,19 @@ public final class TemporalEngine {
         long now=level.getGameTime();
         FIELDS.removeIf(f->f.level==level&&(f.expires<=now||level.getServer().getPlayerList().getPlayer(f.owner)==null||level.getServer().getPlayerList().getPlayer(f.owner).level()!=level||!level.getServer().getPlayerList().getPlayer(f.owner).isAlive()));
         Map<UUID,Long> desired=new HashMap<>();Map<UUID,Entity> entities=new HashMap<>();
-        SLOWED.removeIf(id->{Entity e=level.getEntity(id);return e!=null;});
+        Map<UUID,Entity> desiredSlow=new HashMap<>();
         for(Field f:FIELDS) {
             if(f.level!=level)continue;
             List<Entity> affected=f.target==null?level.getEntities((Entity)null,new AABB(f.center.subtract(f.radius,f.radius,f.radius),f.center.add(f.radius,f.radius,f.radius)),e->eligible(e,f)):Optional.ofNullable(level.getEntity(f.target)).filter(e->eligible(e,f)).map(List::of).orElse(List.of());
             int count=0;for(Entity e:affected) {
                 if(++count>MAX_ENTITIES_PER_FIELD)break;
                 entities.put(e.getUUID(),e);
-                if(f.stop)desired.merge(e.getUUID(),f.expires,Math::max);else SLOWED.add(e.getUUID());
+                if(f.stop)desired.merge(e.getUUID(),f.expires,Math::max);else desiredSlow.put(e.getUUID(),e);
             }
         }
+        Iterator<Map.Entry<UUID,Entity>> oldSlow=SLOWED.entrySet().iterator();
+        while(oldSlow.hasNext()){var e=oldSlow.next();if(e.getValue().level()==level&&!desiredSlow.containsKey(e.getKey())){slowSync(e.getValue(),false);oldSlow.remove();}}
+        for(var e:desiredSlow.entrySet())if(!SLOWED.containsKey(e.getKey())){SLOWED.put(e.getKey(),e.getValue());slowSync(e.getValue(),true);}
         Iterator<Map.Entry<UUID,Frozen>> it=FROZEN.entrySet().iterator();
         while(it.hasNext()) {var entry=it.next();Frozen s=entry.getValue();if(s.entity.level()!=level)continue;
             if(!desired.containsKey(entry.getKey())||s.entity.isRemoved()||s.entity instanceof ServerPlayer && now>=s.expires) {if(s.entity instanceof ServerPlayer){PLAYER_GRACE.put(entry.getKey(),now+100);desired.remove(entry.getKey());}restore(s);it.remove();}
@@ -74,6 +79,10 @@ public final class TemporalEngine {
         CompoundTag n=new CompoundTag();n.putBoolean("frozen",active);n.putDouble("x",s.position.x);n.putDouble("y",s.position.y);n.putDouble("z",s.position.z);n.putFloat("yaw",s.yaw);n.putFloat("pitch",s.pitch);n.putDouble("vx",s.velocity.x);n.putDouble("vy",s.velocity.y);n.putDouble("vz",s.velocity.z);return n;
     }
     private static void sync(Frozen s,boolean active) {LokiNetwork.tracking(s.entity,new LokiNetwork.Message(3,s.entity.getId(),tag(s,active)));}
-    public static void track(ServerPlayer viewer,Entity e) {Frozen s=FROZEN.get(e.getUUID());if(s!=null)LokiNetwork.to(viewer,new LokiNetwork.Message(3,e.getId(),tag(s,true)));}
-    public static void reset() {FROZEN.values().forEach(TemporalEngine::restore);FROZEN.clear();FIELDS.clear();SLOWED.clear();PLAYER_GRACE.clear();}
+    private static void slowSync(Entity e,boolean active) {
+        if(e instanceof ServerPlayer p){for(var type:List.of(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED,net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_SPEED)){var attr=p.getAttribute(type);if(attr!=null){attr.removeModifier(DILATION_SPEED);if(active)attr.addTransientModifier(new net.minecraft.world.entity.ai.attributes.AttributeModifier(DILATION_SPEED,"Temporal dilation",-.8,net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.MULTIPLY_TOTAL));}}}
+        CompoundTag n=new CompoundTag();n.putBoolean("slowed",active);LokiNetwork.tracking(e,new LokiNetwork.Message(7,e.getId(),n));
+    }
+    public static void track(ServerPlayer viewer,Entity e) {if(slowed(e)){CompoundTag n=new CompoundTag();n.putBoolean("slowed",true);LokiNetwork.to(viewer,new LokiNetwork.Message(7,e.getId(),n));}Frozen s=FROZEN.get(e.getUUID());if(s!=null)LokiNetwork.to(viewer,new LokiNetwork.Message(3,e.getId(),tag(s,true)));}
+    public static void reset() {FROZEN.values().forEach(TemporalEngine::restore);FROZEN.clear();FIELDS.clear();SLOWED.values().forEach(e->slowSync(e,false));SLOWED.clear();PLAYER_GRACE.clear();}
 }

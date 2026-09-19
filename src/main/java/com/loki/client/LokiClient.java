@@ -21,7 +21,7 @@ public final class LokiClient {
     public static final class ModBus {
         @SubscribeEvent public static void keys(RegisterKeyMappingsEvent e){for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE})e.register(k);}
         @SubscribeEvent public static void entities(EntityRenderersEvent.RegisterRenderers e){e.registerEntityRenderer(Loki.ILLUSION.get(),IllusionRenderer::new);e.registerEntityRenderer(Loki.PROJECTILE.get(),SpellRenderer::new);}
-        @SubscribeEvent public static void layers(EntityRenderersEvent.AddLayers e){for(String skin:e.getSkins()){var renderer=e.getSkin(skin);if(renderer!=null)renderer.addLayer(new LokiLayer(renderer));}}
+        @SubscribeEvent public static void layers(EntityRenderersEvent.AddLayers e){for(String skin:e.getSkins()){net.minecraft.client.renderer.entity.player.PlayerRenderer renderer=e.getSkin(skin);if(renderer!=null)renderer.addLayer(new LokiLayer(renderer));}}
         @SubscribeEvent public static void reload(RegisterClientReloadListenersEvent e){e.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)r->{LokiLayer.clear();WeaponRenderer.clear();TemporalScreen.close();});}
     }
     @Mod.EventBusSubscriber(modid=Loki.ID,value=Dist.CLIENT)

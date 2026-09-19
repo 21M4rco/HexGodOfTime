@@ -44,7 +44,7 @@ public final class LokiServer {
         long now=LokiData.now(p);
         if(action==5){if(now-INPUT.getOrDefault(p.getUUID(),-100L)<2)return;INPUT.put(p.getUUID(),now);if(value>=0&&value<Ability.values().length&&LokiData.unlocked(p,Ability.at(value)))LokiData.get(p).putInt("selected",value);LokiNetwork.sync(p);return;}
         if(TemporalEngine.frozen(p)||p.isSpectator())return;
-        if(now-INPUT.getOrDefault(p.getUUID(),-100L)<3)return;INPUT.put(p.getUUID(),now);
+        if(now-INPUT.getOrDefault(p.getUUID(),-100L)<(TemporalEngine.slowed(p)?15:3))return;INPUT.put(p.getUUID(),now);
         if(action==2){release(p,false);TemporalEngine.clear(p);return;}
         if(action==4){weapon(p,value!=0);return;}
         Ability a=action==3?Ability.ASCENSION:LokiData.selected(p);
@@ -80,6 +80,12 @@ public final class LokiServer {
                 String type=net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(t.getType()).toString();
                 if(!(t instanceof Player)&&!Set.of("minecraft:zombie","minecraft:skeleton","minecraft:villager","minecraft:pillager","minecraft:witch","minecraft:stray","minecraft:husk").contains(type)){notice(p,"Choose a humanoid target.");return false;}
                 CompoundTag d=new CompoundTag();d.putString("type",type);d.putUUID("uuid",t.getUUID());d.putLong("start",now);d.putLong("end",now+600);LokiData.get(p).put("disguise",d);gesture(p,"illusion","disguise",Loki.ILLUSION_SOUND.get());return true;
+            }
+            case FALSE_TERRAIN -> {
+                Vec3 location=safeAim(p,10);if(location==null)return false;CompoundTag n=new CompoundTag();n.putDouble("x",Math.floor(location.x));n.putDouble("y",Math.floor(location.y));n.putDouble("z",Math.floor(location.z));n.putLong("until",now+160);
+                if(t instanceof ServerPlayer viewer)LokiNetwork.to(viewer,new LokiNetwork.Message(8,p.getId(),n));
+                else for(ServerPlayer viewer:p.serverLevel().players())if(viewer.distanceToSqr(location)<1600)LokiNetwork.to(viewer,new LokiNetwork.Message(8,p.getId(),n));
+                gesture(p,"illusion","cast",Loki.ILLUSION_SOUND.get());return true;
             }
             case BOLT -> {SpellProjectile.cast(p,p.getEyePosition().add(look.scale(.5)),look,secondary?1:0,false);gesture(p,"bolt","cast",Loki.SORCERY.get());return true;}
             case PUSH -> {for(Entity e:p.level().getEntities(p,p.getBoundingBox().inflate(5),e->validTarget(p,e))) {Vec3 away=e.position().subtract(p.position()).normalize();e.setDeltaMovement(away.scale(1.1).add(0,.25,0));e.hurtMarked=true;}gesture(p,"push","push",Loki.SORCERY.get());return true;}
@@ -136,6 +142,8 @@ public final class LokiServer {
         long now=LokiData.now(p);CompoundTag d=LokiData.get(p);
         if(!p.isAlive())return;
         if(now%4==0&&!TemporalEngine.frozen(p)) {ArrayDeque<Moment> h=HISTORY.computeIfAbsent(p.getUUID(),k->new ArrayDeque<>());h.addLast(new Moment(p.position(),p.getYRot(),p.getXRot(),p.getHealth()));while(h.size()>50)h.removeFirst();}
+        int temporal=LokiData.mastery(p,Discipline.TEMPORAL);
+        if(now%200==0&&temporal<160&&LokiData.unlocked(p,Ability.TIME_SLIP)&&!TemporalEngine.frozen(p)&&!p.isPassenger()&&p.getRandom().nextInt(5)==0&&LokiData.energy(p)>=15&&LokiData.cooldown(p,Ability.TIME_SLIP)==0){if(cast(p,Ability.TIME_SLIP,false)){LokiData.spend(p,15);LokiData.get(p).putLong("cd_TIME_SLIP",now+400);reward(p,Discipline.TEMPORAL,120);}}
         if(now%20==0) {LokiData.energy(p,LokiData.energy(p)+(d.getBoolean("ascended")?4:2));LokiNetwork.sync(p);}
         if(d.contains("disguise")&&d.getCompound("disguise").getLong("end")<now){d.remove("disguise");LokiNetwork.sync(p);}
         if(now%5==0){for(LivingEntity e:p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(12),e->e.isAlive())){if(WATCHED.size()>256&&!WATCHED.containsKey(e.getUUID()))break;ArrayDeque<Vec3> q=WATCHED.computeIfAbsent(e.getUUID(),k->new ArrayDeque<>());q.addLast(e.position());while(q.size()>24)q.removeFirst();}}

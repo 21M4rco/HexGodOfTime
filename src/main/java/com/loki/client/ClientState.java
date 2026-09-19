@@ -10,6 +10,7 @@ import java.util.*;
 
 public final class ClientState {
     public static final Map<Integer,CompoundTag> PLAYERS=new HashMap<>();
+    public static final Set<Integer> SLOWED=new HashSet<>();
     public static final Map<Integer,CompoundTag> FROZEN=new HashMap<>();
     public static final Map<Integer,ThreadLink> THREADS=new HashMap<>();
     public record ThreadLink(int target,long until) {}
@@ -28,12 +29,14 @@ public final class ClientState {
                 if(m.data().getBoolean("frozen"))FROZEN.put(m.entity(),m.data());
                 else {FROZEN.remove(m.entity());Entity e=mc.level.getEntity(m.entity());if(e!=null)e.setDeltaMovement(m.data().getDouble("vx"),m.data().getDouble("vy"),m.data().getDouble("vz"));}
             }
+            case 8 -> WorldEffects.terrain(m.data());
+            case 7 -> {if(m.data().getBoolean("slowed"))SLOWED.add(m.entity());else SLOWED.remove(m.entity());}
             case 5 -> WorldEffects.memory(m.entity(),m.data());
             case 6 -> THREADS.put(m.entity(),new ThreadLink(m.data().getInt("target"),m.data().getLong("until")));
         }
     }
     public static void tick() {
-        var mc=Minecraft.getInstance();if(mc.level!=world){PLAYERS.clear();FROZEN.clear();THREADS.clear();WorldEffects.clear();LokiSkin.clear();LokiLayer.clear();TemporalScreen.close();world=mc.level;}
+        var mc=Minecraft.getInstance();if(mc.level!=world){PLAYERS.clear();FROZEN.clear();SLOWED.clear();THREADS.clear();WorldEffects.clear();LokiSkin.clear();LokiLayer.clear();TemporalScreen.close();world=mc.level;}
         if(mc.level==null)return;
         FROZEN.forEach((id,n)->{Entity e=mc.level.getEntity(id);if(e!=null){e.setPos(n.getDouble("x"),n.getDouble("y"),n.getDouble("z"));e.setYRot(n.getFloat("yaw"));e.setXRot(n.getFloat("pitch"));e.setDeltaMovement(Vec3.ZERO);e.xo=e.getX();e.yo=e.getY();e.zo=e.getZ();e.yRotO=e.getYRot();e.xRotO=e.getXRot();}});
         if(now()%100==0){PLAYERS.keySet().removeIf(id->mc.level.getEntity(id)==null);FROZEN.keySet().removeIf(id->mc.level.getEntity(id)==null);}

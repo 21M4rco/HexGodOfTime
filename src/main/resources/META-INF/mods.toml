@@ -22,6 +22,6 @@ side="BOTH"
 [[dependencies.loki]]
 modId="playeranimator"
 mandatory=true
-versionRange="[1.0.2,)"
+versionRange="[1.0.0,)"
 ordering="AFTER"
 side="CLIENT"
