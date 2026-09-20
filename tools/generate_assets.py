@@ -14,7 +14,7 @@ from pathlib import Path
 import math, json, random, wave, struct, subprocess
 from PIL import Image
 
-ROOT = Path(__file__).resolve().parents[1] / 'src/main/resources/assets/loki'
+ROOT = Path(__file__).resolve().parents[1] / 'src/main/resources/assets/hexgodofstories'
 for directory in ['models', 'models/item', 'textures', 'textures/particle', 'sounds', 'player_animation', 'particles']:
     (ROOT / directory).mkdir(parents=True, exist_ok=True)
 
@@ -68,7 +68,7 @@ class Mesh:
                   [radius * .25, radius, radius, radius * .3], group, band, sides)
 
     def save(self, name):
-        lines = ['# Loki authored geometry: item-model units, grip at origin, blade toward +Y.']
+        lines = ['# HexGodOfStories authored geometry: item-model units, grip at origin, blade toward +Y.']
         lines += ['v %.6f %.6f %.6f' % p for p in self.v]
         lines += ['vt %.6f %.6f' % p for p in self.uv]
         group = None
@@ -87,7 +87,7 @@ def grip_wrap(mesh, low, high, radius, group='grip_wire', band=2, turns=9):
                   [radius * .17] * 13, group, band, 6)
 
 
-# Loki's dagger: a broad leaf blade, swept quillons and a wrapped grip.
+# The conjured dagger: a broad leaf blade, swept quillons and a wrapped grip.
 dagger = Mesh()
 dagger.blade([(.060, .050, .048, 0, 0),
               (.115, .073, .046, 0, 0),
@@ -220,7 +220,7 @@ def sprite(name, size, painter):
             if px:
                 im.putpixel((x, y), px)
     im.save(ROOT / f'textures/particle/{name}.png')
-    (ROOT / f'particles/{name}.json').write_text(json.dumps({'textures': [f'loki:{name}']}, indent=2) + '\n')
+    (ROOT / f'particles/{name}.json').write_text(json.dumps({'textures': [f'hexgodofstories:{name}']}, indent=2) + '\n')
 
 
 def soft(colour, power=2.4, core=1.0):
@@ -283,7 +283,7 @@ def animation(name, frames, end=30, loop=False):
         if body is not None:
             move['torso'] = {'pitch': body[0], 'yaw': body[1], 'roll': body[2]}
         moves.append(move)
-    content = {'version': 3, 'name': name, 'author': 'LokiGPT',
+    content = {'version': 3, 'name': name, 'author': 'HexGodOfStories',
                'description': 'Layered upper-body gesture; locomotion remains available.',
                'emote': {'beginTick': 0, 'endTick': end, 'stopTick': end, 'isLoop': loop,
                          'returnTick': 10, 'degrees': True, 'moves': moves}}
@@ -354,7 +354,7 @@ for kind in ['dagger', 'twin', 'sword']:
 # These are event references, preserving sample variation and user resource-pack overrides.
 sound_events = {'rift_open': ('block.glass.break', 0.95, 0.92), 'rift_close': ('block.glass.break', 0.48, 1.18), 'blade_swing': ('entity.player.attack.sweep', 0.8, 1.0), 'blade_throw': ('item.trident.throw', 0.7, 1.16), 'blade_hit': ('item.trident.hit', 0.75, 1.08), 'blade_embed': ('item.trident.hit_ground', 0.7, 0.92), 'conjure': ('item.armor.equip_iron', 0.65, 1.16), 'illusion': ('entity.player.attack.sweep', 0.42, 0.72), 'sorcery': ('entity.evoker.cast_spell', 0.4, 0.92), 'teleport': ('item.chorus_fruit.teleport', 0.38, 1.0), 'time_stop': ('block.beacon.deactivate', 0.36, 0.78), 'time_resume': ('block.beacon.activate', 0.32, 0.92), 'time_slip': ('item.chorus_fruit.teleport', 0.36, 0.8), 'ascend': ('item.armor.equip_netherite', 0.75, 0.82), 'branch_hum': ('block.beacon.ambient', 0.9, 0.55), 'branch_resonance': ('block.conduit.ambient', 0.9, 0.7), 'branch_shimmer': ('block.amethyst_block.resonate', 0.8, 1.35), 'branch_pressure': ('entity.warden.heartbeat', 1.0, 0.6), 'branch_crackle': ('block.amethyst_cluster.hit', 0.7, 1.4), 'branch_ready': ('block.beacon.power_select', 1.0, 1.25), 'branch_open': ('block.end_portal.spawn', 1.0, 0.8), 'branch_release': ('entity.ender_dragon.growl', 1.0, 0.85), 'branch_roar': ('block.portal.ambient', 1.0, 0.5), 'branch_erase': ('entity.elder_guardian.curse', 0.8, 1.35), 'meteor_burn': ('entity.blaze.burn', 1.0, 0.55), 'meteor_roar': ('entity.lightning_bolt.thunder', 1.0, 0.45), 'meteor_impact': ('entity.generic.explode', 1.0, 0.6), 'grip_hold': ('block.beacon.ambient', 0.55, 1.5), 'emerald_cast': ('entity.illusioner.cast_spell', 0.7, 1.1)}
 (ROOT / 'sounds.json').write_text(json.dumps({
-    name: {'subtitle': 'subtitles.loki.' + name, 'sounds': [{
+    name: {'subtitle': 'subtitles.hexgodofstories.' + name, 'sounds': [{
         'name': 'minecraft:' + event, 'type': 'event', 'volume': volume, 'pitch': pitch}]}
     for name, (event, volume, pitch) in sound_events.items()
 }, indent=2) + '\n')
@@ -368,8 +368,8 @@ subtitles = {
 }
 langpath = ROOT / 'lang/en_us.json'
 lang = json.loads(langpath.read_text())
-lang = {k: v for k, v in lang.items() if not k.startswith('subtitles.loki.')}
-lang.update({'subtitles.loki.' + k: v for k, v in subtitles.items()})
+lang = {k: v for k, v in lang.items() if not k.startswith('subtitles.hexgodofstories.')}
+lang.update({'subtitles.hexgodofstories.' + k: v for k, v in subtitles.items()})
 langpath.write_text(json.dumps(lang, indent=2, sort_keys=True) + '\n')
 
 print(f'Generated 5 authored meshes, 6 particle sprites, {len(list((ROOT/"player_animation").glob("*.json")))} animations '

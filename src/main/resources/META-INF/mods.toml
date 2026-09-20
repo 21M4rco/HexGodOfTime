@@ -2,24 +2,24 @@ modLoader="javafml"
 loaderVersion="[47,)"
 license="All Rights Reserved"
 [[mods]]
-modId="loki"
-version="0.3.2"
-displayName="Loki — Glorious Purpose"
+modId="hexgodofstories"
+version="0.5.0"
+displayName="HexGodOfStories"
 authors="21M4rco"
-description='''Deception, sorcery and temporal mastery. Become the keeper of time.'''
-[[dependencies.loki]]
+description='''Illusion, sorcery, conjuration and command of time. Powers are granted by an operator with /hgos, never by default.'''
+[[dependencies.hexgodofstories]]
 modId="forge"
 mandatory=true
 versionRange="[47.4.10,)"
 ordering="NONE"
 side="BOTH"
-[[dependencies.loki]]
+[[dependencies.hexgodofstories]]
 modId="minecraft"
 mandatory=true
 versionRange="[1.20.1,1.20.2)"
 ordering="NONE"
 side="BOTH"
-[[dependencies.loki]]
+[[dependencies.hexgodofstories]]
 modId="playeranimator"
 mandatory=true
 versionRange="[1.0.0,)"

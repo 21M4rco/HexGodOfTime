@@ -1,0 +1,111 @@
+{
+  "version": 3,
+  "name": "unleash",
+  "author": "HexGodOfStories",
+  "description": "Planted stance, both arms extended forward, containing the Time Branches between the hands.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 40,
+    "stopTick": 40,
+    "isLoop": true,
+    "returnTick": 10,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -93,
+          "yaw": -13,
+          "roll": -6
+        },
+        "leftArm": {
+          "pitch": -93,
+          "yaw": 13,
+          "roll": 6
+        },
+        "torso": {
+          "pitch": -4,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 10,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -96,
+          "yaw": -11,
+          "roll": -9
+        },
+        "leftArm": {
+          "pitch": -96,
+          "yaw": 11,
+          "roll": 9
+        },
+        "torso": {
+          "pitch": -5,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 20,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -90,
+          "yaw": -15,
+          "roll": -3
+        },
+        "leftArm": {
+          "pitch": -90,
+          "yaw": 15,
+          "roll": 3
+        },
+        "torso": {
+          "pitch": -3,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 30,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -95,
+          "yaw": -12,
+          "roll": -8
+        },
+        "leftArm": {
+          "pitch": -95,
+          "yaw": 12,
+          "roll": 8
+        },
+        "torso": {
+          "pitch": -5,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 40,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -93,
+          "yaw": -13,
+          "roll": -6
+        },
+        "leftArm": {
+          "pitch": -93,
+          "yaw": 13,
+          "roll": 6
+        },
+        "torso": {
+          "pitch": -4,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "targets": [
+    "hexgodofstories_swap"
+  ],
+  "passes": [
+    {
+      "name": "hexgodofstories:temporal",
+      "intarget": "minecraft:main",
+      "outtarget": "hexgodofstories_swap"
+    },
+    {
+      "name": "blit",
+      "intarget": "hexgodofstories_swap",
+      "outtarget": "minecraft:main"
+    }
+  ]
+}

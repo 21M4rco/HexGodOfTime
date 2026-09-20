@@ -11,7 +11,7 @@ import pathlib
 import struct
 import zlib
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent / 'src/main/resources/assets/loki'
+ROOT = pathlib.Path(__file__).resolve().parent.parent / 'src/main/resources/assets/hexgodofstories'
 (ROOT / 'textures/particle').mkdir(parents=True, exist_ok=True)
 (ROOT / 'particles').mkdir(parents=True, exist_ok=True)
 
@@ -72,7 +72,7 @@ def sprite(name, size, painter, register=True):
     # stay a standalone texture so a render type can bind it directly.
     write_png(ROOT / (f'textures/particle/{name}.png' if register else f'textures/{name}.png'), size, pixels)
     if register:
-        (ROOT / f'particles/{name}.json').write_text(json.dumps({'textures': [f'loki:{name}']}, indent=2) + '\n')
+        (ROOT / f'particles/{name}.json').write_text(json.dumps({'textures': [f'hexgodofstories:{name}']}, indent=2) + '\n')
 
 
 def clamp8(v):

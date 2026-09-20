@@ -13,9 +13,9 @@ Reusable systems retained and adapted:
 - Segmented cloth solver with constraints; movement-derived wind and teleport resets added.
 - Authored quad OBJ loader, UVs, normals and deformation interface.
 
-Gameplay controllers, ability definitions, commands, sounds, original models, packet registrations, cinematics, items, HUD and menus were not carried into the runtime. The replacement registers only `loki` content. No base-mod binary is required or bundled.
+Gameplay controllers, ability definitions, commands, sounds, original models, packet registrations, cinematics, items, HUD and menus were not carried into the runtime. The replacement registers only `hgos` content. No base-mod binary is required or bundled.
 
-Player Animator remains because its tested integration supplies layered motion. The other libraries are omitted because the current Loki systems use the custom mesh, cloth and post-processing pipelines directly; there is no benefit in requiring unused dependencies.
+Player Animator remains because its tested integration supplies layered motion. The other libraries are omitted because the current systems use the custom mesh, cloth and post-processing pipelines directly; there is no benefit in requiring unused dependencies.
 
 The supplied Kagune archive is a sound-patch package with compiled JARs, rather than a complete normal Java source project. Its character models and sound content were not needed for this conversion.
 

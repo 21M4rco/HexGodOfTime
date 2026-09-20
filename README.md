@@ -1,3 +1,13 @@
+## 0.5.0 — HexGodOfStories
+
+- **The mod is now HexGodOfStories.** Mod id, package, assets, keybinding category, creative tab and the command root all move: every command is `/hgos ...`. Existing saves are carried across — progression, unlocks, quick bars, sanctum plots and pending world restores are read from their old names once and rewritten under the new one, so nothing is lost and nothing is regenerated.
+- **A new world grants nothing.** No HUD, no archive, no quick bar, no keys, no progression. Powers exist only after an operator runs `/hgos unlock <player> on`, and a player who has not been granted them accrues no mastery at all, not even silently. `/hgos unlock <player> off` takes everything back down again.
+- **Borrowed Reality is a wall, in four sizes.** Hold the cast key and it grows Small → Medium → Big → Massive; release to commit whichever size it reached. The four previous building designs are gone.
+- **Illusory walls stopped drifting.** The courses are drawn into their own buffer and flushed inside the camera transform that positioned them, instead of being left for Minecraft to flush later under a different matrix — which is what made them slide out of place as you turned. Each block is also lit from where it stands rather than full-bright, so borrowed stone sits in the scene's own light.
+- **Creatures believe the wall.** Pathfinding treats its columns — and two courses of clearance above them — as blocked, so mobs walk around it and never try to cross the parapet. Sight is stopped at its face, so a hunter that loses you behind one forgets you the way it would behind real masonry. A mob that walks into one is turned back. Players still pass straight through: it is your lie, and it has no collision.
+- **The quick slots say what is bound to them.** The archive's eight slots are two rows of four, each printing its number and the ability's full name, with the discipline's colour on its edge and a marker on the one currently selected. The in-game bar lists all eight by name with their recovery, and the readout names the slot the shown ability answers to.
+- **No portal is left standing after an arrival.** A break now closes behind the traveller who opened it, a break is searched for across every level rather than only the one its caster is standing in — which is how one used to survive the crossing — and nothing can open a break in the tick or two after an arrival. An arrival is particles around where you land, and nothing else.
+
 ## 0.4.1 — Fracture modes, honest exits and a sanctum that fights back
 
 - **The alternate key now configures the Fracture; the cast key runs it.** With the Fracture selected **and standing in your sanctum**, the alternate key opens a mode selector. Out in the world there is nothing to choose — the break leads one place, in — so the selector stays shut and the cast key is the whole control. What you pick there is saved and stays saved — through casts, dimension changes, death and a server restart — until you deliberately open the selector and pick something else. The cast key just does whatever is currently saved, as often as you press it. Every other spell keeps its ordinary alternate action.
@@ -34,15 +44,15 @@
 - A thick carved throne, solid seat, wide stair approach, armrests and horned root crown. Right-click the seat to sit; sneak to stand.
 - Existing plot coordinates and return sigils stay in place. V3 generation checkpoints resume after restart. The upgrade replaces matching old generated states and leaves other occupied blocks alone. Blocks a player placed that exactly match the original generated block at the same position cannot be distinguished from the original.
 
-Install the normal `loki-0.3.0.jar` from **Build Loki**; `loki-0.3.0-sources.jar` contains source code. The mod still targets Forge 1.20.1 and retains its existing Player Animator dependency. Client/server playtesting remains necessary; compilation does not certify visual or multiplayer behavior.
+Install the normal `hexgodofstories-0.3.0.jar` from **Build HexGodOfStories**; `hexgodofstories-0.3.0-sources.jar` contains source code. The mod still targets Forge 1.20.1 and retains its existing Player Animator dependency. Client/server playtesting remains necessary; compilation does not certify visual or multiplayer behavior.
 
-# Loki — Glorious Purpose
+# HexGodOfStories
 
 Minecraft **1.20.1**, Forge **47.4.10**, Java **17**. This is a development build, not a certified final release.
 
 ## Installation and build
 
-Install Player Animator **1.0.2-rc1+1.20** (CurseForge file 4587214) on clients. Put the Loki JAR on the server and each client. Run `gradle build` with Gradle 8.8, or download the mod artifact from the **Build Loki** GitHub Action. The server does not need a graphics context.
+Install Player Animator **1.0.2-rc1+1.20** (CurseForge file 4587214) on clients. Put the HexGodOfStories JAR on the server and each client. Run `gradle build` with Gradle 8.8, or download the mod artifact from the **Build HexGodOfStories** GitHub Action. The server does not need a graphics context.
 
 ## Controls
 
@@ -61,7 +71,7 @@ Install Player Animator **1.0.2-rc1+1.20** (CurseForge file 4587214) on clients.
 | Wheel *(while gripping)* | Push or pull what telekinesis is holding |
 | Attack / Use with a conjured weapon | Combination / dagger throw or artifact action |
 
-Key mappings are configurable. Free your hands before conjuring. Successful spell use trains its discipline; training is rate limited. Temporal progression opens after 600 combined mastery in the four magical disciplines. Glorious Purpose opens after 800 Temporal Mastery.
+Nobody has powers until an operator grants them: `/hgos unlock <player> on`. Until then the mod shows no HUD, opens no screen, answers no key and records no progression. Key mappings are configurable. Free your hands before conjuring. Successful spell use trains its discipline; training is rate limited. Temporal progression opens after 600 combined mastery in the four magical disciplines. Glorious Purpose opens after 800 Temporal Mastery.
 
 The quick bar holds eight shortcuts. It fills itself as abilities unlock; to place one deliberately, open the archive, click a quick slot at the bottom, then click the ability you want bound there.
 
@@ -71,7 +81,7 @@ The four time controls are not shortcuts and never enter the quick bar. They are
 
 - **Living Projection** — a decoy that looks, moves and fights like you, down to the name tag. It hunts hostile creatures and anyone who has attacked you, without being told. Creatures choosing between you and your copies cannot tell which is which: the choice is made on distance, sight and who has been hurting them, and never on which one is breathing. Its secondary sends every projection at whatever you are aiming at, or dismisses them all if you aim at nothing.
 - **Invisible Hand** — hold entities and dropped items on a damped spring, several at once with mastery. The wheel pushes and pulls; the secondary hurls, and whatever you hurl takes the impact it was carrying.
-- **Borrowed Reality** — hold the cast key and a false building grows where you aim. It has no collision and is never placed in the world: viewers are handed a design and build the geometry locally, so it can be shown to one chosen pair of eyes.
+- **Borrowed Reality** — hold the cast key and a wall grows where you aim, through Small, Medium, Big and Massive. No block is ever placed: viewers are handed an origin, a size and a seed and build the courses locally, while the server keeps the same columns in memory so that everything which is not a player treats the wall as masonry — mobs path around it, lose sight of you behind it and are turned back when they walk into it. You walk through your own lie; the alternate key dismisses it.
 - **Fracture** — shatters the air where you look. From the outside it leads one place: in, taking anything beside you with it if you hold the key. From inside, where the break leads is chosen in the selector on the alternate key and stays chosen: a named player, whoever is nearest, the Nether, your bed, or the place you left. The break holds for seven seconds, and anything that walks through it follows your destination rather than its own history. Inside your sanctum you cannot be hit, and the island throws falling stars at anyone who tries.
 - **Twin Deceivers** — two daggers, the off hand reversed. Thrown blades fly point-first, bury themselves in what they hit and open bleeding wounds before dissolving.
 - **Masquerade** — wear any living thing in the game, vanilla or modded, keeping that individual creature's variant, colour, size and carried gear rather than its species' default. Creatures read the shape and mostly ignore it, until you attack one.
@@ -80,7 +90,14 @@ The four time controls are not shortcuts and never enter the quick bar. They are
 
 ## Development commands
 
-All commands require operator permission level 2 and use `/loki <player> ...`:
+All commands require operator permission level 2.
+
+Granting and revoking powers:
+
+- `/hgos unlock <player> on` — grant this player their powers
+- `/hgos unlock <player> off` — take them back, tearing down anything they had standing
+
+Everything else takes the player first, as `/hgos <player> ...`:
 
 - `set <discipline> <0..1000>` / `add <discipline> <0..1000>`
 - `unlock <ability>` / `unlock all`
@@ -91,7 +108,7 @@ All commands require operator permission level 2 and use `/loki <player> ...`:
 - `status`
 - `reset`
 
-Example: `/loki @s unlock all`, then `/loki @s transform true`.
+Example: `/hgos @s unlock all`, then `/hgos @s transform true`.
 
 ## Architecture
 
@@ -105,7 +122,7 @@ The server owns mastery, cooldowns, spells, held targets, projection navigation 
 
 **Time.** Fields query bounded local volumes, cap their entity count and retain independent ownership. World tick rate never changes. The world, inventories, blocks and other players' health are never rewound. Temporal history is limited to 50 position/rotation/health samples per player. Players receive at most three seconds of suspension followed by a five-second protection window. Creative and spectator players are exempt.
 
-**Sanctum.** `loki:pocket` is a void dimension defined by datapack. Plots are allocated once per player and remembered in that dimension's saved data; the platform around the arrival point is laid immediately and the remainder is built across the following ticks, budgeted per tick. The way home is stored outside the transient state block so a dimension change cannot erase it.
+**Sanctum.** `hexgodofstories:pocket` is a void dimension defined by datapack. Plots are allocated once per player and remembered in that dimension's saved data; the platform around the arrival point is laid immediately and the remainder is built across the following ticks, budgeted per tick. The way home is stored outside the transient state block so a dimension change cannot erase it.
 
 Meshes, textures, particle sprites, animation keyframes and original synthesised audio are reproducible through `python tools/generate_assets.py` (Pillow and ffmpeg required only for regenerating assets). No audio is sampled from film or game sources.
 

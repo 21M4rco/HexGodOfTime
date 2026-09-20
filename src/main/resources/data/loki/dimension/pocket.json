@@ -1,9 +1,9 @@
 {
-  "type": "loki:pocket",
+  "type": "hexgodofstories:pocket",
   "generator": {
     "type": "minecraft:flat",
     "settings": {
-      "biome": "loki:pocket",
+      "biome": "hexgodofstories:pocket",
       "lakes": false,
       "features": false,
       "structure_overrides": [],

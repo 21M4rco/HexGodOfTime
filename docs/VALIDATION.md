@@ -5,7 +5,7 @@
 - Source foundation pinned and inspected before any change.
 - Runtime source and registration scan for obsolete gameplay identity.
 - Procedural asset generation executed successfully: 5 authored meshes, 6 particle sprites, 25 animations, 14 original sounds.
-- Java/Forge compilation through the **Build Loki** GitHub Action, which is the only compiler available to this project's working environment.
+- Java/Forge compilation through the **Build HexGodOfStories** GitHub Action, which is the only compiler available to this project's working environment.
 
 ## Not verified
 
@@ -73,7 +73,7 @@ Base: `f747e44d518200504785e7400bca49722646f390` (Actions run `35513523267`, the
 
 ### Verified in this environment
 
-- Java/Forge compilation through the **Build Loki** GitHub Action, which remains the only compiler reachable from here: the Forge and CurseForge Maven hosts are blocked by this environment's network policy, so no local Gradle build is possible.
+- Java/Forge compilation through the **Build HexGodOfStories** GitHub Action, which remains the only compiler reachable from here: the Forge and CurseForge Maven hosts are blocked by this environment's network policy, so no local Gradle build is possible.
 - `verifyRealmShape` still passes as part of `check`; realm generation was not touched.
 - The four new particle sheets and the ground-blood decal regenerate deterministically from `tools/generate_vfx_sprites.py`, which needs no third-party imaging library, and every emitted PNG was decoded and checked for a correct header, CRC and pixel count.
 - Cloth invariants are enforced in code rather than asserted by eye: `TemporalCloth.contain` clamps every node against both its parent and the shoulder seam after each solver pass, `node` re-applies the seam clamp to the interpolated grid, and `BodyFrame` refuses a torso matrix that is non-finite, near-singular or scaled outside a sane range. A cloak longer than its own length is therefore unreachable, not merely unlikely.
@@ -105,7 +105,7 @@ Base: the 0.4.0 branch head, Actions run `35516710856`.
 
 ### Verified in this environment
 
-- Compilation through the **Build Loki** Action, again the only compiler reachable here.
+- Compilation through the **Build HexGodOfStories** Action, again the only compiler reachable here.
 - The return bug is fixed at its cause rather than patched at its symptom: `PocketRealm.cross` no longer reads a travelling entity's own saved capture point on the way out. A break carries one `FractureAnchor`, resolved from the owner's mode when it was struck, and owner and cargo both use it. There is no code path left that can send a transported entity to where it was seized.
 - Mode state is player NBT and the packet carries an index plus an optional UUID; the server resolves and validates every destination, so a client cannot name one.
 - Starfall contains no explosion call and no block write of any kind, so terrain damage is structurally impossible rather than merely configured off.
@@ -137,7 +137,7 @@ the start of this task.
 
 **Verified through the GitHub Action, not locally.** The network policy in the editing environment refuses
 `maven.minecraftforge.net` and `repo.spongepowered.org` (the proxy answers `403` to `CONNECT`), so
-ForgeGradle cannot resolve there and `gradle compileJava` fails before reaching javac. The **Build Loki**
+ForgeGradle cannot resolve there and `gradle compileJava` fails before reaching javac. The **Build HexGodOfStories**
 Action is this project's only compiler.
 
 `gradle --no-daemon build` passes on the Action: `compileJava`, the mixin annotation processor and refmap,
@@ -147,7 +147,7 @@ factory is private in 1.20.1, replaced with the public `DamageSource` constructo
 Remaining output is pre-existing deprecation warnings only.
 
 Source-level checks also performed in the editing environment: brace/paren balance across all sources;
-every `Loki.*` registry reference resolved against `Loki.java`; call-site name and arity cross-check
+every `HexGodOfStories.*` registry reference resolved against `HexGodOfStories.java`; call-site name and arity cross-check
 against the classes added by this patch; and a review of each Minecraft and Forge symbol used against
 1.20.1 signatures.
 
@@ -155,7 +155,7 @@ Compiling is not playing, so everything under **Not verified** below still stand
 
 ### Design decisions worth knowing
 
-- **One source of geometry.** `com.loki.data.BranchCharge` holds the charge stages, focus point, radii,
+- **One source of geometry.** `com.hexgodofstories.data.BranchCharge` holds the charge stages, focus point, radii,
   travel speed and timings. Both the server's hit volume and the client's picture are derived from it, so
   nothing can be erased outside the drawn torrent and nothing inside it can survive. `SoftTerrain.cylinder`
   is likewise shared, so the blocks the server removes are the same list, in the same order, that the client
@@ -222,7 +222,7 @@ Nothing below has had one. None of it should be described as working.
 ## 0.4.1 — Full penetration, Nothingness and restoration
 
 Base: `6dd90e8`. The beam no longer collides with the world at all, its reach is 100 blocks, everything it
-passes through is temporarily replaced with `loki:nothingness`, and the world is restored about thirty
+passes through is temporarily replaced with `hexgodofstories:nothingness`, and the world is restored about thirty
 seconds after the torrent ends.
 
 ### What the restoration guarantees, and why

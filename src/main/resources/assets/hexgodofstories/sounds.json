@@ -1,0 +1,321 @@
+{
+  "rift_open": {
+    "subtitle": "subtitles.hexgodofstories.rift_open",
+    "sounds": [
+      {
+        "name": "minecraft:block.glass.break",
+        "type": "event",
+        "volume": 0.95,
+        "pitch": 0.92
+      }
+    ]
+  },
+  "rift_close": {
+    "subtitle": "subtitles.hexgodofstories.rift_close",
+    "sounds": [
+      {
+        "name": "minecraft:block.glass.break",
+        "type": "event",
+        "volume": 0.48,
+        "pitch": 1.18
+      }
+    ]
+  },
+  "blade_swing": {
+    "subtitle": "subtitles.hexgodofstories.blade_swing",
+    "sounds": [
+      {
+        "name": "minecraft:entity.player.attack.sweep",
+        "type": "event",
+        "volume": 0.8,
+        "pitch": 1.0
+      }
+    ]
+  },
+  "blade_throw": {
+    "subtitle": "subtitles.hexgodofstories.blade_throw",
+    "sounds": [
+      {
+        "name": "minecraft:item.trident.throw",
+        "type": "event",
+        "volume": 0.7,
+        "pitch": 1.16
+      }
+    ]
+  },
+  "blade_hit": {
+    "subtitle": "subtitles.hexgodofstories.blade_hit",
+    "sounds": [
+      {
+        "name": "minecraft:item.trident.hit",
+        "type": "event",
+        "volume": 0.75,
+        "pitch": 1.08
+      }
+    ]
+  },
+  "blade_embed": {
+    "subtitle": "subtitles.hexgodofstories.blade_embed",
+    "sounds": [
+      {
+        "name": "minecraft:item.trident.hit_ground",
+        "type": "event",
+        "volume": 0.7,
+        "pitch": 0.92
+      }
+    ]
+  },
+  "conjure": {
+    "subtitle": "subtitles.hexgodofstories.conjure",
+    "sounds": [
+      {
+        "name": "minecraft:item.armor.equip_iron",
+        "type": "event",
+        "volume": 0.65,
+        "pitch": 1.16
+      }
+    ]
+  },
+  "illusion": {
+    "subtitle": "subtitles.hexgodofstories.illusion",
+    "sounds": [
+      {
+        "name": "minecraft:entity.player.attack.sweep",
+        "type": "event",
+        "volume": 0.42,
+        "pitch": 0.72
+      }
+    ]
+  },
+  "sorcery": {
+    "subtitle": "subtitles.hexgodofstories.sorcery",
+    "sounds": [
+      {
+        "name": "minecraft:entity.evoker.cast_spell",
+        "type": "event",
+        "volume": 0.4,
+        "pitch": 0.92
+      }
+    ]
+  },
+  "teleport": {
+    "subtitle": "subtitles.hexgodofstories.teleport",
+    "sounds": [
+      {
+        "name": "minecraft:item.chorus_fruit.teleport",
+        "type": "event",
+        "volume": 0.38,
+        "pitch": 1.0
+      }
+    ]
+  },
+  "time_stop": {
+    "subtitle": "subtitles.hexgodofstories.time_stop",
+    "sounds": [
+      {
+        "name": "minecraft:block.beacon.deactivate",
+        "type": "event",
+        "volume": 0.36,
+        "pitch": 0.78
+      }
+    ]
+  },
+  "time_resume": {
+    "subtitle": "subtitles.hexgodofstories.time_resume",
+    "sounds": [
+      {
+        "name": "minecraft:block.beacon.activate",
+        "type": "event",
+        "volume": 0.32,
+        "pitch": 0.92
+      }
+    ]
+  },
+  "time_slip": {
+    "subtitle": "subtitles.hexgodofstories.time_slip",
+    "sounds": [
+      {
+        "name": "minecraft:item.chorus_fruit.teleport",
+        "type": "event",
+        "volume": 0.36,
+        "pitch": 0.8
+      }
+    ]
+  },
+  "ascend": {
+    "subtitle": "subtitles.hexgodofstories.ascend",
+    "sounds": [
+      {
+        "name": "minecraft:item.armor.equip_netherite",
+        "type": "event",
+        "volume": 0.75,
+        "pitch": 0.82
+      }
+    ]
+  },
+  "branch_hum": {
+    "subtitle": "subtitles.hexgodofstories.branch_hum",
+    "sounds": [
+      {
+        "name": "minecraft:block.beacon.ambient",
+        "type": "event",
+        "volume": 0.9,
+        "pitch": 0.55
+      }
+    ]
+  },
+  "branch_resonance": {
+    "subtitle": "subtitles.hexgodofstories.branch_resonance",
+    "sounds": [
+      {
+        "name": "minecraft:block.conduit.ambient",
+        "type": "event",
+        "volume": 0.9,
+        "pitch": 0.7
+      }
+    ]
+  },
+  "branch_shimmer": {
+    "subtitle": "subtitles.hexgodofstories.branch_shimmer",
+    "sounds": [
+      {
+        "name": "minecraft:block.amethyst_block.resonate",
+        "type": "event",
+        "volume": 0.8,
+        "pitch": 1.35
+      }
+    ]
+  },
+  "branch_pressure": {
+    "subtitle": "subtitles.hexgodofstories.branch_pressure",
+    "sounds": [
+      {
+        "name": "minecraft:entity.warden.heartbeat",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 0.6
+      }
+    ]
+  },
+  "branch_crackle": {
+    "subtitle": "subtitles.hexgodofstories.branch_crackle",
+    "sounds": [
+      {
+        "name": "minecraft:block.amethyst_cluster.hit",
+        "type": "event",
+        "volume": 0.7,
+        "pitch": 1.4
+      }
+    ]
+  },
+  "branch_ready": {
+    "subtitle": "subtitles.hexgodofstories.branch_ready",
+    "sounds": [
+      {
+        "name": "minecraft:block.beacon.power_select",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 1.25
+      }
+    ]
+  },
+  "branch_open": {
+    "subtitle": "subtitles.hexgodofstories.branch_open",
+    "sounds": [
+      {
+        "name": "minecraft:block.end_portal.spawn",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 0.8
+      }
+    ]
+  },
+  "branch_release": {
+    "subtitle": "subtitles.hexgodofstories.branch_release",
+    "sounds": [
+      {
+        "name": "minecraft:entity.ender_dragon.growl",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 0.85
+      }
+    ]
+  },
+  "branch_roar": {
+    "subtitle": "subtitles.hexgodofstories.branch_roar",
+    "sounds": [
+      {
+        "name": "minecraft:block.portal.ambient",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 0.5
+      }
+    ]
+  },
+  "branch_erase": {
+    "subtitle": "subtitles.hexgodofstories.branch_erase",
+    "sounds": [
+      {
+        "name": "minecraft:entity.elder_guardian.curse",
+        "type": "event",
+        "volume": 0.8,
+        "pitch": 1.35
+      }
+    ]
+  },
+  "meteor_burn": {
+    "subtitle": "subtitles.hexgodofstories.meteor_burn",
+    "sounds": [
+      {
+        "name": "minecraft:entity.blaze.burn",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 0.55
+      }
+    ]
+  },
+  "meteor_roar": {
+    "subtitle": "subtitles.hexgodofstories.meteor_roar",
+    "sounds": [
+      {
+        "name": "minecraft:entity.lightning_bolt.thunder",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 0.45
+      }
+    ]
+  },
+  "meteor_impact": {
+    "subtitle": "subtitles.hexgodofstories.meteor_impact",
+    "sounds": [
+      {
+        "name": "minecraft:entity.generic.explode",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 0.6
+      }
+    ]
+  },
+  "grip_hold": {
+    "subtitle": "subtitles.hexgodofstories.grip_hold",
+    "sounds": [
+      {
+        "name": "minecraft:block.beacon.ambient",
+        "type": "event",
+        "volume": 0.55,
+        "pitch": 1.5
+      }
+    ]
+  },
+  "emerald_cast": {
+    "subtitle": "subtitles.hexgodofstories.emerald_cast",
+    "sounds": [
+      {
+        "name": "minecraft:entity.illusioner.cast_spell",
+        "type": "event",
+        "volume": 0.7,
+        "pitch": 1.1
+      }
+    ]
+  }
+}

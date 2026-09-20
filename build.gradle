@@ -3,9 +3,9 @@ plugins {
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
     id 'org.spongepowered.mixin' version '0.7.+'
 }
-group = 'com.loki'
-version = '0.4.2'
-base { archivesName = 'loki' }
+group = 'com.hexgodofstories'
+version = '0.5.0'
+base { archivesName = 'hexgodofstories' }
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 java.withSourcesJar()
 minecraft {
@@ -15,11 +15,11 @@ minecraft {
         configureEach {
             workingDirectory project.file('run')
             property 'forge.logging.console.level', 'info'
-            mods { loki { source sourceSets.main } }
+            mods { hexgodofstories { source sourceSets.main } }
         }
         client {}
         server { args '--nogui' }
-        gameTestServer { property 'forge.enabledGameTestNamespaces', 'loki' }
+        gameTestServer { property 'forge.enabledGameTestNamespaces', 'hexgodofstories' }
     }
 }
 repositories {
@@ -31,10 +31,10 @@ dependencies {
     implementation(fg.deobf('curse.maven:playeranimator-658587:4587214')) { transitive = false }
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
-mixin { add sourceSets.main, 'loki.refmap.json'; config 'loki.mixins.json' }
+mixin { add sourceSets.main, 'hexgodofstories.refmap.json'; config 'hexgodofstories.mixins.json' }
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 jar {
-    manifest { attributes('MixinConfigs': 'loki.mixins.json') }
+    manifest { attributes('MixinConfigs': 'hexgodofstories.mixins.json') }
     finalizedBy 'reobfJar'
 }
 
@@ -42,7 +42,7 @@ jar {
 tasks.register('verifyRealmShape', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.loki.server.RealmShapeTest'
+    mainClass = 'com.hexgodofstories.server.RealmShapeTest'
     enableAssertions = true
 }
 tasks.named('check') { dependsOn 'verifyRealmShape' }
@@ -51,7 +51,16 @@ tasks.named('check') { dependsOn 'verifyRealmShape' }
 tasks.register('verifyTimeBranch', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.loki.data.TimeBranchRegressionTest'
+    mainClass = 'com.hexgodofstories.data.TimeBranchRegressionTest'
     enableAssertions = true
 }
 tasks.named('check') { dependsOn 'verifyTimeBranch' }
+
+// Borrowed Reality's size table and facing; no block palette and no Minecraft bootstrap required.
+tasks.register('verifyIllusoryWall', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.hexgodofstories.data.IllusoryWallTest'
+    enableAssertions = true
+}
+tasks.named('check') { dependsOn 'verifyIllusoryWall' }
