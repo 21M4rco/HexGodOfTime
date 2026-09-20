@@ -20,8 +20,11 @@ public final class LokiHud {
     public static void render(GuiGraphics g) {
         var mc=Minecraft.getInstance();if(mc.player==null||mc.options.hideGui)return;
         var d=ClientState.self();Ability a=QuickBar.displayed();
-        if(a==null)return;
         int screenWidth=mc.getWindow().getGuiScaledWidth(),screenHeight=mc.getWindow().getGuiScaledHeight();
+        // Drawn before the ability panel and independently of it: a caster holding the torrent needs the
+        // charge read-out even if their quick bar happens to be empty.
+        BranchMeter.render(g,screenWidth,screenHeight);
+        if(a==null)return;
         int bottom=screenHeight-(screenWidth<540?54:8);
         int x=8,y=bottom-(int)(HEIGHT*SCALE);
         g.pose().pushPose();g.pose().translate(x,y,0);g.pose().scale(SCALE,SCALE,1);
@@ -62,7 +65,6 @@ public final class LokiHud {
         }
         g.pose().popPose();
         if(ClientState.frozen(mc.player.getId()))g.drawCenteredString(mc.font,"BETWEEN MOMENTS",screenWidth/2,15,0xd8d6be);
-        BranchMeter.render(g,screenWidth,screenHeight);
     }
     /** The permanent time commands: key, name and state, always on screen and never scrollable. */
     private static void controls(GuiGraphics g,net.minecraft.nbt.CompoundTag d,float energy,int top) {

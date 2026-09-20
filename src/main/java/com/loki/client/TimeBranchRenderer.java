@@ -170,15 +170,28 @@ public final class TimeBranchRenderer {
             double distance=caster.position().distanceToSqr(camera);
             if(distance>VISIBLE)continue;
             int held=(int)Mth.clamp(time-entry.getValue(),0,BranchCharge.LIMIT);
-            sphere(PAINTER,caster,held,BranchCharge.sphere(held),1,time,distance,partial);
+            sphere(PAINTER,caster,held,BranchCharge.sphere(held),1,time,distance,partial,visibility(caster));
         }
         for(Torrent t:TORRENTS) {
             double age=time-t.start;
             if(age<0||age>t.life)continue;
             if(t.origin.distanceToSqr(camera)>VISIBLE*4)continue;
-            torrent(PAINTER,t,age,time,camera);
+            torrent(PAINTER,t,age,time,camera,visibility(mc.level.getEntity(t.caster)));
         }
         PAINTER.flush(pose,buffers);
+    }
+
+    /**
+     * How strongly to draw the effect for whoever is watching it.
+     *
+     * <p>Held at arm's length, this thing grows well past the distance between a caster's eyes and their
+     * own hands, so in first person the camera would end up inside the membrane and the screen would go
+     * white at exactly the moment the player most needs to aim. Their own charge is therefore dimmed and
+     * its centre pushed out ahead of them; everybody else sees it in full.
+     */
+    private static float visibility(Entity caster) {
+        var mc=Minecraft.getInstance();
+        return caster!=null&&caster==mc.player&&mc.options.getCameraType().isFirstPerson()?.34f:1;
     }
 
     /**
@@ -188,7 +201,7 @@ public final class TimeBranchRenderer {
      * @param scale 1 while charging; driven down through the release compression.
      */
     private static void sphere(BranchVfx.Painter painter,Entity caster,int held,double radius,double scale,
-                              double time,double distanceSq,float partial) {
+                              double time,double distanceSq,float partial,float visibility) {
         RenderType glow=BranchVfx.glow(),strand=BranchVfx.strand(),cloud=BranchVfx.cloud();
         int stage=BranchCharge.stage(held);
         float power=BranchCharge.power(held);
@@ -199,6 +212,8 @@ public final class TimeBranchRenderer {
         double chaos=switch(stage) {case 1->.05;case 2->.12;case 3->.23;case 4->.36;case 5->.47;default->.47+over*.26;};
         double surge=1+.10*Math.sin(time*.31)+(stage>=4?.09*Math.sin(time*.83+1.4):0)+over*.08*Math.sin(time*1.7);
         Vec3 centre=BranchCharge.focus(caster,partial);
+        // Kept ahead of the caster's own eye as it grows, so their view is never inside the membrane.
+        if(visibility<1)centre=centre.add(BranchCharge.aim(caster,partial).scale(Math.max(0,base*1.25-.9)));
         // The centre of mass shifts: an overfilled membrane does not stay concentric with its contents.
         Vec3 drift=new Vec3(BranchVfx.wobble(time*.07,1.3,2.7),BranchVfx.wobble(2.1,time*.06,.4),
                             BranchVfx.wobble(.9,3.3,time*.08)).scale(base*chaos*.42);
@@ -222,7 +237,7 @@ public final class TimeBranchRenderer {
                 // Where the membrane is thinnest it glows hardest; that is the pressure showing.
                 float heat=(float)Mth.clamp((stretch-1)*1.4,0,.85);
                 painter.quad(glow,a,b,c,d,TemporalPalette.hot(phase,heat),
-                    (float)(.055+.075*power+.06*heat+over*.03));
+                    (float)((.055+.075*power+.06*heat+over*.03)*visibility));
             }
         }
 
@@ -230,7 +245,7 @@ public final class TimeBranchRenderer {
         for(int i=0;i<3;i++) {
             double pulse=.30+.12*Math.sin(time*.27+i*2.1)+(stage>=5?.06*Math.sin(time*1.1):0);
             BranchVfx.billboard(painter,glow,centre,base*pulse*(1+i*.45),time*.05+i,
-                TemporalPalette.hot((float)(time*.09+i*.2),i==0?.92f:.45f),i==0?.55f:.20f);
+                TemporalPalette.hot((float)(time*.09+i*.2),i==0?.92f:.45f),(i==0?.55f:.20f)*visibility);
         }
 
         // --- the nebula it is packed in -----------------------------------------------
@@ -240,7 +255,7 @@ public final class TimeBranchRenderer {
             double rr=base*(.55+.9*TemporalLightning.rand(i,11));
             Vec3 at=centre.add(Math.cos(a)*rr,h*rr*.8,Math.sin(a)*rr);
             BranchVfx.billboard(painter,cloud,at,base*(.75+.55*TemporalLightning.rand(i,13)),a*.5,
-                TemporalPalette.shade((float)(time*.019+TemporalPalette.offset(i))),.09f+.05f*power);
+                TemporalPalette.shade((float)(time*.019+TemporalPalette.offset(i))),(.09f+.05f*power)*visibility);
         }
 
         // --- braided strands ----------------------------------------------------------
@@ -257,7 +272,7 @@ public final class TimeBranchRenderer {
                 points[i]=centre.add(u.scale(Math.cos(a)).add(v.scale(Math.sin(a))).scale(base*1.02*wob*surge));
             }
             BranchVfx.polyline(painter,strand,points,base*(.05+.03*power),
-                (float)(time*.04+TemporalPalette.offset(s)),.55f,.42f+.22f*power);
+                (float)(time*.04+TemporalPalette.offset(s)),.55f,(.42f+.22f*power)*visibility);
         }
 
         // --- tiny branching filaments off the surface ---------------------------------
@@ -269,7 +284,7 @@ public final class TimeBranchRenderer {
             if(out.lengthSqr()<1e-8)continue;
             Vec3 to=from.add(out.normalize().scale(base*(.35+.5*TemporalLightning.rand(seed,3))));
             TemporalLightning.draw(painter,strand,TemporalLightning.bolt(seed,from,to,3,base*.14,1),
-                base*.022,(float)(time*.05+i*.2),.5f);
+                base*.022,(float)(time*.05+i*.2),.5f*visibility);
         }
 
         // --- arcs across the sphere, along the arms, and out at the world -------------
@@ -279,7 +294,7 @@ public final class TimeBranchRenderer {
             Vec3 from=skin(centre,base,surge,chaos,TemporalLightning.rand(seed,4)*Math.PI,TemporalLightning.rand(seed,5)*Math.PI*2,time);
             Vec3 to=skin(centre,base,surge,chaos,TemporalLightning.rand(seed,6)*Math.PI,TemporalLightning.rand(seed,7)*Math.PI*2,time);
             TemporalLightning.draw(painter,strand,TemporalLightning.bolt(seed,from,to,5,base*.30,1),
-                base*.028,(float)(time*.06+i*.3),.62f);
+                base*.028,(float)(time*.06+i*.3),.62f*visibility);
         }
         if(stage>=3&&!far) {
             // Up the arms: the containment is not only in front of them, it is running over them.
@@ -288,7 +303,7 @@ public final class TimeBranchRenderer {
                 long seed=(long)(time/TemporalLightning.FLICKER)*61+hand;
                 Vec3 shoulder=caster.getEyePosition(partial).add(side.scale(hand==0?.34:-.34)).add(0,-.28,0);
                 TemporalLightning.draw(painter,strand,TemporalLightning.bolt(seed,shoulder,centre,4,base*.22,1),
-                    base*.020,(float)(time*.07+hand*.5),.44f);
+                    base*.020,(float)(time*.07+hand*.5),.44f*visibility);
             }
         }
         if(stage>=4&&!far) {
@@ -298,14 +313,14 @@ public final class TimeBranchRenderer {
             Vec3 outward=new Vec3(Math.cos(a)*Math.cos(tilt),Math.sin(tilt),Math.sin(a)*Math.cos(tilt));
             Vec3 to=centre.add(outward.scale(base*(2.2+2.4*TemporalLightning.rand(seed,22))));
             TemporalLightning.draw(painter,strand,TemporalLightning.bolt(seed,centre,to,6,base*.42,2),
-                base*.020,(float)(time*.05),.38f);
+                base*.020,(float)(time*.05),.38f*visibility);
         }
 
         // --- space giving way around it ------------------------------------------------
         if(stage>=3&&!far)for(int i=0;i<2;i++) {
             double breathe=1+.09*Math.sin(time*.19+i*2.3);
             BranchVfx.billboard(painter,cloud,centre,base*(2.1+i*.7)*breathe,time*.013*(i==0?1:-1),
-                TemporalPalette.shade((float)(time*.012+i*.4)),.035f+.02f*power);
+                TemporalPalette.shade((float)(time*.012+i*.4)),(.035f+.02f*power)*visibility);
         }
     }
 
@@ -323,9 +338,10 @@ public final class TimeBranchRenderer {
      * The torrent: rings down the axis with strands braided around them, branches leaving and rejoining,
      * pulses travelling through, and a far end that comes apart into filaments rather than stopping flat.
      */
-    private static void torrent(BranchVfx.Painter painter,Torrent t,double age,double time,Vec3 camera) {
+    private static void torrent(BranchVfx.Painter painter,Torrent t,double age,double time,Vec3 camera,float visibility) {
         RenderType glow=BranchVfx.glow(),strand=BranchVfx.strand(),cloud=BranchVfx.cloud();
-        float fade=(float)Mth.clamp((t.life-age)/BranchCharge.FADE,0,1);
+        // Every layer below multiplies this, so dimming the caster's own first-person view is one change.
+        float fade=(float)Mth.clamp((t.life-age)/BranchCharge.FADE,0,1)*visibility;
         double front=BranchCharge.front(t.length,age);
 
         // The held breath: the sphere collapses almost to nothing, and for a moment nothing happens.
@@ -334,10 +350,10 @@ public final class TimeBranchRenderer {
             double collapse=Math.max(.06,1-age/BranchCharge.COMPRESS);
             if(caster!=null)
                 sphere(painter,caster,t.held,BranchCharge.sphere(t.held),
-                    collapse*collapse,time,caster.position().distanceToSqr(camera),1);
+                    collapse*collapse,time,caster.position().distanceToSqr(camera),1,visibility);
             // Compressed to a point and far brighter than it was: all of it, in a thumbnail.
             BranchVfx.billboard(painter,glow,t.origin,BranchCharge.sphere(t.held)*(collapse*.5+.12),time*.2,
-                TemporalPalette.hot((float)(time*.13),.95f),(float)(.5+.5*(1-collapse)));
+                TemporalPalette.hot((float)(time*.13),.95f),(float)((.5+.5*(1-collapse))*visibility));
         }
         if(front<=0)return;
 

@@ -135,15 +135,23 @@ the start of this task.
 
 ### Compilation
 
-**Not verified in this environment, and this is a hard limitation rather than an omission.** The network
-policy here refuses `maven.minecraftforge.net` and `repo.spongepowered.org` (the proxy answers `403` to
-`CONNECT`), so ForgeGradle cannot resolve and `gradle compileJava` fails before reaching javac. The
-**Build Loki** GitHub Action is the only compiler this project has. Treat the Action's result as the
-authority on whether this patch builds.
+**Verified through the GitHub Action, not locally.** The network policy in the editing environment refuses
+`maven.minecraftforge.net` and `repo.spongepowered.org` (the proxy answers `403` to `CONNECT`), so
+ForgeGradle cannot resolve there and `gradle compileJava` fails before reaching javac. The **Build Loki**
+Action is this project's only compiler.
 
-Source-level checks that *were* performed here: brace/paren balance across all sources; every `Loki.*`
-registry reference resolved against `Loki.java`; call-site name and arity cross-check against the classes
-added by this patch; and a review of each Minecraft and Forge symbol used against 1.20.1 signatures.
+`gradle --no-daemon build` passes on the Action: `compileJava`, the mixin annotation processor and refmap,
+`verifyRealmShape` under `check`, and the jar artifact. Three errors were found and fixed by that route —
+a missing `BlockPos` import in the meteor, and two calls to `DamageSources.source(...)`, whose typed
+factory is private in 1.20.1, replaced with the public `DamageSource` constructor over a registry holder.
+Remaining output is pre-existing deprecation warnings only.
+
+Source-level checks also performed in the editing environment: brace/paren balance across all sources;
+every `Loki.*` registry reference resolved against `Loki.java`; call-site name and arity cross-check
+against the classes added by this patch; and a review of each Minecraft and Forge symbol used against
+1.20.1 signatures.
+
+Compiling is not playing, so everything under **Not verified** below still stands.
 
 ### Design decisions worth knowing
 
@@ -171,6 +179,10 @@ added by this patch; and a review of each Minecraft and Forge symbol used agains
   handed back on interruption, death, dimension change, logout or shutdown. The death only lands after the
   visual sequence finishes, and non-players that survive a bypassing damage source are discarded; players
   never are.
+- **The caster's own view is not the audience's.** Held at arm's length the sphere grows well past the
+  distance from a caster's eyes to their own hands, so in first person their charge is dimmed and its
+  centre pushed out ahead of them — otherwise the screen whites out at exactly the moment they most need
+  to aim. Everyone else sees it in full.
 - **Directional dissolve without touching foreign renderers.** True geometry clipping is not available
   across arbitrary modded renderers, so past 18% of the sequence the ordinary renderer stands down and the
   body is rebuilt as cuboid fragments sized to its own bounding box and textured from whatever sheet its
