@@ -11,7 +11,7 @@ public final class TemporalScreen {
     private static long start,end;
     private static int mode,width,height;
     private static boolean failed;
-    public static void trigger(String effect,boolean self){int duration;switch(effect){case "stop"-> {mode=1;duration=120;}case "slip"->{mode=2;duration=28;}case "ascend"->{mode=3;duration=self?140:65;}case "resume"->{mode=4;duration=16;}case "dilate"->{mode=1;duration=60;}default->{return;}}start=ClientState.now();end=start+duration;}
+    public static void trigger(String effect,boolean self){int duration;switch(effect){case "stop"-> {mode=1;duration=120;}case "slip"->{mode=2;duration=28;}case "ascend"->{mode=3;duration=self?140:65;}case "resume"->{mode=4;duration=16;}case "dilate"->{mode=1;duration=60;}case "fracture","rift_open"->{mode=2;duration=34;}case "rift_cross"->{mode=3;duration=24;}default->{return;}}start=ClientState.now();end=start+duration;}
     public static void close(){if(chain!=null)chain.close();chain=null;failed=false;end=0;}
     public static void render(float partial){var mc=Minecraft.getInstance();if(mc.level==null||mc.options.hideGui||failed)return;boolean suspended=mc.player!=null&&ClientState.frozen(mc.player.getId());if(ClientState.now()>end&&!suspended)return;
         try{

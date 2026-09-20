@@ -4,6 +4,7 @@ import net.minecraft.world.entity.player.Player;
 
 /** Persistent progression uses the foundation's compact player-NBT and XP curve. Transient control state lives on the server. */
 public final class LokiData {
+    public static final int QUICK_SLOTS=8;
     public static CompoundTag get(Player p) {
         CompoundTag parent=p.getPersistentData();
         if(!parent.contains("Loki")) {CompoundTag n=new CompoundTag();n.putFloat("energy",100);parent.put("Loki",n);}
@@ -26,8 +27,33 @@ public final class LokiData {
     public static long now(Player p) {return p.level().getGameTime();}
     public static int cooldown(Player p,Ability a) {return (int)Math.max(0,get(p).getLong("cd_"+a.name())-now(p));}
     public static Ability selected(Player p) {return Ability.at(get(p).getInt("selected"));}
+
+    /** Eight persisted shortcuts. Empty slots hold -1 so an unlock can claim them without disturbing a chosen layout. */
+    public static int[] quick(Player p) {
+        int[] slots=get(p).getIntArray("quick");
+        if(slots.length!=QUICK_SLOTS) {int[] fresh=new int[QUICK_SLOTS];java.util.Arrays.fill(fresh,-1);get(p).putIntArray("quick",fresh);return fresh;}
+        return slots;
+    }
+    public static void quick(Player p,int slot,int ability) {
+        if(slot<0||slot>=QUICK_SLOTS)return;
+        int[] slots=quick(p);
+        for(int i=0;i<QUICK_SLOTS;i++)if(slots[i]==ability)slots[i]=-1;
+        slots[slot]=ability;get(p).putIntArray("quick",slots);
+    }
+    /** Fills empty shortcuts with newly unlocked abilities so progression is immediately reachable from the bar. */
+    public static void refreshQuick(Player p) {
+        int[] slots=quick(p);boolean changed=false;
+        for(int i=0;i<QUICK_SLOTS;i++)if(slots[i]>=0&&!unlocked(p,Ability.at(slots[i]))){slots[i]=-1;changed=true;}
+        for(Ability a:Ability.values()) {
+            if(!unlocked(p,a))continue;
+            boolean present=false;for(int v:slots)if(v==a.ordinal())present=true;
+            if(present)continue;
+            for(int i=0;i<QUICK_SLOTS;i++)if(slots[i]<0){slots[i]=a.ordinal();changed=true;break;}
+        }
+        if(changed)get(p).putIntArray("quick",slots);
+    }
     public static void clearTransient(Player p,boolean death) {
-        CompoundTag d=get(p);d.remove("disguise");d.remove("vanishUntil");d.remove("wardUntil");d.remove("held");d.remove("transformStart");
+        CompoundTag d=get(p);d.remove("disguise");d.remove("vanishUntil");d.remove("wardUntil");d.remove("held");d.remove("transformStart");d.remove("grip");
         if(death)d.putBoolean("ascended",false);
     }
 }

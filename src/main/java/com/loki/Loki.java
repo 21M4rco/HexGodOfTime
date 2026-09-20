@@ -21,19 +21,44 @@ public final class Loki {
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, ID);
     public static final DeferredRegister<SoundEvent> SOUNDS = DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, ID);
     public static final DeferredRegister<CreativeModeTab> TABS = DeferredRegister.create(net.minecraft.core.registries.Registries.CREATIVE_MODE_TAB, ID);
+    public static final DeferredRegister<net.minecraft.core.particles.ParticleType<?>> PARTICLES = DeferredRegister.create(ForgeRegistries.PARTICLE_TYPES, ID);
+
     public static final RegistryObject<EntityType<IllusionEntity>> ILLUSION = ENTITIES.register("projection", () -> EntityType.Builder.of(IllusionEntity::new, MobCategory.MISC).sized(.6f, 1.8f).clientTrackingRange(10).updateInterval(2).build("loki:projection"));
     public static final RegistryObject<EntityType<SpellProjectile>> PROJECTILE = ENTITIES.register("spell", () -> EntityType.Builder.<SpellProjectile>of(SpellProjectile::new, MobCategory.MISC).sized(.18f,.18f).clientTrackingRange(10).updateInterval(1).build("loki:spell"));
+    public static final RegistryObject<EntityType<ThrownDagger>> THROWN_DAGGER = ENTITIES.register("thrown_dagger", () -> EntityType.Builder.<ThrownDagger>of(ThrownDagger::new, MobCategory.MISC).sized(.28f,.28f).clientTrackingRange(8).updateInterval(1).build("loki:thrown_dagger"));
+    public static final RegistryObject<EntityType<RiftEntity>> RIFT = ENTITIES.register("rift", () -> EntityType.Builder.<RiftEntity>of(RiftEntity::new, MobCategory.MISC).sized(2.2f,2.8f).clientTrackingRange(10).updateInterval(2).fireImmune().noSummon().build("loki:rift"));
+
     public static final RegistryObject<Item> DAGGER = ITEMS.register("dagger", () -> new ConjuredWeapon(0));
     public static final RegistryObject<Item> LAEVATEINN = ITEMS.register("laevateinn", () -> new ConjuredWeapon(1));
     public static final RegistryObject<Item> TIME_STICK = ITEMS.register("time_stick", () -> new ConjuredWeapon(2));
-    public static final RegistryObject<SoundEvent> SORCERY = sound("sorcery"), ILLUSION_SOUND = sound("illusion"), TELEPORT = sound("teleport"), SLIP = sound("time_slip"), STOP = sound("time_stop"), RESUME = sound("time_resume"), ASCEND = sound("ascend"), CONJURE = sound("conjure");
+
+    public static final RegistryObject<SoundEvent> SORCERY = sound("sorcery"), ILLUSION_SOUND = sound("illusion"), TELEPORT = sound("teleport"),
+        SLIP = sound("time_slip"), STOP = sound("time_stop"), RESUME = sound("time_resume"), ASCEND = sound("ascend"), CONJURE = sound("conjure"),
+        BLADE_SWING = sound("blade_swing"), BLADE_HIT = sound("blade_hit"), BLADE_THROW = sound("blade_throw"), BLADE_EMBED = sound("blade_embed"),
+        RIFT_OPEN = sound("rift_open"), RIFT_CLOSE = sound("rift_close");
     private static RegistryObject<SoundEvent> sound(String name) { return SOUNDS.register(name, () -> SoundEvent.createVariableRangeEvent(id(name))); }
+
+    /**
+     * Option-free particle types: the behaviour lives in each client factory, so nothing has to travel
+     * on the wire. Vanilla keeps SimpleParticleType's constructor protected, hence the subclass.
+     */
+    public static final class Glow extends net.minecraft.core.particles.SimpleParticleType {
+        public Glow() { super(false); }
+    }
+    public static final RegistryObject<Glow> EMBER = particle("ember");
+    public static final RegistryObject<Glow> GOLD_EMBER = particle("gold_ember");
+    public static final RegistryObject<Glow> RUNE = particle("rune");
+    public static final RegistryObject<Glow> SHARD = particle("shard");
+    public static final RegistryObject<Glow> MOTE = particle("mote");
+    public static final RegistryObject<Glow> BLOOD = particle("blood");
+    private static RegistryObject<Glow> particle(String name) { return PARTICLES.register(name, Glow::new); }
+
     static {
         TABS.register("purpose", () -> CreativeModeTab.builder().title(Component.translatable("itemGroup.loki")).icon(() -> new ItemStack(DAGGER.get())).displayItems((p,o) -> {o.accept(DAGGER.get());o.accept(LAEVATEINN.get());o.accept(TIME_STICK.get());}).build());
     }
     public Loki() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
-        ENTITIES.register(bus); ITEMS.register(bus); SOUNDS.register(bus); TABS.register(bus);
+        ENTITIES.register(bus); ITEMS.register(bus); SOUNDS.register(bus); TABS.register(bus); PARTICLES.register(bus);
         bus.addListener((EntityAttributeCreationEvent e) -> e.put(ILLUSION.get(), IllusionEntity.attributes().build()));
         bus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) -> e.enqueueWork(LokiNetwork::init));
     }

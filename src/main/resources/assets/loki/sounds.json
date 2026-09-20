@@ -1,9 +1,54 @@
 {
-  "sorcery": {
-    "subtitle": "subtitles.loki.sorcery",
+  "ascend": {
+    "subtitle": "subtitles.loki.ascend",
     "sounds": [
       {
-        "name": "loki:sorcery",
+        "name": "loki:ascend",
+        "stream": true
+      }
+    ]
+  },
+  "blade_embed": {
+    "subtitle": "subtitles.loki.blade_embed",
+    "sounds": [
+      {
+        "name": "loki:blade_embed",
+        "stream": false
+      }
+    ]
+  },
+  "blade_hit": {
+    "subtitle": "subtitles.loki.blade_hit",
+    "sounds": [
+      {
+        "name": "loki:blade_hit",
+        "stream": false
+      }
+    ]
+  },
+  "blade_swing": {
+    "subtitle": "subtitles.loki.blade_swing",
+    "sounds": [
+      {
+        "name": "loki:blade_swing",
+        "stream": false
+      }
+    ]
+  },
+  "blade_throw": {
+    "subtitle": "subtitles.loki.blade_throw",
+    "sounds": [
+      {
+        "name": "loki:blade_throw",
+        "stream": false
+      }
+    ]
+  },
+  "conjure": {
+    "subtitle": "subtitles.loki.conjure",
+    "sounds": [
+      {
+        "name": "loki:conjure",
         "stream": false
       }
     ]
@@ -17,11 +62,47 @@
       }
     ]
   },
+  "rift_close": {
+    "subtitle": "subtitles.loki.rift_close",
+    "sounds": [
+      {
+        "name": "loki:rift_close",
+        "stream": false
+      }
+    ]
+  },
+  "rift_open": {
+    "subtitle": "subtitles.loki.rift_open",
+    "sounds": [
+      {
+        "name": "loki:rift_open",
+        "stream": false
+      }
+    ]
+  },
+  "sorcery": {
+    "subtitle": "subtitles.loki.sorcery",
+    "sounds": [
+      {
+        "name": "loki:sorcery",
+        "stream": false
+      }
+    ]
+  },
   "teleport": {
     "subtitle": "subtitles.loki.teleport",
     "sounds": [
       {
         "name": "loki:teleport",
+        "stream": false
+      }
+    ]
+  },
+  "time_resume": {
+    "subtitle": "subtitles.loki.time_resume",
+    "sounds": [
+      {
+        "name": "loki:time_resume",
         "stream": false
       }
     ]
@@ -40,33 +121,6 @@
     "sounds": [
       {
         "name": "loki:time_stop",
-        "stream": false
-      }
-    ]
-  },
-  "time_resume": {
-    "subtitle": "subtitles.loki.time_resume",
-    "sounds": [
-      {
-        "name": "loki:time_resume",
-        "stream": false
-      }
-    ]
-  },
-  "ascend": {
-    "subtitle": "subtitles.loki.ascend",
-    "sounds": [
-      {
-        "name": "loki:ascend",
-        "stream": true
-      }
-    ]
-  },
-  "conjure": {
-    "subtitle": "subtitles.loki.conjure",
-    "sounds": [
-      {
-        "name": "loki:conjure",
         "stream": false
       }
     ]

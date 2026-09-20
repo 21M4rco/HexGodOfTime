@@ -5,8 +5,8 @@
   "description": "Layered upper-body gesture; locomotion remains available.",
   "emote": {
     "beginTick": 0,
-    "endTick": 30,
-    "stopTick": 30,
+    "endTick": 48,
+    "stopTick": 48,
     "isLoop": true,
     "returnTick": 10,
     "degrees": true,
@@ -15,56 +15,37 @@
         "tick": 0,
         "easing": "inoutquad",
         "rightArm": {
-          "pitch": 0,
-          "yaw": 0,
-          "roll": 0
-        },
-        "leftArm": {
-          "pitch": 0,
-          "yaw": 0,
-          "roll": 0
-        },
-        "torso": {
-          "pitch": 0,
-          "yaw": 0,
-          "roll": 0
-        }
-      },
-      {
-        "tick": 5,
-        "easing": "inoutquad",
-        "rightArm": {
-          "pitch": -25,
-          "yaw": -20,
-          "roll": -12
-        },
-        "leftArm": {
-          "pitch": -15,
-          "yaw": 15,
-          "roll": 10
-        },
-        "torso": {
-          "pitch": 0,
-          "yaw": -4,
-          "roll": 0
-        }
-      },
-      {
-        "tick": 10,
-        "easing": "inoutquad",
-        "rightArm": {
-          "pitch": -95,
-          "yaw": -9,
+          "pitch": -20,
+          "yaw": -10,
           "roll": -6
         },
         "leftArm": {
-          "pitch": -20,
-          "yaw": 14,
+          "pitch": -10,
+          "yaw": 10,
           "roll": 4
         },
         "torso": {
-          "pitch": 2,
-          "yaw": -7,
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 6,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -96,
+          "yaw": -12,
+          "roll": -10
+        },
+        "leftArm": {
+          "pitch": -26,
+          "yaw": 16,
+          "roll": 6
+        },
+        "torso": {
+          "pitch": 3,
+          "yaw": -9,
           "roll": 0
         }
       },
@@ -72,37 +53,56 @@
         "tick": 20,
         "easing": "inoutquad",
         "rightArm": {
-          "pitch": -95,
-          "yaw": -9,
-          "roll": -6
+          "pitch": -101,
+          "yaw": -7,
+          "roll": -14
         },
         "leftArm": {
-          "pitch": -20,
-          "yaw": 14,
-          "roll": 4
+          "pitch": -24,
+          "yaw": 13,
+          "roll": 7
         },
         "torso": {
-          "pitch": 1,
-          "yaw": -4,
-          "roll": 0
+          "pitch": 4,
+          "yaw": -11,
+          "roll": 2
         }
       },
       {
-        "tick": 30,
+        "tick": 34,
         "easing": "inoutquad",
         "rightArm": {
-          "pitch": 0,
-          "yaw": 0,
-          "roll": 0
+          "pitch": -93,
+          "yaw": -14,
+          "roll": -7
         },
         "leftArm": {
-          "pitch": 0,
-          "yaw": 0,
-          "roll": 0
+          "pitch": -29,
+          "yaw": 18,
+          "roll": 4
         },
         "torso": {
-          "pitch": 0,
-          "yaw": 0,
+          "pitch": 2,
+          "yaw": -7,
+          "roll": -1
+        }
+      },
+      {
+        "tick": 48,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -96,
+          "yaw": -12,
+          "roll": -10
+        },
+        "leftArm": {
+          "pitch": -26,
+          "yaw": 16,
+          "roll": 6
+        },
+        "torso": {
+          "pitch": 3,
+          "yaw": -9,
           "roll": 0
         }
       }

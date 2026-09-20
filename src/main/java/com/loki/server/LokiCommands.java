@@ -30,6 +30,14 @@ public final class LokiCommands {
         player.then(Commands.literal("reset").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");LokiServer.clear(p,true);p.getPersistentData().remove("Loki");LokiNetwork.sync(p);return 1;}));
         player.then(Commands.literal("clear_illusions").executes(c->{LokiServer.clearIllusions(EntityArgument.getPlayer(c,"player"));return 1;}));
         player.then(Commands.literal("clear_time").executes(c->{TemporalEngine.clear(EntityArgument.getPlayer(c,"player"));return 1;}));
+        player.then(Commands.literal("clear_bleed").executes(c->{Bleed.clear(EntityArgument.getPlayer(c,"player"));return 1;}));
+        player.then(Commands.literal("clear_quick").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");for(int i=0;i<LokiData.QUICK_SLOTS;i++)LokiData.quick(p,i,-1);LokiNetwork.sync(p);return 1;}));
+        player.then(Commands.literal("realm").then(Commands.literal("enter").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");return PocketRealm.enter(p)?1:0;}))
+            .then(Commands.literal("exit").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");return PocketRealm.leave(p)?1:0;})));
+        player.then(Commands.literal("status").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");
+            c.getSource().sendSuccess(()->Component.literal(p.getGameProfile().getName()+" — "+LokiData.selected(p).title
+                +" | energy "+Math.round(LokiData.energy(p))+"/"+Math.round(LokiData.maxEnergy(p))
+                +" | ascended "+LokiData.get(p).getBoolean("ascended")),false);return 1;}));
         root.then(player);e.getDispatcher().register(root);
     }
 }

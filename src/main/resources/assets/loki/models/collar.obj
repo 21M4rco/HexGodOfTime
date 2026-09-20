@@ -1,4 +1,4 @@
-# Loki authored geometry: meters; grip at origin; no borrowed character meshes.
+# Loki authored geometry: item-model units, grip at origin, blade toward +Y.
 v 0.000000 -0.035000 0.190000
 v 0.029723 -0.035431 0.187661
 v 0.035236 -0.014598 0.191365

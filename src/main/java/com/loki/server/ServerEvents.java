@@ -1,9 +1,11 @@
 package com.loki.server;
+
 import com.loki.Loki;
 import com.loki.data.*;
 import com.loki.entity.ConjuredWeapon;
 import com.loki.network.LokiNetwork;
 import net.minecraft.server.level.*;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.*;
@@ -17,15 +19,32 @@ public final class ServerEvents {
     @SubscribeEvent public static void player(TickEvent.PlayerTickEvent e) {if(e.phase==TickEvent.Phase.END&&e.player instanceof ServerPlayer p)LokiServer.tick(p);}
     @SubscribeEvent public static void level(TickEvent.LevelTickEvent e) {if(e.phase==TickEvent.Phase.START&&e.level instanceof ServerLevel s){TemporalEngine.tick(s);LokiServer.tickLevel(s);}}
     @SubscribeEvent public static void login(PlayerEvent.PlayerLoggedInEvent e) {if(e.getEntity() instanceof ServerPlayer p){LokiData.get(p).remove("transformStart");LokiNetwork.sync(p);}}
-    @SubscribeEvent public static void tracking(PlayerEvent.StartTracking e) {if(e.getEntity() instanceof ServerPlayer p){TemporalEngine.track(p,e.getTarget());if(e.getTarget() instanceof ServerPlayer q)LokiNetwork.to(p,new LokiNetwork.Message(0,q.getId(),LokiData.get(q).copy()));}}
+    @SubscribeEvent public static void tracking(PlayerEvent.StartTracking e) {
+        if(!(e.getEntity() instanceof ServerPlayer p))return;
+        TemporalEngine.track(p,e.getTarget());
+        if(e.getTarget() instanceof ServerPlayer q)LokiNetwork.to(p,new LokiNetwork.Message(LokiNetwork.SYNC,q.getId(),LokiData.get(q).copy()));
+    }
     @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p)LokiServer.clear(p,false);}
     @SubscribeEvent public static void dimension(PlayerEvent.PlayerChangedDimensionEvent e) {if(e.getEntity() instanceof ServerPlayer p){LokiServer.clear(p,false);LokiNetwork.sync(p);}}
-    @SubscribeEvent public static void death(LivingDeathEvent e) {if(e.getEntity() instanceof ServerPlayer p)LokiServer.clear(p,true);}
+    @SubscribeEvent public static void death(LivingDeathEvent e) {
+        Bleed.clear(e.getEntity());
+        if(e.getEntity() instanceof ServerPlayer p)LokiServer.clear(p,true);
+    }
     @SubscribeEvent public static void clone(PlayerEvent.Clone e) {e.getEntity().getPersistentData().put("Loki",LokiData.get(e.getOriginal()).copy());LokiData.clearTransient(e.getEntity(),e.isWasDeath());}
     @SubscribeEvent public static void respawn(PlayerEvent.PlayerRespawnEvent e) {if(e.getEntity() instanceof ServerPlayer p)LokiNetwork.sync(p);}
-    @SubscribeEvent public static void attack(AttackEntityEvent e) {if(TemporalEngine.frozen(e.getEntity())){e.setCanceled(true);return;}if(e.getEntity() instanceof ServerPlayer p&&p.getMainHandItem().getItem() instanceof ConjuredWeapon){e.setCanceled(true);LokiServer.weapon(p,false);}}
+    @SubscribeEvent public static void attack(AttackEntityEvent e) {
+        if(TemporalEngine.frozen(e.getEntity())){e.setCanceled(true);return;}
+        if(!(e.getEntity() instanceof ServerPlayer p))return;
+        if(e.getTarget() instanceof LivingEntity victim)LokiServer.engaged(p,victim);
+        if(p.getMainHandItem().getItem() instanceof ConjuredWeapon){e.setCanceled(true);LokiServer.weapon(p,false);}
+    }
     @SubscribeEvent public static void interact(PlayerInteractEvent e) {if(!e.getLevel().isClientSide&&TemporalEngine.frozen(e.getEntity())&&e.isCancelable())e.setCanceled(true);}
-    @SubscribeEvent public static void hurt(LivingHurtEvent e) {if(e.getEntity() instanceof ServerPlayer p&&LokiData.get(p).getLong("wardUntil")>LokiData.now(p))e.setAmount(e.getAmount()*.25f);if(e.getSource().getEntity()!=null&&TemporalEngine.frozen(e.getSource().getEntity()))e.setCanceled(true);}
+    @SubscribeEvent public static void hurt(LivingHurtEvent e) {
+        if(e.getSource().getEntity()!=null&&TemporalEngine.frozen(e.getSource().getEntity())){e.setCanceled(true);return;}
+        // A suspended body cannot be wounded in a moment that is not passing; the harm waits for time to resume.
+        if(TemporalEngine.bank(e.getEntity(),e.getAmount(),e.getSource().getEntity())){e.setCanceled(true);return;}
+        if(e.getEntity() instanceof ServerPlayer p&&LokiData.get(p).getLong("wardUntil")>LokiData.now(p))e.setAmount(e.getAmount()*.25f);
+    }
     @SubscribeEvent public static void target(LivingChangeTargetEvent e) {if(e.getEntity() instanceof Mob m&&LokiServer.charmedAgainst(m,e.getNewTarget()))e.setCanceled(true);}
     @SubscribeEvent public static void fall(LivingFallEvent e) {if(e.getEntity() instanceof ServerPlayer p&&LokiData.mastery(p,Discipline.SORCERY)>0)e.setDistance(Math.max(0,e.getDistance()-3));}
     @SubscribeEvent public static void breakBlock(net.minecraftforge.event.level.BlockEvent.BreakEvent e) {if(TemporalEngine.frozen(e.getPlayer()))e.setCanceled(true);}

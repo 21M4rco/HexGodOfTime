@@ -4,7 +4,6 @@ import com.loki.Loki;
 import com.loki.data.LokiData;
 import com.loki.server.LokiServer;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraftforge.api.distmarker.Dist;
@@ -13,14 +12,17 @@ import net.minecraftforge.network.*;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class LokiNetwork {
-    public static final SimpleChannel CHANNEL=NetworkRegistry.newSimpleChannel(Loki.id("main"),()->"1","1"::equals,"1"::equals);
+    public static final SimpleChannel CHANNEL=NetworkRegistry.newSimpleChannel(Loki.id("main"),()->"2","2"::equals,"2"::equals);
+    /** Highest accepted client action id; see {@link LokiServer#input}. */
+    public static final int MAX_ACTION=10;
+    public static final int SYNC=0,ANIMATE=1,FX=2,FROZEN=3,GRIP=4,MEMORY=5,THREADS=6,SLOWED=7,ARCHITECTURE=8,BLEED=9,FIELD=10;
     public record Input(int action,int value) {}
     public record Message(int kind,int entity,CompoundTag data) {}
     public static void init() {
         CHANNEL.messageBuilder(Input.class,0,NetworkDirection.PLAY_TO_SERVER)
             .encoder((m,b)->{b.writeVarInt(m.action);b.writeVarInt(m.value);})
             .decoder(b->new Input(b.readVarInt(),b.readVarInt()))
-            .consumerMainThread((m,c)->{ServerPlayer p=c.get().getSender();if(p!=null&&p.isAlive()&&m.action>=0&&m.action<=6)LokiServer.input(p,m.action,m.value);c.get().setPacketHandled(true);}).add();
+            .consumerMainThread((m,c)->{ServerPlayer p=c.get().getSender();if(p!=null&&p.isAlive()&&m.action>=0&&m.action<=MAX_ACTION)LokiServer.input(p,m.action,m.value);c.get().setPacketHandled(true);}).add();
         CHANNEL.messageBuilder(Message.class,1,NetworkDirection.PLAY_TO_CLIENT)
             .encoder((m,b)->{b.writeVarInt(m.kind);b.writeVarInt(m.entity);b.writeNbt(m.data);})
             .decoder(b->new Message(b.readVarInt(),b.readVarInt(),b.readNbt()))
@@ -29,7 +31,10 @@ public final class LokiNetwork {
     public static void send(int action,int value) {CHANNEL.sendToServer(new Input(action,value));}
     public static void to(ServerPlayer p,Message m) {CHANNEL.send(PacketDistributor.PLAYER.with(()->p),m);}
     public static void tracking(Entity p,Message m) {CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(()->p),m);}
-    public static void sync(ServerPlayer p) {tracking(p,new Message(0,p.getId(),LokiData.get(p).copy()));}
-    public static void animate(ServerPlayer p,String name) {CompoundTag d=new CompoundTag();d.putString("animation",name);tracking(p,new Message(1,p.getId(),d));}
-    public static void fx(Entity p,String name) {CompoundTag d=new CompoundTag();d.putString("effect",name);d.putDouble("x",p.getX());d.putDouble("y",p.getY());d.putDouble("z",p.getZ());tracking(p,new Message(2,p.getId(),d));}
+    public static void sync(ServerPlayer p) {LokiData.refreshQuick(p);tracking(p,new Message(SYNC,p.getId(),LokiData.get(p).copy()));}
+    public static void animate(ServerPlayer p,String name) {CompoundTag d=new CompoundTag();d.putString("animation",name);tracking(p,new Message(ANIMATE,p.getId(),d));}
+    public static void fx(Entity p,String name) {fx(p,name,p.getX(),p.getY(),p.getZ());}
+    public static void fx(Entity p,String name,double x,double y,double z) {
+        CompoundTag d=new CompoundTag();d.putString("effect",name);d.putDouble("x",x);d.putDouble("y",y);d.putDouble("z",z);tracking(p,new Message(FX,p.getId(),d));
+    }
 }
