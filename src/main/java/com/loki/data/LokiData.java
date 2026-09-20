@@ -89,6 +89,7 @@ public final class LokiData {
 
     public static void clearTransient(Player p,boolean death) {
         CompoundTag d=get(p);d.remove("disguise");d.remove("vanishUntil");d.remove("wardUntil");d.remove("held");d.remove("transformStart");d.remove("grip");
+        d.remove(BranchFistState.UNTIL);d.remove(BranchFistState.START);d.remove(BranchFistState.IMPACT);
         if(death)d.putBoolean("ascended",false);
     }
 }

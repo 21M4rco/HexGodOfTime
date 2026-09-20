@@ -19,7 +19,7 @@ import net.minecraft.world.phys.*;
 import java.util.*;
 
 public final class LokiServer {
-    public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12;
+    public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12,BRANCH_TAP=13;
     /** Values carried by {@link #TIME}: the permanent time controls, each on its own key. */
     public static final int TIME_HALT=0,TIME_RESUME=1,TIME_REWIND=2,TIME_DILATE=3;
     public record Moment(Vec3 position,float yaw,float pitch,float health) {}
@@ -74,6 +74,7 @@ public final class LokiServer {
         }
         if(now-INPUT.getOrDefault(p.getUUID(),-100L)<(TemporalEngine.slowed(p)?15:3))return;
         INPUT.put(p.getUUID(),now);
+        if(action==BRANCH_TAP){BranchFist.arm(p);return;}
         if(action==UTILITY){Telekinesis.release(p,false);Architecture.forget(p);TemporalEngine.clear(p);dismissRift(p);return;}
         if(action==WEAPON){weapon(p,value!=0);return;}
         if(action==FLIGHT){CosmicFlight.toggle(p);return;}
@@ -136,7 +137,7 @@ public final class LokiServer {
         if(a==Ability.SELECTIVE_STOP&&LokiData.unlocked(p,a)){Entity t=target(p,20);if(t!=null){TemporalEngine.exempt(p,t);notice(p,"Your chosen companion may walk through your stopped time.");}return true;}
         if(a==Ability.DAGGERS||a==Ability.TWIN_DAGGERS||a==Ability.LAEVATEINN){dismissWeapons(p);return true;}
         // The ultimate has no alternate action, and says so rather than falling through to the cast path.
-        if(a==Ability.TIME_BRANCH){notice(p,"Hold the cast key to charge, and release it to unleash.");return true;}
+        if(a==Ability.TIME_BRANCH){notice(p,"Tap for a charged right fist; hold and release for the torrent.");return true;}
         return false;
     }
 
@@ -364,6 +365,7 @@ public final class LokiServer {
         Transformation.sustain(p);
         CosmicFlight.tick(p);
         TimeBranch.tick(p);
+        BranchFist.tick(p);
         if(now%4==0&&!TemporalEngine.frozen(p)) {
             ArrayDeque<Moment> h=HISTORY.computeIfAbsent(p.getUUID(),k->new ArrayDeque<>());
             h.addLast(new Moment(p.position(),p.getYRot(),p.getXRot(),p.getHealth()));
@@ -534,7 +536,7 @@ public final class LokiServer {
         CosmicFlight.revoke(p);
         // The charge, the erasure hold and the granted armour all go together; none of them may outlive
         // a death, a logout or a crossing.
-        TimeBranch.forget(p);Erasure.forget(p);Transformation.strip(p);
+        TimeBranch.forget(p);BranchFist.clear(p);Erasure.forget(p);Transformation.strip(p);
         HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         LokiData.clearTransient(p,death);
     }

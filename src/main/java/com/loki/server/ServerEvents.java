@@ -50,6 +50,9 @@ public final class ServerEvents {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
         LokiData.get(p).remove("transformStart");
         LokiData.get(p).remove("branchStart");
+        LokiData.get(p).remove(BranchFistState.UNTIL);
+        LokiData.get(p).remove(BranchFistState.START);
+        LokiData.get(p).remove(BranchFistState.IMPACT);
         // Attribute modifiers are saved with the player, so a session that ended mid-transformation would
         // otherwise hand the armour back for free. Re-derived from the mantle, never inherited.
         Transformation.strip(p);
@@ -59,6 +62,7 @@ public final class ServerEvents {
     @SubscribeEvent public static void tracking(PlayerEvent.StartTracking e) {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
         TemporalEngine.track(p,e.getTarget());
+        Erasure.track(p,e.getTarget());
         if(!(e.getTarget() instanceof ServerPlayer q))return;
         LokiNetwork.syncTo(p,q);
         // A borrowed shape is sent once, not every second, so a new viewer has to be told separately.
@@ -105,6 +109,9 @@ public final class ServerEvents {
         if(e.getLevel().isClientSide||!e.isCancelable())return;
         if(TemporalEngine.frozen(e.getEntity())||Erasure.erasing(e.getEntity())||TimeBranch.planted(e.getEntity()))e.setCanceled(true);
     }
+    @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
+    public static void branchPunch(LivingDamageEvent e) {BranchFist.damage(e);}
+
     @SubscribeEvent public static void hurt(LivingHurtEvent e) {
         if(Erasure.erasing(e.getSource().getEntity())){e.setCanceled(true);return;}
         // A body being taken out of the timeline cannot be hurt out of it. Without this, anything else

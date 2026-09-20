@@ -54,7 +54,7 @@ public final class LokiClient {
         @SubscribeEvent public static void layers(EntityRenderersEvent.AddLayers e) {
             for(String skin:e.getSkins()) {
                 net.minecraft.client.renderer.entity.player.PlayerRenderer renderer=e.getSkin(skin);
-                if(renderer!=null)renderer.addLayer(new LokiLayer(renderer));
+                if(renderer!=null){renderer.addLayer(new LokiLayer(renderer));renderer.addLayer(new BranchFistLayer(renderer));}
             }
         }
         @SubscribeEvent public static void reload(RegisterClientReloadListenersEvent e) {
@@ -72,13 +72,14 @@ public final class LokiClient {
             if(e.phase!=TickEvent.Phase.END)return;
             ClientState.tick();
             Minecraft mc=Minecraft.getInstance();
-            if(mc.player==null){primaryDown=false;selectDown=false;QuickBar.closeBar(false);return;}
+            if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;selectDown=false;QuickBar.closeBar(false);return;}
             if(mc.screen!=null) {
+                BranchKeyInput.cancel(true);
                 // Ending the hold here means the key is no longer "down" as far as this loop knows,
                 // so a key that is still physically held would read as a brand new press the moment
                 // the screen closes. Crossing a dimension puts the terrain screen up mid-hold, which
                 // is exactly how arriving in the sanctum used to open a second break on arrival.
-                if(primaryDown){primaryDown=false;primaryLatched=true;LokiNetwork.send(LokiServer.HOLD_END,0);}
+                if(primaryDown){primaryDown=false;primaryLatched=true;if(primaryWasHold)LokiNetwork.send(LokiServer.HOLD_END,0);}
                 if(selectDown){selectDown=false;QuickBar.closeBar(false);}
                 drain();return;
             }
@@ -93,10 +94,12 @@ public final class LokiClient {
             boolean primary=PRIMARY.isDown();
             // A cast that was interrupted needs a real release before it counts as pressed again.
             if(primaryLatched){if(primary)primary=false;else primaryLatched=false;}
-            if(primary&&!primaryDown){primaryWasHold=selected.hold;LokiNetwork.send(selected.hold?LokiServer.HOLD_BEGIN:LokiServer.CAST,0);repeat=0;}
+            boolean branchInput=BranchKeyInput.tick(primary,primaryDown);
+            if(branchInput)primaryWasHold=false;
+            if(!branchInput&&primary&&!primaryDown){primaryWasHold=selected.hold;LokiNetwork.send(selected.hold?LokiServer.HOLD_BEGIN:LokiServer.CAST,0);repeat=0;}
             // Holding an ordinary spell repeats it; the server's own rate limit and cooldown set the pace.
-            else if(primary&&!selected.hold&&++repeat>=5){repeat=0;LokiNetwork.send(LokiServer.CAST,0);}
-            if(!primary&&primaryDown&&primaryWasHold)LokiNetwork.send(LokiServer.HOLD_END,0);
+            else if(!branchInput&&primary&&!selected.hold&&++repeat>=5){repeat=0;LokiNetwork.send(LokiServer.CAST,0);}
+            if(!branchInput&&!primary&&primaryDown&&primaryWasHold)LokiNetwork.send(LokiServer.HOLD_END,0);
             primaryDown=primary;
 
             // The alternate key configures the Fracture, but only inside the sanctum, which is the
@@ -114,6 +117,7 @@ public final class LokiClient {
         }
         /** Called when the world changes underfoot: a held cast must not survive the crossing. */
         static void releaseHeldCast() {
+            BranchKeyInput.cancel(false);
             if(primaryDown||PRIMARY.isDown())primaryLatched=true;
             primaryDown=false;
         }

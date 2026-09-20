@@ -34,7 +34,7 @@ public final class LokiCommands {
         player.then(Commands.literal("clear_bleed").executes(c->{Bleed.clear(EntityArgument.getPlayer(c,"player"));return 1;}));
         // Drops a charge that is being held and hands back anything caught mid-erasure, for testing and
         // for the rare case an operator needs to unstick a player by hand.
-        player.then(Commands.literal("clear_branch").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");TimeBranch.cancel(p);Erasure.forget(p);LokiNetwork.sync(p);return 1;}));
+        player.then(Commands.literal("clear_branch").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");TimeBranch.cancel(p);BranchFist.clear(p);Erasure.forget(p);LokiNetwork.sync(p);return 1;}));
         // Reports how much of the world is still owed a restore, and puts it all back on the spot. Both
         // are worth having by hand: the first to confirm nothing is stuck, the second to end the wait.
         root.then(Commands.literal("nothingness").then(Commands.literal("pending").executes(c->{

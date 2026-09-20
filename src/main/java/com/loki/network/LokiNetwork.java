@@ -12,9 +12,9 @@ import net.minecraftforge.network.*;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class LokiNetwork {
-    public static final SimpleChannel CHANNEL=NetworkRegistry.newSimpleChannel(Loki.id("main"),()->"2","2"::equals,"2"::equals);
+    public static final SimpleChannel CHANNEL=NetworkRegistry.newSimpleChannel(Loki.id("main"),()->"3","3"::equals,"3"::equals);
     /** Highest accepted client action id; see {@link LokiServer#input}. */
-    public static final int MAX_ACTION=12;
+    public static final int MAX_ACTION=13;
     public static final int SYNC=0,ANIMATE=1,FX=2,FROZEN=3,GRIP=4,MEMORY=5,THREADS=6,SLOWED=7,ARCHITECTURE=8,BLEED=9,FIELD=10,DISGUISE=11,
         BRANCH=12,TORRENT=13,ERASURE=14;
     public record Input(int action,int value) {}

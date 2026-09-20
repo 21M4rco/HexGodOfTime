@@ -48,7 +48,13 @@ public final class LokiHud {
         var lines=mc.font.split(net.minecraft.network.chat.Component.literal(primary+"  "+head),WIDTH-14);
         for(int i=0;i<Math.min(2,lines.size());i++)g.drawString(mc.font,lines.get(i),7,32+i*10,fracture?0xd8ecdd:0xc9d8ce,false);
         String hint=!fracture?alternate(a):home?"Choose where the break leads":"";
-        if(!hint.isEmpty())g.drawString(mc.font,secondary+"  "+hint,7,54,fracture?0xc0b184:0x9cb6a6,false);
+        if(a==Ability.TIME_BRANCH) {
+            long remaining=Math.max(0,d.getLong(BranchFistState.UNTIL)-ClientState.now());
+            long fistCd=Math.max(0,d.getLong(BranchFistState.COOLDOWN)-ClientState.now());
+            hint=remaining>0?String.format(Locale.ROOT,"Right fist: %.1fs — punch",remaining/20f)
+                :fistCd>0?String.format(Locale.ROOT,"Tap recovery %.1fs",fistCd/20f):"Tap ready | Cost "+BranchFistState.COST;
+        }
+        if(!hint.isEmpty())g.drawString(mc.font,(a==Ability.TIME_BRANCH?"":secondary+"  ")+hint,7,54,fracture?0xc0b184:0x9cb6a6,false);
         String select=LokiClient.SELECT.getTranslatedKeyMessage().getString();
         g.drawString(mc.font,select+" + scroll: choose ability",7,67,0x779d87,false);
         float max=100+MasteryScreen.mastery(d,Discipline.TEMPORAL)*.2f+(d.getBoolean("ascended")?150:0),energy=d.getFloat("energy");
@@ -114,7 +120,7 @@ public final class LokiHud {
             case SELECTIVE_STOP -> "Freeze the target in your aim.";
             case THREADS -> "Bind your target in time.";
             case ASCENSION -> "Toggle your final transformation.";
-            case TIME_BRANCH -> "Transformed: hold to charge, release to erase.";
+            case TIME_BRANCH -> "Tap: right fist. Hold/release: beam.";
         };
     }
     private static String alternate(Ability a) {
