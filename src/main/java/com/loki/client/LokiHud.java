@@ -19,7 +19,7 @@ public final class LokiHud {
     private static final float SCALE=.8f;
     public static void render(GuiGraphics g) {
         var mc=Minecraft.getInstance();if(mc.player==null||mc.options.hideGui)return;
-        var d=ClientState.self();Ability a=QuickBar.displayed();
+        var d=ClientState.self();if(!d.getBoolean("abilitiesEnabled"))return;Ability a=QuickBar.displayed();
         int screenWidth=mc.getWindow().getGuiScaledWidth(),screenHeight=mc.getWindow().getGuiScaledHeight();
         // Drawn before the ability panel and independently of it: a caster holding the torrent needs the
         // charge read-out even if their quick bar happens to be empty.

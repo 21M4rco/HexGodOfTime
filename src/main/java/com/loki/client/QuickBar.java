@@ -17,23 +17,24 @@ public final class QuickBar {
     private static boolean open;
     private static int cursor;
 
-    public static boolean open() {return open;}
+    private static boolean enabled(){return ClientState.self().getBoolean("abilitiesEnabled");}
+    public static boolean open() {return open&&enabled();}
 
     public static void openBar() {
-        if(open)return;
+        if(!enabled()||open)return;
         open=true;
         cursor=Math.max(0,indexOf(ClientState.self(),ClientState.self().getInt("selected")));
     }
     public static void closeBar(boolean commit) {
-        if(!open)return;
+        if(!enabled()||!open)return;
         open=false;
-        if(!commit)return;
+        if(!commit||!enabled())return;
         int ability=slot(ClientState.self(),cursor);
         if(ability>=0)LokiNetwork.send(LokiServer.SELECT,ability);
     }
     /** @return true when the wheel was consumed by the bar rather than the hotbar. */
     public static boolean scroll(double delta) {
-        if(!open)return false;
+        if(!enabled()||!open)return false;
         int step=delta>0?-1:1;
         for(int i=0;i<LokiData.QUICK_SLOTS;i++) {
             cursor=Math.floorMod(cursor+step,LokiData.QUICK_SLOTS);
@@ -41,7 +42,7 @@ public final class QuickBar {
         }
         return true;
     }
-    public static void assign(int slot,int ability) {LokiNetwork.send(LokiServer.ASSIGN,slot*1000+ability+1);}
+    public static void assign(int slot,int ability) {if(enabled())LokiNetwork.send(LokiServer.ASSIGN,slot*1000+ability+1);}
     public static int cursor() {return cursor;}
 
     private static int slot(CompoundTag data,int index) {
@@ -64,6 +65,7 @@ public final class QuickBar {
     }
 
     public static Ability displayed() {
+        if(!enabled())return null;
         int id=open?slot(ClientState.self(),cursor):ClientState.self().getInt("selected");
         return Ability.slot(id);
     }

@@ -35,6 +35,8 @@ public final class LokiClient {
     private static KeyMapping key(String name,int key){return new KeyMapping("key.loki."+name,InputConstants.Type.KEYSYM,key,"key.categories.loki");}
     private static boolean primaryDown,selectDown,primaryWasHold,primaryLatched;
     private static int repeat;
+    /** The server syncs this flag. Missing/false means this client gets no Loki UI or controls at all. */
+    public static boolean enabled(){return ClientState.self().getBoolean("abilitiesEnabled");}
 
     @Mod.EventBusSubscriber(modid=Loki.ID,value=Dist.CLIENT,bus=Mod.EventBusSubscriber.Bus.MOD)
     public static final class ModBus {
@@ -73,6 +75,17 @@ public final class LokiClient {
             ClientState.tick();
             Minecraft mc=Minecraft.getInstance();
             if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;selectDown=false;QuickBar.closeBar(false);return;}
+            if(!enabled()) {
+                // Locked means invisible and inert, not merely server-rejected. Swallow every Loki input
+                // and close any Loki-only screen immediately when access is revoked.
+                BranchKeyInput.cancel(false);
+                primaryLatched=primaryPhysicallyDown();
+                primaryDown=false;primaryWasHold=false;repeat=0;
+                selectDown=SELECT.isDown();
+                QuickBar.closeBar(false);
+                if(mc.screen instanceof MasteryScreen||mc.screen instanceof FractureScreen)mc.setScreen(null);
+                drain();return;
+            }
             if(mc.screen!=null) {
                 BranchKeyInput.cancel(true);
                 // Ending the hold here means the key is no longer "down" as far as this loop knows,
@@ -131,14 +144,14 @@ public final class LokiClient {
             return PRIMARY.isDown();
         }
         private static void drain() {
-            while(PRIMARY.consumeClick());
-            while(SELECT.consumeClick());
+            for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT})
+                while(k.consumeClick());
             for(KeyMapping k:TIME_KEYS)while(k.consumeClick());
         }
 
         @SubscribeEvent public static void scroll(InputEvent.MouseScrollingEvent e) {
             var mc=Minecraft.getInstance();
-            if(mc.player==null||mc.screen!=null)return;
+            if(mc.player==null||mc.screen!=null||!enabled())return;
             if(QuickBar.scroll(e.getScrollDelta())){e.setCanceled(true);return;}
             if(ClientState.self().getInt("grip")>0) {
                 // Both hands are busy holding something; the wheel pushes and pulls it instead of the hotbar.
@@ -148,7 +161,7 @@ public final class LokiClient {
         }
         @SubscribeEvent public static void mouse(InputEvent.InteractionKeyMappingTriggered e) {
             var mc=Minecraft.getInstance();
-            if(mc.player==null||mc.screen!=null)return;
+            if(mc.player==null||mc.screen!=null||!enabled())return;
             if(!(mc.player.getMainHandItem().getItem() instanceof ConjuredWeapon)||!(e.isAttack()||e.isUseItem()))return;
             e.setCanceled(true);e.setSwingHand(false);
             if(!ClientState.frozen(mc.player.getId()))LokiNetwork.send(LokiServer.WEAPON,e.isUseItem()?1:0);

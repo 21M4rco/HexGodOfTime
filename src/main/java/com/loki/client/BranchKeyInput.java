@@ -18,7 +18,7 @@ public final class BranchKeyInput {
     private static final BranchTapGesture GESTURE=new BranchTapGesture();
     private static boolean owned,latched;
     private static boolean selected(){return Ability.at(ClientState.self().getInt("selected"))==Ability.TIME_BRANCH;}
-    private static boolean available(){var mc=Minecraft.getInstance();return mc.player!=null&&mc.screen==null;}
+    private static boolean available(){var mc=Minecraft.getInstance();return mc.player!=null&&mc.screen==null&&LokiClient.enabled();}
     @SubscribeEvent public static void key(InputEvent.Key e) {
         if(LokiClient.PRIMARY.matches(e.getKey(),e.getScanCode()))edge(e.getAction());
     }
