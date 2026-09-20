@@ -68,7 +68,7 @@ public final class Throne {
         Vec3 away=trespasser.position().subtract(seat);
         // Straight up is not "away", so a body sitting exactly on the seat is given a direction to go.
         Vec3 flat=new Vec3(away.x,0,away.z);
-        if(flat.lengthSqr()<1e-4)flat=new Vec3(trespasser.getRandom().nextDouble()-.5,0,trespasser.getRandom().nextDouble()-.5);
+        if(flat.lengthSqr()<1e-4)flat=new Vec3(level.getRandom().nextDouble()-.5,0,level.getRandom().nextDouble()-.5);
         if(flat.lengthSqr()<1e-6)flat=new Vec3(0,0,1);
         flat=flat.normalize();
         trespasser.stopRiding();
