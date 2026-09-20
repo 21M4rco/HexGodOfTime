@@ -228,7 +228,10 @@ public final class TemporalEngine {
      * the journey along it stretches out.
      */
     private static void drift(Entity e,double factor) {
-        if(e.isNoGravity()||e.onGround())return;
+        // A player's fall is predicted on their own client, so pushing back against it from here
+        // would rubber-band them. Their walking and striking are already slowed by attributes, which
+        // the client is told about and predicts correctly.
+        if(e instanceof ServerPlayer||e.isNoGravity()||e.onGround())return;
         double gravity=gravityOf(e);
         if(gravity<=0)return;
         e.setDeltaMovement(e.getDeltaMovement().add(0,gravity*(1-factor*factor),0));

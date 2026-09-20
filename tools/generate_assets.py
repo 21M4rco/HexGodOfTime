@@ -1,5 +1,8 @@
 """Reproducible authored meshes, textures, particle sprites, animations and recorded-Foley mappings.
 
+The nebula-family sprites and the ground-blood decal live in `generate_vfx_sprites.py` instead, which
+needs no third-party imaging library; this module needs Pillow.
+
 Requires Pillow. Audio references samples from the installed Minecraft assets; no audio
 is redistributed or synthesized.
 

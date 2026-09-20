@@ -42,7 +42,7 @@ Install Player Animator **1.0.2-rc1+1.20** (CurseForge file 4587214) on clients.
 | R | Cast the selected spell; **hold** for abilities that shape while held |
 | G | Alternate contextual action |
 | H | Glorious Purpose transformation |
-| X | Release held targets / seal your fracture |
+| X | Release held targets / seal your fracture / also resumes your time fields |
 | Z | **Stillness** — suspend the local battlefield |
 | B | **Resume Time** — release everything you are holding |
 | N | **Personal Rewind** |
