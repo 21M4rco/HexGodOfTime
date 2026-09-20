@@ -38,13 +38,13 @@ public final class TimeBranch {
     /** An opened torrent, sweeping forward: what it has already caught and what it has yet to reach. */
     private static final class Torrent {
         final UUID caster;final Vec3 origin,direction;final double length;final float power;
-        final long start;final int life;final List<BlockPos> soft;final double[] reach;
+        final long start;final int life;final List<BlockPos> soft;final double[] distances;
         final Set<UUID> caught=new HashSet<>();
         int cursor;
         Torrent(UUID caster,Vec3 origin,Vec3 direction,double length,float power,long start,int life,
-                List<BlockPos> soft,double[] reach) {
+                List<BlockPos> soft,double[] distances) {
             this.caster=caster;this.origin=origin;this.direction=direction;this.length=length;
-            this.power=power;this.start=start;this.life=life;this.soft=soft;this.reach=reach;
+            this.power=power;this.start=start;this.life=life;this.soft=soft;this.distances=distances;
         }
     }
     private static final Map<UUID,Cast> CASTS=new HashMap<>();
@@ -139,7 +139,7 @@ public final class TimeBranch {
         float power=BranchCharge.power(held);
         Vec3 origin=BranchCharge.focus(p,1);
         Vec3 direction=p.getLookAngle();
-        double length=reach(level,p,origin,direction);
+        double length=reach(level,origin,direction);
         double erase=BranchCharge.eraseRadius(power);
         List<BlockPos> soft=SoftTerrain.cylinder(level,origin,direction,BranchCharge.SAFE,length,erase,MAX_SOFT);
         double[] distances=new double[soft.size()];
@@ -163,7 +163,7 @@ public final class TimeBranch {
      * How far the torrent carries. Soft cover does not stop it — that is the point of it — so only a
      * structural, collidable block ends the beam, and the visible length is that same number.
      */
-    private static double reach(ServerLevel level,ServerPlayer caster,Vec3 origin,Vec3 direction) {
+    private static double reach(ServerLevel level,Vec3 origin,Vec3 direction) {
         for(double t=BranchCharge.SAFE;t<BranchCharge.RANGE;t+=.25) {
             Vec3 at=origin.add(direction.scale(t));
             BlockPos pos=BlockPos.containing(at);
@@ -224,7 +224,7 @@ public final class TimeBranch {
     private static void erase(ServerLevel level,Torrent t,long age) {
         int removed=0;
         while(t.cursor<t.soft.size()&&removed<SOFT_PER_TICK) {
-            if(BranchCharge.reaches(t.reach[t.cursor])+BranchCharge.DISSOLVE>age)break;
+            if(BranchCharge.reaches(t.distances[t.cursor])+BranchCharge.DISSOLVE>age)break;
             BlockPos pos=t.soft.get(t.cursor++);
             if(!level.hasChunkAt(pos))continue;
             BlockState state=level.getBlockState(pos);

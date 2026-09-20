@@ -1,6 +1,8 @@
 package com.loki.server;
 
 import com.loki.network.LokiNetwork;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.*;
 import net.minecraft.world.damagesource.*;
@@ -114,15 +116,29 @@ public final class Erasure {
         LivingEntity v=f.victim;
         if(!v.isAlive()||v.isRemoved())return;
         ServerPlayer caster=level.getServer().getPlayerList().getPlayer(f.caster);
-        DamageSource source=caster!=null
-            ?v.damageSources().source(DamageTypes.GENERIC_KILL,caster)
-            :v.damageSources().source(DamageTypes.GENERIC_KILL);
+        DamageSource source=erasure(level,v,caster);
         v.invulnerableTime=0;
         v.hurt(source,v.getMaxHealth()*4+1000);
         if(v.isAlive()){v.invulnerableTime=0;v.kill();}
         // A creature that survives even that is not going to be killed by asking again; it is taken out
         // of the world instead. Players are never discarded — their death is the server's to resolve.
         if(v.isAlive()&&!(v instanceof Player))v.discard();
+    }
+
+    /**
+     * The damage that lands at the end. Built from the registry rather than through
+     * {@link DamageSources}, whose typed factory is private, so the kill can carry the caster for credit
+     * while still bypassing armour, resistance and invulnerability frames — this is a removal, not a hit.
+     * If the registry cannot answer, the untyped kill is used instead and the body still dies.
+     */
+    private static DamageSource erasure(ServerLevel level,LivingEntity victim,ServerPlayer caster) {
+        try {
+            Holder<DamageType> type=level.registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
+                .getHolderOrThrow(DamageTypes.GENERIC_KILL);
+            return new DamageSource(type,caster,caster);
+        } catch(Exception ignored) {
+            return victim.damageSources().genericKill();
+        }
     }
 
     public static void forget(Entity e) {

@@ -3,6 +3,7 @@ package com.loki.entity;
 import com.loki.Loki;
 import com.loki.network.LokiNetwork;
 import com.loki.server.SanctumWard;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
