@@ -148,23 +148,28 @@ public final class BranchVfx {
         }
         public int size() {return total;}
 
+        /*
+         * Scratch arrays for the emit loop. WorldEffects.quad only reads what it is handed, so one set is
+         * refilled per quad rather than allocating ten small arrays a quad — which at a couple of thousand
+         * quads a frame is the difference between a steady effect and a stuttering one.
+         */
+        private final float[][] corners={new float[3],new float[3],new float[3],new float[3]};
+        private final float[][] texture={new float[2],new float[2],new float[2],new float[2]};
+
         /** One {@code getBuffer}/{@code endBatch} pair per type, in the order the types were first used. */
         public void flush(PoseStack pose,MultiBufferSource.BufferSource buffers) {
             for(var entry:batches.entrySet()) {
                 Batch batch=entry.getValue();
                 if(batch.count==0)continue;
                 VertexConsumer out=buffers.getBuffer(entry.getKey());
-                float[] v=new float[3];
+                float[] data=batch.data;
                 for(int q=0;q<batch.count;q++) {
                     int at=q*STRIDE;
-                    float[] data=batch.data;
-                    float alpha=data[at+20];
-                    int colour=batch.colour[q];
-                    float[][] corners=new float[4][];
-                    for(int i=0;i<4;i++)corners[i]=new float[]{data[at+i*3],data[at+i*3+1],data[at+i*3+2]};
-                    float[][] uv=new float[4][];
-                    for(int i=0;i<4;i++)uv[i]=new float[]{data[at+12+i*2],data[at+13+i*2]};
-                    WorldEffects.quad(pose,out,corners,uv,15728880,colour,alpha);
+                    for(int i=0;i<4;i++) {
+                        corners[i][0]=data[at+i*3];corners[i][1]=data[at+i*3+1];corners[i][2]=data[at+i*3+2];
+                        texture[i][0]=data[at+12+i*2];texture[i][1]=data[at+13+i*2];
+                    }
+                    WorldEffects.quad(pose,out,corners,texture,15728880,batch.colour[q],data[at+20]);
                 }
                 buffers.endBatch(entry.getKey());
                 batch.count=0;
