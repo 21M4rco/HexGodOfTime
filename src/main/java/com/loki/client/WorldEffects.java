@@ -277,7 +277,7 @@ public final class WorldEffects {
         }
 
         for(Projection projection:PROJECTIONS.values()) {
-            if(projection.origin.distanceToSqr(camera)>4096)continue;
+            if(projection.origin.distanceToSqr(camera)>2304)continue;
             float build=Mth.clamp((float)(now-projection.shown)/14f,0,1);
             int height=projection.blocks.stream().mapToInt(b->b.offset().getY()).max().orElse(1)+1;
             int light=LevelRenderer.getLightColor(mc.level,BlockPos.containing(projection.origin.add(0,1,0)));

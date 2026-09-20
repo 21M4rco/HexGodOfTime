@@ -31,6 +31,8 @@ public final class PocketRealm {
     private static final int FLOOR_CELLS=SIZE*SIZE,TOTAL=FLOOR_CELLS*2+COLUMNS*WALL;
     private static final int IMMEDIATE=22,BUDGET=3000,UPDATE_CLIENTS=2;
     private static final List<int[]> PENDING=new ArrayList<>();
+    private static final Map<UUID,Integer> KNEELING=new HashMap<>();
+    private static final int KNEEL_TICKS=60;
 
     /** Persisted plot ledger. Lives in the pocket dimension's own data storage. */
     public static final class Realms extends SavedData {
@@ -131,13 +133,18 @@ public final class PocketRealm {
             while(job[1]<TOTAL&&placed<BUDGET) {place(level,o,job[1]++);placed++;}
             if(job[1]>=TOTAL)PENDING.remove(0);
         }
-        if(level.getGameTime()%20!=0)return;
-        for(ServerPlayer p:level.players()) {
-            if(p.isSpectator()||p.isCreative())continue;
-            if(p.getY()>FLOOR_Y-24)continue;
-            int plot=realms(level).plot(p.getUUID());
-            Vec3 safe=centre(plot);
-            p.teleportTo(safe.x,safe.y,safe.z);
+        for(ServerPlayer p:new ArrayList<>(level.players())) {
+            Vec3 middle=centre(realms(level).plot(p.getUUID()));
+            // Kneeling on the gilded centre always sends you home, with no spell and no cooldown,
+            // so nobody can be stranded here by losing an ability or forgetting the way out.
+            if(p.isCrouching()&&p.distanceToSqr(middle)<9) {
+                int held=KNEELING.merge(p.getUUID(),1,Integer::sum);
+                if(held==KNEEL_TICKS/2)p.displayClientMessage(Component.literal("Hold still, and the way home will open."),true);
+                if(held>=KNEEL_TICKS){KNEELING.remove(p.getUUID());leave(p);continue;}
+            } else KNEELING.remove(p.getUUID());
+            if(level.getGameTime()%20!=0)continue;
+            if(p.isSpectator()||p.isCreative()||p.getY()>FLOOR_Y-24)continue;
+            p.teleportTo(middle.x,middle.y,middle.z);
             p.setDeltaMovement(Vec3.ZERO);p.resetFallDistance();
         }
     }
@@ -165,6 +172,7 @@ public final class PocketRealm {
         double dx=x-(SIZE-1)/2.0,dz=z-(SIZE-1)/2.0,r=Math.sqrt(dx*dx+dz*dz);
         if(r<7)return Blocks.GILDED_BLACKSTONE.defaultBlockState();
         if(r<8.6)return Blocks.CHISELED_POLISHED_BLACKSTONE.defaultBlockState();
+        if(x%10==0&&z%10==0)return Blocks.OCHRE_FROGLIGHT.defaultBlockState();
         if(x%10==0||z%10==0)return Blocks.POLISHED_BLACKSTONE_BRICKS.defaultBlockState();
         return Blocks.DEEPSLATE_TILES.defaultBlockState();
     }
@@ -188,5 +196,5 @@ public final class PocketRealm {
         @Override public boolean playTeleportSound(ServerPlayer player,ServerLevel from,ServerLevel to) {return false;}
     }
 
-    public static void reset() {PENDING.clear();}
+    public static void reset() {PENDING.clear();KNEELING.clear();}
 }

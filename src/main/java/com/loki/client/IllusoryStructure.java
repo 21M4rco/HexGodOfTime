@@ -90,7 +90,7 @@ public final class IllusoryStructure {
     }
 
     private static void hall(List<Placement> out,int scale,RandomSource random) {
-        int width=2+scale,depth=3+scale,height=4+scale;
+        int width=1+scale,depth=2+scale,height=4+scale;
         for(int x=-width;x<=width;x++) {
             for(int z=-depth;z<=depth;z++) {
                 boolean edge=Math.abs(x)==width||Math.abs(z)==depth;
