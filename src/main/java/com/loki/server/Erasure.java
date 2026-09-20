@@ -15,9 +15,19 @@ import java.util.*;
  * Temporal erasure: the part of Time Branch Unleashing that removes a body from the timeline.
  *
  * <p>Nothing is killed on contact. A caught creature is first taken out of the fight — held still, its
- * navigation and its aggression stopped, its own controls refused — and stays visible for the length of
- * the sequence while the client draws the destruction travelling through it. Only when that has run its
- * course does the death land, and the server is the only thing that decides it.
+ * navigation and its aggression stopped, its own controls refused, its voice taken and every other source
+ * of harm refused on its behalf — and stays visible for the length of the sequence while the client draws
+ * the destruction travelling through it. Only when that has run its course does the death land, and the
+ * server is the only thing that decides it.
+ *
+ * <p>It takes its time. The sequence runs for the better part of ten seconds and longer at full charge,
+ * because the whole point is watching a body be taken apart rather than watching it fall over.
+ *
+ * <p>And nothing falls over. Once the death lands, the shell is removed in the same tick — drops, experience
+ * and advancements have all already been handed out by that death, so what is discarded is only the corpse
+ * and the twenty ticks of tipping that would have gone with it. A player's body cannot be discarded, so it
+ * is the client that keeps it hidden for as long as it lies there. Either way the last thing anybody sees is
+ * the last fragment going, which is the only ending this ability has.
  *
  * <p>Every hold here is reversible and leased. A victim whose caster vanishes, whose world changes, or
  * whose sequence is interrupted has its gravity and its AI handed straight back, and the whole register
@@ -28,12 +38,20 @@ public final class Erasure {
 
     private static final class Fading {
         final LivingEntity victim;final UUID caster;final Vec3 direction;
-        final long start;final int duration;final boolean gravity,noAi;
-        Fading(LivingEntity victim,UUID caster,Vec3 direction,long start,int duration,boolean gravity,boolean noAi) {
+        final long start;final int duration;final boolean gravity,noAi,silent;
+        Fading(LivingEntity victim,UUID caster,Vec3 direction,long start,int duration,
+               boolean gravity,boolean noAi,boolean silent) {
             this.victim=victim;this.caster=caster;this.direction=direction;
-            this.start=start;this.duration=duration;this.gravity=gravity;this.noAi=noAi;
+            this.start=start;this.duration=duration;this.gravity=gravity;this.noAi=noAi;this.silent=silent;
         }
     }
+    /**
+     * How long a body takes to go. Deliberately long: a tap still spends seven and a half seconds coming
+     * apart and a full charge the better part of twelve, because the erasure is the spectacle and hurrying
+     * it would make it a damage number with particles on top. A player gets longer again, since theirs is
+     * the death somebody is watching happen to them.
+     */
+    private static final int MOB_TICKS=150,PLAYER_TICKS=180,CHARGE_TICKS=90;
     private static final Map<UUID,Fading> FADING=new LinkedHashMap<>();
     /** A hard ceiling on bodies mid-erasure, so a crowded torrent cannot grow unbounded work. */
     private static final int MAX=48;
@@ -51,9 +69,9 @@ public final class Erasure {
         if(victim==caster||!LokiServer.validTarget(caster,victim))return false;
         // Somebody's own animal is not what this is for.
         if(victim instanceof TamableAnimal pet&&caster.getUUID().equals(pet.getOwnerUUID()))return false;
-        int duration=(victim instanceof Player?30:22)+(int)(power*14);
+        int duration=(victim instanceof Player?PLAYER_TICKS:MOB_TICKS)+(int)(power*CHARGE_TICKS);
         Fading fading=new Fading(victim,caster.getUUID(),direction.normalize(),victim.level().getGameTime(),
-            duration,victim.isNoGravity(),victim instanceof Mob m&&m.isNoAi());
+            duration,victim.isNoGravity(),victim instanceof Mob m&&m.isNoAi(),victim.isSilent());
         FADING.put(victim.getUUID(),fading);
         hold(fading);
         CompoundTag n=new CompoundTag();
@@ -79,9 +97,12 @@ public final class Erasure {
         for(Fading f:done)finish(f,level);
     }
 
-    /** Held out of time: no fall, no drift, no navigation, no aggression, no swing. */
+    /** Held out of time: no fall, no drift, no navigation, no aggression, no swing, and no voice. */
     private static void hold(Fading f) {
         LivingEntity v=f.victim;
+        // Silenced for the whole sequence, which is also what keeps the death sound from arriving at the
+        // end of it. A thing being unmade does not grunt.
+        if(!v.isSilent())v.setSilent(true);
         v.setNoGravity(true);
         v.setDeltaMovement(Vec3.ZERO);
         v.fallDistance=0;
@@ -98,8 +119,13 @@ public final class Erasure {
         }
     }
 
-    /** Hands everything back exactly as it was found. */
+    /** Hands everything back exactly as it was found, for a sequence that was interrupted. */
     private static void release(Fading f) {
+        unhold(f);
+        f.victim.setSilent(f.silent);
+    }
+    /** The mechanical holds only. Silence is kept through a death so the death itself stays quiet. */
+    private static void unhold(Fading f) {
         LivingEntity v=f.victim;
         v.setNoGravity(f.gravity);
         v.fallDistance=0;
@@ -112,17 +138,25 @@ public final class Erasure {
      * bosses and modded creatures that refuse a damage source outright.
      */
     private static void finish(Fading f,ServerLevel level) {
-        release(f);
+        // The mechanical holds go back so the death itself is an ordinary one; the silence stays, because
+        // the death sound would arrive after the body had already finished coming apart.
+        unhold(f);
         LivingEntity v=f.victim;
-        if(!v.isAlive()||v.isRemoved())return;
+        if(!v.isAlive()||v.isRemoved()){v.setSilent(f.silent);return;}
         ServerPlayer caster=level.getServer().getPlayerList().getPlayer(f.caster);
         DamageSource source=erasure(level,v,caster);
         v.invulnerableTime=0;
         v.hurt(source,v.getMaxHealth()*4+1000);
         if(v.isAlive()){v.invulnerableTime=0;v.kill();}
-        // A creature that survives even that is not going to be killed by asking again; it is taken out
-        // of the world instead. Players are never discarded — their death is the server's to resolve.
-        if(v.isAlive()&&!(v instanceof Player))v.discard();
+        if(v instanceof Player) {
+            // A player's body cannot be discarded — the server owns their death and their respawn. Their
+            // corpse is hidden client-side instead, for as long as it lies there.
+            return;
+        }
+        // Everything else loses its shell now. The death above has already handed out drops, experience and
+        // advancements synchronously, so all that is thrown away is the corpse and the twenty ticks of
+        // tipping over that would otherwise undo the entire erasure.
+        v.discard();
     }
 
     /**

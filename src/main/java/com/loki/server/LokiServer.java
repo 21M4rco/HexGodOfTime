@@ -411,6 +411,7 @@ public final class LokiServer {
         Telekinesis.tickSlams(level);
         TimeBranch.tickLevel(level);
         Erasure.tickLevel(level);
+        Nothingness.tick(level);
         PocketRealm.tick(level);
         if(now%200==0)WATCHED.entrySet().removeIf(e->level.getEntity(e.getKey())==null);
     }

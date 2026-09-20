@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.*;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -34,6 +35,20 @@ public final class LokiCommands {
         // Drops a charge that is being held and hands back anything caught mid-erasure, for testing and
         // for the rare case an operator needs to unstick a player by hand.
         player.then(Commands.literal("clear_branch").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");TimeBranch.cancel(p);Erasure.forget(p);LokiNetwork.sync(p);return 1;}));
+        // Reports how much of the world is still owed a restore, and puts it all back on the spot. Both
+        // are worth having by hand: the first to confirm nothing is stuck, the second to end the wait.
+        root.then(Commands.literal("nothingness").then(Commands.literal("pending").executes(c->{
+            ServerLevel level=c.getSource().getLevel();
+            int count=Nothingness.pending(level);
+            c.getSource().sendSuccess(()->Component.literal(count+" position(s) awaiting restoration in "+level.dimension().location()),false);
+            return count;
+        })).then(Commands.literal("restore").executes(c->{
+            ServerLevel level=c.getSource().getLevel();
+            int count=Nothingness.pending(level);
+            Nothingness.restoreAll(level);
+            c.getSource().sendSuccess(()->Component.literal("Restored "+count+" position(s)."),false);
+            return count;
+        })));
         player.then(Commands.literal("clear_quick").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");for(int i=0;i<LokiData.QUICK_SLOTS;i++)LokiData.quick(p,i,-1);LokiNetwork.sync(p);return 1;}));
         player.then(Commands.literal("realm").then(Commands.literal("enter").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");return PocketRealm.enter(p)?1:0;}))
             .then(Commands.literal("exit").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");return PocketRealm.leave(p)?1:0;})));

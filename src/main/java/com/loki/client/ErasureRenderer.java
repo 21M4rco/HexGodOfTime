@@ -29,6 +29,17 @@ import java.util.*;
  * renderer reports. That approximation works for every living entity in the game, vanilla or modded,
  * because it never touches the foreign renderer — it replaces it. Every lookup is guarded, and a renderer
  * that refuses to answer falls back to untextured temporal fragments rather than failing.
+ *
+ * <p>The material does not tumble away as debris. It is <em>drawn out</em>: a fragment the front has
+ * reached stretches downstream into fine parallel filaments along the torrent, thinning as it goes, so the
+ * body smears rather than crumbles and the silhouette stays readable inside the streaking right up until
+ * there is none of it left. That directional smear is the whole character of the reference, and cuboids
+ * spinning off in every direction read as rubble instead.
+ *
+ * <p>This is also where the death animation is refused. Once the sequence is finished nothing is drawn at
+ * all, and the ordinary renderer stays stood down for as long as the body is lying there dead — which for a
+ * player is until they respawn, since a player's corpse cannot simply be removed from the world. A corpse
+ * tipping over after the body has already come apart would undo the entire effect, so it is never shown.
  */
 public final class ErasureRenderer {
     private ErasureRenderer() {}
@@ -37,6 +48,10 @@ public final class ErasureRenderer {
     private static final Map<Integer,Fading> FADING=new HashMap<>();
     /** Below this the real model is still drawn; past it the fragment body replaces it. */
     private static final float TAKEOVER=.18f;
+    /** Ticks past the sequence before a body that is neither gone nor alive is given up on. */
+    private static final int GRACE=10,ABANDON=2400;
+    /** Ticks between bursts of dust. The sequence is long, so the rate is sparse rather than constant. */
+    private static final int CADENCE=3;
     /** Half-width of the band that is actively breaking, as a fraction of the body's depth. */
     private static final double BAND=.17;
     private static final int MAX_CELLS=900;
@@ -72,14 +87,25 @@ public final class ErasureRenderer {
         var mc=Minecraft.getInstance();
         if(mc.level==null){clear();return;}
         long now=ClientState.now();
-        FADING.entrySet().removeIf(e->mc.level.getEntity(e.getKey())==null||now-e.getValue().start()>e.getValue().duration()+6);
+        FADING.entrySet().removeIf(e->{
+            Entity victim=mc.level.getEntity(e.getKey());
+            if(victim==null)return true;
+            long over=now-e.getValue().start()-e.getValue().duration();
+            if(over<GRACE)return false;
+            // Past the sequence. A body that has gone, or that genuinely survived, can be let go of. One
+            // still lying there dead stays hidden, because that corpse is the death animation.
+            if(over>ABANDON)return true;
+            return victim.isAlive();
+        });
         if(FADING.isEmpty()||mc.player==null)return;
+        if(now%CADENCE!=0)return;
         Vec3 eye=mc.player.getEyePosition();
         for(var entry:FADING.entrySet()) {
             Entity e=mc.level.getEntity(entry.getKey());
             if(e==null||e.position().distanceToSqr(eye)>VISIBLE)continue;
             Fading f=entry.getValue();
             float phase=Mth.clamp((now-f.start())/(float)f.duration(),0,1);
+            if(phase>=1)continue;
             Vec3 front=e.position().add(0,e.getBbHeight()*(1-phase*.7),0);
             // Dust, wisps and threads, all swept the way the torrent was going.
             Vfx.cone(Loki.TEMPORAL_DUST.get(),front,f.direction(),Vfx.count(3+f.power()*3),.34,.16);
@@ -107,7 +133,8 @@ public final class ErasureRenderer {
             double distance=e.position().distanceToSqr(camera);
             if(distance>VISIBLE)continue;
             float phase=progress(entry.getKey(),partial);
-            if(phase<0)continue;
+            // Finished. Nothing is drawn, and nothing vanilla is drawn either, so the body is simply gone.
+            if(phase<0||phase>=1)continue;
             try {
                 budget-=body(PAINTER,e,entry.getValue(),phase,partial,distance,time,budget);
                 crawl(PAINTER,e,entry.getValue(),phase,partial,time);
@@ -153,6 +180,8 @@ public final class ErasureRenderer {
         // A little overshoot at both ends: the front arrives before the leading edge and leaves after
         // the trailing one, so no fragment is stranded and none disappears without breaking first.
         double frontAt=phase*1.18-.09;
+        // Two directions square to the flow, so the filaments can be spread across it rather than stacked.
+        Vec3 across=BranchVfx.perpendicular(d),over=across.cross(d).normalize();
         int drawn=0;
 
         for(int i=0;i<nx;i++)for(int j=0;j<ny;j++)for(int k=0;k<nz;k++) {
@@ -170,20 +199,36 @@ public final class ErasureRenderer {
                 drawn++;
                 continue;
             }
-            // On the front: coming apart, lifted, spinning, and swept downstream.
+            // On the front: caught, drawn out, and carried off down the torrent.
             double bite=Mth.clamp((frontAt+BAND-s)/(BAND*2),0,1);
-            double spin=rad+bite*(TemporalLightning.rand(cell,1)-.5)*4.2;
+            // Only a little tumble. Too much and it reads as rubble rather than as something being pulled
+            // apart along one direction.
+            double spin=rad+bite*(TemporalLightning.rand(cell,1)-.5)*1.1;
             Vec3 thrown=at
-                .add(d.scale(bite*(.45+f.power()*.7)))
-                .add((TemporalLightning.rand(cell,2)-.5)*bite*.5,
-                     (TemporalLightning.rand(cell,3)-.2)*bite*.55,
-                     (TemporalLightning.rand(cell,4)-.5)*bite*.5);
+                .add(d.scale(bite*(.35+f.power()*.5)))
+                .add((TemporalLightning.rand(cell,2)-.5)*bite*.22,
+                     (TemporalLightning.rand(cell,3)-.2)*bite*.26,
+                     (TemporalLightning.rand(cell,4)-.5)*bite*.22);
             float left=(float)(1-bite);
-            cube(painter,skin,thrown,half*(.85-bite*.55),spin,uv(texture,i,j,nx,ny),0xffffff,left*.9f);
-            // Lit from inside as it goes, in the colour of whatever branch took it.
-            BranchVfx.billboard(painter,glow,thrown,half*(1.5-bite*.6),spin,
-                TemporalPalette.hot((float)(time*.06+TemporalPalette.offset(cell)),(float)bite*.6f),
-                (.30f+.35f*(float)bite)*left);
+            float[] patch=uv(texture,i,j,nx,ny);
+            // What is left of the solid piece: shrinking fast, because it is being drawn into the streaks.
+            cube(painter,skin,thrown,half*(.78-bite*.62),spin,patch,0xffffff,left*.85f);
+            // The smear. Several fine filaments off the same piece, offset across the flow so a body reads
+            // as hundreds of parallel lines rather than as a handful of comet tails.
+            double smear=bite*(2.4+f.power()*4.2);
+            if(smear>.05) {
+                for(int strand=0;strand<3;strand++) {
+                    double spread=(TemporalLightning.rand(cell*3+strand,5)-.5)*half*1.7;
+                    double lift=(TemporalLightning.rand(cell*3+strand,6)-.5)*half*1.7;
+                    Vec3 from=thrown.add(across.scale(spread)).add(over.scale(lift));
+                    Vec3 to=from.add(d.scale(smear*(.55+TemporalLightning.rand(cell*3+strand,7)*.85)));
+                    // The near half keeps the victim's own colours; the far half has already become light.
+                    streak(painter,skin,from,to,half*(.30-bite*.17),patch,0xffffff,left*.62f);
+                    streak(painter,glow,from.add(d.scale(smear*.35)),to,half*(.17-bite*.09),null,
+                        TemporalPalette.hot((float)(time*.06+TemporalPalette.offset(cell+strand)),(float)bite*.65f),
+                        (.22f+.30f*(float)bite)*left);
+                }
+            }
             drawn++;
         }
         return drawn;
@@ -215,6 +260,26 @@ public final class ErasureRenderer {
             TemporalLightning.draw(painter,BranchVfx.strand(),TemporalLightning.bolt(seed,from,to,4,width*.32,1),
                 width*.045,(float)(time*.06+i*.3),.55f*(1-phase*.45f));
         }
+    }
+
+    /**
+     * One filament of smeared material: a camera-facing band from where the piece was to where the torrent
+     * has taken it, tapering as it goes. Handed a patch of the victim's sheet it carries their colours;
+     * handed none it is pure light, which is what the far end of every streak becomes.
+     */
+    private static void streak(BranchVfx.Painter painter,RenderType type,Vec3 from,Vec3 to,double width,
+                               float[] patch,int colour,float alpha) {
+        if(width<=0||alpha<=.004f)return;
+        Vec3 along=to.subtract(from);
+        if(along.lengthSqr()<1e-8)return;
+        Vec3 camera=Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        Vec3 side=along.cross(from.subtract(camera));
+        if(side.lengthSqr()<1e-12)side=BranchVfx.perpendicular(along.normalize());
+        side=side.normalize().scale(width);
+        // Pinched to nothing at the trailing end: the filament thins out rather than stopping square.
+        Vec3 tip=side.scale(.12);
+        float[] uv=patch==null?null:new float[]{patch[0],patch[1],patch[2],patch[1],patch[2],patch[3],patch[0],patch[3]};
+        painter.quad(type,from.subtract(side),from.add(side),to.add(tip),to.subtract(tip),uv,colour,alpha);
     }
 
     /** Six faces, rotated with the body. Cuboids rather than sprites, because this is Minecraft. */

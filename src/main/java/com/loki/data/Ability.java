@@ -30,7 +30,7 @@ public enum Ability {
     SELECTIVE_STOP(TEMPORAL,740,30,160,false,"Chosen Moment","Suspend one target. Secondary: exempt one ally from your field."),
     THREADS(PURPOSE,0,25,80,false,"Temporal Threads","Bind a target in time. Secondary: pull it along the strand."),
     ASCENSION(PURPOSE,700,100,400,false,"Glorious Purpose","Weave the final mantle, living cloak and dark crown. While transformed, toggle Cosmic Flight with its key; Space rises and crouch descends."),
-    TIME_BRANCH(PURPOSE,900,120,700,true,"Time Branch Unleashing","Transformed only. Hold to plant yourself and compress the Time Branches between both hands; release to open them through reality. Ten seconds is the hard limit, full power at five and a half. Anything living caught in the torrent is erased from the timeline; soft ground dissolves out of it.");
+    TIME_BRANCH(PURPOSE,900,120,700,true,"Time Branch Unleashing","Transformed only. Hold to plant yourself and compress the Time Branches between both hands; release to open them through reality. Ten seconds is the hard limit, full power at five and a half. A hundred blocks of torrent that nothing stops: everything it passes through becomes Nothingness and is put back about half a minute later, exactly as it was. Anything living caught inside is erased from the timeline.");
     public final Discipline discipline; public final int level,cost,cooldown; public final boolean hold,dedicated; public final String title,description;
     Ability(Discipline d,int l,int cost,int cd,boolean hold,String title,String description) {this(d,l,cost,cd,hold,false,title,description);}
     Ability(Discipline d,int l,int cost,int cd,boolean hold,boolean dedicated,String title,String description) {

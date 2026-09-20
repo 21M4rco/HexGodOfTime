@@ -34,7 +34,8 @@ public final class TimeBranchRenderer {
     private static final class Torrent {
         final int caster;final Vec3 origin,direction;final double length;final float power;
         final int held;final long start;final int life;
-        final List<BlockPos> soft=new ArrayList<>();final List<Double> reach=new ArrayList<>();
+        final List<BlockPos> volume=new ArrayList<>();final List<Double> reach=new ArrayList<>();
+        final List<Boolean> dusty=new ArrayList<>();
         int dusted;
         Torrent(int caster,Vec3 origin,Vec3 direction,double length,float power,int held,long start,int life) {
             this.caster=caster;this.origin=origin;this.direction=direction;this.length=length;
@@ -46,7 +47,7 @@ public final class TimeBranchRenderer {
     private static final Map<Integer,Long> CHARGING=new HashMap<>();
     private static final List<Torrent> TORRENTS=new ArrayList<>();
     private static final double VISIBLE=100*100;
-    private static final int MAX_SOFT=2000,MAX_DISSOLVE_DRAWN=180;
+    private static final int MAX_VOLUME=4200,MAX_DISSOLVE_DRAWN=200;
 
     public static void clear() {CHARGING.clear();TORRENTS.clear();}
     public static boolean charging(int id) {return CHARGING.containsKey(id);}
@@ -77,7 +78,7 @@ public final class TimeBranchRenderer {
         if(direction.lengthSqr()<1e-8)return;
         Torrent t=new Torrent(caster,origin,direction.normalize(),n.getDouble("length"),
             n.getFloat("power"),n.getInt("held"),n.getLong("start"),n.getInt("life"));
-        gatherSoft(t);
+        gatherVolume(t);
         if(TORRENTS.size()>4)TORRENTS.remove(0);
         TORRENTS.add(t);
         BranchAudio.discharge(origin,t.power);
@@ -85,16 +86,18 @@ public final class TimeBranchRenderer {
     }
 
     /**
-     * The same sweep the server made, over the same blocks, so each one is seen coming apart at the
-     * instant it is taken. Done once per cast rather than streamed block by block.
+     * The same walk the server made, over the same blocks, so each one is seen coming apart at the instant
+     * it is taken out of the world. Done once per cast rather than streamed block by block.
      */
-    private static void gatherSoft(Torrent t) {
+    private static void gatherVolume(Torrent t) {
         var level=Minecraft.getInstance().level;
         if(level==null)return;
-        for(BlockPos pos:SoftTerrain.cylinder(level,t.origin,t.direction,BranchCharge.SAFE,t.length,
-                BranchCharge.eraseRadius(t.power),MAX_SOFT)) {
-            t.soft.add(pos);
-            t.reach.add(Vec3.atCenterOf(pos).subtract(t.origin).dot(t.direction));
+        for(BlockPos pos:BeamPath.occupied(level,t.origin,t.direction,BranchCharge.SAFE,t.length,
+                BranchCharge.eraseRadius(t.power),MAX_VOLUME)) {
+            t.volume.add(pos);
+            t.reach.add(BeamPath.along(t.origin,t.direction,Vec3.atCenterOf(pos)));
+            // Turf comes apart into dust, a wall into fragments. One look-up per block, kept for the draw.
+            t.dusty.add(SoftTerrain.soft(level,pos,level.getBlockState(pos)));
         }
     }
 
@@ -142,14 +145,25 @@ public final class TimeBranchRenderer {
                     if(now%2==0)Vfx.spark(Loki.STAR.get(),head,t.direction.scale(.06));
                 }
             }
-            // Each soft block gets one small handful of dust as its dissolve opens, once, in order.
-            while(t.dusted<t.soft.size()) {
+            // Nebula rolling down the length of it, not only at the head: the torrent is a volume, and it
+            // should read as one from the side as well as from the front.
+            if(now%2==0)for(int i=0;i<3;i++) {
+                double at=BranchCharge.SAFE+(front-BranchCharge.SAFE)*((i+((now/2)%4)*.25)/3.0%1);
+                Vec3 point=t.origin.add(t.direction.scale(at));
+                if(point.distanceToSqr(eye)>VISIBLE)continue;
+                Vfx.cloud(Loki.NEBULA.get(),point,1.1+t.power*1.5,Vfx.count(1+t.power),.018);
+                if(i==0)Vfx.cloud(Loki.VEIL.get(),point,1.6+t.power*2,1,.01);
+            }
+            // Each block gets one small handful as it goes, once, in the order the front reaches them.
+            while(t.dusted<t.volume.size()) {
                 if(BranchCharge.reaches(t.reach.get(t.dusted))>age)break;
-                BlockPos pos=t.soft.get(t.dusted++);
+                int index=t.dusted++;
+                BlockPos pos=t.volume.get(index);
                 Vec3 at=Vec3.atCenterOf(pos);
                 if(at.distanceToSqr(eye)>3600)continue;
-                Vfx.cone(Loki.TEMPORAL_DUST.get(),at,t.direction,2,.14,.13);
-                if((t.dusted&3)==0)Vfx.spark(Loki.SPECTRAL.get(),at,t.direction.scale(.04));
+                boolean dust=index<t.dusty.size()&&t.dusty.get(index);
+                Vfx.cone(dust?Loki.TEMPORAL_DUST.get():Loki.SHARD.get(),at,t.direction,2,.14,.13);
+                if((index&3)==0)Vfx.spark(Loki.SPECTRAL.get(),at,t.direction.scale(.04));
             }
         }
     }
@@ -359,7 +373,7 @@ public final class TimeBranchRenderer {
 
         boolean far=t.origin.distanceToSqr(camera)>64*64;
         double core=BranchCharge.beamRadius(t.power);
-        int rings=(int)Mth.clamp(front/(far?3.4:1.7)+2,3,far?18:42);
+        int rings=(int)Mth.clamp(front/(far?3.6:1.7)+2,3,far?24:56);
         Vec3[] centres=new Vec3[rings+1];
         double[] wide=new double[rings+1],thin=new double[rings+1],haze=new double[rings+1];
         int[] colour=new int[rings+1];
@@ -382,24 +396,46 @@ public final class TimeBranchRenderer {
             }
             centres[i]=t.origin.add(t.direction.scale(distance))
                 .add(BranchVfx.perpendicular(t.direction).scale(BranchVfx.wobble(distance*.23,age*.07,1.7)*core*.11));
-            wide[i]=radius*1.22;thin[i]=radius*.33;haze[i]=radius*2.15;
+            wide[i]=radius*1.22;thin[i]=radius*.33;haze[i]=radius*3.0;
             float phase=(float)(time*.036+distance*.028);
             colour[i]=TemporalPalette.shade(phase);
             hot[i]=TemporalPalette.hot(phase+.1f,(float)Mth.clamp(.5+pulse,0,1));
             float body=(float)((.11+.06*t.power)*fade*(1+pulse*.5));
             alpha[i]=body;
             hotAlpha[i]=(float)((.38+.18*t.power)*fade*(1+pulse*.7));
-            hazeAlpha[i]=(float)((.055+.03*t.power)*fade);
+            hazeAlpha[i]=(float)((.085+.05*t.power)*fade);
         }
         int sides=far?6:(t.power>.6f?12:9);
+        Vec3 u=BranchVfx.perpendicular(t.direction),v=u.cross(t.direction).normalize();
+        // Three nested volumes of cloud before any of the sharp material goes on: an outer bank that the
+        // torrent is buried in, the body of the haze, and the lit inner shell the branches show through.
+        double[] outer=new double[rings+1];
+        float[] outerAlpha=new float[rings+1];
+        for(int i=0;i<=rings;i++){outer[i]=haze[i]*1.55;outerAlpha[i]=hazeAlpha[i]*.62f;}
+        BranchVfx.tube(painter,cloud,centres,outer,colour,outerAlpha,Math.max(5,sides-4),-.04);
         BranchVfx.tube(painter,cloud,centres,haze,colour,hazeAlpha,Math.max(5,sides-3),.06);
         BranchVfx.tube(painter,glow,centres,wide,colour,alpha,sides,.11);
         BranchVfx.tube(painter,glow,centres,thin,hot,hotAlpha,Math.max(5,sides-3),-.07);
 
+        // Banks of cloud rolling along it, turning at their own rates, so the volume churns instead of
+        // sitting there as smooth tubes. These are what make it read as nebula rather than as a pipe.
+        int banks=far?4:10+(int)(t.power*14);
+        for(int b=0;b<banks;b++) {
+            double t01=(b+.5)/banks;
+            double distance=BranchCharge.SAFE+span*t01;
+            double a=TemporalPalette.offset(b)*Math.PI*2+age*.05*(b%2==0?1:-1);
+            double ring=core*(.9+1.5*TemporalLightning.rand(b,3));
+            Vec3 at=t.origin.add(t.direction.scale(distance))
+                .add(u.scale(Math.cos(a)*ring)).add(v.scale(Math.sin(a)*ring))
+                .add(t.direction.scale(BranchVfx.wobble(b,age*.09,t01*4)*1.4));
+            BranchVfx.billboard(painter,cloud,at,core*(1.9+2.1*TemporalLightning.rand(b,5)),a*.6+age*.02,
+                TemporalPalette.shade((float)(time*.017+TemporalPalette.offset(b))),
+                (.10f+.06f*t.power)*fade);
+        }
+
         // --- timeline branches wound around it ----------------------------------------
         int strands=far?3:4+(int)(t.power*5);
-        Vec3 u=BranchVfx.perpendicular(t.direction),v=u.cross(t.direction).normalize();
-        int steps=far?10:Math.min(34,rings+2);
+        int steps=far?10:Math.min(40,rings+2);
         for(int s=0;s<strands;s++) {
             double phase=TemporalPalette.offset(s)*Math.PI*2;
             double coil=.55+.25*TemporalLightning.rand(s,3);
@@ -476,12 +512,12 @@ public final class TimeBranchRenderer {
     private static void dissolve(BranchVfx.Painter painter,Torrent t,double age,double time,Vec3 camera,float fade) {
         RenderType glow=BranchVfx.glow(),strand=BranchVfx.strand();
         int drawn=0;
-        for(int i=0;i<t.soft.size()&&drawn<MAX_DISSOLVE_DRAWN;i++) {
+        for(int i=0;i<t.volume.size()&&drawn<MAX_DISSOLVE_DRAWN;i++) {
             double opens=BranchCharge.reaches(t.reach.get(i));
             if(opens>age)break;
             double phase=(age-opens)/BranchCharge.DISSOLVE;
             if(phase>1)continue;
-            BlockPos pos=t.soft.get(i);
+            BlockPos pos=t.volume.get(i);
             Vec3 at=Vec3.atCenterOf(pos);
             if(at.distanceToSqr(camera)>3600)continue;
             drawn++;

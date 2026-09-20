@@ -19,6 +19,7 @@ public final class Loki {
     public static ResourceLocation id(String path) { return new ResourceLocation(ID, path); }
     public static final DeferredRegister<EntityType<?>> ENTITIES = DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, ID);
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, ID);
+    public static final DeferredRegister<net.minecraft.world.level.block.Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, ID);
     public static final DeferredRegister<SoundEvent> SOUNDS = DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, ID);
     public static final DeferredRegister<CreativeModeTab> TABS = DeferredRegister.create(net.minecraft.core.registries.Registries.CREATIVE_MODE_TAB, ID);
     public static final DeferredRegister<net.minecraft.core.particles.ParticleType<?>> PARTICLES = DeferredRegister.create(ForgeRegistries.PARTICLE_TYPES, ID);
@@ -31,6 +32,14 @@ public final class Loki {
     public static final RegistryObject<EntityType<StarfallEntity>> STARFALL = ENTITIES.register("starfall", () -> EntityType.Builder.<StarfallEntity>of(StarfallEntity::new, MobCategory.MISC).sized(.6f,.6f).clientTrackingRange(12).updateInterval(1).fireImmune().noSummon().build("loki:starfall"));
 
     public static final RegistryObject<EntityType<ThroneSeat>> THRONE_SEAT = ENTITIES.register("throne_seat", () -> EntityType.Builder.<ThroneSeat>of(ThroneSeat::new, MobCategory.MISC).sized(.5f,.2f).clientTrackingRange(8).noSave().noSummon().build("loki:throne_seat"));
+
+    /**
+     * The absence a Time Branch torrent leaves behind. Registered with no {@code BlockItem} on purpose:
+     * with no item form, no loot table and bedrock's hardness it cannot be mined, blown up, picked or
+     * obtained, so it can only ever exist where the ability put it and only until the world is restored.
+     */
+    public static final RegistryObject<net.minecraft.world.level.block.Block> NOTHINGNESS =
+        BLOCKS.register("nothingness", com.loki.block.NothingnessBlock::new);
 
     public static final RegistryObject<Item> DAGGER = ITEMS.register("dagger", () -> new ConjuredWeapon(0));
     public static final RegistryObject<Item> LAEVATEINN = ITEMS.register("laevateinn", () -> new ConjuredWeapon(1));
@@ -88,7 +97,7 @@ public final class Loki {
     }
     public Loki() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
-        ENTITIES.register(bus); ITEMS.register(bus); SOUNDS.register(bus); TABS.register(bus); PARTICLES.register(bus);
+        ENTITIES.register(bus); ITEMS.register(bus); BLOCKS.register(bus); SOUNDS.register(bus); TABS.register(bus); PARTICLES.register(bus);
         bus.addListener((EntityAttributeCreationEvent e) -> e.put(ILLUSION.get(), IllusionEntity.attributes().build()));
         bus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) -> e.enqueueWork(LokiNetwork::init));
     }

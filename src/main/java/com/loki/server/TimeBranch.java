@@ -10,8 +10,6 @@ import net.minecraft.server.level.*;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.*;
 import java.util.*;
 
@@ -26,6 +24,13 @@ import java.util.*;
  *
  * <p>The volume the picture uses and the volume the hits use are the same volume, out of
  * {@link BranchCharge}. A body is never erased outside the visible torrent and never survives inside it.
+ *
+ * <p>Nothing stops it. The torrent does not collide with the world, is not slowed by it and is not shortened
+ * by it: it runs its full hundred blocks through stone, ore, a wall, a vault door or a modded machine alike.
+ * Everything it passes through is replaced with {@link com.loki.block.NothingnessBlock} — absolute black,
+ * unbreakable, no drops — and every one of those positions is written down first, completely, so that about
+ * half a minute later {@link Nothingness} puts the world back exactly as it was, down to a chest's
+ * inventory and a sign's text. The destruction is theatre; the record is the real work.
  */
 public final class TimeBranch {
     private TimeBranch() {}
@@ -38,19 +43,20 @@ public final class TimeBranch {
     /** An opened torrent, sweeping forward: what it has already caught and what it has yet to reach. */
     private static final class Torrent {
         final UUID caster;final Vec3 origin,direction;final double length;final float power;
-        final long start;final int life;final List<BlockPos> soft;final double[] distances;
+        final long start;final int life;final List<BlockPos> volume;final double[] distances;final long restoreAt;
         final Set<UUID> caught=new HashSet<>();
         int cursor;
         Torrent(UUID caster,Vec3 origin,Vec3 direction,double length,float power,long start,int life,
-                List<BlockPos> soft,double[] distances) {
+                List<BlockPos> volume,double[] distances,long restoreAt) {
             this.caster=caster;this.origin=origin;this.direction=direction;this.length=length;
-            this.power=power;this.start=start;this.life=life;this.soft=soft;this.distances=distances;
+            this.power=power;this.start=start;this.life=life;this.volume=volume;this.distances=distances;
+            this.restoreAt=restoreAt;
         }
     }
     private static final Map<UUID,Cast> CASTS=new HashMap<>();
     private static final List<Torrent> TORRENTS=new ArrayList<>();
     /** Bounds on the one-shot work a single release is allowed to do. */
-    private static final int MAX_SOFT=2000,SOFT_PER_TICK=200,MAX_TORRENTS=6;
+    private static final int MAX_BLOCKS=4200,BLOCKS_PER_TICK=220,MAX_TORRENTS=6;
     /** How far a planted caster may drift before the server puts them back. */
     private static final double DRIFT=.32;
     private static final double AUDIBLE=132;
@@ -139,15 +145,18 @@ public final class TimeBranch {
         float power=BranchCharge.power(held);
         Vec3 origin=BranchCharge.focus(p,1);
         Vec3 direction=p.getLookAngle();
-        double length=reach(level,origin,direction);
+        // Its full reach, every time. No raycast, no wall, no shortening: whatever is in the way is in the
+        // way and will be taken out of the way.
+        double length=BranchCharge.RANGE;
         double erase=BranchCharge.eraseRadius(power);
-        List<BlockPos> soft=SoftTerrain.cylinder(level,origin,direction,BranchCharge.SAFE,length,erase,MAX_SOFT);
-        double[] distances=new double[soft.size()];
-        for(int i=0;i<soft.size();i++)distances[i]=axial(origin,direction,Vec3.atCenterOf(soft.get(i)));
+        List<BlockPos> volume=BeamPath.occupied(level,origin,direction,BranchCharge.SAFE,length,erase,MAX_BLOCKS);
+        double[] distances=new double[volume.size()];
+        for(int i=0;i<volume.size();i++)distances[i]=axial(origin,direction,Vec3.atCenterOf(volume.get(i)));
         long now=level.getGameTime();
         int life=BranchCharge.life(length,power);
         if(TORRENTS.size()>=MAX_TORRENTS)TORRENTS.remove(0);
-        TORRENTS.add(new Torrent(p.getUUID(),origin,direction,length,power,now,life,soft,distances));
+        TORRENTS.add(new Torrent(p.getUUID(),origin,direction,length,power,now,life,volume,distances,
+            now+life+BranchCharge.RESTORE));
 
         CompoundTag n=new CompoundTag();
         n.putDouble("x",origin.x);n.putDouble("y",origin.y);n.putDouble("z",origin.z);
@@ -157,23 +166,6 @@ public final class TimeBranch {
         LokiNetwork.near(level,origin,AUDIBLE+length,new LokiNetwork.Message(LokiNetwork.TORRENT,p.getId(),n));
         // The discharge itself. Everything softer is layered client-side off the same state.
         level.playSound(null,BlockPos.containing(origin),Loki.BRANCH_RELEASE.get(),SoundSource.PLAYERS,1.6f,.72f-power*.14f);
-    }
-
-    /**
-     * How far the torrent carries. Soft cover does not stop it — that is the point of it — so only a
-     * structural, collidable block ends the beam, and the visible length is that same number.
-     */
-    private static double reach(ServerLevel level,Vec3 origin,Vec3 direction) {
-        for(double t=BranchCharge.SAFE;t<BranchCharge.RANGE;t+=.25) {
-            Vec3 at=origin.add(direction.scale(t));
-            BlockPos pos=BlockPos.containing(at);
-            if(!level.hasChunkAt(pos))return Math.max(BranchCharge.SAFE,t-.25);
-            BlockState state=level.getBlockState(pos);
-            if(state.isAir()||SoftTerrain.soft(level,pos,state))continue;
-            if(state.getCollisionShape(level,pos).isEmpty())continue;
-            return Math.max(BranchCharge.SAFE,t-.2);
-        }
-        return BranchCharge.RANGE;
     }
 
     private static double axial(Vec3 origin,Vec3 direction,Vec3 point) {return point.subtract(origin).dot(direction);}
@@ -196,7 +188,7 @@ public final class TimeBranch {
             if(caster==null||caster.level()!=level){if(caster==null)it.remove();continue;}
             double front=BranchCharge.front(t.length,age);
             catchBodies(caster,t,front);
-            erase(level,t,age);
+            carve(level,t,age);
         }
     }
 
@@ -220,20 +212,17 @@ public final class TimeBranch {
         }
     }
 
-    /** Soft cover leaves the world as its dissolve completes, capped so a wide torrent cannot spike. */
-    private static void erase(ServerLevel level,Torrent t,long age) {
-        int removed=0;
-        while(t.cursor<t.soft.size()&&removed<SOFT_PER_TICK) {
+    /**
+     * The world coming apart as the front reaches it, capped per tick so even a hundred-block bore cannot
+     * spike the server. Each position is recorded before it is replaced and is owed a restore from that
+     * moment, so an interrupted or overlapping cast can still only ever add to the record.
+     */
+    private static void carve(ServerLevel level,Torrent t,long age) {
+        int taken=0;
+        while(t.cursor<t.volume.size()&&taken<BLOCKS_PER_TICK) {
             if(BranchCharge.reaches(t.distances[t.cursor])+BranchCharge.DISSOLVE>age)break;
-            BlockPos pos=t.soft.get(t.cursor++);
-            if(!level.hasChunkAt(pos))continue;
-            BlockState state=level.getBlockState(pos);
-            // Re-checked on removal: whatever grew, fell or was placed there since is not this move's.
-            if(!SoftTerrain.soft(level,pos,state))continue;
-            // Set to air rather than broken. Nothing drops, because nothing was mined — the block's
-            // existence is what was taken, and an item on the floor would say otherwise.
-            level.setBlock(pos,Blocks.AIR.defaultBlockState(),net.minecraft.world.level.block.Block.UPDATE_ALL);
-            removed++;
+            BlockPos pos=t.volume.get(t.cursor++);
+            if(Nothingness.take(level,pos,t.restoreAt))taken++;
         }
     }
 

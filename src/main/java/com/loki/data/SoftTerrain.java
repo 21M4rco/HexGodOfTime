@@ -2,70 +2,24 @@ package com.loki.data;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
-import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import java.util.*;
 
 /**
- * What raw temporal radiation can take out of the timeline, and what it cannot.
+ * Whether a block reads as soft natural cover — soil, sand, gravel, snow, leaves, flowers, crops and the
+ * loose growth between them — as opposed to stone, wood, metal or something somebody built with.
  *
- * <p>This is an allow list on purpose. A hardness threshold would read as reasonable and then quietly
- * delete glass, rails, redstone and every other cheap thing somebody built with, so nothing qualifies
- * here unless it is soft natural cover: soil, sand, gravel, snow, leaves, flowers, crops and the loose
- * growth between them. Stone, wood, ore, metal and anything holding a block entity survive, which is
- * what keeps the ultimate from carving a permanent tunnel through a mountain or erasing a hall.
+ * <p>This no longer decides what a Time Branch torrent takes: the torrent passes through everything and
+ * puts it all back, so there is nothing to be permitted or refused. What it decides is how a block
+ * <em>looks</em> as it goes. Turf comes apart into dust and the beam carries it away; a wall comes apart
+ * into fragments. One test, read on the client, for that difference alone.
  *
- * <p>Both sides read the same test. The server decides what actually leaves the world and the client
- * decides what to dissolve on screen, so the two agree without a packet per block.
+ * <p>It stays an allow list rather than a hardness threshold because a threshold would call glass, rails
+ * and redstone soft, and they plainly are not.
  */
 public final class SoftTerrain {
     private SoftTerrain() {}
-
-    /** Steps along the axis and across each slice, in blocks. Fine enough not to miss a block. */
-    private static final double SLICE=.6,GRID=.6;
-
-    /**
-     * The soft cover inside a cylinder, ordered by how far along the axis it sits.
-     *
-     * <p>Walked as slices down the axis rather than over the segment's bounding box. That is not a
-     * micro-optimisation: a sixty-block beam pointed diagonally has a bounding box of some eighty
-     * thousand positions, so a box walk would both cost a visible hitch and, once it hit any cap,
-     * truncate the result along the world axes instead of along the beam — erasing a wedge of ground
-     * and leaving the rest. Slicing keeps the cost flat whichever way the caster is facing, and an
-     * over-long beam simply stops taking cover at its far end.
-     *
-     * <p>Both sides call this, so what the server removes and what the client dissolves are the same
-     * list in the same order, with no packet per block.
-     */
-    public static List<BlockPos> cylinder(BlockGetter level,Vec3 origin,Vec3 direction,
-                                          double from,double to,double radius,int cap) {
-        List<BlockPos> found=new ArrayList<>();
-        if(to<=from||radius<=0)return found;
-        Vec3 axis=direction.normalize();
-        Vec3 side=axis.cross(new Vec3(0,1,0));
-        if(side.lengthSqr()<1e-6)side=axis.cross(new Vec3(1,0,0));
-        if(side.lengthSqr()<1e-6)side=new Vec3(1,0,0);
-        side=side.normalize();
-        Vec3 up=side.cross(axis).normalize();
-        Set<BlockPos> seen=new HashSet<>();
-        double radiusSq=radius*radius;
-        for(double t=from;t<=to;t+=SLICE) {
-            Vec3 centre=origin.add(axis.scale(t));
-            for(double a=-radius;a<=radius;a+=GRID)for(double b=-radius;b<=radius;b+=GRID) {
-                if(a*a+b*b>radiusSq)continue;
-                BlockPos pos=BlockPos.containing(centre.add(side.scale(a)).add(up.scale(b)));
-                if(!seen.add(pos))continue;
-                if(soft(level,pos,level.getBlockState(pos)))found.add(pos);
-                if(found.size()>=cap)return found;
-            }
-        }
-        return found;
-    }
-
-    /** Beyond this the block is structural whatever else it looks like. */
-    private static final float LOOSE_HARDNESS=.7f;
 
     public static boolean soft(BlockGetter level,BlockPos pos,BlockState state) {
         if(state.isAir()||state.hasBlockEntity())return false;

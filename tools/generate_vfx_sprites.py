@@ -244,6 +244,17 @@ def ash_paint(u, v):
     return (clamp8(196 + 48 * density), clamp8(188 + 46 * density), clamp8(182 + 44 * density), clamp8(200 * density))
 
 
+def black(path, size=16):
+    """Nothingness. Pure #000000 at full opacity, and the blackness is structural rather than a choice
+    of paint: block rendering multiplies the texture by the light map and by face shading, and zero times
+    anything is zero, so this stays absolute black at every light level and from every angle. Black
+    concrete and black wool are dark greys being lit; this is not being lit."""
+    pixels = [b'\x00\x00\x00\xff'] * (size * size)
+    (ROOT / 'textures/block').mkdir(parents=True, exist_ok=True)
+    write_png(ROOT / path, size, pixels)
+
+
+black('textures/block/nothingness.png')
 sprite('nebula', 32, nebula_paint)
 sprite('veil', 32, veil_paint)
 sprite('star', 16, star_paint)
@@ -258,4 +269,4 @@ sprite('ash', 32, ash_paint)
 sprite('blood_pool', 32, pool_paint, register=False)
 
 print('Wrote nebula, veil, star, smoke, temporal_dust, branch_thread, spectral, meteor_fire, cinder\n'
-      'and ash particle sheets, plus the blood_pool decal.')
+      'and ash particle sheets, the blood_pool decal and the Nothingness block texture.')

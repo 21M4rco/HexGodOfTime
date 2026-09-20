@@ -19,15 +19,17 @@ public final class BranchCharge {
     /** Stage thresholds in ticks: formation, stable, pressure, critical, maximum, overcharge. */
     public static final int FORMATION=20,STABLE=50,PRESSURE=80,CRITICAL=110,FULL=140,LIMIT=200;
     /** Reach, in blocks. Charge never extends it; charge widens the torrent instead. */
-    public static final double RANGE=60;
+    public static final double RANGE=100;
     /** The caster's own hitbox ends well short of this, which is what keeps them out of their own beam. */
     public static final double SAFE=2.4;
     /** Blocks per tick the leading front travels, so the sweep and the render advance together. */
     public static final double SWEEP=6.5;
     /** Ticks the torrent stays open once the front has arrived, and the dissipation after it. */
     public static final int OPEN=16,FADE=16;
-    /** Ticks a soft block spends coming apart before it actually leaves the world. */
+    /** Ticks a block spends coming apart before it is taken out of the world. */
     public static final int DISSOLVE=7;
+    /** Ticks after the torrent has fully ended before the world is put back: about thirty seconds. */
+    public static final int RESTORE=600;
     /** The held breath: the sphere collapses inward for this long before anything leaves the hands. */
     public static final double COMPRESS=1.5;
 

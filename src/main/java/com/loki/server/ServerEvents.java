@@ -85,6 +85,7 @@ public final class ServerEvents {
     @SubscribeEvent public static void ward(net.minecraftforge.event.entity.living.LivingAttackEvent e) {
         // Only something attacking them. A fall, the void or drowning is the island's business and
         // the owner's own problem; blinking away from gravity would be nonsense.
+        if(Erasure.erasing(e.getEntity())){e.setCanceled(true);return;}
         if(e.getSource().getEntity()==null&&e.getSource().getDirectEntity()==null)return;
         if(SanctumWard.evade(e.getEntity()))e.setCanceled(true);
     }
@@ -106,6 +107,10 @@ public final class ServerEvents {
     }
     @SubscribeEvent public static void hurt(LivingHurtEvent e) {
         if(Erasure.erasing(e.getSource().getEntity())){e.setCanceled(true);return;}
+        // A body being taken out of the timeline cannot be hurt out of it. Without this, anything else
+        // landing a hit mid-sequence would flash it red or kill it outright, and the slow coming-apart the
+        // ability exists for would be replaced by an ordinary death.
+        if(Erasure.erasing(e.getEntity())){e.setCanceled(true);return;}
         if(e.getSource().getEntity()!=null&&TemporalEngine.frozen(e.getSource().getEntity())){e.setCanceled(true);return;}
         // A suspended body cannot be wounded in a moment that is not passing; the harm waits for time to resume.
         if(TemporalEngine.bank(e.getEntity(),e.getAmount(),e.getSource().getEntity())){e.setCanceled(true);return;}
@@ -134,5 +139,11 @@ public final class ServerEvents {
         if(LokiData.mastery(p,Discipline.SORCERY)>0)e.setDistance(Math.max(0,e.getDistance()-3));
     }}
     @SubscribeEvent public static void breakBlock(net.minecraftforge.event.level.BlockEvent.BreakEvent e) {if(TemporalEngine.frozen(e.getPlayer()))e.setCanceled(true);}
-    @SubscribeEvent public static void stopping(ServerStoppingEvent e) {for(ServerPlayer p:e.getServer().getPlayerList().getPlayers())LokiServer.clear(p,false);LokiServer.reset();}
+    @SubscribeEvent public static void stopping(ServerStoppingEvent e) {
+        for(ServerPlayer p:e.getServer().getPlayerList().getPlayers())LokiServer.clear(p,false);
+        // Put the world back while its chunks are still loaded. The record is saved either way, but a world
+        // that is never opened again should not be left with a black tunnel through it.
+        for(ServerLevel level:e.getServer().getAllLevels())Nothingness.restoreAll(level);
+        LokiServer.reset();
+    }
 }
