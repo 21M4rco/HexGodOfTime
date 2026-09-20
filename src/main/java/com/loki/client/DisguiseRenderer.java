@@ -185,9 +185,10 @@ public final class DisguiseRenderer {
         proxy.setTicksFrozen(p.getTicksFrozen());
         proxy.setAirSupply(p.getAirSupply());
 
+        // hurtTime alone drives the red flash and the flinch; the knock direction behind it is a
+        // player-only field, and a borrowed body has no use for it.
         proxy.hurtTime=p.hurtTime;
         proxy.hurtDuration=p.hurtDuration;
-        proxy.hurtDir=p.hurtDir;
         proxy.deathTime=0;
         proxy.attackAnim=p.attackAnim;
         proxy.oAttackAnim=p.oAttackAnim;
