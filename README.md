@@ -1,3 +1,17 @@
+## 0.4.0 — Cloak, deception, universal shapes and time control
+
+- **The cloak no longer stretches across the world.** Its solver now enforces two hard geometric limits after every pass and again on the frame the renderer draws, so no part of it can leave the shoulders by more than the fabric hanging above it, or leave the node above it by more than one stretched segment. Torso transforms that cannot be inverted are rejected rather than propagated, per-tick motion is capped, anything non-finite re-seeds the grid from the body, and a hem resting on the ground is dragged along instead of welded to the block it touched.
+- **Projections fight on their own.** They pick out hostile creatures — vanilla or modded — anything already hunting their caster, and anyone who has recently drawn the caster's blood, including another player. Friendly, tame and neutral creatures are left alone unless they attack first.
+- **A court carries mixed arms.** Copies spawn with a single dagger, twin daggers or the Void sword, and one always mirrors whatever the caster is actually holding. Swordsmen use the plain swing; dagger pairs alternate hands on a faster cadence.
+- **Creatures cannot tell a copy from the original.** When something decides to hunt a keeper who has projections out, that decision is reopened across the keeper and every nearby copy and settled by a weighted draw on distance, line of sight and how much each body has recently hurt it. Being the real player counts for nothing. Existing aggression is redistributed the moment copies appear, and a copy that lands a blow draws retaliation onto itself.
+- **Copies are hard to pick out by eye.** They carry the caster's skin, armour, worn head gear, elytra, name tag, harmless potion effects and cloak, mirror the caster's crouch and visible flourishes, and glance around instead of staring at their target.
+- **Masquerade wears anything alive.** Any living entity in the game can be copied — vanilla or modded, passive, hostile, aquatic, flying, humanoid or not. The target's own saved state is captured, so a specific sheep keeps its colour and a specific modded creature keeps its variant instead of reverting to a default model. The borrowed body is driven from the player's movement, rotation, pose, swing and hurt state, and the player's own body is replaced rather than drawn underneath. Creatures respond to the costume: monsters ignore a monster shape and nothing hunts its own species, until the wearer attacks.
+- **Thrown daggers stay where they land.** A chest hit rides the chest, an arm hit swings with the arm and a head hit turns with the skull, at any body size, and wounds bleed from the blade itself and leave drying pools on the ground behind a moving body.
+- **Effects gather rather than switch on.** Every particle opens over its first ticks, ability effects release across a stretch of them, and the flight nebula condenses and disperses over about a second and a half. A nebula family built from the same noise field as that cloud gives the whole mod one material.
+- **Time control has permanent keys.** Stillness, Resume, Rewind and Dilation each own a key, are drawn permanently at the bottom of the screen beside those keys, and can no longer be scrolled to or bound to a quick slot.
+- **Stillness holds the world, not just the mobs.** Bodies, arrows, thrown weapons, loose items, falling blocks, primed charges and orbs all stop, and weather and loose particles freeze where they stand — rain hangs in the air and resumes from the same phase.
+- **Dilation is smooth.** Nothing has its ticks withheld any more; rates are scaled instead, so slow motion interpolates like ordinary movement rather than teleporting.
+
 ## 0.3.0 — Fracture and world-tree island
 
 - Fracture inside the realm opens a return portal without an energy/mastery/cooldown requirement. Walk through to return to your own saved dimension, position and facing. A short crossing grace period prevents bouncing back into the entry portal. The arrival sigil remains a crouch-to-exit fallback.
@@ -28,7 +42,11 @@ Install Player Animator **1.0.2-rc1+1.20** (CurseForge file 4587214) on clients.
 | R | Cast the selected spell; **hold** for abilities that shape while held |
 | G | Alternate contextual action |
 | H | Glorious Purpose transformation |
-| X | Release held targets / resume your time fields / seal your fracture |
+| X | Release held targets / seal your fracture |
+| Z | **Stillness** — suspend the local battlefield |
+| B | **Resume Time** — release everything you are holding |
+| N | **Personal Rewind** |
+| M | **Dilation** — slow the local battlefield |
 | Wheel *(while gripping)* | Push or pull what telekinesis is holding |
 | Attack / Use with a conjured weapon | Combination / dagger throw or artifact action |
 
@@ -36,14 +54,18 @@ Key mappings are configurable. Free your hands before conjuring. Successful spel
 
 The quick bar holds eight shortcuts. It fills itself as abilities unlock; to place one deliberately, open the archive, click a quick slot at the bottom, then click the ability you want bound there.
 
+The four time controls are not shortcuts and never enter the quick bar. They are permanent commands on the four keys above, shown as a fixed row at the bottom of the screen with their keys, readiness and recovery. All bindings are configurable in Minecraft's Controls menu; the defaults are unbound in vanilla.
+
 ## Notable abilities
 
-- **Living Projection** — a decoy that looks, moves and fights like you. Its secondary sends every projection at whatever you are aiming at, or dismisses them all if you aim at nothing. Mobs target projections; a struck projection dies in green magic with no marker and no name tag.
+- **Living Projection** — a decoy that looks, moves and fights like you, down to the name tag. It hunts hostile creatures and anyone who has attacked you, without being told. Creatures choosing between you and your copies cannot tell which is which: the choice is made on distance, sight and who has been hurting them, and never on which one is breathing. Its secondary sends every projection at whatever you are aiming at, or dismisses them all if you aim at nothing.
 - **Invisible Hand** — hold entities and dropped items on a damped spring, several at once with mastery. The wheel pushes and pulls; the secondary hurls, and whatever you hurl takes the impact it was carrying.
 - **Borrowed Reality** — hold the cast key and a false building grows where you aim. It has no collision and is never placed in the world: viewers are handed a design and build the geometry locally, so it can be shown to one chosen pair of eyes.
 - **Fracture** — shatters the air where you look. The break holds for seven seconds and opens onto a private hundred-by-hundred sanctum in its own dimension. Casting it again inside opens the way back.
 - **Twin Deceivers** — two daggers, the off hand reversed. Thrown blades fly point-first, bury themselves in what they hit and open bleeding wounds before dissolving.
-- **Stillness** — local suspension that decelerates into and out of a stop rather than snapping. Harm you deal to a suspended body is banked and lands the instant time resumes.
+- **Masquerade** — wear any living thing in the game, vanilla or modded, keeping that individual creature's variant, colour, size and carried gear rather than its species' default. Creatures read the shape and mostly ignore it, until you attack one.
+- **Stillness** — local suspension that decelerates into and out of a stop rather than snapping, and holds bodies, shots, loose items, falling blocks and the weather alike. Harm you deal to a suspended body is banked and lands the instant time resumes.
+- **Dilation** — everything nearby runs at roughly a third speed, smoothly. Movement, attacks and arcing shots slow together; nothing stutters.
 
 ## Development commands
 

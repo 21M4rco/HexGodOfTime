@@ -66,3 +66,33 @@ Replaces the eight-card overlay with one 204×96 logical-pixel bottom-left reado
 Removes the shared decorative ring/strand mesh passes from spell, transformation, grip, bind and time-field effects, plus all orbital filaments/cross wires from flight. Existing particles and the spatial cloud nebula remain. Projectile bodies, mirror fractures and shooting-star trails retain their functional silhouettes.
 
 Validation: source diff/remaining caller audit; CI build required. In-game screenshot and multiplayer checks have not been performed here.
+
+## 0.4.0 — Cloak, deception, universal shapes and time control
+
+Base: `f747e44d518200504785e7400bca49722646f390` (Actions run `35513523267`, the latest successful push build when this patch started).
+
+### Verified in this environment
+
+- Java/Forge compilation through the **Build Loki** GitHub Action, which remains the only compiler reachable from here: the Forge and CurseForge Maven hosts are blocked by this environment's network policy, so no local Gradle build is possible.
+- `verifyRealmShape` still passes as part of `check`; realm generation was not touched.
+- The four new particle sheets and the ground-blood decal regenerate deterministically from `tools/generate_vfx_sprites.py`, which needs no third-party imaging library, and every emitted PNG was decoded and checked for a correct header, CRC and pixel count.
+- Cloth invariants are enforced in code rather than asserted by eye: `TemporalCloth.contain` clamps every node against both its parent and the shoulder seam after each solver pass, `node` re-applies the seam clamp to the interpolated grid, and `BodyFrame` refuses a torso matrix that is non-finite, near-singular or scaled outside a sane range. A cloak longer than its own length is therefore unreachable, not merely unlikely.
+
+### Not verified — needs a recorded game session
+
+Nothing below should be described as working.
+
+- **Cloak:** sprint, jump, fall, land, crouch, rapid turn, teleport, Fracture crossing, flight, transformation mid-motion, and a cloak dragged across stairs, slabs and ledges, viewed from every side and at several GUI scales. The bug this patch targets was reproducible; the fix has not been watched.
+- **Projections:** automatic engagement against vanilla hostiles, modded hostiles and a player who struck first; correctly ignoring tame wolves, villagers and unprovoked neutrals; loadout spread across a full court; retaliation landing on the copy that struck.
+- **Deception:** whether a mob's target genuinely spreads across the court over a long fight, whether the commitment window feels right or reads as indecision, and whether another player can pick out the original by watching.
+- **Masquerade:** a broad sample of vanilla mobs, at least one GeckoLib creature and at least one other modded animated creature; variant preservation (sheep colour, horse markings, axolotl, cat, villager profession, modded variants); bosses and very large or very small bodies; multiplayer synchronisation; the graceful fallback when a renderer throws.
+- **Daggers:** chest, head, arm, leg and back hits on walking, running, turning, falling and animating bodies of several sizes; wound spatter and ground pools at a distance and under load.
+- **Time:** rain visibly suspended and resuming in phase; arrows and thrown weapons holding position and orientation; Dilation watched for any remaining stutter; a stopped player in multiplayer; overlapping fields from two casters.
+- **Performance:** a large battle with several courts, many wounds and an active hold, measured rather than estimated.
+- **Regression:** logout/reconnect, death/respawn and dimension changes while transformed, disguised, holding a field or carrying embedded blades.
+
+### Known limitations
+
+- The weather and particle freezes are client-side presentation over a server-authoritative hold. They are applied with optional mixin injectors, so a mapping change disables the effect rather than the game.
+- Dilation scales rates rather than time itself. A creature's decisions still run at the normal cadence even though its movement and attacks do not, and gravity is countered by approximation per entity class rather than read from each entity.
+- A mimic snapshot is capped; a creature that saves more than about seven kilobytes degrades to its scalar state and then to its plain form.
