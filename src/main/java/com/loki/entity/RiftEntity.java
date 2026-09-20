@@ -21,12 +21,19 @@ public final class RiftEntity extends Entity {
     private static final EntityDataAccessor<Integer> LIFE=SynchedEntityData.defineId(RiftEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> SEED=SynchedEntityData.defineId(RiftEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> HOMEWARD=SynchedEntityData.defineId(RiftEntity.class,EntityDataSerializers.BOOLEAN);
-    public static final int DURATION=140,OPENING=14;
+    private static final EntityDataAccessor<Boolean> VACUUM=SynchedEntityData.defineId(RiftEntity.class,EntityDataSerializers.BOOLEAN);
+    public static final int DURATION=140,OPENING=14,CHARGE_TICKS=12,PULL_TICKS=10;
+    private boolean charging;
+    private int pullAge;
+    private final List<UUID> captured=new ArrayList<>();
     private UUID caster;
     private final Map<UUID,Long> recent=new HashMap<>();
 
     public RiftEntity(EntityType<? extends RiftEntity> type,Level level) {super(type,level);noPhysics=true;}
-    @Override protected void defineSynchedData() {entityData.define(LIFE,DURATION);entityData.define(SEED,0);entityData.define(HOMEWARD,false);}
+    @Override protected void defineSynchedData() {entityData.define(LIFE,DURATION);entityData.define(SEED,0);entityData.define(HOMEWARD,false);entityData.define(VACUUM,false);}
+    public boolean vacuum(){return entityData.get(VACUUM);}
+    public void armCharge(){charging=true;}
+    public void releaseCharge(){charging=false;}
     public int life() {return entityData.get(LIFE);}
     public int seed() {return entityData.get(SEED);}
     public boolean homeward() {return entityData.get(HOMEWARD);}
@@ -60,18 +67,50 @@ public final class RiftEntity extends Entity {
             discard();
             return;
         }
+        if(charging&&!vacuum()&&DURATION-remaining>=CHARGE_TICKS) {
+            charging=false;entityData.set(VACUUM,true);
+            Vec3 centre=position().add(0,1,0);
+            for(Entity e:level().getEntities(this,new AABB(centre,centre).inflate(5),this::eligible))
+                if(e.getBoundingBox().getCenter().distanceToSqr(centre)<=25)captured.add(e.getUUID());
+        }
+        if(vacuum()){pullAndCross();return;}
         if(remaining>DURATION-OPENING)return;
         long now=level().getGameTime();
         recent.values().removeIf(v->v<now);
         AABB mouth=new AABB(getX()-1.1,getY()-.2,getZ()-1.1,getX()+1.1,getY()+2.4,getZ()+1.1);
-        for(ServerPlayer player:level().getEntitiesOfClass(ServerPlayer.class,mouth,p->p.isAlive()&&!p.isSpectator())) {
-            if(recent.containsKey(player.getUUID())||PocketRealm.crossingCooldown(player))continue;
-            // The actual dimension is authoritative, including rifts saved by an older version.
-            boolean crossed=PocketRealm.inside(level())?PocketRealm.leave(player):PocketRealm.enter(player);
-            if(crossed)recent.put(player.getUUID(),now+60);
-            else recent.put(player.getUUID(),now+20);
+        ServerPlayer owner=((net.minecraft.server.level.ServerLevel)level()).getServer().getPlayerList().getPlayer(caster);
+        if(owner==null)return;
+        for(Entity entity:level().getEntities(this,mouth,this::eligible)) {
+            if(recent.containsKey(entity.getUUID())||PocketRealm.crossingCooldown(entity))continue;
+            boolean crossed=PocketRealm.cross(entity,owner);
+            recent.put(entity.getUUID(),now+(crossed?60:20));
             if(isRemoved())return;
         }
+    }
+    private boolean eligible(Entity e) {
+        return e.isAlive()&&!e.isSpectator()&&!(e instanceof RiftEntity)&&!(e instanceof ThroneSeat)&&e.canChangeDimensions();
+    }
+    private void pullAndCross() {
+        var source=(net.minecraft.server.level.ServerLevel)level();
+        ServerPlayer owner=source.getServer().getPlayerList().getPlayer(caster);
+        if(owner==null||!owner.isAlive()||owner.level()!=level()){discard();return;}
+        pullAge++;
+        Vec3 centre=position().add(0,1,0);
+        for(UUID id:captured) {
+            Entity e=source.getEntity(id);if(e==null||!eligible(e))continue;
+            Vec3 delta=centre.subtract(e.getBoundingBox().getCenter());
+            e.setDeltaMovement(delta.scale(.28).add(0,.045,0));e.hurtMarked=true;e.resetFallDistance();
+        }
+        if(pullAge<PULL_TICKS)return;
+        // Transfer a snapshot, caster last: its dimension-change cleanup may discard this rift.
+        List<Entity> group=new ArrayList<>();
+        for(UUID id:captured){Entity e=source.getEntity(id);if(e!=null&&eligible(e))group.add(e);}
+        group.sort(Comparator.comparing(e->e.getUUID().equals(caster)));
+        int failed=0;
+        for(Entity e:group)if(!PocketRealm.cross(e,owner)){e.setDeltaMovement(Vec3.ZERO);failed++;}
+        source.playSound(null,blockPosition(),Loki.RIFT_CLOSE.get(),SoundSource.PLAYERS,.9f,1);
+        LokiNetwork.fx(this,"rift_close");discard();
+        if(failed>0)owner.displayClientMessage(net.minecraft.network.chat.Component.literal("Some entities could not cross safely and remain at the source."),true);
     }
 
     @Override public boolean isPickable() {return false;}

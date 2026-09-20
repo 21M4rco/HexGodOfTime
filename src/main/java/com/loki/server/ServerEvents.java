@@ -69,7 +69,10 @@ public final class ServerEvents {
         if(e.getEntity() instanceof ServerPlayer p&&LokiData.get(p).getLong("wardUntil")>LokiData.now(p))e.setAmount(e.getAmount()*.25f);
     }
     @SubscribeEvent public static void target(LivingChangeTargetEvent e) {if(e.getEntity() instanceof Mob m&&LokiServer.charmedAgainst(m,e.getNewTarget()))e.setCanceled(true);}
-    @SubscribeEvent public static void fall(LivingFallEvent e) {if(e.getEntity() instanceof ServerPlayer p&&LokiData.mastery(p,Discipline.SORCERY)>0)e.setDistance(Math.max(0,e.getDistance()-3));}
+    @SubscribeEvent public static void fall(LivingFallEvent e) {if(e.getEntity() instanceof ServerPlayer p) {
+        if(p.getAbilities().flying&&LokiData.get(p).getBoolean("ascended")||LokiData.get(p).getLong("flightLandingGrace")>LokiData.now(p)){e.setCanceled(true);return;}
+        if(LokiData.mastery(p,Discipline.SORCERY)>0)e.setDistance(Math.max(0,e.getDistance()-3));
+    }}
     @SubscribeEvent public static void breakBlock(net.minecraftforge.event.level.BlockEvent.BreakEvent e) {if(TemporalEngine.frozen(e.getPlayer()))e.setCanceled(true);}
     @SubscribeEvent public static void stopping(ServerStoppingEvent e) {for(ServerPlayer p:e.getServer().getPlayerList().getPlayers())LokiServer.clear(p,false);LokiServer.reset();}
 }

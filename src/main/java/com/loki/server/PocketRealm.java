@@ -26,12 +26,20 @@ public final class PocketRealm {
     public static final ResourceKey<Level> KEY=ResourceKey.create(Registries.DIMENSION,Loki.id("pocket"));
     public static final int SIZE=100,SPACING=512,FLOOR_Y=64,WALL=18,COLUMNS=4*SIZE-4;
     private static final int SURFACE_CELLS=RealmShape.SIZE*RealmShape.SIZE;
-    private static final int DEEP_CELLS=SURFACE_CELLS*(RealmShape.DEPTH-1);
+    private static final int DEEP_CELLS=SURFACE_CELLS;
     private static List<RealmGarden.Block> garden;
-    private static List<LegacyRealmGarden.Block> oldGarden;
+    private static List<RealmGarden.Block> oldGarden;
     private static List<RealmGarden.Block> garden(){if(garden==null)garden=RealmGarden.plan();return garden;}
-    private static List<LegacyRealmGarden.Block> oldGarden(){if(oldGarden==null)oldGarden=LegacyRealmGarden.plan();return oldGarden;}
-    private static final int IMMEDIATE=4,BUDGET=2600,UPDATE_CLIENTS=2;
+    private static List<RealmGarden.Block> oldGarden(){
+        if(oldGarden==null){
+            List<RealmGarden.Block> all=new ArrayList<>();
+            for(var b:LegacyRealmGarden.plan())all.add(new RealmGarden.Block(b.offset(),b.state()));
+            for(var b:LegacyRealmGardenV3.plan())all.add(new RealmGarden.Block(b.offset(),b.state()));
+            oldGarden=List.copyOf(all);
+        }
+        return oldGarden;
+    }
+    private static final int IMMEDIATE=10,BUDGET=2600,UPDATE_CLIENTS=2;
     private static final long BUILD_NANOS=4_000_000L;
     private static final List<int[]> PENDING=new ArrayList<>();
     private static final Map<UUID,Integer> KNEELING=new HashMap<>();
@@ -49,8 +57,8 @@ public final class PocketRealm {
             ListTag list=n.getList("plots",Tag.TAG_COMPOUND);
             for(int i=0;i<list.size();i++){CompoundTag e=list.getCompound(i);if(e.hasUUID("id"))r.plots.put(e.getUUID("id"),e.getInt("plot"));}
             for(int v:n.getIntArray("built"))r.built.add(v);
-            for(int v:n.getIntArray("gardens_v3"))r.gardens.add(v);
-            ListTag pending=n.getList("garden_progress_v3",Tag.TAG_COMPOUND);
+            for(int v:n.getIntArray("gardens_v4"))r.gardens.add(v);
+            ListTag pending=n.getList("garden_progress_v4",Tag.TAG_COMPOUND);
             for(int i=0;i<pending.size();i++){CompoundTag e=pending.getCompound(i);r.progress.put(e.getInt("plot"),e.getInt("index"));}
             return r;
         }
@@ -61,10 +69,10 @@ public final class PocketRealm {
             n.put("plots",list);
             int[] done=new int[built.size()];int i=0;for(int v:built)done[i++]=v;
             n.putIntArray("built",done);
-            n.putIntArray("gardens_v3",gardens.stream().mapToInt(Integer::intValue).toArray());
+            n.putIntArray("gardens_v4",gardens.stream().mapToInt(Integer::intValue).toArray());
             ListTag pending=new ListTag();
             progress.forEach((plot,index)->{CompoundTag e=new CompoundTag();e.putInt("plot",plot);e.putInt("index",index);pending.add(e);});
-            n.put("garden_progress_v3",pending);
+            n.put("garden_progress_v4",pending);
             return n;
         }
         int plot(UUID id) {
@@ -106,6 +114,7 @@ public final class PocketRealm {
         d.putDouble("returnX",p.getX());d.putDouble("returnY",p.getY());d.putDouble("returnZ",p.getZ());
         d.putFloat("returnYaw",p.getYRot());d.putFloat("returnPitch",p.getXRot());
         int plot=realms(realm).plot(p.getUUID());
+        d.putInt("realmPlot",plot);
         prepare(realm,plot);
         Vec3 spawn=centre(plot);
         if(!move(p,realm,spawn,180,0))return false;
@@ -137,8 +146,92 @@ public final class PocketRealm {
         }
         if(home==null)return false;
         if(!move(p,destination,home,d.getFloat("returnYaw"),d.getFloat("returnPitch")))return false;
+        d.remove("realmPlot");
         LokiNetwork.fx(p,"rift_cross");
         return true;
+    }
+
+    private static int occupiedPlot(ServerPlayer p) {
+        CompoundTag d=LokiData.get(p);
+        return d.contains("realmPlot",Tag.TAG_INT)?d.getInt("realmPlot"):realms(p.serverLevel()).plot(p.getUUID());
+    }
+
+    private static CompoundTag travelData(net.minecraft.world.entity.Entity e) {
+        if(e instanceof ServerPlayer p)return LokiData.get(p);
+        CompoundTag parent=e.getPersistentData();
+        if(!parent.contains("LokiFractureReturn"))parent.put("LokiFractureReturn",new CompoundTag());
+        return parent.getCompound("LokiFractureReturn");
+    }
+    private static void remember(net.minecraft.world.entity.Entity e,CompoundTag d) {
+        d.putString("returnDim",e.level().dimension().location().toString());
+        d.putDouble("returnX",e.getX());d.putDouble("returnY",e.getY());d.putDouble("returnZ",e.getZ());
+        d.putFloat("returnYaw",e.getYRot());d.putFloat("returnPitch",e.getXRot());
+    }
+
+    /** All captured visitors enter the caster's plot; every visitor keeps its own persistent way home. */
+    public static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster) {
+        if(!e.isAlive()||e.isRemoved()||e.isSpectator())return false;
+        boolean homeward=inside(e.level());
+        if(homeward&&e instanceof ServerPlayer player)return leave(player);
+        CompoundTag d=travelData(e);
+        ServerLevel destination;Vec3 target;
+        int plot=-1;
+        if(!homeward) {
+            destination=level(caster.server);if(destination==null)return false;
+            plot=realms(destination).plot(caster.getUUID());prepare(destination,plot);
+            target=centre(plot);remember(e,d);
+        } else {
+            CompoundTag saved=d.contains("returnX")?d:LokiData.get(caster);
+            ResourceLocation id=ResourceLocation.tryParse(saved.getString("returnDim"));
+            destination=id==null?null:caster.server.getLevel(ResourceKey.create(Registries.DIMENSION,id));
+            if(destination==null||inside(destination))destination=caster.server.overworld();
+            target=saved.contains("returnX")?new Vec3(saved.getDouble("returnX"),saved.getDouble("returnY"),saved.getDouble("returnZ"))
+                :Vec3.atBottomCenterOf(destination.getSharedSpawnPos());
+            if(!Double.isFinite(target.x)||!Double.isFinite(target.y)||!Double.isFinite(target.z))return false;
+        }
+        Vec3 at=safeArrival(e,destination,target);
+        if(at==null)return false;
+        if(e instanceof ServerPlayer p) {
+            if(!homeward)d.putInt("realmPlot",plot);
+            if(!move(p,destination,at,d.getFloat("returnYaw"),d.getFloat("returnPitch")))return false;
+            if(homeward)d.remove("realmPlot");
+            LokiNetwork.fx(p,"rift_cross");return true;
+        }
+        e.stopRiding();e.ejectPassengers();
+        // Forge creates the destination copy through its normal lifecycle, retaining mod entity data.
+        net.minecraft.world.entity.Entity moved=e.changeDimension(destination,new net.minecraftforge.common.util.ITeleporter() {
+            @Override public net.minecraft.world.level.portal.PortalInfo getPortalInfo(net.minecraft.world.entity.Entity entity,ServerLevel dest,
+                    java.util.function.Function<ServerLevel,net.minecraft.world.level.portal.PortalInfo> fallback) {
+                return new net.minecraft.world.level.portal.PortalInfo(at,Vec3.ZERO,entity.getYRot(),entity.getXRot());
+            }
+            @Override public net.minecraft.world.entity.Entity placeEntity(net.minecraft.world.entity.Entity entity,ServerLevel from,ServerLevel dest,float yaw,
+                    java.util.function.Function<Boolean,net.minecraft.world.entity.Entity> reposition) {
+                var copy=reposition.apply(false);
+                if(copy!=null){copy.moveTo(at.x,at.y,at.z,entity.getYRot(),entity.getXRot());copy.setDeltaMovement(Vec3.ZERO);copy.resetFallDistance();}
+                return copy;
+            }
+        });
+        if(moved==null)return false;
+        travelData(moved).putLong("riftGraceUntil",caster.server.overworld().getGameTime()+com.loki.entity.RiftEntity.DURATION+20);
+        return true;
+    }
+    public static boolean crossingCooldown(net.minecraft.world.entity.Entity e) {
+        if(e instanceof ServerPlayer p)return crossingCooldown(p);
+        return !inside(e.level())&&travelData(e).getLong("riftGraceUntil")>((ServerLevel)e.level()).getServer().overworld().getGameTime();
+    }
+    private static Vec3 safeArrival(net.minecraft.world.entity.Entity e,ServerLevel destination,Vec3 target) {
+        for(int ring=0;ring<=6;ring++)for(int x=-ring;x<=ring;x++)for(int z=-ring;z<=ring;z++) {
+            if(Math.max(Math.abs(x),Math.abs(z))!=ring)continue;
+            for(int y=0;y<=10;y++) {
+                Vec3 at=target.add(x,y,z);BlockPos pos=BlockPos.containing(at);
+                if(at.y<destination.getMinBuildHeight()||at.y+e.getBbHeight()>=destination.getMaxBuildHeight()
+                        ||!destination.getWorldBorder().isWithinBounds(pos))continue;
+                destination.getChunk(pos.getX()>>4,pos.getZ()>>4);
+                var box=e.getBoundingBox().move(at.subtract(e.position()));
+                if(destination.noCollision(e,box)&&!destination.containsAnyLiquid(box))return at;
+            }
+        }
+        return null;
     }
 
     private static Vec3 safeReturn(ServerPlayer p,ServerLevel destination,Vec3 target) {
@@ -188,7 +281,7 @@ public final class PocketRealm {
 
     public static void tick(ServerLevel level) {
         if(!inside(level))return;
-        for(ServerPlayer player:level.players())prepare(level,realms(level).plot(player.getUUID()));
+        for(ServerPlayer player:level.players())prepare(level,occupiedPlot(player));
         if(!PENDING.isEmpty()) {
             int[] job=PENDING.get(0);
             BlockPos o=origin(job[0]);
@@ -203,7 +296,7 @@ public final class PocketRealm {
             if(finished)PENDING.remove(0);
         }
         for(ServerPlayer p:new ArrayList<>(level.players())) {
-            Vec3 middle=centre(realms(level).plot(p.getUUID()));
+            Vec3 middle=centre(occupiedPlot(p));
             // Kneeling on the gilded centre always sends you home, with no spell and no cooldown,
             // so nobody can be stranded here by losing an ability or forgetting the way out.
             if(p.isCrouching()&&p.distanceToSqr(middle)<9) {
@@ -219,6 +312,14 @@ public final class PocketRealm {
     }
 
     private static void place(ServerLevel level,BlockPos o,int index) {
+        if(index<oldGarden().size()) {
+            RealmGarden.Block old=oldGarden().get(index);
+            BlockPos pos=o.offset(old.offset());
+            // Only exact generated v2 states can be removed. Other blocks, chests and builds survive.
+            if(level.getBlockState(pos).equals(old.state()))level.setBlock(pos,Blocks.AIR.defaultBlockState(),UPDATE_CLIENTS);
+            return;
+        }
+        index-=oldGarden().size();
         if(index<SURFACE_CELLS) {
             int x=index%RealmShape.SIZE+RealmShape.MIN,z=index/RealmShape.SIZE+RealmShape.MIN;
             boolean land=RealmShape.contains(x,z);int top=RealmShape.surface(x,z);
@@ -230,30 +331,22 @@ public final class PocketRealm {
             return;
         }
         index-=SURFACE_CELLS;
-        if(index<oldGarden().size()) {
-            LegacyRealmGarden.Block old=oldGarden().get(index);
-            BlockPos pos=o.offset(old.offset());
-            // Only exact generated v2 states can be removed. Other blocks, chests and builds survive.
-            if(level.getBlockState(pos).equals(old.state()))level.setBlock(pos,Blocks.AIR.defaultBlockState(),UPDATE_CLIENTS);
-            return;
-        }
-        index-=oldGarden().size();
         if(index<garden().size()) {
             RealmGarden.Block block=garden().get(index);BlockPos pos=o.offset(block.offset());
-            if(level.getBlockState(pos).isAir())level.setBlock(pos,block.state(),UPDATE_CLIENTS);
+            BlockState current=level.getBlockState(pos);
+            BlockPos local=block.offset();
+            // Root volume can replace this version's generated soil, but never block entities.
+            if(level.getBlockEntity(pos)==null&&(current.isAir()||current.equals(terrain(local.getX(),local.getY(),local.getZ()))))
+                level.setBlock(pos,block.state(),UPDATE_CLIENTS);
             return;
         }
         index-=garden().size();
         if(index<DEEP_CELLS) {
-            int depth=2+index/SURFACE_CELLS,i=index%SURFACE_CELLS;
-            int x=i%RealmShape.SIZE+RealmShape.MIN,z=i/RealmShape.SIZE+RealmShape.MIN;
-            boolean solid=RealmShape.contains(x,z)&&depth<=RealmShape.depth(x,z);
-            BlockState state=Blocks.AIR.defaultBlockState();
-            if(solid) {
-                int grain=Math.floorMod(x*23+z*41+depth*17,31);
-                state=(depth<7?Blocks.STONE:grain<4?Blocks.TUFF:grain<8?Blocks.BASALT:Blocks.DEEPSLATE).defaultBlockState();
-            }
-            replaceTerrain(level,o.offset(x,-depth,z),state,previousTerrain(x,-depth,z));
+            int x=index%RealmShape.SIZE+RealmShape.MIN,z=index/RealmShape.SIZE+RealmShape.MIN;
+            int bottom=RealmShape.contains(x,z)?RealmShape.depth(x,z):1;
+            int oldBottom=LegacyRealmShapeV3.contains(x,z)?LegacyRealmShapeV3.depth(x,z):1;
+            for(int depth=2;depth<=Math.max(bottom,oldBottom);depth++)
+                replaceTerrain(level,o.offset(x,-depth,z),terrain(x,-depth,z),previousTerrain(x,-depth,z));
             return;
         }
         // Remove the exact original 100x100 v1 wall, not the new island boundary.
@@ -266,6 +359,29 @@ public final class PocketRealm {
         BlockPos pos=o.offset(x,height+1,z);
         if(level.getBlockState(pos).equals(wall(along,height)))level.setBlock(pos,Blocks.AIR.defaultBlockState(),UPDATE_CLIENTS);
     }
+    private static BlockState terrain(int x,int y,int z) {
+        if(!RealmShape.contains(x,z)||y>RealmShape.surface(x,z)||y< -RealmShape.depth(x,z))return Blocks.AIR.defaultBlockState();
+        int top=RealmShape.surface(x,z);
+        if(y==top)return floor(x,z);
+        if(y==top-1)return Blocks.ROOTED_DIRT.defaultBlockState();
+        int depth=-y,grain=Math.floorMod(x*23+z*41+depth*17,31);
+        return (depth<7?Blocks.STONE:grain<4?Blocks.TUFF:grain<8?Blocks.BASALT:Blocks.DEEPSLATE).defaultBlockState();
+    }
+    private static BlockState terrainV3(int x,int y,int z) {
+        if(!LegacyRealmShapeV3.contains(x,z)||y>LegacyRealmShapeV3.surface(x,z)||y< -LegacyRealmShapeV3.depth(x,z))return Blocks.AIR.defaultBlockState();
+        int top=LegacyRealmShapeV3.surface(x,z);
+        if(y==top) {
+            double sigil=Math.hypot(x-50,z-72);
+            if(sigil<2)return Blocks.GILDED_BLACKSTONE.defaultBlockState();
+            if(sigil<3.3)return Blocks.EMERALD_BLOCK.defaultBlockState();
+            if(Math.abs(x-50)<3&&z>55&&z<72)return Blocks.POLISHED_BLACKSTONE_BRICKS.defaultBlockState();
+            if(LegacyRealmShapeV3.fraction(x,z)>.94)return (Math.floorMod(x*19+z*37,5)==0?Blocks.MOSS_BLOCK:Blocks.TUFF).defaultBlockState();
+            return (Math.floorMod(x*73+z*37,13)<3?Blocks.ROOTED_DIRT:Blocks.MOSS_BLOCK).defaultBlockState();
+        }
+        if(y>=-1)return (y==top-1?Blocks.ROOTED_DIRT:Blocks.STONE).defaultBlockState();
+        int depth=-y,grain=Math.floorMod(x*23+z*41+depth*17,31);
+        return (depth<7?Blocks.STONE:grain<4?Blocks.TUFF:grain<8?Blocks.BASALT:Blocks.DEEPSLATE).defaultBlockState();
+    }
     private static BlockState previousTerrain(int x,int y,int z) {
         if(x<0||x>=100||z<0||z>=100||y>0||y< -8)return Blocks.AIR.defaultBlockState();
         int depth=-y;
@@ -276,10 +392,13 @@ public final class PocketRealm {
     }
     private static void replaceTerrain(ServerLevel level,BlockPos pos,BlockState state,BlockState previous) {
         BlockState current=level.getBlockState(pos);
+        if(level.getBlockEntity(pos)!=null)return;
         int x=Math.floorMod(pos.getX(),SPACING),z=Math.floorMod(pos.getZ(),SPACING);
         boolean legacy=x<SIZE&&z<SIZE&&(pos.getY()==FLOOR_Y&&current.equals(legacyFloor(x,z))
             ||pos.getY()==FLOOR_Y-1&&current.is(Blocks.POLISHED_BLACKSTONE));
-        if((current.isAir()||current.equals(previous)||legacy)&&!current.equals(state))level.setBlock(pos,state,UPDATE_CLIENTS);
+        int localX=Math.floorMod(pos.getX()-RealmShape.MIN,SPACING)+RealmShape.MIN;
+        int localZ=Math.floorMod(pos.getZ()-RealmShape.MIN,SPACING)+RealmShape.MIN;
+        if((current.isAir()||current.equals(previous)||current.equals(terrainV3(localX,pos.getY()-FLOOR_Y,localZ))||legacy)&&!current.equals(state))level.setBlock(pos,state,UPDATE_CLIENTS);
     }
     private static BlockState floor(int x,int z) {
         double sigil=Math.hypot(x-50,z-72);
@@ -288,7 +407,7 @@ public final class PocketRealm {
         if(Math.abs(x-50)<3&&z>55&&z<72)return Blocks.POLISHED_BLACKSTONE_BRICKS.defaultBlockState();
         double edge=RealmShape.fraction(x,z);
         if(edge>.94)return (Math.floorMod(x*19+z*37,5)==0?Blocks.MOSS_BLOCK:Blocks.TUFF).defaultBlockState();
-        if(Math.floorMod(x*73+z*37,13)<3)return Blocks.ROOTED_DIRT.defaultBlockState();
+        if(Math.sin(x*.18)+Math.cos(z*.16)+Math.sin((x+z)*.09)>2.2)return Blocks.ROOTED_DIRT.defaultBlockState();
         return Blocks.MOSS_BLOCK.defaultBlockState();
     }
     private static BlockState oldFloor(int x,int z) {
@@ -325,7 +444,7 @@ public final class PocketRealm {
         if(!player.level().getBlockState(clicked).is(Blocks.POLISHED_BLACKSTONE))return false;
         if(clicked.getY()!=FLOOR_Y+5)return false;
         int localX=Math.floorMod(clicked.getX(),SPACING),localZ=Math.floorMod(clicked.getZ(),SPACING);
-        if(localX<48||localX>52||localZ<51||localZ>54)return false;
+        if(localX<49||localX>51||localZ<51||localZ>54)return false;
         Vec3 seatAt=new Vec3(clicked.getX()-localX+50.5,FLOOR_Y+6,clicked.getZ()-localZ+53.5);
         if(!player.level().getEntitiesOfClass(com.loki.entity.ThroneSeat.class,new net.minecraft.world.phys.AABB(seatAt,seatAt).inflate(2)).isEmpty())return true;
         var seat=new com.loki.entity.ThroneSeat(com.loki.Loki.THRONE_SEAT.get(),player.level());

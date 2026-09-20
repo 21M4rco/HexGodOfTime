@@ -4,7 +4,7 @@ plugins {
     id 'org.spongepowered.mixin' version '0.7.+'
 }
 group = 'com.loki'
-version = '0.3.0'
+version = '0.3.2'
 base { archivesName = 'loki' }
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 java.withSourcesJar()

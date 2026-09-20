@@ -45,3 +45,24 @@ Validation added: `verifyRealmShape` checks island bounds, land area, non-cylind
 Runtime checks still required: two players enter/exit from different dimensions and positions; exit immediately after entry with zero energy; saved return after reconnect/restart; blocked/missing return dimension fallback; Q/CTRL-Q/inventory/death/hopper weapon drops; transferred inventory weapons; throne sit/dismount/dimension change; new and existing island upgrades/restart; cloth in motion; portal mirror appearance and sound balance.
 
 No Minecraft client or dedicated-server playtest was available in the editing environment.
+
+## 0.3.1 — Fracture, cosmos, flight and HUD
+
+Base: `0019138521132de36e47f37624155b17a8233d27` (Actions run `35511132447`).
+
+- Island geometry regression passes: 34,920 connected land columns, over twice the linked build's footprint, coast radius 87–128, underside depth 3–57. Arrival and throne approach remain flat.
+- v2 and v3 garden plans are frozen for migration. v4 checkpoints are separate so completed older gardens rebuild once. Only air or matching generated states are replaced; block entities are protected.
+- Fracture tap opens a regular doorway. Hold for 12 server ticks captures eligible entities within a five-block sphere, pulls for ten ticks, transfers the captured group and closes. Entrants share the caster's plot; return locations persist per visitor. Transfer failures leave entities at the source.
+- J toggles flight while ascended; Space/crouch rise and descend. The binding is configurable. Flight also uses vanilla double-jump controls. Grants are removed on detransformation/death/logout/dimension changes, preserving creative/spectator or previously held flight permission. Disabling flight grants a short landing grace.
+- Eight named cards expose readiness and cooldowns. Hold the selection key and scroll to choose; primary/energy/flight hints display beside the cards.
+- The cape retains its original collar anchors, with a smooth wider lower profile. Sky galaxies, meteors and wisps are client-only, and the flight nebula uses depth-sorted emissive cloud layers in world space.
+
+A Minecraft visual or multiplayer playtest has not been performed in this environment. In-game acceptance checks: fresh and existing realms (including interrupted upgrades); full crown and throne silhouette; tap/held entry and exit with players/mobs/items, mounted entities, blocked returns and different source dimensions; normal/Fabulous/shader graphics; flight relog/death/detransformation; cape during turns, stairs and flight; HUD at different GUI scales.
+
+## 0.3.2 — Compact HUD and removal of decorative effect wires
+
+Replaces the eight-card overlay with one 204×96 logical-pixel bottom-left readout rendered at 0.8 scale (about 163×77 GUI pixels). Each selected/bound ability has explicit primary/alternate instructions, recovery, cost and energy. Holding V previews three neighboring slots in place; all eight remain scrollable. On narrow viewports the readout sits above vanilla survival bars.
+
+Removes the shared decorative ring/strand mesh passes from spell, transformation, grip, bind and time-field effects, plus all orbital filaments/cross wires from flight. Existing particles and the spatial cloud nebula remain. Projectile bodies, mirror fractures and shooting-star trails retain their functional silhouettes.
+
+Validation: source diff/remaining caller audit; CI build required. In-game screenshot and multiplayer checks have not been performed here.

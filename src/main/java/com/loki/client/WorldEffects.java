@@ -19,9 +19,8 @@ import org.joml.Vector3f;
 import java.util.*;
 
 /**
- * Presentation for everything the server tells this client happened. Effects are shapes first and
- * particles second: rings, ribbons and strands carry the silhouette, and the additive motes from
- * {@link Vfx} sit on top of them, so magic reads as designed rather than merely numerous.
+ * Client presentation uses particles, clouds and projections. Decorative wire rings and
+ * orbiting strands are deliberately absent.
  */
 public final class WorldEffects {
     public static final ResourceLocation WHITE=Loki.id("textures/white.png");
@@ -141,6 +140,11 @@ public final class WorldEffects {
             }
             if(!(entity instanceof com.loki.entity.RiftEntity rift)||now%2!=0)continue;
             if(rift.position().distanceToSqr(eye)>2304)continue;
+            if(rift.vacuum()) {
+                double angle=mc.level.random.nextDouble()*Math.PI*2;
+                Vec3 at=rift.position().add(Math.cos(angle)*4,mc.level.random.nextDouble()*3,Math.sin(angle)*4);
+                Vfx.spark(Loki.EMBER.get(),at,rift.position().add(0,1,0).subtract(at).scale(.13));
+            }
             Vfx.cone(Loki.SHARD.get(),rift.position().add(0,1.1,0),new Vec3(mc.level.random.nextGaussian(),mc.level.random.nextGaussian()*.4,mc.level.random.nextGaussian()),1,.05,.05);
             Vfx.spark(Loki.GOLD_EMBER.get(),rift.position().add((mc.level.random.nextDouble()-.5)*1.8,.3+mc.level.random.nextDouble()*1.9,(mc.level.random.nextDouble()-.5)*1.8),new Vec3(0,.01,0));
         }
@@ -220,62 +224,6 @@ public final class WorldEffects {
         var out=buffers.getBuffer(RenderType.entityTranslucent(WHITE));
         double now=ClientState.now()+partial;
 
-        for(Effect e:EFFECTS) {
-            float age=(float)(now-e.start),t=Mth.clamp(age/e.duration,0,1);
-            Entity entity=mc.level.getEntity(e.entity);
-            Vec3 origin=e.kind.equals("ascend")&&entity!=null?entity.getPosition(partial):e.pos;
-            boolean temporal=e.kind.equals("stop")||e.kind.equals("slip")||e.kind.equals("dilate")||e.kind.equals("ascend")||e.kind.equals("bind");
-            int color=temporal?0xc8ba7b:0x39cf78;
-            if(e.kind.equals("stop")||e.kind.equals("dilate")) {
-                float radius=Math.min(18,age*1.1f);
-                ring(pose,out,origin.add(0,.08,0),radius,.025f,color,(1-t)*.8f,0);
-                if(age<24)ring(pose,out,origin.add(0,1,0),radius*.7f,.013f,0xefffe9,1-age/24,Math.PI/2);
-            } else if(e.kind.equals("cast")||e.kind.equals("impact")||e.kind.equals("slash")||e.kind.equals("throw")||e.kind.equals("blade_bite")) {
-                ring(pose,out,origin.add(0,1,0),.35+age*.06,.010f,color,(1-t)*.55f,Math.PI/2);
-            } else {
-                int count=e.kind.equals("ascend")?14:6;
-                for(int i=0;i<count;i++) {
-                    Vec3 last=null;
-                    for(int j=0;j<18;j++) {
-                        float f=j/17f;
-                        double a=i*Math.PI*2/count+f*2.6+age*.045;
-                        double radius=(e.kind.equals("ascend")?.7:.35)*(1+.25*Math.sin(f*Math.PI));
-                        Vec3 v=origin.add(Math.cos(a)*radius,.15+f*2.2,Math.sin(a)*radius);
-                        if(last!=null)ribbon(pose,out,last,v,.008f*(float)Math.sin(f*Math.PI),i%3==0?0xd8c780:color,(1-t)*.7f);
-                        last=v;
-                    }
-                }
-            }
-        }
-
-        for(var entry:ClientState.THREADS.entrySet()) {
-            Entity owner=mc.level.getEntity(entry.getKey()),target=mc.level.getEntity(entry.getValue().target());
-            if(owner==null||target==null)continue;
-            strands(pose,out,hand(owner),target.getPosition(partial).add(0,target.getBbHeight()*.55,0),now,4,0xe6db9b,0x66c98a);
-            for(int i=0;i<4;i++)ring(pose,out,target.getPosition(partial).add(0,target.getBbHeight()*.55+(i-1.5)*.2,0),target.getBbWidth()*.7+.2,.009f,0xbdd68b,.8f,i*.3);
-        }
-        for(var entry:GRIPS.entrySet()) {
-            Entity owner=mc.level.getEntity(entry.getKey());
-            if(owner==null)continue;
-            Vec3 palm=hand(owner);
-            for(int id:entry.getValue().targets) {
-                Entity held=mc.level.getEntity(id);
-                if(held==null)continue;
-                Vec3 centre=held.getPosition(partial).add(0,held.getBbHeight()*.5,0);
-                strands(pose,out,palm,centre,now,3,0x4fe39a,0x9ae7bd);
-                ring(pose,out,centre,held.getBbWidth()*.75+.2,.011f,0x5fe0a2,.75f,now*.02%Math.PI);
-                ring(pose,out,centre,held.getBbWidth()*.75+.2,.008f,0xd6e8a8,.5f,Math.PI/2+now*.017%Math.PI);
-            }
-        }
-        for(Field f:FIELDS.values()) {
-            float age=(float)(now-f.started);
-            float fade=Mth.clamp((float)(f.expires-now)/20f,0,1)*Math.min(1,age/6f);
-            if(fade<=.02f)continue;
-            int color=f.stop?0xd8c07a:0x86d9a6;
-            for(int i=0;i<3;i++)ring(pose,out,f.centre.add(0,.1+i*.9,0),f.radius*Math.cos(i*.55),.012f,color,fade*.35f,0);
-            ring(pose,out,f.centre.add(0,f.radius*.5,0),f.radius,.010f,color,fade*.25f,Math.PI/2);
-        }
-
         for(Projection projection:PROJECTIONS.values()) {
             if(projection.origin.distanceToSqr(camera)>2304)continue;
             float build=Mth.clamp((float)(now-projection.shown)/14f,0,1);
@@ -308,33 +256,12 @@ public final class WorldEffects {
         }
 
         CapeRenderer.renderAll(pose,buffers,partial);
+        CosmicNebula.render(pose,buffers,partial);
         pose.popPose();
         buffers.endBatch(RenderType.entityTranslucent(WHITE));
         buffers.endBatch(RenderType.entityCutoutNoCull(LokiLayer.CLOTH));
     }
 
-    /** Several loose strands between two points, twisting slowly so they read as living thread. */
-    private static void strands(PoseStack pose,VertexConsumer out,Vec3 from,Vec3 to,double now,int count,int warm,int cool) {
-        for(int strand=0;strand<count;strand++) {
-            Vec3 last=from;
-            for(int i=1;i<=32;i++) {
-                double t=i/32.0,a=t*Math.PI*6+now*.025+strand*Math.PI*2/count;
-                Vec3 v=from.lerp(to,t).add(Math.cos(a)*Math.sin(t*Math.PI)*.2,Math.sin(a)*.15-Math.sin(t*Math.PI)*.22,Math.sin(a)*Math.sin(t*Math.PI)*.2);
-                ribbon(pose,out,last,v,.007f,strand==0?warm:cool,.8f);
-                last=v;
-            }
-        }
-    }
-
-    public static void ring(PoseStack pose,VertexConsumer out,Vec3 center,double radius,float width,int color,float alpha,double tilt) {
-        Vec3 last=null;
-        for(int i=0;i<=80;i++) {
-            double a=i*Math.PI*2/80;
-            Vec3 v=center.add(Math.cos(a)*radius,Math.sin(a)*radius*Math.sin(tilt),Math.sin(a)*radius*Math.cos(tilt));
-            if(last!=null)ribbon(pose,out,last,v,width,color,alpha);
-            last=v;
-        }
-    }
     public static void ribbon(PoseStack pose,VertexConsumer out,Vec3 a,Vec3 b,float width,int color,float alpha) {
         Vec3 view=Minecraft.getInstance().gameRenderer.getMainCamera().getPosition().subtract(a).normalize();
         Vec3 side=b.subtract(a).cross(view);

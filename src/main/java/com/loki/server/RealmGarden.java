@@ -7,7 +7,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import java.util.*;
 
-/** A towering branching canopy, buttress roots, root-tail underside and a carved, solid throne. */
+/** Swept boughs, a connected irregular crown, buried tapering roots and a usable carved throne. */
 final class RealmGarden {
     record Block(BlockPos offset,BlockState state) {}
     private final Map<BlockPos,BlockState> blocks=new LinkedHashMap<>();
@@ -15,155 +15,161 @@ final class RealmGarden {
     private static final BlockState LEAVES=Blocks.AZALEA_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT,true);
     private static final BlockState FLOWERS=Blocks.FLOWERING_AZALEA_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT,true);
     private static final BlockState STONE=Blocks.POLISHED_BLACKSTONE_BRICKS.defaultBlockState();
+    private static final Vec3 BASE=new Vec3(50,1,36);
 
     static List<Block> plan() {
         RealmGarden g=new RealmGarden();
-        Vec3 base=new Vec3(50,1,39);
-        for(int y=1;y<=66;y++) {
-            double t=y/66.0;
-            g.ball(new Vec3(50+Math.sin(t*5.4)*3.0,y,39+Math.cos(t*4)*2),6.3-t*4.7,WOOD);
+        g.curve(BASE,BASE.add(-7,26,5),BASE.add(8,60,-5),BASE.add(2,91,0),8.2,1.4);
+        Random r=new Random(0x59474744);
+        // Each leader sweeps out from the trunk and splits into a connected fan of smaller boughs.
+        for(int arm=0;arm<11;arm++) {
+            double a=arm*2.399963+.2,reach=42+r.nextDouble()*24;
+            double height=76+r.nextDouble()*27;
+            Vec3 start=BASE.add(1,31+arm%4*8,0);
+            Vec3 end=BASE.add(Math.cos(a)*reach,height,Math.sin(a)*reach);
+            Vec3 elbow=BASE.add(Math.cos(a-.24)*reach*.68,height-10,Math.sin(a-.24)*reach*.68);
+            g.curve(start,start.add(Math.cos(a)*12,21,Math.sin(a)*12),elbow,end,4.1,1.0);
+            for(int fork=0;fork<6;fork++) {
+                double f=fork/5.0,fa=a+(f-.5)*1.65;
+                Vec3 from=elbow.lerp(end,f*.75);
+                double spread=13+r.nextDouble()*12;
+                Vec3 tip=end.add(Math.cos(fa)*spread,3+r.nextDouble()*12,Math.sin(fa)*spread);
+                g.curve(from,from.add(0,8,0),tip.add(-Math.cos(fa)*7,3,-Math.sin(fa)*7),tip,1.7,.24);
+                g.crown(tip,8+r.nextDouble()*3,5+r.nextDouble()*3,arm*17+fork);
+                g.crown(from.lerp(tip,.48).add(0,3,0),8,5.5,arm*31+fork);
+                if(fork%2==0)g.drape(tip.add(Math.cos(fa)*5,-2,Math.sin(fa)*5),7+r.nextInt(9),arm+fork);
+            }
+            g.crown(elbow.add(0,4,0),11,7,arm+70);
         }
-        for(int arm=0;arm<15;arm++) {
-            double a=arm*Math.PI*2/15+.24;
-            Vec3 start=base.add(Math.sin(arm)*1.5,27+(arm%5)*6,Math.cos(arm)*1.5);
-            Vec3 end=base.add(Math.cos(a)*(33+arm%4*4),48+(arm%5)*5,Math.sin(a)*(33+arm%4*4));
-            g.limb(start,end,3.1,1.0,arm,5);
-            g.canopy(end,8.5,4.3,arm);
-            for(int fork=0;fork<4;fork++) {
-                double fa=a+(fork-1.5)*.48;
-                Vec3 tip=end.add(Math.cos(fa)*(9+fork*2),6+(fork%3)*4,Math.sin(fa)*(9+fork*2));
-                g.limb(end.lerp(start,.24),tip,1.4,.32,arm+fork,3);
-                g.canopy(tip,6.0+fork*.5,3.4,arm*4+fork);
-                for(int twig=0;twig<2;twig++) {
-                    Vec3 leaf=tip.add(Math.cos(fa+twig-.5)*5,3+twig,Math.sin(fa+twig-.5)*5);
-                    g.limb(tip,leaf,.48,.12,arm+twig,1);
-                    g.canopy(leaf,3.5,2.5,arm+twig);
-                }
-                if(fork==1)g.hanging(tip,8+arm%7);
+        // Upper leaders bridge the centre into a rounded, many-tipped crown rather than a stacked cone.
+        for(int i=0;i<9;i++) {
+            double a=i*2.399963,reach=10+i%3*8;
+            Vec3 tip=BASE.add(Math.cos(a)*reach,112+i%3*5,Math.sin(a)*reach);
+            g.curve(BASE.add(2,69,0),BASE.add(4,94,2),tip.add(0,-7,0),tip,2.6,.35);
+            g.crown(tip,10+i%2*2,7,i+200);
+        }
+        g.roots();g.flowers();g.throne();
+        // Actual chair clearance and an uninterrupted approach to the existing return sigil.
+        for(int x=49;x<=51;x++)for(int z=51;z<=54;z++)for(int y=6;y<=8;y++)g.blocks.remove(new BlockPos(x,y,z));
+        List<Block> result=new ArrayList<>(g.blocks.size());g.blocks.forEach((p,s)->result.add(new Block(p,s)));return List.copyOf(result);
+    }
+
+    private void roots() {
+        Random r=new Random(0xB077);
+        for(int i=0;i<10;i++) {
+            double a=i*2.399963+.5,length=29+r.nextDouble()*38,bend=(i%2==0?1:-1)*(.35+r.nextDouble()*.45);
+            Vec3 end=BASE.add(Math.cos(a+bend)*length,0,Math.sin(a+bend)*length);
+            Vec3 c1=BASE.add(Math.cos(a)*length*.35,0,Math.sin(a)*length*.35);
+            Vec3 c2=BASE.add(Math.cos(a+bend*1.6)*length*.72,0,Math.sin(a+bend*1.6)*length*.72);
+            root(BASE,c1,c2,end,4.6,.25);
+            for(int fork=0;fork<2;fork++) {
+                double t=.48+fork*.22,fa=a+bend+(fork==0?-.7:.65);
+                Vec3 from=bezier(BASE,c1,c2,end,t);
+                Vec3 tip=from.add(Math.cos(fa)*(15+fork*7),0,Math.sin(fa)*(15+fork*7));
+                root(from,from.add(Math.cos(fa-.4)*9,0,Math.sin(fa-.4)*9),tip.add(-3,0,2),tip,1.25,.13);
             }
         }
-        g.canopy(new Vec3(48,72,38),11,5,107);
-        g.canopy(new Vec3(53,78,40),7,4,110);
-        // Roots cover most of the island and fork into the grass. Keep the arrival/throne aisle open.
-        for(int i=0;i<19;i++) {
-            double a=i*Math.PI*2/19;
-            double length=38+(i%4)*8;
-            Vec3 end=base.add(Math.cos(a)*length,0,Math.sin(a)*length);
-            if(end.z>45&&Math.abs(end.x-50)<12)continue;
-            end=new Vec3(end.x,RealmShape.surface((int)end.x,(int)end.z)+.3,end.z);
-            g.limb(base.add(0,3,0),end,3.3,.5,i,.5);
-            for(int fork:new int[]{-1,1}) {
-                Vec3 start=base.lerp(end,.63);
-                Vec3 tip=end.add(Math.cos(a+fork*.5)*11,0,Math.sin(a+fork*.5)*11);
-                if(!RealmShape.contains((int)tip.x,(int)tip.z))continue;
-                tip=new Vec3(tip.x,RealmShape.surface((int)tip.x,(int)tip.z)+.3,tip.z);
-                g.limb(start,tip,1.3,.2,i+fork,.5);
-            }
+        // Roots visible below the island grow out of its core, then curl down and inward.
+        for(int i=0;i<8;i++) {
+            double a=i*2.399963,radius=64+i%3*9;
+            Vec3 start=BASE.add(Math.cos(a)*23,-27,Math.sin(a)*23);
+            Vec3 shoulder=BASE.add(Math.cos(a+.35)*radius,-17,Math.sin(a+.35)*radius);
+            Vec3 tip=BASE.add(Math.cos(a+.65)*(radius-15),-52-i%3*2,Math.sin(a+.65)*(radius-15));
+            curve(start,shoulder,shoulder.add(0,-23,0),tip,3.4,.16);
         }
-        // Thick roots curl down over the ragged shore, making the underside part of the tree itself.
-        for(int i=0;i<12;i++) {
-            double a=i*Math.PI*2/12+.1,r=RealmShape.edge(a)-3;
-            Vec3 lip=new Vec3(50+Math.cos(a)*r,2,50+Math.sin(a)*r/1.07);
-            lip=new Vec3(lip.x,RealmShape.surface((int)lip.x,(int)lip.z)+.2,lip.z);
-            Vec3 inner=base.lerp(lip,.62);
-            inner=new Vec3(inner.x,RealmShape.surface((int)inner.x,(int)inner.z),inner.z);
-            if(!(lip.z>50&&Math.abs(lip.x-50)<10))g.limb(inner,lip,1.45,.85,i,.4);
-            Vec3 tip=lip.add(-Math.cos(a)*9,-14-i%4*3,-Math.sin(a)*9);
-            g.limb(lip,tip,1.3,.15,i,-2);
+    }
+    private void root(Vec3 start,Vec3 a,Vec3 b,Vec3 end,double thick,double thin) {
+        int steps=(int)(start.distanceTo(end)*3)+1;
+        for(int i=0;i<=steps;i++) {
+            double t=i/(double)steps;Vec3 v=bezier(start,a,b,end,t);
+            // Stay out of the throne aisle; most of each root is embedded in the soil.
+            if(v.z>44&&v.z<82&&Math.abs(v.x-50)<9)continue;
+            if(!RealmShape.contains((int)v.x,(int)v.z))continue;
+            double rad=thin+(thick-thin)*Math.pow(1-t,2.2);
+            double y=RealmShape.surface((int)v.x,(int)v.z)-.75+Math.pow(1-t,5)*3.5;
+            ball(new Vec3(v.x,y,v.z),rad,WOOD);
         }
-        // Sparse light veins emphasize the bark without replacing the trunk with a neon column.
-        for(int y=4;y<63;y+=3) {
-            double t=y/66.0,a=y*.19,r=6.3-t*4.7;
-            g.put(new BlockPos((int)Math.round(50+Math.sin(t*5.4)*3+Math.cos(a)*r),y,
-                (int)Math.round(39+Math.cos(t*4)*2+Math.sin(a)*r)),
-                y%9==4?Blocks.VERDANT_FROGLIGHT.defaultBlockState():Blocks.MOSS_BLOCK.defaultBlockState());
-        }
-        g.flowers();g.throne();
-        // Reserve the seat and approach even if a root or leaf would otherwise occupy them.
-        for(int x=48;x<=52;x++)for(int z=51;z<=55;z++)for(int y=6;y<=8;y++)g.blocks.remove(new BlockPos(x,y,z));
-        List<Block> result=new ArrayList<>();g.blocks.forEach((p,s)->result.add(new Block(p,s)));return List.copyOf(result);
     }
     private void throne() {
-        // Fill every tier, including beneath the chair. The former single-row stairs left a hole.
-        for(int tier=0;tier<3;tier++)for(int x=42+tier;x<=58-tier;x++)for(int z=46+tier;z<=59-tier;z++)
-            put(new BlockPos(x,1+tier,z),(x==42+tier||x==58-tier||z==46+tier||z==59-tier)
-                ?Blocks.CHISELED_POLISHED_BLACKSTONE.defaultBlockState():STONE);
+        for(int tier=0;tier<3;tier++)for(int x=43+tier;x<=57-tier;x++)for(int z=46+tier;z<=59-tier;z++) {
+            boolean edge=x==43+tier||x==57-tier||z==46+tier||z==59-tier;
+            put(new BlockPos(x,1+tier,z),edge?Blocks.CHISELED_POLISHED_BLACKSTONE.defaultBlockState():STONE);
+        }
         for(int tier=0;tier<3;tier++)for(int x=47;x<=53;x++)put(new BlockPos(x,1+tier,60-tier),
             Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS.defaultBlockState().setValue(StairBlock.FACING,Direction.NORTH));
-        for(int x=47;x<=53;x++)for(int z=50;z<=55;z++)put(new BlockPos(x,4,z),STONE);
-        for(int x=48;x<=52;x++)for(int z=51;z<=54;z++)put(new BlockPos(x,5,z),Blocks.POLISHED_BLACKSTONE.defaultBlockState());
-        // A double-thick back, carved frame, silver inlay and a recessed luminous emerald crest.
-        for(int y=5;y<=14;y++)for(int x=46+(y>11?1:0);x<=54-(y>11?1:0);x++)for(int z=48;z<=49;z++) {
-            boolean border=x==46||x==54||y==14;
-            put(new BlockPos(x,y,z),border?Blocks.CHISELED_POLISHED_BLACKSTONE.defaultBlockState():STONE);
+        for(int x=47;x<=53;x++)for(int z=49;z<=55;z++)put(new BlockPos(x,4,z),STONE);
+        for(int x=49;x<=51;x++)for(int z=51;z<=54;z++)put(new BlockPos(x,5,z),Blocks.POLISHED_BLACKSTONE.defaultBlockState());
+        // Narrow inset back, sculpted outline, dark seat and restrained gold trim.
+        for(int y=5;y<=12;y++)for(int x=48;x<=52;x++) {
+            if(y>10&&Math.abs(x-50)>12-y)continue;
+            put(new BlockPos(x,y,50),x==48||x==52||y==12?Blocks.GILDED_BLACKSTONE.defaultBlockState():STONE);
+            put(new BlockPos(x,y,49),STONE);
         }
-        for(int y=7;y<=12;y++)put(new BlockPos(50,y,50),y==10?Blocks.VERDANT_FROGLIGHT.defaultBlockState():Blocks.EMERALD_BLOCK.defaultBlockState());
-        for(int x:new int[]{47,53})for(int z=50;z<=55;z++) {
-            for(int y=5;y<=6;y++)put(new BlockPos(x,y,z),Blocks.GILDED_BLACKSTONE.defaultBlockState());
+        put(new BlockPos(50,10,51),Blocks.VERDANT_FROGLIGHT.defaultBlockState());
+        put(new BlockPos(50,11,51),Blocks.EMERALD_BLOCK.defaultBlockState());
+        for(int x:new int[]{48,52})for(int z=51;z<=55;z++) {
+            put(new BlockPos(x,5,z),STONE);
+            put(new BlockPos(x,6,z),Blocks.CHISELED_POLISHED_BLACKSTONE.defaultBlockState());
             put(new BlockPos(x,7,z),Blocks.POLISHED_BLACKSTONE_BRICK_SLAB.defaultBlockState());
-            if(z==55)put(new BlockPos(x,6,z),Blocks.CHISELED_POLISHED_BLACKSTONE.defaultBlockState());
         }
-        for(int x:new int[]{46,54})for(int y=8;y<=13;y++)put(new BlockPos(x,y,50),Blocks.POLISHED_BLACKSTONE_WALL.defaultBlockState());
-        // Swept root-carved crown and twin horn finials surround the back, away from the usable seat.
-        for(int sign:new int[]{-1,1}) {
-            limb(new Vec3(50+sign*5,3,47),new Vec3(50+sign*7,15,47),1.0,.6,sign,0);
-            limb(new Vec3(50+sign*7,15,47),new Vec3(50+sign*3,20,47),.6,.12,sign,1);
-        }
-        for(int x:new int[]{41,59}) {
-            for(int y=1;y<5;y++)put(new BlockPos(x,y,57),Blocks.POLISHED_BLACKSTONE_WALL.defaultBlockState());
-            put(new BlockPos(x,5,57),Blocks.SOUL_LANTERN.defaultBlockState());
+        for(int side:new int[]{-1,1}) {
+            curve(new Vec3(50+side*4,3,48),new Vec3(50+side*7,9,47),new Vec3(50+side*6,17,48),new Vec3(50+side*2,18,49),1.1,.2);
+            for(int y=4;y<=8;y++)put(new BlockPos(50+side*4,y,55),Blocks.POLISHED_BLACKSTONE_WALL.defaultBlockState());
+            put(new BlockPos(50+side*4,9,55),Blocks.SOUL_LANTERN.defaultBlockState());
+            for(int z=56;z<=65;z++)put(new BlockPos(50+side*4,RealmShape.surface(50+side*4,z),z),Blocks.GILDED_BLACKSTONE.defaultBlockState());
         }
     }
     private void flowers() {
         Random r=new Random(0xF10A3);
-        for(int i=0;i<400;i++) {
-            int x=-24+r.nextInt(148),z=-24+r.nextInt(148);
-            if(!RealmShape.contains(x,z)||Math.hypot(x-50,z-39)<14||Math.abs(x-50)<7&&z>44&&z<78)continue;
-            int y=RealmShape.surface(x,z)+1;
-            BlockPos at=new BlockPos(x,y,z);
+        for(int i=0;i<780;i++) {
+            int x=RealmShape.MIN+r.nextInt(RealmShape.SIZE),z=RealmShape.MIN+r.nextInt(RealmShape.SIZE);
+            if(!RealmShape.contains(x,z)||Math.hypot(x-50,z-36)<17||Math.abs(x-50)<9&&z>44&&z<82)continue;
+            BlockPos at=new BlockPos(x,RealmShape.surface(x,z)+1,z);
             if(blocks.containsKey(at))continue;
-            var flower=switch(i%7) {
-                case 0->Blocks.FLOWERING_AZALEA;case 1->Blocks.ALLIUM;case 2->Blocks.AZURE_BLUET;
-                case 3->Blocks.BLUE_ORCHID;case 4->Blocks.LILY_OF_THE_VALLEY;default->Blocks.MOSS_CARPET;
-            };
+            var flower=switch(i%8) {case 0->Blocks.FLOWERING_AZALEA;case 1->Blocks.ALLIUM;case 2->Blocks.AZURE_BLUET;
+                case 3->Blocks.BLUE_ORCHID;case 4->Blocks.LILY_OF_THE_VALLEY;default->Blocks.MOSS_CARPET;};
             put(at,flower.defaultBlockState());
         }
-        // Hand-built luminous blossom groves; a low leaf rosette around a crystal flower.
-        for(int i=0;i<9;i++) {
-            double a=i*Math.PI*2/9;int x=50+(int)(Math.cos(a)*53),z=50+(int)(Math.sin(a)*49);
-            int y=RealmShape.surface(x,z)+1;BlockPos c=new BlockPos(x,y,z);
-            if(blocks.containsKey(c))continue;
-            put(c,Blocks.VERDANT_FROGLIGHT.defaultBlockState());
-            put(c.above(),Blocks.AMETHYST_CLUSTER.defaultBlockState());
-            for(Direction dir:Direction.Plane.HORIZONTAL) {
-                BlockPos petal=c.relative(dir);if(!blocks.containsKey(petal))put(petal,FLOWERS);
-            }
+        for(int i=0;i<15;i++) {
+            double a=i*2.399963,radius=63+i%3*10;
+            int x=50+(int)(Math.cos(a)*radius),z=50+(int)(Math.sin(a)*radius);
+            BlockPos c=new BlockPos(x,RealmShape.surface(x,z)+1,z);
+            if(!RealmShape.contains(x,z)||blocks.containsKey(c))continue;
+            put(c,Blocks.VERDANT_FROGLIGHT.defaultBlockState());put(c.above(),Blocks.AMETHYST_CLUSTER.defaultBlockState());
+            for(Direction d:Direction.Plane.HORIZONTAL)if(!blocks.containsKey(c.relative(d)))put(c.relative(d),FLOWERS);
         }
     }
-    private void hanging(Vec3 tip,int length) {
-        for(int y=2;y<=length;y++)put(BlockPos.containing(tip).below(y),y==length?Blocks.SEA_LANTERN.defaultBlockState():Blocks.CHAIN.defaultBlockState());
+    private void drape(Vec3 tip,int length,int seed) {
+        for(int i=0;i<length;i++) {
+            Vec3 p=tip.add(Math.sin(i*.34+seed)*1.2,-i,Math.cos(i*.27+seed)*.9);
+            ball(p,i<length/3?1.6:.75,i%7==0?FLOWERS:LEAVES);
+            if(i==length-2)put(BlockPos.containing(p),Blocks.VERDANT_FROGLIGHT.defaultBlockState());
+        }
     }
-    private void limb(Vec3 from,Vec3 to,double thick,double thin,int seed,double arch) {
-        int steps=Math.max(1,(int)Math.ceil(from.distanceTo(to)*2));
+    private static Vec3 bezier(Vec3 p,Vec3 a,Vec3 b,Vec3 q,double t) {
+        double s=1-t;return p.scale(s*s*s).add(a.scale(3*s*s*t)).add(b.scale(3*s*t*t)).add(q.scale(t*t*t));
+    }
+    private void curve(Vec3 from,Vec3 a,Vec3 b,Vec3 to,double thick,double thin) {
+        int steps=(int)Math.ceil((from.distanceTo(a)+a.distanceTo(b)+b.distanceTo(to))*2);
         for(int i=0;i<=steps;i++) {
-            double t=i/(double)steps;
-            Vec3 at=from.lerp(to,t).add(Math.sin(t*Math.PI)*Math.sin(seed)*2.2,Math.sin(t*Math.PI)*arch,Math.sin(t*Math.PI)*Math.cos(seed)*1.8);
-            ball(at,thick+(thin-thick)*t,WOOD);
+            double t=i/(double)steps;ball(bezier(from,a,b,to,t),thin+(thick-thin)*Math.pow(1-t,1.35),WOOD);
         }
     }
     private void ball(Vec3 centre,double radius,BlockState state) {
         int r=(int)Math.ceil(radius);BlockPos c=BlockPos.containing(centre);
         for(int x=-r;x<=r;x++)for(int y=-r;y<=r;y++)for(int z=-r;z<=r;z++)
-            if(x*x+y*y+z*z<=radius*radius+.4)put(c.offset(x,y,z),state);
+            if(x*x+y*y+z*z<=radius*radius+.45)put(c.offset(x,y,z),state);
     }
-    private void canopy(Vec3 centre,double radius,double height,int seed) {
-        BlockPos c=BlockPos.containing(centre);int r=(int)Math.ceil(radius),h=(int)Math.ceil(height);
+    private void crown(Vec3 centre,double radius,double height,int seed) {
+        BlockPos c=BlockPos.containing(centre);int r=(int)Math.ceil(radius+2),h=(int)Math.ceil(height+2);
         for(int x=-r;x<=r;x++)for(int y=-h;y<=h;y++)for(int z=-r;z<=r;z++) {
+            double edge=1+.16*Math.sin(x*.6+seed)*Math.cos(z*.5-seed)+.12*Math.sin(y*.8+x*.3);
             double shape=(x*x+z*z)/(radius*radius)+y*y/(height*height);
-            int hash=Math.floorMod(x*7349+y*9151+z*3571+seed*101,43);
-            if(shape>1||shape>.73&&hash<9)continue;
+            if(shape>edge)continue;
+            int hash=Math.floorMod(x*7349+y*9151+z*3571+seed*101,173);
+            if(shape>.78&&hash<15)continue;
             BlockPos pos=c.offset(x,y,z);
-            if(!blocks.containsKey(pos))put(pos,hash==0?Blocks.VERDANT_FROGLIGHT.defaultBlockState():hash<6?FLOWERS:LEAVES);
+            if(!blocks.containsKey(pos))put(pos,hash==0&&shape<.8?Blocks.VERDANT_FROGLIGHT.defaultBlockState():hash<12?FLOWERS:LEAVES);
         }
     }
     private void put(BlockPos p,BlockState state) {
