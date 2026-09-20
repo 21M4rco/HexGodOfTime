@@ -70,7 +70,8 @@ public final class LokiServer {
         if(LokiData.energy(p)<a.cost){notice(p,"Not enough Temporal Energy.");return;}
         if(action==HOLD_BEGIN) {
             if(!a.hold)return;
-            LokiData.spend(p,a.cost);Architecture.begin(p);LokiNetwork.sync(p);return;
+            if(Architecture.begin(p))LokiData.spend(p,a.cost);
+            LokiNetwork.sync(p);return;
         }
         if(a.hold){Architecture.begin(p);return;}
         if(cast(p,a,action==ALTERNATE)) {

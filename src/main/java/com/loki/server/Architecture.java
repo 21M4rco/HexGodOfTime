@@ -38,14 +38,16 @@ public final class Architecture {
         return switch(Math.floorMod(design,DESIGNS)){case 0->"Rampart";case 1->"Gatehouse";case 2->"Great hall";default->"Ruin";};
     }
 
-    public static void begin(ServerPlayer p) {
-        if(CASTING.containsKey(p.getUUID()))return;
+    /** @return false when there is no ground in view to build on, so nothing is charged for a miss. */
+    public static boolean begin(ServerPlayer p) {
+        if(CASTING.containsKey(p.getUUID()))return false;
         Cast cast=new Cast(LokiData.now(p),design(p),p.getRandom().nextInt(1<<16));
         cast.anchor=aim(p);cast.yaw=p.getYRot();
-        if(cast.anchor==null)return;
+        if(cast.anchor==null){p.displayClientMessage(Component.literal("Look at the ground you would build on."),true);return false;}
         CASTING.put(p.getUUID(),cast);
         LokiNetwork.animate(p,"illusion");
         p.level().playSound(null,p.blockPosition(),Loki.ILLUSION_SOUND.get(),SoundSource.PLAYERS,.6f,.8f);
+        return true;
     }
 
     public static void tick(ServerPlayer p) {
