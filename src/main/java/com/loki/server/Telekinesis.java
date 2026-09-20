@@ -155,6 +155,14 @@ public final class Telekinesis {
         LokiData.get(p).putInt("grip",grip.held.size());
         LokiNetwork.tracking(p,new LokiNetwork.Message(LokiNetwork.GRIP,p.getId(),n));
     }
-    public static void forget(ServerPlayer p) {Grip grip=GRIPS.remove(p.getUUID());if(grip!=null)grip.held.forEach(Telekinesis::restore);}
+    /** Drops everything without a throw, and tells viewers to stop drawing the strands. */
+    public static void forget(ServerPlayer p) {
+        Grip grip=GRIPS.remove(p.getUUID());
+        if(grip==null)return;
+        grip.held.forEach(Telekinesis::restore);
+        LokiData.get(p).remove("grip");
+        CompoundTag n=new CompoundTag();n.putInt("count",0);
+        LokiNetwork.tracking(p,new LokiNetwork.Message(LokiNetwork.GRIP,p.getId(),n));
+    }
     public static void reset() {GRIPS.values().forEach(g->g.held.forEach(Telekinesis::restore));GRIPS.clear();SLAMS.clear();}
 }
