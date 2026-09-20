@@ -127,6 +127,7 @@ public final class PocketRealm {
 
     /** @return true when the caster was actually moved, so the rift only reports success on a real crossing. */
     public static boolean enter(ServerPlayer p) {
+        if(!LokiData.access(p)){p.displayClientMessage(Component.literal("Loki powers are locked."),true);return false;}
         ServerLevel realm=level(p.server);
         if(realm==null){p.displayClientMessage(Component.literal("The sanctum will not open; its dimension is missing."),true);return false;}
         if(inside(p.level()))return false;

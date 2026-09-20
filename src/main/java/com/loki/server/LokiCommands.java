@@ -30,7 +30,7 @@ public final class LokiCommands {
         for(Ability a:Ability.values())unlock.then(Commands.literal(a.name().toLowerCase()).executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");LokiData.get(p).putBoolean("unlock_"+a.name(),true);LokiNetwork.sync(p);return 1;}));
         player.then(unlock);
         player.then(Commands.literal("energy").then(Commands.argument("amount",FloatArgumentType.floatArg(0,1000)).executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");LokiData.energy(p,FloatArgumentType.getFloat(c,"amount"));LokiNetwork.sync(p);return 1;})));
-        player.then(Commands.literal("transform").then(Commands.argument("active",BoolArgumentType.bool()).executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");LokiData.get(p).putBoolean("ascended",BoolArgumentType.getBool(c,"active"));LokiData.get(p).putLong("transformStart",LokiData.now(p));LokiNetwork.fx(p,"ascend");LokiNetwork.sync(p);return 1;})));
+        player.then(Commands.literal("transform").then(Commands.argument("active",BoolArgumentType.bool()).executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");if(!LokiData.access(p)){c.getSource().sendFailure(Component.literal("That player does not have Loki powers enabled."));return 0;}LokiData.get(p).putBoolean("ascended",BoolArgumentType.getBool(c,"active"));LokiData.get(p).putLong("transformStart",LokiData.now(p));LokiNetwork.fx(p,"ascend");LokiNetwork.sync(p);return 1;})));
         player.then(Commands.literal("reset").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");LokiServer.clear(p,true);p.getPersistentData().remove("Loki");LokiNetwork.sync(p);return 1;}));
         player.then(Commands.literal("clear_illusions").executes(c->{LokiServer.clearIllusions(EntityArgument.getPlayer(c,"player"));return 1;}));
         player.then(Commands.literal("clear_time").executes(c->{TemporalEngine.clear(EntityArgument.getPlayer(c,"player"));return 1;}));
@@ -53,7 +53,7 @@ public final class LokiCommands {
             return count;
         })));
         player.then(Commands.literal("clear_quick").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");for(int i=0;i<LokiData.QUICK_SLOTS;i++)LokiData.quick(p,i,-1);LokiNetwork.sync(p);return 1;}));
-        player.then(Commands.literal("realm").then(Commands.literal("enter").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");return PocketRealm.enter(p)?1:0;}))
+        player.then(Commands.literal("realm").then(Commands.literal("enter").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");if(!LokiData.access(p)){c.getSource().sendFailure(Component.literal("That player does not have Loki powers enabled."));return 0;}return PocketRealm.enter(p)?1:0;}))
             .then(Commands.literal("exit").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");return PocketRealm.leave(p)?1:0;})));
         player.then(Commands.literal("status").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");
             c.getSource().sendSuccess(()->Component.literal(p.getGameProfile().getName()+" — "+LokiData.selected(p).title

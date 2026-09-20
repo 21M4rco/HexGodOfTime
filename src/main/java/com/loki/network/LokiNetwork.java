@@ -48,7 +48,11 @@ public final class LokiNetwork {
     public static void near(net.minecraft.server.level.ServerLevel level,net.minecraft.world.phys.Vec3 at,double radius,Message m) {
         CHANNEL.send(PacketDistributor.NEAR.with(()->new PacketDistributor.TargetPoint(at.x,at.y,at.z,radius,level.dimension())),m);
     }
-    public static void sync(ServerPlayer p) {LokiData.refreshQuick(p);tracking(p,new Message(SYNC,p.getId(),light(LokiData.get(p))));}
+    public static void sync(ServerPlayer p) {
+        // Locking the mod must hide it, not erase the player's saved loadout.
+        if(LokiData.access(p))LokiData.refreshQuick(p);
+        tracking(p,new Message(SYNC,p.getId(),light(LokiData.get(p))));
+    }
     /**
      * The routine state packet goes out once a second to everyone tracking the player, so a mimicked
      * entity's full snapshot — which can run to kilobytes — never rides along with it. Only the small
