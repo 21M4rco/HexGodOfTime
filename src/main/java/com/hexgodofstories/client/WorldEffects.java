@@ -466,6 +466,10 @@ public final class WorldEffects {
             for(IllusoryWall.Placement block:projection.blocks) {
                 if(block.offset().getY()>build*height)continue;
                 BlockPos at=projection.origin.offset(block.offset());
+                // A course that lands inside real terrain is left out rather than drawn through it, so a
+                // wall raised against a slope meets the hill instead of fighting it face to face.
+                var standing=mc.level.getBlockState(at);
+                if(!standing.isAir()&&!standing.canBeReplaced())continue;
                 pose.pushPose();
                 pose.translate(at.getX(),at.getY(),at.getZ());
                 // Lit from where it stands, so borrowed stone sits in the scene's own light instead of

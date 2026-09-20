@@ -562,7 +562,7 @@ public final class HexServer {
     }
 
     public static void clear(ServerPlayer p,boolean death) {
-        Telekinesis.forget(p);Architecture.forget(p);IllusoryWalls.dismiss(p.getUUID());clearIllusions(p);dismissRift(p);TemporalEngine.clear(p);
+        Telekinesis.forget(p);Architecture.dismiss(p);clearIllusions(p);dismissRift(p);TemporalEngine.clear(p);
         Masquerade.drop(p);Threat.forget(p);
         CosmicFlight.revoke(p);
         // The charge, the erasure hold and the granted armour all go together; none of them may outlive
