@@ -4,6 +4,7 @@ import com.loki.data.*;
 import com.loki.network.LokiNetwork;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.*;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.*;
 import net.minecraft.world.entity.item.*;
@@ -41,6 +42,8 @@ public final class TemporalEngine {
     /** Bodies spinning back up after a hold released. */
     private static final Map<UUID,Long> RECOVERING=new HashMap<>();
     private static final Map<UUID,Banked> BANKED=new HashMap<>();
+    /** Body, head and pitch angles captured before a dilated creature ticks, so turning can be slowed too. */
+    private static final Map<UUID,float[]> ROTATION=new HashMap<>();
     private static final UUID DILATION_SPEED=UUID.fromString("65b293d4-1384-446d-902c-7a261ca31cf2");
     private static final UUID DILATION_ATTACK=UUID.fromString("0c6c27e9-1f7d-4c58-9d0a-5b2f6ba0a4c1");
     private static final UUID DILATION_FLIGHT=UUID.fromString("a7d1f3b2-90c5-4a8e-bd41-2f9c8e1d7a30");
@@ -157,11 +160,13 @@ public final class TemporalEngine {
             if(e.level()!=level)continue;
             if(!rates.containsKey(id)||desired.containsKey(id))rate(e,1);
         }
+        ROTATION.clear();
         for(var entry:rates.entrySet()) {
             Entity e=entities.get(entry.getKey());
             if(e==null||desired.containsKey(entry.getKey()))continue;
             rate(e,entry.getValue());
             drift(e,entry.getValue());
+            remember(e,entry.getValue());
         }
 
         for(var entry:desired.entrySet()) {
@@ -220,6 +225,31 @@ public final class TemporalEngine {
         if(attribute==null)return;
         attribute.removeModifier(id);
         if(factor<.999)attribute.addTransientModifier(new AttributeModifier(id,"Temporal dilation",factor-1,AttributeModifier.Operation.MULTIPLY_TOTAL));
+    }
+
+    /**
+     * A head snapping round at full speed inside slow motion is as wrong as a body crossing the
+     * ground at full speed. Angles are captured here, before the creature's own tick turns them, and
+     * eased back afterwards so a turn takes as long as the movement it belongs to.
+     */
+    private static void remember(Entity e,double factor) {
+        if(!(e instanceof LivingEntity living)||e instanceof ServerPlayer)return;
+        ROTATION.put(e.getUUID(),new float[]{living.getYRot(),living.getXRot(),living.yHeadRot,living.yBodyRot,(float)factor});
+    }
+
+    /** Called after the level's entities have ticked; see {@link #remember}. */
+    public static void afterTick(ServerLevel level) {
+        if(ROTATION.isEmpty())return;
+        for(var entry:ROTATION.entrySet()) {
+            if(!(level.getEntity(entry.getKey()) instanceof LivingEntity living))continue;
+            float[] before=entry.getValue();
+            float factor=Mth.clamp(before[4],0,1);
+            living.setYRot(Mth.rotLerp(factor,before[0],living.getYRot()));
+            living.setXRot(Mth.rotLerp(factor,before[1],living.getXRot()));
+            living.yHeadRot=Mth.rotLerp(factor,before[2],living.yHeadRot);
+            living.yBodyRot=Mth.rotLerp(factor,before[3],living.yBodyRot);
+        }
+        ROTATION.clear();
     }
 
     /**
@@ -317,6 +347,6 @@ public final class TemporalEngine {
         FROZEN.clear();FIELDS.clear();
         for(Entity e:new ArrayList<>(SLOWED.values()))if(!e.isRemoved())rate(e,1);
         SLOWED.clear();APPLIED.clear();
-        PLAYER_GRACE.clear();RECOVERING.clear();BANKED.clear();
+        PLAYER_GRACE.clear();RECOVERING.clear();BANKED.clear();ROTATION.clear();
     }
 }

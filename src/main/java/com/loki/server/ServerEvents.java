@@ -40,7 +40,12 @@ public final class ServerEvents {
         }
     }
     @SubscribeEvent public static void player(TickEvent.PlayerTickEvent e) {if(e.phase==TickEvent.Phase.END&&e.player instanceof ServerPlayer p)LokiServer.tick(p);}
-    @SubscribeEvent public static void level(TickEvent.LevelTickEvent e) {if(e.phase==TickEvent.Phase.START&&e.level instanceof ServerLevel s){TemporalEngine.tick(s);LokiServer.tickLevel(s);}}
+    @SubscribeEvent public static void level(TickEvent.LevelTickEvent e) {
+        if(!(e.level instanceof ServerLevel s))return;
+        if(e.phase==TickEvent.Phase.START){TemporalEngine.tick(s);LokiServer.tickLevel(s);}
+        // Turning is eased after the creatures have turned, which is the only point it can be done.
+        else TemporalEngine.afterTick(s);
+    }
     @SubscribeEvent public static void login(PlayerEvent.PlayerLoggedInEvent e) {if(e.getEntity() instanceof ServerPlayer p){LokiData.get(p).remove("transformStart");LokiNetwork.sync(p);}}
     @SubscribeEvent public static void tracking(PlayerEvent.StartTracking e) {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
