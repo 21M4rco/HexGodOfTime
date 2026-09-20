@@ -24,8 +24,21 @@ Everything below needs a recorded in-game session and **has not had one**. Nothi
 
 ## Known limitations
 
-- Illusory architecture re-renders its blocks each frame rather than baking a buffer. It is capped at 620 blocks and 64 blocks of view distance; that is a deliberate trade for a short-lived effect, not a finished optimisation.
+- Illusory walls re-render their blocks each frame rather than baking a buffer. A Massive wall is under 200 blocks and they are drawn within 80 blocks of the camera; that is a deliberate trade for a short-lived effect, not a finished optimisation.
 - Compatibility with third-party shader packs is untested.
+
+## 0.5.0 rebrand and Borrowed Reality rework
+
+Source and build checks performed here: whole-tree rename to `hexgodofstories` with no `loki` identifier left outside the two legacy-migration constants; class names matching file names across the tree; compilation, mixin annotation processing (which resolved both new injection targets) and the three assertion suites through the **Build HexGodOfStories** Action; a new `verifyIllusoryWall` suite covering the size table and quarter-turn facing.
+
+Required game checks, none of which have been performed:
+
+- A fresh world with an unlocked account: no HUD, archive, quick bar, key response or mastery gain, and `/hgos unlock <player> on` granting them.
+- An existing 0.4.x world loading under the new id, with progression, quick bars, sanctum plots and pending Nothingness restores carried over rather than reset.
+- Borrowed Reality raised at each of the four sizes, watched from a turning camera at range, against flat ground and a slope, in daylight and at night.
+- Mobs meeting a wall: pathing around it, losing a hunted player behind it and forgetting them, and being turned back when they walk into one. Whether the shove reads as a wall or as a shove is exactly the sort of thing only play can answer.
+- The quick slots in the archive and the in-game bar at several GUI scales and window sizes.
+- A crossing in both directions with no break left standing at either end, and none opening on arrival while the cast key is still held.
 
 ## 0.2.1 patch
 
