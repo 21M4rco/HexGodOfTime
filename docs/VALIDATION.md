@@ -217,3 +217,77 @@ Nothing below has had one. None of it should be described as working.
 - Emerald Throw: quick and charged forms, the charged burst's radius, and the projectile's look in flight.
 - Meteors: entry from ~190 blocks up on a long diagonal, the burn audio through the descent, the arrival, the
   chance gate actually gating, and confirmation that the island still takes no terrain damage.
+
+
+## 0.4.1 — Full penetration, Nothingness and restoration
+
+Base: `6dd90e8`. The beam no longer collides with the world at all, its reach is 100 blocks, everything it
+passes through is temporarily replaced with `loki:nothingness`, and the world is restored about thirty
+seconds after the torrent ends.
+
+### What the restoration guarantees, and why
+
+- **Recorded before replaced, completely.** `NbtUtils.writeBlockState` captures the block state with every
+  property it carries — orientation, half, shape, waterlogging, a fluid's own level, and whatever a mod
+  added — and `saveWithFullMetadata` captures the block entity. A chest returns with its inventory, a
+  furnace with its burn time and contents, a sign with its text, a modded machine with whatever it saves.
+- **Saved with the world, not held in memory.** The record is a `SavedData`, so a crash, a restart or a
+  server stopped inside the window resumes overdue instead of stranding a black tunnel. `ServerStoppingEvent`
+  also restores everything outright while chunks are still loaded.
+- **Block entities are detached before their block goes.** A chest's own `onRemove` throws its entire
+  inventory onto the floor; the restore would then hand the same items back a second time. Removing the
+  block entity first leaves that hook nothing to empty. **This is the duplication bug this design exists to
+  avoid** and is the single most important line in `Nothingness.take`.
+- **Nothing cascades.** Both the carve and the restore use `UPDATE_CLIENTS | UPDATE_KNOWN_SHAPE` — clients
+  are told, nothing else is. No door loses its other half, no torch pops off a wall that briefly stopped
+  existing, and nothing outside the recorded volume can be disturbed.
+- **The window cannot be interfered with.** Nothingness is unbreakable, has no loot table and no item form,
+  so nothing can be mined, placed, pushed or blown up where a record is waiting. That makes the restore
+  conflict-free by construction rather than by care. A second torrent through the same wall extends the
+  existing record's wait instead of recording the void as the thing to put back.
+- **It refuses to clobber.** A position is only restored if it still holds Nothingness or air. If something
+  else is there, the world has moved on and the record is dropped — overwriting a player's new block would
+  be worse than the hole.
+- **Unloaded chunks wait rather than fail.** A position whose chunk is not loaded is deferred and retried;
+  after a long patience it is forced through, because loading a chunk is cheaper than leaving a hole.
+
+### Deliberate choices worth challenging
+
+- **Air is skipped.** Only positions that hold a block become Nothingness. Filling the open part of the beam
+  would wall the world off with a solid black tube rather than show a hole through it, and would encase the
+  caster and anything else standing in the open.
+- **Nothingness is solid.** A hole you could walk into is a hole you could be standing inside when the wall
+  comes back. It neither suffocates nor blocks the view, so anything that does end up inside one is
+  inconvenienced rather than killed.
+- **The soft/hard distinction is gone from gameplay.** Everything is taken and everything comes back, so
+  there is nothing left to permit or refuse. `SoftTerrain` survives only to decide whether a block sheds
+  dust or fragments on screen.
+
+### Erasure, and the absence of a death animation
+
+Sequences now run 150–240 ticks (7.5–12s). A mob's shell is discarded in the same tick its death lands —
+after that death has already handed out drops, experience and advancements synchronously — so only the
+corpse and its twenty ticks of tipping are thrown away. A player's body cannot be discarded, so the client
+keeps the ordinary renderer stood down for as long as it lies there dead, up to a two-minute backstop.
+Victims are silenced for the whole sequence and every other source of harm is refused on their behalf.
+
+The body smears rather than crumbles: each piece the front reaches is drawn downstream into fine parallel
+filaments, near half in the victim's own colours and far half already light, matching the reference's
+directional streaking. Cuboids spinning off in all directions read as rubble and were wrong.
+
+### Not verified — needs a recorded in-game session
+
+**This patch has not been run.** In addition to everything under 0.4.0:
+
+- A beam straight through a furnished house: chests, furnaces, signs, torches, beds, doors and decorations
+  all present and identical after the delay, with nothing on the floor and nothing duplicated.
+- The same through a modded storage or machine room.
+- Overlapping casts through the same wall, and a cast through a wall already carved.
+- A server stopped, and separately killed, inside the thirty-second window; and a beam fired across a chunk
+  border that is then unloaded.
+- Measured tick cost of carving and restoring ~2,400 positions, since an opaque block going in and out
+  drives a light-engine recalculation over the whole volume. **This is the most likely performance problem
+  in the patch.**
+- That Nothingness cannot be obtained, mined, exploded, pushed by a piston, or picked in creative.
+- Erasure pacing at 7.5s and at 12s — whether it is now too slow to play against rather than only to watch.
+- That no mob tips over and no player corpse is ever visible, from a second client.
