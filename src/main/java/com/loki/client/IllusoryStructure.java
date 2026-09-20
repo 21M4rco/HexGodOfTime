@@ -95,9 +95,14 @@ public final class IllusoryStructure {
             for(int z=-depth;z<=depth;z++) {
                 boolean edge=Math.abs(x)==width||Math.abs(z)==depth;
                 if(!edge)continue;
+                // Openings are spaced by whichever coordinate runs along the wall being built,
+                // so every side gets windows instead of only the two where x happens to vary.
+                boolean sideWall=Math.abs(x)==width;
+                int along=sideWall?Math.abs(z):Math.abs(x);
+                int corner=sideWall?depth:width;
                 for(int y=0;y<height;y++) {
-                    boolean door=z==-depth&&Math.abs(x)<=0&&y<3;
-                    boolean window=y==height-3&&Math.abs(x)%3==1&&Math.abs(z)!=depth;
+                    boolean door=z==-depth&&Math.abs(x)<=1&&y<4;
+                    boolean window=y==height-3&&along%3==1&&along!=corner;
                     if(door||window)continue;
                     put(out,x,y,z,stone(random));
                 }
