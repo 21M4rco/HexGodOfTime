@@ -48,7 +48,7 @@ public final class WorldEffects {
         Vec3 pos=new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z"));
         var p=Minecraft.getInstance().player;
         if(p!=null&&p.distanceToSqr(pos)<1600)TemporalScreen.trigger(name,entity==p.getId());
-        if(name.equals("arrive")||name.equals("disguise")||name.equals("rift_cross"))REFORMING.put(entity,ClientState.now()+18);
+        if(name.equals("arrive")||name.equals("disguise")||name.equals("rift_cross")||name.equals("arrive_realm"))REFORMING.put(entity,ClientState.now()+18);
         if(name.equals("slip")) {
             SLIPPING.put(entity,ClientState.now()+26);
             for(int i=0;i<5;i++)ECHOES.add(new Echo(entity,pos.add(0,i*.08,i*.12),ClientState.now()+24+i*2));
@@ -231,6 +231,13 @@ public final class WorldEffects {
                 Vfx.gather(green,at.add(0,.9,0),1.4*(1-Vfx.ease(t))+.2,Vfx.count(swell*4f),.12);
                 Vfx.cloud(nebula,at.add(0,.9,0),.55,Vfx.count(swell*1.6f),.01);
                 if(t>.75f)Vfx.spark(star,at.add(0,1,0),Vec3.ZERO);
+            });
+            // Surfacing inside the sanctum: nebula gathering into the shape of a body, nothing more.
+            // No mirror, no shards, no ring — the break itself is left behind on the other side.
+            case "arrive_realm" -> Vfx.bloom(entity,pos,look,18,(at,aim,t)->{
+                float swell=Vfx.swell(t);
+                Vfx.gather(nebula,at.add(0,1,0),1.1*(1-Vfx.ease(t))+.2,Vfx.count(swell*2.4f),.09);
+                Vfx.cloud(veil,at.add(0,.9,0),.5,Vfx.count(swell*1.2f),.006);
             });
             case "rift_cross" -> Vfx.bloom(entity,pos,look,16,(at,aim,t)->{
                 float swell=Vfx.swell(t);

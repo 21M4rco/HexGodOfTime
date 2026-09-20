@@ -71,6 +71,7 @@ public final class ClientState {
         if(mc.level!=world) {
             PLAYERS.clear();FROZEN.clear();SLOWED.clear();THREADS.clear();DISGUISES.clear();
             WorldEffects.clear();LokiSkin.clear();LokiLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();
+            LokiClient.ForgeBus.releaseHeldCast();
             world=mc.level;
         }
         if(mc.level==null)return;

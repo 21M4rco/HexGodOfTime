@@ -33,7 +33,7 @@ public final class LokiClient {
     /** The permanent time commands, paired with the value {@link LokiServer#TIME} carries for each. */
     public static final KeyMapping[] TIME_KEYS={TIME_STOP,TIME_RESUME,TIME_REWIND,TIME_DILATE};
     private static KeyMapping key(String name,int key){return new KeyMapping("key.loki."+name,InputConstants.Type.KEYSYM,key,"key.categories.loki");}
-    private static boolean primaryDown,selectDown,primaryWasHold;
+    private static boolean primaryDown,selectDown,primaryWasHold,primaryLatched;
     private static int repeat;
 
     @Mod.EventBusSubscriber(modid=Loki.ID,value=Dist.CLIENT,bus=Mod.EventBusSubscriber.Bus.MOD)
@@ -73,7 +73,11 @@ public final class LokiClient {
             Minecraft mc=Minecraft.getInstance();
             if(mc.player==null){primaryDown=false;selectDown=false;QuickBar.closeBar(false);return;}
             if(mc.screen!=null) {
-                if(primaryDown){primaryDown=false;LokiNetwork.send(LokiServer.HOLD_END,0);}
+                // Ending the hold here means the key is no longer "down" as far as this loop knows,
+                // so a key that is still physically held would read as a brand new press the moment
+                // the screen closes. Crossing a dimension puts the terrain screen up mid-hold, which
+                // is exactly how arriving in the sanctum used to open a second break on arrival.
+                if(primaryDown){primaryDown=false;primaryLatched=true;LokiNetwork.send(LokiServer.HOLD_END,0);}
                 if(selectDown){selectDown=false;QuickBar.closeBar(false);}
                 drain();return;
             }
@@ -86,6 +90,8 @@ public final class LokiClient {
 
             Ability selected=Ability.at(ClientState.self().getInt("selected"));
             boolean primary=PRIMARY.isDown();
+            // A cast that was interrupted needs a real release before it counts as pressed again.
+            if(primaryLatched){if(primary)primary=false;else primaryLatched=false;}
             if(primary&&!primaryDown){primaryWasHold=selected.hold;LokiNetwork.send(selected.hold?LokiServer.HOLD_BEGIN:LokiServer.CAST,0);repeat=0;}
             // Holding an ordinary spell repeats it; the server's own rate limit and cooldown set the pace.
             else if(primary&&!selected.hold&&++repeat>=5){repeat=0;LokiNetwork.send(LokiServer.CAST,0);}
@@ -103,6 +109,11 @@ public final class LokiClient {
             while(FLIGHT.consumeClick())LokiNetwork.send(LokiServer.FLIGHT,0);
             for(int i=0;i<TIME_KEYS.length;i++)while(TIME_KEYS[i].consumeClick())LokiNetwork.send(LokiServer.TIME,i);
             drain();
+        }
+        /** Called when the world changes underfoot: a held cast must not survive the crossing. */
+        static void releaseHeldCast() {
+            if(primaryDown||PRIMARY.isDown())primaryLatched=true;
+            primaryDown=false;
         }
         private static void drain() {
             while(PRIMARY.consumeClick());

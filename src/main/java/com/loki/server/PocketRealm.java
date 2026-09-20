@@ -140,7 +140,9 @@ public final class PocketRealm {
         prepare(realm,plot);
         Vec3 spawn=centre(plot);
         if(!move(p,realm,spawn,180,0))return false;
-        LokiNetwork.fx(p,"rift_cross");
+        // Arriving in the sanctum is quiet: a small bloom of nebula where the body reforms, and no
+        // second break hanging in the air beside it.
+        LokiNetwork.fx(p,"arrive_realm");
         p.displayClientMessage(Component.literal("Your world tree. Fracture to leave, or crouch on the arrival sigil."),true);
         return true;
     }
@@ -230,7 +232,7 @@ public final class PocketRealm {
             if(!homeward&&anchor==null)d.putInt("realmPlot",plot);
             if(!move(p,destination,at,yaw,pitch))return false;
             if(homeward||anchor!=null)d.remove("realmPlot");
-            LokiNetwork.fx(p,"rift_cross");return true;
+            LokiNetwork.fx(p,inside(destination)?"arrive_realm":"rift_cross");return true;
         }
         e.stopRiding();e.ejectPassengers();
         Vec3 landing=at;
@@ -249,7 +251,7 @@ public final class PocketRealm {
         });
         if(moved==null)return false;
         travelData(moved).putLong("riftGraceUntil",caster.server.overworld().getGameTime()+com.loki.entity.RiftEntity.DURATION+20);
-        LokiNetwork.fx(moved,"rift_cross");
+        LokiNetwork.fx(moved,inside(destination)?"arrive_realm":"rift_cross");
         return true;
     }
 
