@@ -16,12 +16,15 @@ public final class RealmShapeTest {
             assert depth>=3&&depth<=RealmShape.DEPTH&&64-depth>0 : "Underside outside dimension";
             minDepth=Math.min(minDepth,depth);maxDepth=Math.max(maxDepth,depth);
         }
-        assert area>2*Math.PI*47*47 : "Island must offer over twice the old usable footprint";
+        int previous=0;
+        for(int x=LegacyRealmShapeV3.MIN;x<=LegacyRealmShapeV3.MAX;x++)for(int z=LegacyRealmShapeV3.MIN;z<=LegacyRealmShapeV3.MAX;z++)
+            if(LegacyRealmShapeV3.contains(x,z))previous++;
+        assert area>previous*2 : "Island must offer over twice the linked build footprint";
         assert maxDepth-minDepth>30 : "Underside must taper substantially";
         for(int degrees=0;degrees<360;degrees++) {
             int edge=(int)RealmShape.edge(Math.toRadians(degrees));minEdge=Math.min(minEdge,edge);maxEdge=Math.max(maxEdge,edge);
         }
-        assert maxEdge-minEdge>=15 : "Shoreline must not form a cylinder";
+        assert maxEdge-minEdge>=35 : "Shoreline must not form a cylinder";
         for(int x=42;x<=58;x++)for(int z=44;z<=76;z++) {
             assert RealmShape.contains(x,z)&&RealmShape.surface(x,z)==0 : "Throne/return approach must stay flat and connected";
         }

@@ -19,7 +19,7 @@ import net.minecraft.world.phys.*;
 import java.util.*;
 
 public final class LokiServer {
-    public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10;
+    public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11;
     public record Moment(Vec3 position,float yaw,float pitch,float health) {}
     private record Charm(Mob mob,UUID owner,long end,UUID previous) {}
     private record Strike(int weapon,int combo,long contact,long end) {}
@@ -58,16 +58,22 @@ public final class LokiServer {
         if(action==RESYNC){LokiNetwork.sync(p);return;}
         if(TemporalEngine.frozen(p)||p.isSpectator())return;
         if(action==SCROLL){Telekinesis.adjust(p,Math.max(-4,Math.min(4,value-8)));return;}
-        if(action==HOLD_END){Architecture.commit(p);return;}
+        if(action==HOLD_END){
+            UUID id=RIFTS.get(p.getUUID());
+            if(id!=null&&p.serverLevel().getEntity(id) instanceof RiftEntity rift)rift.releaseCharge();
+            Architecture.commit(p);return;
+        }
         if(now-INPUT.getOrDefault(p.getUUID(),-100L)<(TemporalEngine.slowed(p)?15:3))return;
         INPUT.put(p.getUUID(),now);
         if(action==UTILITY){Telekinesis.release(p,false);Architecture.forget(p);TemporalEngine.clear(p);dismissRift(p);return;}
         if(action==WEAPON){weapon(p,value!=0);return;}
+        if(action==FLIGHT){CosmicFlight.toggle(p);return;}
         Ability a=action==TRANSFORM?Ability.ASCENSION:LokiData.selected(p);
         // Returning home must never depend on energy, mastery or the entry spell's recovery.
-        if(a==Ability.RIFT&&PocketRealm.inside(p.level())&&(action==CAST||action==ALTERNATE)) {
+        if(a==Ability.RIFT&&PocketRealm.inside(p.level())&&(action==CAST||action==ALTERNATE||action==HOLD_BEGIN)) {
             UUID active=RIFTS.get(p.getUUID());
             if(active==null||!(p.serverLevel().getEntity(active) instanceof RiftEntity))fracture(p);
+            if(action==HOLD_BEGIN)armFracture(p);
             return;
         }
         if(action==ALTERNATE&&secondary(p,a)){LokiNetwork.sync(p);return;}
@@ -76,10 +82,17 @@ public final class LokiServer {
         if(LokiData.energy(p)<a.cost){notice(p,"Not enough Temporal Energy.");return;}
         if(action==HOLD_BEGIN) {
             if(!a.hold)return;
+            if(a==Ability.RIFT) {
+                if(fracture(p)) {
+                    armFracture(p);LokiData.spend(p,a.cost);LokiData.get(p).putLong("cd_"+a.name(),now+a.cooldown);
+                    reward(p,a.discipline,90);LokiNetwork.sync(p);
+                }
+                return;
+            }
             if(Architecture.begin(p))LokiData.spend(p,a.cost);
             LokiNetwork.sync(p);return;
         }
-        if(a.hold){Architecture.begin(p);return;}
+        if(a.hold&&a!=Ability.RIFT){Architecture.begin(p);return;}
         if(cast(p,a,action==ALTERNATE)) {
             LokiData.spend(p,a.cost);LokiData.get(p).putLong("cd_"+a.name(),now+a.cooldown);
             reward(p,a.discipline,90);LokiNetwork.sync(p);
@@ -155,7 +168,7 @@ public final class LokiServer {
                 LokiNetwork.tracking(p,new LokiNetwork.Message(LokiNetwork.THREADS,p.getId(),n));
                 gesture(p,"threads","bind",Loki.SORCERY.get());return true;
             }
-            case ASCENSION -> {boolean on=!LokiData.get(p).getBoolean("ascended");LokiData.get(p).putBoolean("ascended",on);LokiData.get(p).putLong("transformStart",now);gesture(p,"ascend",on?"ascend":"dismiss",Loki.ASCEND.get());return true;}
+            case ASCENSION -> {boolean on=!LokiData.get(p).getBoolean("ascended");LokiData.get(p).putBoolean("ascended",on);LokiData.get(p).putLong("transformStart",now);if(!on)CosmicFlight.revoke(p);gesture(p,"ascend",on?"ascend":"dismiss",Loki.ASCEND.get());return true;}
             default -> {return false;}
         }
     }
@@ -179,6 +192,10 @@ public final class LokiServer {
         // RiftEntity owns the positional crack sound; playing it on the caster doubled the attack.
         LokiNetwork.animate(p,"threads");
         return true;
+    }
+    private static void armFracture(ServerPlayer p) {
+        UUID id=RIFTS.get(p.getUUID());
+        if(id!=null&&p.serverLevel().getEntity(id) instanceof RiftEntity rift)rift.armCharge();
     }
     private static boolean dismissRift(ServerPlayer p) {
         UUID id=RIFTS.remove(p.getUUID());
@@ -267,6 +284,7 @@ public final class LokiServer {
     public static void tick(ServerPlayer p) {
         long now=LokiData.now(p);CompoundTag d=LokiData.get(p);
         if(!p.isAlive())return;
+        CosmicFlight.tick(p);
         if(now%4==0&&!TemporalEngine.frozen(p)) {
             ArrayDeque<Moment> h=HISTORY.computeIfAbsent(p.getUUID(),k->new ArrayDeque<>());
             h.addLast(new Moment(p.position(),p.getYRot(),p.getXRot(),p.getHealth()));
@@ -399,6 +417,7 @@ public final class LokiServer {
 
     public static void clear(ServerPlayer p,boolean death) {
         Telekinesis.forget(p);Architecture.forget(p);clearIllusions(p);dismissRift(p);TemporalEngine.clear(p);
+        CosmicFlight.revoke(p);
         HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         LokiData.clearTransient(p,death);
     }

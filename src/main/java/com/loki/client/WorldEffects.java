@@ -141,6 +141,11 @@ public final class WorldEffects {
             }
             if(!(entity instanceof com.loki.entity.RiftEntity rift)||now%2!=0)continue;
             if(rift.position().distanceToSqr(eye)>2304)continue;
+            if(rift.vacuum()) {
+                double angle=mc.level.random.nextDouble()*Math.PI*2;
+                Vec3 at=rift.position().add(Math.cos(angle)*4,mc.level.random.nextDouble()*3,Math.sin(angle)*4);
+                Vfx.spark(Loki.EMBER.get(),at,rift.position().add(0,1,0).subtract(at).scale(.13));
+            }
             Vfx.cone(Loki.SHARD.get(),rift.position().add(0,1.1,0),new Vec3(mc.level.random.nextGaussian(),mc.level.random.nextGaussian()*.4,mc.level.random.nextGaussian()),1,.05,.05);
             Vfx.spark(Loki.GOLD_EMBER.get(),rift.position().add((mc.level.random.nextDouble()-.5)*1.8,.3+mc.level.random.nextDouble()*1.9,(mc.level.random.nextDouble()-.5)*1.8),new Vec3(0,.01,0));
         }
@@ -308,6 +313,7 @@ public final class WorldEffects {
         }
 
         CapeRenderer.renderAll(pose,buffers,partial);
+        CosmicNebula.render(pose,buffers,partial);
         pose.popPose();
         buffers.endBatch(RenderType.entityTranslucent(WHITE));
         buffers.endBatch(RenderType.entityCutoutNoCull(LokiLayer.CLOTH));

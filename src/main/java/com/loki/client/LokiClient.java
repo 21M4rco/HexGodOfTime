@@ -22,15 +22,15 @@ import org.lwjgl.glfw.GLFW;
 public final class LokiClient {
     public static final KeyMapping MENU=key("mastery",GLFW.GLFW_KEY_K),SELECT=key("select",GLFW.GLFW_KEY_V),
         PRIMARY=key("primary",GLFW.GLFW_KEY_R),SECONDARY=key("secondary",GLFW.GLFW_KEY_G),
-        TRANSFORM=key("transform",GLFW.GLFW_KEY_H),RELEASE=key("release",GLFW.GLFW_KEY_X);
+        TRANSFORM=key("transform",GLFW.GLFW_KEY_H),RELEASE=key("release",GLFW.GLFW_KEY_X),FLIGHT=key("flight",GLFW.GLFW_KEY_J);
     private static KeyMapping key(String name,int key){return new KeyMapping("key.loki."+name,InputConstants.Type.KEYSYM,key,"key.categories.loki");}
-    private static boolean primaryDown,selectDown;
+    private static boolean primaryDown,selectDown,primaryWasHold;
     private static int repeat;
 
     @Mod.EventBusSubscriber(modid=Loki.ID,value=Dist.CLIENT,bus=Mod.EventBusSubscriber.Bus.MOD)
     public static final class ModBus {
         @SubscribeEvent public static void dimensionEffects(RegisterDimensionSpecialEffectsEvent e){e.register(Loki.id("pocket"),new RealmSky());}
-        @SubscribeEvent public static void keys(RegisterKeyMappingsEvent e){for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE})e.register(k);}
+        @SubscribeEvent public static void keys(RegisterKeyMappingsEvent e){for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT})e.register(k);}
         @SubscribeEvent public static void entities(EntityRenderersEvent.RegisterRenderers e) {
             e.registerEntityRenderer(Loki.ILLUSION.get(),IllusionRenderer::new);
             e.registerEntityRenderer(Loki.PROJECTILE.get(),SpellRenderer::new);
@@ -46,7 +46,7 @@ public final class LokiClient {
         }
         @SubscribeEvent public static void reload(RegisterClientReloadListenersEvent e) {
             e.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)r->{
-                LokiLayer.clear();WeaponRenderer.clear();RiftRenderer.clear();RealmSky.clear();TemporalScreen.close();
+                LokiLayer.clear();WeaponRenderer.clear();RiftRenderer.clear();RealmSky.clear();CosmicNebula.clear();TemporalScreen.close();
             });
         }
     }
@@ -72,15 +72,16 @@ public final class LokiClient {
 
             Ability selected=Ability.at(ClientState.self().getInt("selected"));
             boolean primary=PRIMARY.isDown();
-            if(primary&&!primaryDown){LokiNetwork.send(selected.hold?LokiServer.HOLD_BEGIN:LokiServer.CAST,0);repeat=0;}
+            if(primary&&!primaryDown){primaryWasHold=selected.hold;LokiNetwork.send(selected.hold?LokiServer.HOLD_BEGIN:LokiServer.CAST,0);repeat=0;}
             // Holding an ordinary spell repeats it; the server's own rate limit and cooldown set the pace.
             else if(primary&&!selected.hold&&++repeat>=5){repeat=0;LokiNetwork.send(LokiServer.CAST,0);}
-            if(!primary&&primaryDown&&selected.hold)LokiNetwork.send(LokiServer.HOLD_END,0);
+            if(!primary&&primaryDown&&primaryWasHold)LokiNetwork.send(LokiServer.HOLD_END,0);
             primaryDown=primary;
 
             while(SECONDARY.consumeClick())LokiNetwork.send(LokiServer.ALTERNATE,0);
             while(TRANSFORM.consumeClick())LokiNetwork.send(LokiServer.TRANSFORM,0);
             while(RELEASE.consumeClick())LokiNetwork.send(LokiServer.UTILITY,0);
+            while(FLIGHT.consumeClick())LokiNetwork.send(LokiServer.FLIGHT,0);
             drain();
         }
         private static void drain() {while(PRIMARY.consumeClick());while(SELECT.consumeClick());}

@@ -11,7 +11,7 @@ import org.joml.Vector3f;
 /** World-space cloth with attachment and body collision taken from the rendered torso bone. */
 public final class TemporalCloth {
     public static final int ROWS=22,COLS=13;
-    private static final double LENGTH=2.22,HALF_TOP=.29,HALF_BOTTOM=.98;
+    private static final double LENGTH=2.22,HALF_TOP=.29,HALF_BOTTOM=1.34;
     private static final double SEGMENT=LENGTH/(ROWS-1),GRAVITY=.022,DAMPING=.92;
     private static final int PASSES=10;
     private final Vec3[] current=new Vec3[ROWS*COLS],previous=new Vec3[ROWS*COLS],old=new Vec3[ROWS*COLS];
@@ -55,7 +55,7 @@ public final class TemporalCloth {
     }
 
     private static int at(int row,int col){return row*COLS+col;}
-    public static double halfWidth(double t){return HALF_TOP+(HALF_BOTTOM-HALF_TOP)*t;}
+    public static double halfWidth(double t){t=Mth.clamp(t,0,1);double flare=t*t*(3-2*t);return HALF_TOP+(HALF_BOTTOM-HALF_TOP)*flare;}
 
     public void tick(LivingEntity wearer,BodyFrame body) {
         frame=body;centre=body.anchor(COLS/2);
@@ -113,7 +113,7 @@ public final class TemporalCloth {
             double t=row/(double)(ROWS-1),u=col/(double)(COLS-1)*2-1;
             double drop=wearer.onGround()?Math.min(LENGTH*t,Math.max(.1,centre.y-wearer.getY()-.03)):LENGTH*t;
             double train=Math.max(0,LENGTH*t-drop);
-            Vec3 v=body.anchor(col).add(side.scale(u*(HALF_BOTTOM-HALF_TOP)*t)).add(back.scale(.18*t+train)).add(0,-drop,0);
+            Vec3 v=body.anchor(col).add(side.scale(u*(halfWidth(t)-HALF_TOP))).add(back.scale(.18*t+train)).add(0,-drop,0);
             int i=at(row,col);current[i]=previous[i]=old[i]=v;floors[i]=Double.NEGATIVE_INFINITY;
         }
         solvedCentre=centre;ready=true;tick=Integer.MIN_VALUE;

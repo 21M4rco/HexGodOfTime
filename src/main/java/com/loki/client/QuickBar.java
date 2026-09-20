@@ -14,16 +14,14 @@ import net.minecraft.util.Mth;
  * trip through a menu. Slot contents live in player data, so a layout survives relogging and death.
  */
 public final class QuickBar {
-    private static final int SLOT=22,GAP=2;
     private static boolean open;
     private static int cursor;
-    private static long openedAt;
 
     public static boolean open() {return open;}
 
     public static void openBar() {
         if(open)return;
-        open=true;openedAt=ClientState.now();
+        open=true;
         cursor=Math.max(0,indexOf(ClientState.self(),ClientState.self().getInt("selected")));
     }
     public static void closeBar(boolean commit) {
@@ -65,49 +63,37 @@ public final class QuickBar {
         return out.toString();
     }
 
+    public record Layout(int left,int top,int cardWidth,int cardHeight,int width) {}
+    public static Layout layout() {
+        var w=Minecraft.getInstance().getWindow();
+        int card=Math.min(110,(w.getGuiScaledWidth()-28)/4),width=card*4+12;
+        return new Layout((w.getGuiScaledWidth()-width)/2,Math.max(30,w.getGuiScaledHeight()-154),card,38,width);
+    }
+    public static Ability displayed() {
+        int id=open?slot(ClientState.self(),cursor):ClientState.self().getInt("selected");
+        return id<0?null:Ability.at(id);
+    }
     public static void render(GuiGraphics g) {
-        var mc=Minecraft.getInstance();
-        if(mc.player==null)return;
-        CompoundTag data=ClientState.self();
+        var mc=Minecraft.getInstance();if(mc.player==null)return;
+        CompoundTag data=ClientState.self();Layout l=layout();
         int selected=data.getInt("selected");
-        int width=LokiData.QUICK_SLOTS*SLOT+(LokiData.QUICK_SLOTS-1)*GAP;
-        int left=(mc.getWindow().getGuiScaledWidth()-width)/2;
-        int top=mc.getWindow().getGuiScaledHeight()-(open?78:60);
-        float reveal=open?Mth.clamp((ClientState.now()-openedAt)/3f,0,1):1;
-        float energy=data.getFloat("energy");
-
         for(int i=0;i<LokiData.QUICK_SLOTS;i++) {
-            int x=left+i*(SLOT+GAP),y=top;
-            int ability=slot(data,i);
-            boolean active=ability>=0&&ability==selected;
-            boolean hovered=open&&i==cursor;
-            g.fill(x,y,x+SLOT,y+SLOT,hovered?0xe0121f18:0xb00a1511);
-            if(ability<0) {
-                g.fill(x,y+SLOT-1,x+SLOT,y+SLOT,0x40605a44);
-                continue;
-            }
-            Ability a=Ability.at(ability);
-            int tint=a.discipline.color;
-            long cooldown=Math.max(0,data.getLong("cd_"+a.name())-ClientState.now());
-            boolean ready=cooldown<=0&&energy>=a.cost;
-            g.fill(x,y,x+SLOT,y+1,0xff000000|tint);
-            g.drawCenteredString(mc.font,abbreviation(a),x+SLOT/2,y+7,ready?0xffe6f0dd:0xff6f7a66);
-            if(cooldown>0) {
-                int shade=Math.min(SLOT-2,(int)(SLOT*Math.min(1,cooldown/(float)Math.max(1,a.cooldown))));
-                g.fill(x+1,y+SLOT-shade,x+SLOT-1,y+SLOT-1,0x99101a14);
-            }
-            if(a.cost>0)g.fill(x+2,y+SLOT-3,x+2+(int)((SLOT-4)*Mth.clamp(energy/Math.max(1,a.cost),0,1)),y+SLOT-2,0xffc3ab67);
-            if(active||hovered) {
-                int border=active?0xffd8c27a:0xff8fae92;
-                g.fill(x-1,y-1,x+SLOT+1,y,border);g.fill(x-1,y+SLOT,x+SLOT+1,y+SLOT+1,border);
-                g.fill(x-1,y,x,y+SLOT,border);g.fill(x+SLOT,y,x+SLOT+1,y+SLOT,border);
-            }
-            g.drawString(mc.font,String.valueOf(i+1),x+2,y+SLOT-9,0x55ffffff,false);
+            int x=l.left+i%4*(l.cardWidth+4),y=l.top+i/4*(l.cardHeight+4);
+            int id=slot(data,i);boolean active=id>=0&&id==selected,hovered=open&&i==cursor;
+            int border=hovered?0xffffe2a0:active?0xff72f1b2:0xff344f46;
+            g.fill(x,y,x+l.cardWidth,y+l.cardHeight,border);
+            g.fill(x+1,y+1,x+l.cardWidth-1,y+l.cardHeight-1,hovered?0xf3213027:active?0xf3123025:0xeb091610);
+            Ability a=Ability.slot(id);
+            if(a==null){g.drawString(mc.font,"Empty slot",x+6,y+8,0x81918a,false);continue;}
+            g.fill(x+1,y+1,x+3,y+l.cardHeight-1,0xff000000|a.discipline.color);
+            var lines=mc.font.split(net.minecraft.network.chat.Component.literal(a.title),l.cardWidth-12);
+            for(int line=0;line<Math.min(2,lines.size());line++)g.drawString(mc.font,lines.get(line),x+6,y+5+line*10,active||hovered?0xf3fff7:0xdce9df,false);
+            long cd=Math.max(0,data.getLong("cd_"+a.name())-ClientState.now());
+            boolean home=a==Ability.RIFT&&com.loki.server.PocketRealm.inside(mc.player.level());
+            String status=home?"RETURN":cd>0?String.format(java.util.Locale.ROOT,"%.1fs",cd/20f):data.getFloat("energy")<a.cost?"LOW ENERGY":"READY";
+            int tint=home||cd<=0&&data.getFloat("energy")>=a.cost?0x87d8a8:0xd2b27f;
+            g.drawString(mc.font,status,x+6,y+l.cardHeight-11,tint,false);
+            if(cd>0&&!home)g.fill(x+3,y+l.cardHeight-2,x+3+(int)((l.cardWidth-5)*Math.min(1,cd/(double)Math.max(1,a.cooldown))),y+l.cardHeight-1,0xffd2b27f);
         }
-        if(!open||reveal<.2f)return;
-        int ability=slot(data,cursor);
-        String label=ability>=0?Ability.at(ability).title:"Empty";
-        g.drawCenteredString(mc.font,label,mc.getWindow().getGuiScaledWidth()/2,top-13,0xffdfe7d2);
-        g.drawCenteredString(mc.font,"scroll to choose",mc.getWindow().getGuiScaledWidth()/2,top+SLOT+4,0xff7d8f78);
     }
 }

@@ -90,3 +90,11 @@ Build and validation status is recorded in `docs/VALIDATION.md`. A successful Ja
 - Crouch for three seconds on the green/gold arrival sigil to return without spending energy. Fracture also opens the normal return portal.
 
 Client appearance and movement still require in-game verification; compilation alone cannot establish those results.
+
+### 0.3.1 controls and realm update
+
+Fracture: tap the primary key for a doorway, or hold for 0.6 seconds to gather all eligible entities within five blocks of the portal. After a brief inward pull, the group crosses and the portal closes. The same hold works inside the pocket realm; returning costs no energy and ignores entry cooldown. Visitors arrive in the caster's realm and keep their own way home.
+
+While transformed, press **J** to toggle Cosmic Flight. **Space** rises and **crouch** descends; vanilla double-jump flight controls also work. Change the binding in Minecraft's Controls menu. A green spatial nebula and star filaments surround flying players.
+
+The HUD shows eight named ability cards with recovery/ready status, selection and energy. Hold the select key and scroll to switch. Existing realms receive the larger island, organic tree/roots and rebuilt throne through a resumable upgrade; no world reset is needed.
