@@ -31,6 +31,9 @@ public final class LokiCommands {
         player.then(Commands.literal("clear_illusions").executes(c->{LokiServer.clearIllusions(EntityArgument.getPlayer(c,"player"));return 1;}));
         player.then(Commands.literal("clear_time").executes(c->{TemporalEngine.clear(EntityArgument.getPlayer(c,"player"));return 1;}));
         player.then(Commands.literal("clear_bleed").executes(c->{Bleed.clear(EntityArgument.getPlayer(c,"player"));return 1;}));
+        // Drops a charge that is being held and hands back anything caught mid-erasure, for testing and
+        // for the rare case an operator needs to unstick a player by hand.
+        player.then(Commands.literal("clear_branch").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");TimeBranch.cancel(p);Erasure.forget(p);LokiNetwork.sync(p);return 1;}));
         player.then(Commands.literal("clear_quick").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");for(int i=0;i<LokiData.QUICK_SLOTS;i++)LokiData.quick(p,i,-1);LokiNetwork.sync(p);return 1;}));
         player.then(Commands.literal("realm").then(Commands.literal("enter").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");return PocketRealm.enter(p)?1:0;}))
             .then(Commands.literal("exit").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");return PocketRealm.leave(p)?1:0;})));

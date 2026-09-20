@@ -25,6 +25,13 @@ public final class ClientState {
         return entity.isInvisible()||data(entity.getId()).getLong("vanishUntil")>now();
     }
     public static boolean frozen(int id){return FROZEN.containsKey(id);}
+    /** Ticks this player has been holding Time Branch Unleashing, or -1 when they are not holding it. */
+    public static int branchHeld(int id,float partial){return TimeBranchRenderer.held(id,partial);}
+    /** Planted or being erased: either way this body takes no movement input of its own. */
+    public static boolean immobile(net.minecraft.world.entity.Entity e) {
+        return e!=null&&(frozen(e.getId())||TimeBranchRenderer.charging(e.getId())
+            ||ErasureRenderer.erasing(e)||GripRenderer.gripped(e.getId()));
+    }
     public static float progress(int id,float partial) {
         CompoundTag d=data(id);
         if(!d.getBoolean("ascended"))return 0;
@@ -55,6 +62,9 @@ public final class ClientState {
             case LokiNetwork.ARCHITECTURE -> WorldEffects.architecture(m.entity(),m.data());
             case LokiNetwork.BLEED -> WorldEffects.bleeding(m.entity(),m.data().getInt("stacks"));
             case LokiNetwork.FIELD -> WorldEffects.field(m.entity(),m.data());
+            case LokiNetwork.BRANCH -> TimeBranchRenderer.charge(m.entity(),m.data());
+            case LokiNetwork.TORRENT -> TimeBranchRenderer.torrent(m.entity(),m.data());
+            case LokiNetwork.ERASURE -> ErasureRenderer.begin(m.entity(),m.data());
             case LokiNetwork.DISGUISE -> {
                 if(m.data().getBoolean("clear"))DISGUISES.remove(m.entity());
                 else {
@@ -71,6 +81,7 @@ public final class ClientState {
         if(mc.level!=world) {
             PLAYERS.clear();FROZEN.clear();SLOWED.clear();THREADS.clear();DISGUISES.clear();
             WorldEffects.clear();LokiSkin.clear();LokiLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();
+            TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();GripRenderer.clear();
             LokiClient.ForgeBus.releaseHeldCast();
             world=mc.level;
         }
@@ -91,6 +102,10 @@ public final class ClientState {
         }
         THREADS.entrySet().removeIf(e->e.getValue().until<now());
         WorldEffects.tick();
+        TimeBranchRenderer.tick();
+        ErasureRenderer.tick();
+        BranchAudio.tick();
+        MeteorAudio.tick();
         RealmAmbience.tick();
     }
 }

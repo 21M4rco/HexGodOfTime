@@ -46,7 +46,16 @@ public final class ServerEvents {
         // Turning is eased after the creatures have turned, which is the only point it can be done.
         else TemporalEngine.afterTick(s);
     }
-    @SubscribeEvent public static void login(PlayerEvent.PlayerLoggedInEvent e) {if(e.getEntity() instanceof ServerPlayer p){LokiData.get(p).remove("transformStart");LokiNetwork.sync(p);}}
+    @SubscribeEvent public static void login(PlayerEvent.PlayerLoggedInEvent e) {
+        if(!(e.getEntity() instanceof ServerPlayer p))return;
+        LokiData.get(p).remove("transformStart");
+        LokiData.get(p).remove("branchStart");
+        // Attribute modifiers are saved with the player, so a session that ended mid-transformation would
+        // otherwise hand the armour back for free. Re-derived from the mantle, never inherited.
+        Transformation.strip(p);
+        Transformation.sustain(p);
+        LokiNetwork.sync(p);
+    }
     @SubscribeEvent public static void tracking(PlayerEvent.StartTracking e) {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
         TemporalEngine.track(p,e.getTarget());
@@ -58,6 +67,7 @@ public final class ServerEvents {
     @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p)LokiServer.clear(p,false);}
     @SubscribeEvent public static void dimension(PlayerEvent.PlayerChangedDimensionEvent e) {if(e.getEntity() instanceof ServerPlayer p){LokiServer.clear(p,false);LokiNetwork.sync(p);}}
     @SubscribeEvent public static void death(LivingDeathEvent e) {
+        Erasure.forget(e.getEntity());
         Bleed.clear(e.getEntity());
         Threat.forget(e.getEntity());
         Decoy.release(e.getEntity());
@@ -84,12 +94,18 @@ public final class ServerEvents {
     }
     @SubscribeEvent public static void attack(AttackEntityEvent e) {
         if(TemporalEngine.frozen(e.getEntity())){e.setCanceled(true);return;}
+        // Nothing swings while it is being erased, and nothing swings while it is holding the torrent.
+        if(Erasure.erasing(e.getEntity())||TimeBranch.planted(e.getEntity())){e.setCanceled(true);return;}
         if(!(e.getEntity() instanceof ServerPlayer p))return;
         if(e.getTarget() instanceof LivingEntity victim)LokiServer.engaged(p,victim);
         if(p.getMainHandItem().getItem() instanceof ConjuredWeapon){e.setCanceled(true);LokiServer.weapon(p,false);}
     }
-    @SubscribeEvent public static void interact(PlayerInteractEvent e) {if(!e.getLevel().isClientSide&&TemporalEngine.frozen(e.getEntity())&&e.isCancelable())e.setCanceled(true);}
+    @SubscribeEvent public static void interact(PlayerInteractEvent e) {
+        if(e.getLevel().isClientSide||!e.isCancelable())return;
+        if(TemporalEngine.frozen(e.getEntity())||Erasure.erasing(e.getEntity())||TimeBranch.planted(e.getEntity()))e.setCanceled(true);
+    }
     @SubscribeEvent public static void hurt(LivingHurtEvent e) {
+        if(Erasure.erasing(e.getSource().getEntity())){e.setCanceled(true);return;}
         if(e.getSource().getEntity()!=null&&TemporalEngine.frozen(e.getSource().getEntity())){e.setCanceled(true);return;}
         // A suspended body cannot be wounded in a moment that is not passing; the harm waits for time to resume.
         if(TemporalEngine.bank(e.getEntity(),e.getAmount(),e.getSource().getEntity())){e.setCanceled(true);return;}

@@ -48,7 +48,7 @@ public final class LokiClient {
             e.registerEntityRenderer(Loki.PROJECTILE.get(),SpellRenderer::new);
             e.registerEntityRenderer(Loki.THROWN_DAGGER.get(),DaggerRenderer::new);
             e.registerEntityRenderer(Loki.RIFT.get(),RiftRenderer::new);
-            e.registerEntityRenderer(Loki.STARFALL.get(),StarRenderer::new);
+            e.registerEntityRenderer(Loki.STARFALL.get(),MeteorRenderer::new);
             e.registerEntityRenderer(Loki.THRONE_SEAT.get(),net.minecraft.client.renderer.entity.NoopRenderer::new);
         }
         @SubscribeEvent public static void layers(EntityRenderersEvent.AddLayers e) {
@@ -60,6 +60,7 @@ public final class LokiClient {
         @SubscribeEvent public static void reload(RegisterClientReloadListenersEvent e) {
             e.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)r->{
                 LokiLayer.clear();WeaponRenderer.clear();RiftRenderer.clear();RealmSky.clear();CosmicNebula.clear();
+                BranchVfx.clear();TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();
                 DisguiseRenderer.clear();DisguiseRenderer.forgive();Blood.clear();TemporalScreen.close();
             });
         }
@@ -139,9 +140,18 @@ public final class LokiClient {
             e.setCanceled(true);e.setSwingHand(false);
             if(!ClientState.frozen(mc.player.getId()))LokiNetwork.send(LokiServer.WEAPON,e.isUseItem()?1:0);
         }
+        /**
+         * Walking, sprinting, strafing, jumping and flight input all stop while the caster is planted
+         * holding the torrent, while a body is being erased, and inside a suspended moment. Only the
+         * mouse is left alone, so a planted caster can still aim what they are about to fire.
+         */
         @SubscribeEvent public static void movement(MovementInputUpdateEvent e) {
-            if(!ClientState.frozen(e.getEntity().getId()))return;
-            e.getInput().forwardImpulse=0;e.getInput().leftImpulse=0;e.getInput().jumping=false;
+            if(!ClientState.immobile(e.getEntity()))return;
+            var input=e.getInput();
+            input.forwardImpulse=0;input.leftImpulse=0;
+            input.up=false;input.down=false;input.left=false;input.right=false;
+            input.jumping=false;input.shiftKeyDown=false;
+            e.getEntity().setSprinting(false);
         }
         @SubscribeEvent public static void hud(RenderGuiOverlayEvent.Post e) {
             if(e.getOverlay().id().equals(net.minecraftforge.client.gui.overlay.VanillaGuiOverlay.HOTBAR.id()))LokiHud.render(e.getGuiGraphics());
@@ -151,7 +161,19 @@ public final class LokiClient {
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES)WorldEffects.render(e);
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL)TemporalScreen.render(e.getPartialTick());
         }
-        @SubscribeEvent public static void player(RenderPlayerEvent.Pre e){if(ClientState.data(e.getEntity().getId()).getLong("vanishUntil")>ClientState.now()){e.setCanceled(true);return;}DisguiseRenderer.render(e);if(!e.isCanceled())WorldEffects.beforePlayer(e);}
+        @SubscribeEvent public static void player(RenderPlayerEvent.Pre e) {
+            // Checked before anything pushes a pose: a cancelled pre-event never gets its post-event, so
+            // the erasure has to bow out here or the matching pop would be lost.
+            if(ErasureRenderer.consumed(e.getEntity())){e.setCanceled(true);return;}
+            if(ClientState.data(e.getEntity().getId()).getLong("vanishUntil")>ClientState.now()){e.setCanceled(true);return;}
+            DisguiseRenderer.render(e);
+            if(!e.isCanceled())WorldEffects.beforePlayer(e);
+        }
+        /** The same stand-down for every other living thing; players are answered above. */
+        @SubscribeEvent public static void living(net.minecraftforge.client.event.RenderLivingEvent.Pre<?,?> e) {
+            if(e.getEntity() instanceof net.minecraft.world.entity.player.Player)return;
+            if(ErasureRenderer.consumed(e.getEntity()))e.setCanceled(true);
+        }
         @SubscribeEvent public static void playerEnd(RenderPlayerEvent.Post e){WorldEffects.afterPlayer(e);}
     }
 }

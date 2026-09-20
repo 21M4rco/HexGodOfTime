@@ -40,6 +40,19 @@ public final class Loki {
         SLIP = sound("time_slip"), STOP = sound("time_stop"), RESUME = sound("time_resume"), ASCEND = sound("ascend"), CONJURE = sound("conjure"),
         BLADE_SWING = sound("blade_swing"), BLADE_HIT = sound("blade_hit"), BLADE_THROW = sound("blade_throw"), BLADE_EMBED = sound("blade_embed"),
         RIFT_OPEN = sound("rift_open"), RIFT_CLOSE = sound("rift_close");
+    /**
+     * Time Branch Unleashing's own bed. Each of these is one layer: the charge stacks the first five and
+     * drives their volume and pitch from the synchronised charge, so the build is assembled at the ear
+     * rather than streamed from the server, and none of it is an explosion or a thunderclap.
+     */
+    public static final RegistryObject<SoundEvent> BRANCH_HUM = sound("branch_hum"), BRANCH_RESONANCE = sound("branch_resonance"),
+        BRANCH_SHIMMER = sound("branch_shimmer"), BRANCH_PRESSURE = sound("branch_pressure"), BRANCH_CRACKLE = sound("branch_crackle"),
+        BRANCH_READY = sound("branch_ready"), BRANCH_OPEN = sound("branch_open"), BRANCH_RELEASE = sound("branch_release"),
+        BRANCH_ROAR = sound("branch_roar"), BRANCH_ERASE = sound("branch_erase");
+    /** A stone burning its way through an atmosphere, and what it does when it arrives. */
+    public static final RegistryObject<SoundEvent> METEOR_BURN = sound("meteor_burn"), METEOR_ROAR = sound("meteor_roar"),
+        METEOR_IMPACT = sound("meteor_impact");
+    public static final RegistryObject<SoundEvent> GRIP_HOLD = sound("grip_hold"), EMERALD_CAST = sound("emerald_cast");
     private static RegistryObject<SoundEvent> sound(String name) { return SOUNDS.register(name, () -> SoundEvent.createVariableRangeEvent(id(name))); }
 
     /**
@@ -60,6 +73,14 @@ public final class Loki {
     public static final RegistryObject<Glow> VEIL = particle("veil");
     public static final RegistryObject<Glow> STAR = particle("star");
     public static final RegistryObject<Glow> SMOKE = particle("smoke");
+    /** What is left of a body or a block that has been taken out of the timeline. */
+    public static final RegistryObject<Glow> TEMPORAL_DUST = particle("temporal_dust");
+    public static final RegistryObject<Glow> BRANCH_THREAD = particle("branch_thread");
+    public static final RegistryObject<Glow> SPECTRAL = particle("spectral");
+    /** Atmospheric entry: flame torn off the stone, cooling cinders and the smoke behind it. */
+    public static final RegistryObject<Glow> METEOR_FIRE = particle("meteor_fire");
+    public static final RegistryObject<Glow> CINDER = particle("cinder");
+    public static final RegistryObject<Glow> ASH = particle("ash");
     private static RegistryObject<Glow> particle(String name) { return PARTICLES.register(name, Glow::new); }
 
     static {

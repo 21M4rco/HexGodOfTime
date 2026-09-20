@@ -27,20 +27,18 @@ public final class WorldEffects {
     private record Echo(int entity,Vec3 pos,long end) {}
     private record Projection(Vec3 origin,long until,boolean preview,long shown,List<IllusoryStructure.Placement> blocks) {}
     private record Field(Vec3 centre,double radius,boolean stop,long started,long expires) {}
-    private record Grip(int[] targets,double distance) {}
 
     private static final List<Echo> ECHOES=new ArrayList<>();
     private static final Map<Integer,Projection> PROJECTIONS=new HashMap<>();
     private static final Map<Integer,Field> FIELDS=new HashMap<>();
-    private static final Map<Integer,Grip> GRIPS=new HashMap<>();
     private static final Map<Integer,Integer> BLEEDING=new HashMap<>();
     private static final Set<Integer> POSED=new HashSet<>();
     private static final Map<Integer,Long> REFORMING=new HashMap<>(),SLIPPING=new HashMap<>();
 
     public static void clear() {
-        ECHOES.clear();PROJECTIONS.clear();FIELDS.clear();GRIPS.clear();BLEEDING.clear();
+        ECHOES.clear();PROJECTIONS.clear();FIELDS.clear();BLEEDING.clear();GripRenderer.clear();
         POSED.clear();REFORMING.clear();SLIPPING.clear();
-        Vfx.clear();Blood.clear();
+        Vfx.clear();Blood.clear();TimeBranchRenderer.clear();ErasureRenderer.clear();
     }
 
     public static void add(int entity,CompoundTag n) {
@@ -69,10 +67,8 @@ public final class WorldEffects {
         if(!n.getBoolean("active")){FIELDS.remove(caster);return;}
         FIELDS.put(caster,new Field(new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z")),n.getDouble("radius"),n.getBoolean("stop"),n.getLong("started"),n.getLong("expires")));
     }
-    public static void grip(int caster,CompoundTag n) {
-        if(n.getInt("count")<=0){GRIPS.remove(caster);return;}
-        GRIPS.put(caster,new Grip(n.getIntArray("targets"),n.getDouble("distance")));
-    }
+    /** The grasp is drawn as a construct rather than as a ring of motes; {@link GripRenderer} owns it. */
+    public static void grip(int caster,CompoundTag n) {GripRenderer.set(caster,n);}
     /**
      * @return the tick at which a local hold took this point, or {@link Long#MIN_VALUE} when time is
      *         still running there. Weather and loose particles read this to stop where they are.
@@ -138,15 +134,7 @@ public final class WorldEffects {
             }
             if(f.stop&&now%3==0)Vfx.cloud(Loki.VEIL.get(),f.centre.add(0,1,0),f.radius*.75,1,.002);
         }
-        for(var entry:GRIPS.entrySet()) {
-            Entity owner=mc.level.getEntity(entry.getKey());
-            if(owner==null||now%2!=0)continue;
-            for(int id:entry.getValue().targets) {
-                Entity held=mc.level.getEntity(id);
-                if(held==null)continue;
-                Vfx.ring(Loki.EMBER.get(),held.position().add(0,held.getBbHeight()*.5,0),held.getBbWidth()*.7+.25,3,.01,.005);
-            }
-        }
+        GripRenderer.tick(now);
         // One pass: blade trails, rift breath, and the embedded steel each wound bleeds from.
         Map<Integer,List<com.loki.entity.ThrownDagger>> wounds=new HashMap<>();
         for(var entity:mc.level.entitiesForRendering()) {
@@ -161,15 +149,21 @@ public final class WorldEffects {
                 continue;
             }
             if(entity instanceof com.loki.entity.StarfallEntity star) {
-                if(star.position().distanceToSqr(eye)>4096)continue;
-                float charge=star.charge();
-                Vec3 back=star.getDeltaMovement().lengthSqr()<1e-6?Vec3.ZERO:star.getDeltaMovement().normalize().scale(-.06);
-                Vfx.cloud(Loki.NEBULA.get(),star.position(),.3+.3*charge,1+(now%2==0?1:0),.01);
-                Vfx.spark(Loki.EMBER.get(),star.position(),back);
-                // Unstable debris: irregular, and heavier as the star closes on its quarry.
-                if(mc.level.random.nextFloat()<.25f+charge*.45f)
-                    Vfx.cone(Loki.SHARD.get(),star.position(),back,1,.06,.09);
-                if(charge>.55f&&now%3==0)Vfx.spark(Loki.STAR.get(),star.position(),Vec3.ZERO);
+                // Visible from a long way off, because watching it come in is the point; the emission
+                // thins out with distance rather than cutting off at the edge of the old range.
+                double away=star.position().distanceToSqr(eye);
+                if(away>40000)continue;
+                MeteorAudio.follow(star);
+                boolean close=away<6400;
+                if(!close&&now%3!=0)continue;
+                float heat=star.heat();
+                Vec3 back=star.getDeltaMovement().lengthSqr()<1e-6?Vec3.ZERO:star.getDeltaMovement().normalize().scale(-.22);
+                // Flame shed off the stone, cinders torn loose, and the ash column left hanging behind it.
+                Vfx.cone(Loki.METEOR_FIRE.get(),star.position(),back,Vfx.count(close?1.6f+heat*2f:1),.3,.16);
+                Vfx.cloud(Loki.ASH.get(),star.position().add(back.scale(4)),.7+heat,Vfx.count(close?1.2f:.5f),.014);
+                if(close&&mc.level.random.nextFloat()<.35f+heat*.5f)
+                    Vfx.cone(Loki.CINDER.get(),star.position(),back,1,.22,.18);
+                if(close&&heat>.6f&&now%3==0)Vfx.spark(Loki.STAR.get(),star.position(),Vec3.ZERO);
                 continue;
             }
             if(!(entity instanceof com.loki.entity.RiftEntity rift)||now%2!=0)continue;
@@ -295,6 +289,16 @@ public final class WorldEffects {
                 if(t<.2f)Vfx.spark(star,at.add(0,1,0),Vec3.ZERO);
                 Vfx.cloud(nebula,at.add(0,1,0),.4,Vfx.count(swell*.8f),.012);
             });
+            // A charged throw opening where it landed: a hard ring, a shell and shards thrown clear.
+            case "emerald_burst" -> Vfx.bloom(-1,pos,look,16,(at,aim,t)->{
+                float swell=Vfx.swell(t);
+                double radius=.35+2.1*Vfx.ease(Math.min(1,t*1.8f));
+                Vfx.ring(green,at,radius,Vfx.count(swell*6f),.20,.05);
+                Vfx.dome(veil,at,radius*.8,Vfx.count(swell*3f),.02);
+                Vfx.cone(Loki.SHARD.get(),at,aim,Vfx.count(swell*4f),.28,.22);
+                Vfx.cloud(nebula,at,.9,Vfx.count(swell*2f),.02);
+                if(t<.2f){Vfx.spark(star,at,Vec3.ZERO);Vfx.glyph(at);}
+            });
             case "slash" -> Vfx.bloom(entity,palm,look,7,(at,aim,t)->
                 Vfx.cone(green,at,aim,Vfx.count(Vfx.swell(t)*3f),.22,.09));
             case "throw" -> Vfx.bloom(entity,palm,look,8,(at,aim,t)->{
@@ -354,19 +358,24 @@ public final class WorldEffects {
                 Vfx.cloud(veil,at.add(0,1,0),.6,Vfx.count(swell*1.6f),.01);
                 if(t>.7f)Vfx.spark(star,at.add(0,1.1,0),Vec3.ZERO);
             });
-            // A star opening high above, then landing: a green celestial burst, never an explosion.
-            case "starfall_open" -> Vfx.bloom(entity,pos,look,12,(at,aim,t)->{
-                Vfx.cloud(nebula,at,.7,Vfx.count(Vfx.swell(t)*2f),.02);
+            // Atmospheric entry: the moment it catches light, high enough up to be a point in the sky.
+            case "meteor_entry" -> Vfx.bloom(entity,pos,look,14,(at,aim,t)->{
+                float swell=Vfx.swell(t);
+                Vfx.cloud(Loki.METEOR_FIRE.get(),at,.9,Vfx.count(swell*2.5f),.03);
+                Vfx.cloud(Loki.ASH.get(),at,1.2,Vfx.count(swell),.02);
                 if(t<.2f)Vfx.spark(star,at,Vec3.ZERO);
             });
-            case "starfall_impact" -> Vfx.bloom(-1,pos,look,22,(at,aim,t)->{
+            // Arrival: fire thrown outward and up, a column of ash, and embers raining back down. Still
+            // no explosion call anywhere near it, so the island takes none of this.
+            case "meteor_impact" -> Vfx.bloom(-1,pos,look,30,(at,aim,t)->{
                 float swell=Vfx.swell(t);
-                double radius=.4+4.2*Vfx.ease(Math.min(1,t*1.9f));
-                Vfx.ring(green,at.add(0,.15,0),radius,Vfx.count(swell*7f),.16,.05);
-                Vfx.dome(veil,at.add(0,.7,0),radius*.8,Vfx.count(swell*4f),.02);
-                Vfx.cloud(nebula,at.add(0,.8,0),1.5,Vfx.count(swell*3f),.03);
-                Vfx.cone(Loki.SHARD.get(),at.add(0,.4,0),new Vec3(0,1,0),Vfx.count(swell*4f),.32,.26);
-                if(t<.18f){Vfx.spark(star,at.add(0,.8,0),Vec3.ZERO);Vfx.ring(star,at.add(0,.6,0),1.1,5,.18,.09);}
+                double radius=.5+5.4*Vfx.ease(Math.min(1,t*1.7f));
+                Vfx.ring(Loki.METEOR_FIRE.get(),at.add(0,.2,0),radius,Vfx.count(swell*7f),.22,.09);
+                Vfx.cone(Loki.CINDER.get(),at.add(0,.4,0),new Vec3(0,1,0),Vfx.count(swell*6f),.52,.34);
+                Vfx.column(Loki.ASH.get(),at,1.5,5.5,Vfx.count(swell*3.5f),t);
+                Vfx.dome(Loki.ASH.get(),at.add(0,.6,0),radius*.85,Vfx.count(swell*3f),.03);
+                Vfx.cone(Loki.SHARD.get(),at.add(0,.3,0),new Vec3(0,1,0),Vfx.count(swell*3f),.36,.3);
+                if(t<.16f){Vfx.spark(star,at.add(0,.7,0),Vec3.ZERO);Vfx.ring(Loki.METEOR_FIRE.get(),at.add(0,.5,0),1.4,6,.3,.14);}
             });
             case "ascend" -> Vfx.bloom(entity,pos,look,64,(at,aim,t)->{
                 float swell=Vfx.swell(t);
@@ -444,6 +453,9 @@ public final class WorldEffects {
         Blood.render(pose,buffers,partial);
         CapeRenderer.renderAll(pose,buffers,partial);
         CosmicNebula.render(pose,buffers,partial);
+        GripRenderer.render(pose,buffers,partial);
+        TimeBranchRenderer.render(pose,buffers,partial);
+        ErasureRenderer.render(pose,buffers,partial);
         pose.popPose();
         buffers.endBatch(RenderType.entityTranslucent(WHITE));
         buffers.endBatch(RenderType.entityTranslucent(Blood.POOL));

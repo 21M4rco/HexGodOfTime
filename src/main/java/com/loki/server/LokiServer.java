@@ -59,8 +59,15 @@ public final class LokiServer {
         }
         if(action==RESYNC){LokiNetwork.sync(p);return;}
         if(TemporalEngine.frozen(p)||p.isSpectator())return;
+        // Being erased is not a state anything is cast out of, and a planted caster has only one move
+        // left: letting go. Both refusals sit ahead of every other action on purpose.
+        if(Erasure.erasing(p))return;
+        if(TimeBranch.charging(p)&&action!=HOLD_END){if(action==UTILITY)TimeBranch.cancel(p);return;}
         if(action==SCROLL){Telekinesis.adjust(p,Math.max(-4,Math.min(4,value-8)));return;}
         if(action==HOLD_END){
+            // Read from the charge itself rather than the selector, so switching spells mid-hold still
+            // releases the torrent instead of stranding the caster planted in place.
+            if(TimeBranch.charging(p)){TimeBranch.release(p);return;}
             UUID id=RIFTS.get(p.getUUID());
             if(id!=null&&p.serverLevel().getEntity(id) instanceof RiftEntity rift)rift.releaseCharge();
             Architecture.commit(p);return;
@@ -97,7 +104,18 @@ public final class LokiServer {
                 }
                 return;
             }
+            if(a==Ability.TIME_BRANCH) {
+                if(TimeBranch.begin(p))LokiData.spend(p,a.cost);
+                LokiNetwork.sync(p);return;
+            }
             if(Architecture.begin(p))LokiData.spend(p,a.cost);
+            LokiNetwork.sync(p);return;
+        }
+        // A plain cast press still charges; only a release fires. Deliberately limited to the cast key:
+        // any other action starting a charge would plant the caster with nothing to release it but the
+        // ten-second limit.
+        if(a==Ability.TIME_BRANCH) {
+            if(action==CAST&&TimeBranch.begin(p))LokiData.spend(p,a.cost);
             LokiNetwork.sync(p);return;
         }
         if(a.hold&&a!=Ability.RIFT){Architecture.begin(p);return;}
@@ -117,6 +135,8 @@ public final class LokiServer {
         if(a==Ability.ENCHANT){direct(p);return true;}
         if(a==Ability.SELECTIVE_STOP&&LokiData.unlocked(p,a)){Entity t=target(p,20);if(t!=null){TemporalEngine.exempt(p,t);notice(p,"Your chosen companion may walk through your stopped time.");}return true;}
         if(a==Ability.DAGGERS||a==Ability.TWIN_DAGGERS||a==Ability.LAEVATEINN){dismissWeapons(p);return true;}
+        // The ultimate has no alternate action, and says so rather than falling through to the cast path.
+        if(a==Ability.TIME_BRANCH){notice(p,"Hold the cast key to charge, and release it to unleash.");return true;}
         return false;
     }
 
@@ -202,7 +222,7 @@ public final class LokiServer {
                 LokiNetwork.tracking(p,new LokiNetwork.Message(LokiNetwork.THREADS,p.getId(),n));
                 gesture(p,"threads","bind",Loki.SORCERY.get());return true;
             }
-            case ASCENSION -> {boolean on=!LokiData.get(p).getBoolean("ascended");LokiData.get(p).putBoolean("ascended",on);LokiData.get(p).putLong("transformStart",now);if(!on)CosmicFlight.revoke(p);gesture(p,"ascend",on?"ascend":"dismiss",Loki.ASCEND.get());return true;}
+            case ASCENSION -> {boolean on=!LokiData.get(p).getBoolean("ascended");LokiData.get(p).putBoolean("ascended",on);LokiData.get(p).putLong("transformStart",now);if(!on){CosmicFlight.revoke(p);TimeBranch.cancel(p);Transformation.strip(p);}else Transformation.sustain(p);gesture(p,"ascend",on?"ascend":"dismiss",Loki.ASCEND.get());return true;}
             default -> {return false;}
         }
     }
@@ -329,8 +349,12 @@ public final class LokiServer {
 
     public static void tick(ServerPlayer p) {
         long now=LokiData.now(p);CompoundTag d=LokiData.get(p);
-        if(!p.isAlive())return;
+        if(!p.isAlive()){Transformation.strip(p);return;}
+        // The mantle is armour, so it is maintained where the mantle is: every tick, granted and
+        // renewed while it is worn and taken off the instant it is not.
+        Transformation.sustain(p);
         CosmicFlight.tick(p);
+        TimeBranch.tick(p);
         if(now%4==0&&!TemporalEngine.frozen(p)) {
             ArrayDeque<Moment> h=HISTORY.computeIfAbsent(p.getUUID(),k->new ArrayDeque<>());
             h.addLast(new Moment(p.position(),p.getYRot(),p.getXRot(),p.getHealth()));
@@ -385,6 +409,8 @@ public final class LokiServer {
         Threat.tick(now);
         Decoy.tick(now);
         Telekinesis.tickSlams(level);
+        TimeBranch.tickLevel(level);
+        Erasure.tickLevel(level);
         PocketRealm.tick(level);
         if(now%200==0)WATCHED.entrySet().removeIf(e->level.getEntity(e.getKey())==null);
     }
@@ -496,12 +522,15 @@ public final class LokiServer {
         Telekinesis.forget(p);Architecture.forget(p);clearIllusions(p);dismissRift(p);TemporalEngine.clear(p);
         Masquerade.drop(p);Threat.forget(p);
         CosmicFlight.revoke(p);
+        // The charge, the erasure hold and the granted armour all go together; none of them may outlive
+        // a death, a logout or a crossing.
+        TimeBranch.forget(p);Erasure.forget(p);Transformation.strip(p);
         HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         LokiData.clearTransient(p,death);
     }
     public static void reset() {
         HISTORY.clear();CHARMS.clear();STRIKES.clear();INPUT.clear();TRAINING.clear();ILLUSIONS.clear();WATCHED.clear();RIFTS.clear();
         Telekinesis.reset();Architecture.reset();Bleed.reset();PocketRealm.reset();TemporalEngine.reset();
-        Threat.reset();Decoy.reset();
+        Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();
     }
 }

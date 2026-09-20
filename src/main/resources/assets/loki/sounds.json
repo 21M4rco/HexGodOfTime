@@ -152,5 +152,170 @@
         "pitch": 0.82
       }
     ]
+  },
+  "branch_hum": {
+    "subtitle": "subtitles.loki.branch_hum",
+    "sounds": [
+      {
+        "name": "minecraft:block.beacon.ambient",
+        "type": "event",
+        "volume": 0.9,
+        "pitch": 0.55
+      }
+    ]
+  },
+  "branch_resonance": {
+    "subtitle": "subtitles.loki.branch_resonance",
+    "sounds": [
+      {
+        "name": "minecraft:block.conduit.ambient",
+        "type": "event",
+        "volume": 0.9,
+        "pitch": 0.7
+      }
+    ]
+  },
+  "branch_shimmer": {
+    "subtitle": "subtitles.loki.branch_shimmer",
+    "sounds": [
+      {
+        "name": "minecraft:block.amethyst_block.resonate",
+        "type": "event",
+        "volume": 0.8,
+        "pitch": 1.35
+      }
+    ]
+  },
+  "branch_pressure": {
+    "subtitle": "subtitles.loki.branch_pressure",
+    "sounds": [
+      {
+        "name": "minecraft:entity.warden.heartbeat",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 0.6
+      }
+    ]
+  },
+  "branch_crackle": {
+    "subtitle": "subtitles.loki.branch_crackle",
+    "sounds": [
+      {
+        "name": "minecraft:block.amethyst_cluster.hit",
+        "type": "event",
+        "volume": 0.7,
+        "pitch": 1.4
+      }
+    ]
+  },
+  "branch_ready": {
+    "subtitle": "subtitles.loki.branch_ready",
+    "sounds": [
+      {
+        "name": "minecraft:block.beacon.power_select",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 1.25
+      }
+    ]
+  },
+  "branch_open": {
+    "subtitle": "subtitles.loki.branch_open",
+    "sounds": [
+      {
+        "name": "minecraft:block.end_portal.spawn",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 0.8
+      }
+    ]
+  },
+  "branch_release": {
+    "subtitle": "subtitles.loki.branch_release",
+    "sounds": [
+      {
+        "name": "minecraft:entity.ender_dragon.growl",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 0.85
+      }
+    ]
+  },
+  "branch_roar": {
+    "subtitle": "subtitles.loki.branch_roar",
+    "sounds": [
+      {
+        "name": "minecraft:block.portal.ambient",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 0.5
+      }
+    ]
+  },
+  "branch_erase": {
+    "subtitle": "subtitles.loki.branch_erase",
+    "sounds": [
+      {
+        "name": "minecraft:entity.elder_guardian.curse",
+        "type": "event",
+        "volume": 0.8,
+        "pitch": 1.35
+      }
+    ]
+  },
+  "meteor_burn": {
+    "subtitle": "subtitles.loki.meteor_burn",
+    "sounds": [
+      {
+        "name": "minecraft:entity.blaze.burn",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 0.55
+      }
+    ]
+  },
+  "meteor_roar": {
+    "subtitle": "subtitles.loki.meteor_roar",
+    "sounds": [
+      {
+        "name": "minecraft:entity.lightning_bolt.thunder",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 0.45
+      }
+    ]
+  },
+  "meteor_impact": {
+    "subtitle": "subtitles.loki.meteor_impact",
+    "sounds": [
+      {
+        "name": "minecraft:entity.generic.explode",
+        "type": "event",
+        "volume": 1.0,
+        "pitch": 0.6
+      }
+    ]
+  },
+  "grip_hold": {
+    "subtitle": "subtitles.loki.grip_hold",
+    "sounds": [
+      {
+        "name": "minecraft:block.beacon.ambient",
+        "type": "event",
+        "volume": 0.55,
+        "pitch": 1.5
+      }
+    ]
+  },
+  "emerald_cast": {
+    "subtitle": "subtitles.loki.emerald_cast",
+    "sounds": [
+      {
+        "name": "minecraft:entity.illusioner.cast_spell",
+        "type": "event",
+        "volume": 0.7,
+        "pitch": 1.1
+      }
+    ]
   }
 }

@@ -126,3 +126,82 @@ Base: the 0.4.0 branch head, Actions run `35516710856`.
 - `Nearest Player` prefers someone in the same dimension and otherwise takes whoever it can find; it does not rank across dimensions by real distance, because there is no such distance.
 - A break opened by a travel mode is still a walk-through door with the normal seven-second life. Holding the cast key inside the sanctum arms the vacuum for every mode, so cargo can be dragged out to any destination; outside, holding always means the inbound pull.
 - The selector is refused outside the sanctum on both sides: the panel will not open, and the server drops a selection packet from a player who is not inside one. The saved mode itself is untouched by leaving and re-entering.
+
+
+## 0.4.0 — Time Branch Unleashing, transformed defence, grasp, throw and meteors
+
+Base: `e943d5e` (`Offer the Fracture selector only where the break has a choice to make`), the latest push at
+the start of this task.
+
+### Compilation
+
+**Not verified in this environment, and this is a hard limitation rather than an omission.** The network
+policy here refuses `maven.minecraftforge.net` and `repo.spongepowered.org` (the proxy answers `403` to
+`CONNECT`), so ForgeGradle cannot resolve and `gradle compileJava` fails before reaching javac. The
+**Build Loki** GitHub Action is the only compiler this project has. Treat the Action's result as the
+authority on whether this patch builds.
+
+Source-level checks that *were* performed here: brace/paren balance across all sources; every `Loki.*`
+registry reference resolved against `Loki.java`; call-site name and arity cross-check against the classes
+added by this patch; and a review of each Minecraft and Forge symbol used against 1.20.1 signatures.
+
+### Design decisions worth knowing
+
+- **One source of geometry.** `com.loki.data.BranchCharge` holds the charge stages, focus point, radii,
+  travel speed and timings. Both the server's hit volume and the client's picture are derived from it, so
+  nothing can be erased outside the drawn torrent and nothing inside it can survive. `SoftTerrain.cylinder`
+  is likewise shared, so the blocks the server removes are the same list, in the same order, that the client
+  dissolves — with no packet per block.
+- **Two packets per cast.** `BRANCH` on charge, `TORRENT` on release, plus one `ERASURE` per victim. Every
+  sphere, strand, arc, dissolve and sound is derived client-side from those. The release packet is also what
+  ends the charge on the client, so two packets can never race and leave a sphere hanging.
+- **Batched geometry, not particle mass.** `BranchVfx.Painter` gathers quads per render type and emits one
+  `getBuffer`/`endBatch` pair each. This is required, not merely faster: Minecraft's shared buffer source
+  ends one type's batch as soon as another is requested, so drawing in reading order without gathering would
+  both flush a draw call per layer and write into closed builders.
+- **A diagonal beam's bounding box is not its volume.** A sixty-block beam pointed diagonally has an ~80,000
+  position bounding box; the erasure scan walks axial slices instead, so cost is flat in every direction and
+  a hit cap truncates the beam's far end rather than a world-axis wedge of it.
+- **Transformed armour is real armour.** Attribute modifiers on `ARMOR` (20) and `ARMOR_TOUGHNESS` (8) feed
+  Minecraft's own reduction curve — the same numbers a full diamond set feeds — with no separate damage hook
+  and no armour slot touched. Resistance II and Fire Resistance III are renewed on a five-second lease every
+  second, so a missed teardown lapses in seconds instead of leaving somebody permanently armoured; login
+  strips and re-derives, because attribute modifiers are saved with the player.
+- **Erasure is reversible until it is not.** Every hold (gravity, AI, navigation, input) is recorded and
+  handed back on interruption, death, dimension change, logout or shutdown. The death only lands after the
+  visual sequence finishes, and non-players that survive a bypassing damage source are discarded; players
+  never are.
+- **Directional dissolve without touching foreign renderers.** True geometry clipping is not available
+  across arbitrary modded renderers, so past 18% of the sequence the ordinary renderer stands down and the
+  body is rebuilt as cuboid fragments sized to its own bounding box and textured from whatever sheet its
+  renderer reports. Every lookup is guarded; an unknown renderer costs that body its fragments, never the
+  frame.
+
+### Not verified — needs a recorded in-game session
+
+Nothing below has had one. None of it should be described as working.
+
+- Time Branch Unleashing end to end: charge stages at the documented 1.0/2.5/4.0/5.5/7.0/10.0s thresholds,
+  the forced release at the hard limit, the compression beat, and the torrent's appearance at low, medium
+  and maximum charge.
+- That an untransformed press does nothing at all — no pose, no sphere, no energy, no packet.
+- The plant: walking, sprinting, strafing, jumping and Cosmic Flight all refused while aiming stays free.
+- Agreement between the visible torrent and what it hits, at 60 blocks and at every charge level, including
+  a body clipped by the very edge of the volume.
+- Soft cover dissolving with no item drops, and hard structural blocks and builds surviving a direct hit.
+- Erasure of: vanilla mobs, passive mobs, villagers, a second player, a vanilla boss, and at least one
+  modded creature with a non-standard renderer.
+- That a caster is never caught by their own torrent, their own arcs or their own dissolve.
+- Interruption paths: detransforming, dying, being frozen, logging out and changing dimension mid-charge and
+  mid-erasure, and that nothing is left stunned, floating or invisible afterwards.
+- Frame cost of a maximum-charge torrent at close range with several bodies erasing at once, and the same at
+  distance, under normal, Fabulous and third-party shader graphics.
+- The layered charge audio, the full-power cue at 5.5s, the discharge and the sustained roar, in multiplayer
+  from a second client.
+- Transformed defence: measured damage reduction against a known hit, the two effects present and invisible
+  on the model, and both gone after detransforming, dying, relogging and crossing dimensions.
+- Telekinesis: a held player in multiplayer with no rubber-banding, mass limits at low and high mastery,
+  scroll push/pull, the throw and its slam damage, and the grasp's appearance from several angles.
+- Emerald Throw: quick and charged forms, the charged burst's radius, and the projectile's look in flight.
+- Meteors: entry from ~190 blocks up on a long diagonal, the burn audio through the descent, the arrival, the
+  chance gate actually gating, and confirmation that the island still takes no terrain damage.

@@ -62,6 +62,7 @@ public final class LokiHud {
         }
         g.pose().popPose();
         if(ClientState.frozen(mc.player.getId()))g.drawCenteredString(mc.font,"BETWEEN MOMENTS",screenWidth/2,15,0xd8d6be);
+        BranchMeter.render(g,screenWidth,screenHeight);
     }
     /** The permanent time commands: key, name and state, always on screen and never scrollable. */
     private static void controls(GuiGraphics g,net.minecraft.nbt.CompoundTag d,float energy,int top) {
@@ -94,7 +95,7 @@ public final class LokiHud {
             case MASQUERADE -> "Copy a humanoid appearance.";
             case MIRAGE -> "Create decoys and briefly vanish.";
             case ARCHITECTURE -> "Hold: raise an illusory building.";
-            case BOLT -> "Fire an emerald magic bolt.";
+            case BOLT -> "Hurl a bolt of emerald seidr.";
             case PUSH -> "Push nearby enemies away.";
             case TELEKINESIS -> "Grab target. Scroll: move it.";
             case BLINK -> "Teleport toward your aim.";
@@ -111,6 +112,7 @@ public final class LokiHud {
             case SELECTIVE_STOP -> "Freeze the target in your aim.";
             case THREADS -> "Bind your target in time.";
             case ASCENSION -> "Toggle your final transformation.";
+            case TIME_BRANCH -> "Transformed: hold to charge, release to erase.";
         };
     }
     private static String alternate(Ability a) {
@@ -120,13 +122,14 @@ public final class LokiHud {
             case PROJECTION_SWAP -> "Place a decoy at your aim";
             case MASQUERADE -> "Remove disguise";
             case ARCHITECTURE -> "Change building design";
-            case BOLT -> "Stronger impact";
+            case BOLT -> "Charged throw, bursts on impact";
             case TELEKINESIS -> "Throw held target";
             case DAGGERS,TWIN_DAGGERS,LAEVATEINN -> "Dismiss weapons";
             case ENCHANT -> "Direct charmed creatures";
             case SLOW_FIELD,TIME_STOP -> "Resume time";
             case SELECTIVE_STOP -> "Exempt an ally";
             case THREADS -> "Pull bound target";
+            case TIME_BRANCH -> "None — release the cast key to fire";
             default -> "Same action";
         };
     }

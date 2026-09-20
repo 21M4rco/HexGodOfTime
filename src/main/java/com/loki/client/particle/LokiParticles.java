@@ -58,6 +58,168 @@ public final class LokiParticles {
         e.registerSpriteSet(Loki.VEIL.get(),set->new Cloud.Provider(set,.52f,.92f,.74f,1.15f,true,90));
         e.registerSpriteSet(Loki.SMOKE.get(),set->new Cloud.Provider(set,.16f,.29f,.24f,.85f,false,110));
         e.registerSpriteSet(Loki.STAR.get(),Flare.Provider::new);
+        e.registerSpriteSet(Loki.TEMPORAL_DUST.get(),Dust.Provider::new);
+        e.registerSpriteSet(Loki.BRANCH_THREAD.get(),Thread_.Provider::new);
+        e.registerSpriteSet(Loki.SPECTRAL.get(),Spectral.Provider::new);
+        e.registerSpriteSet(Loki.METEOR_FIRE.get(),Flame.Provider::new);
+        e.registerSpriteSet(Loki.CINDER.get(),Cinder.Provider::new);
+        e.registerSpriteSet(Loki.ASH.get(),set->new Cloud.Provider(set,.21f,.19f,.18f,1.35f,false,150));
+    }
+
+    /**
+     * The residue of erasure: a fragment small enough to be dust, bright enough to see, and carried along
+     * whatever swept it off the thing it used to be part of. It keeps the velocity it was given rather
+     * than settling, because it is not falling — it is being taken downstream.
+     */
+    public static final class Dust extends TextureSheetParticle {
+        private final float tone;
+        Dust(ClientLevel level,double x,double y,double z,double vx,double vy,double vz,SpriteSet sprites) {
+            super(level,x,y,z);
+            xd=vx;yd=vy;zd=vz;
+            tone=random.nextFloat();
+            hasPhysics=false;friction=.975f;
+            lifetime=26+random.nextInt(30);
+            quadSize=.035f+random.nextFloat()*.045f;
+            alpha=0;
+            pickSprite(sprites);
+            shade(0);
+        }
+        private void shade(float t) {
+            int colour=com.loki.client.TemporalPalette.shade(tone+t*.45f);
+            rCol=(colour>>16&255)/255f;gCol=(colour>>8&255)/255f;bCol=(colour&255)/255f;
+        }
+        @Override public ParticleRenderType getRenderType() {return GLOW;}
+        @Override public void tick() {
+            super.tick();
+            float t=age/(float)lifetime;
+            shade(t);
+            yd+=.0012;
+            alpha=bloom(age,0,3)*(1-t)*(1-t*.4f);
+            quadSize*=.987f;
+        }
+        record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
+            @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
+                return new Dust(level,x,y,z,vx,vy,vz,sprites);
+            }
+        }
+    }
+
+    /** A thin strand of loose timeline, stretched along its own travel and fading from both ends. */
+    public static final class Thread_ extends TextureSheetParticle {
+        private final float tone;
+        Thread_(ClientLevel level,double x,double y,double z,double vx,double vy,double vz,SpriteSet sprites) {
+            super(level,x,y,z);
+            xd=vx;yd=vy;zd=vz;
+            tone=random.nextFloat();
+            hasPhysics=false;friction=.985f;
+            lifetime=20+random.nextInt(18);
+            quadSize=.10f+random.nextFloat()*.10f;
+            roll=random.nextFloat()*6.28f;oRoll=roll;
+            alpha=0;
+            pickSprite(sprites);
+            int colour=com.loki.client.TemporalPalette.shade(tone);
+            rCol=(colour>>16&255)/255f;gCol=(colour>>8&255)/255f;bCol=(colour&255)/255f;
+        }
+        @Override public ParticleRenderType getRenderType() {return GLOW;}
+        @Override public void tick() {
+            super.tick();
+            oRoll=roll;roll+=.02f;
+            float t=age/(float)lifetime;
+            alpha=bloom(age,0,2)*Math.min(1,(1-t)*2.1f);
+            quadSize*=.994f;
+        }
+        record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
+            @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
+                return new Thread_(level,x,y,z,vx,vy,vz,sprites);
+            }
+        }
+    }
+
+    /** A mote that never settles on one colour: several currents passing through the same speck. */
+    public static final class Spectral extends TextureSheetParticle {
+        private final float tone,rate;
+        Spectral(ClientLevel level,double x,double y,double z,double vx,double vy,double vz,SpriteSet sprites) {
+            super(level,x,y,z);
+            xd=vx;yd=vy;zd=vz;
+            tone=random.nextFloat();
+            rate=.010f+random.nextFloat()*.026f;
+            hasPhysics=false;friction=.97f;
+            lifetime=34+random.nextInt(34);
+            quadSize=.05f+random.nextFloat()*.06f;
+            alpha=0;
+            pickSprite(sprites);
+        }
+        @Override public ParticleRenderType getRenderType() {return GLOW;}
+        @Override public void tick() {
+            super.tick();
+            int colour=com.loki.client.TemporalPalette.shade(tone+age*rate);
+            rCol=(colour>>16&255)/255f;gCol=(colour>>8&255)/255f;bCol=(colour&255)/255f;
+            float t=age/(float)lifetime;
+            alpha=bloom(age,0,5)*(1-t)*(1-t);
+        }
+        record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
+            @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
+                return new Spectral(level,x,y,z,vx,vy,vz,sprites);
+            }
+        }
+    }
+
+    /**
+     * Flame torn off a stone falling far too fast. White at the leading edge, cooling through yellow and
+     * orange as it is left behind, and swelling as it goes because it is being shed, not burning in place.
+     */
+    public static final class Flame extends TextureSheetParticle {
+        Flame(ClientLevel level,double x,double y,double z,double vx,double vy,double vz,SpriteSet sprites) {
+            super(level,x,y,z);
+            xd=vx;yd=vy;zd=vz;
+            hasPhysics=false;friction=.90f;
+            lifetime=12+random.nextInt(14);
+            quadSize=.22f+random.nextFloat()*.30f;
+            roll=random.nextFloat()*6.28f;oRoll=roll;
+            alpha=0;
+            pickSprite(sprites);
+        }
+        @Override public ParticleRenderType getRenderType() {return GLOW;}
+        @Override public void tick() {
+            super.tick();
+            oRoll=roll;roll+=.05f;
+            float t=age/(float)lifetime;
+            rCol=1;
+            gCol=Math.max(.18f,.98f-t*1.15f);
+            bCol=Math.max(.04f,.72f-t*1.9f);
+            quadSize*=1.035f;
+            alpha=bloom(age,0,2)*(1-t)*(1-t*.45f)*.95f;
+        }
+        record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
+            @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
+                return new Flame(level,x,y,z,vx,vy,vz,sprites);
+            }
+        }
+    }
+
+    /** Ablated rock: a hot speck thrown clear of the meteor that cools and drops away behind it. */
+    public static final class Cinder extends TextureSheetParticle {
+        Cinder(ClientLevel level,double x,double y,double z,double vx,double vy,double vz,SpriteSet sprites) {
+            super(level,x,y,z);
+            xd=vx;yd=vy;zd=vz;
+            hasPhysics=true;friction=.965f;gravity=.28f;
+            lifetime=28+random.nextInt(34);
+            quadSize=.05f+random.nextFloat()*.06f;
+            alpha=0;
+            pickSprite(sprites);
+        }
+        @Override public ParticleRenderType getRenderType() {return GLOW;}
+        @Override public void tick() {
+            super.tick();
+            float t=age/(float)lifetime;
+            rCol=1;gCol=Math.max(.10f,.80f-t*1.0f);bCol=Math.max(.03f,.32f-t*.9f);
+            alpha=bloom(age,0,2)*(1-t)*(1-t*.3f);
+        }
+        record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
+            @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
+                return new Cinder(level,x,y,z,vx,vy,vz,sprites);
+            }
+        }
     }
 
     /**

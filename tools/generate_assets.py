@@ -315,6 +315,17 @@ animation('telekinesis', [
     (48, (-96, -12, -10), (-26, 16, 6), (3, -9, 0)),
 ], 48, loop=True)
 
+# Time Branch Unleashing. Deliberately simple: the power is in the sphere and in the world reacting to
+# it, not in the body. Both arms go forward and stay there, with only enough tremble to read as strain.
+# The loop opens already extended so the three-tick fade carries the raise and the arms never drop.
+animation('unleash', [
+    (0, (-93, -13, -6), (-93, 13, 6), (-4, 0, 0)),
+    (10, (-96, -11, -9), (-96, 11, 9), (-5, 0, 0)),
+    (20, (-90, -15, -3), (-90, 15, 3), (-3, 0, 0)),
+    (30, (-95, -12, -8), (-95, 12, 8), (-5, 0, 0)),
+    (40, (-93, -13, -6), (-93, 13, 6), (-4, 0, 0)),
+], 40, loop=True)
+
 animation('ascend', [(0, zero, zero, zero), (25, (-10, -7, -8), (-9, 7, 8), (-2, 0, 0)),
                      (60, (-18, -10, -15), (-18, 10, 15), (-2, 0, 0)),
                      (100, (-15, -8, -10), (-14, 8, 10), (0, 0, 0)), (140, zero, zero, zero)], 140)
@@ -341,7 +352,7 @@ for kind in ['dagger', 'twin', 'sword']:
 # ------------------------------------------------------------------- audio ---
 # Reference the installed game's recorded Foley. Do not regenerate the old oscillators/noise beds.
 # These are event references, preserving sample variation and user resource-pack overrides.
-sound_events = {'rift_open': ('block.glass.break', 0.95, 0.92), 'rift_close': ('block.glass.break', 0.48, 1.18), 'blade_swing': ('entity.player.attack.sweep', 0.8, 1.0), 'blade_throw': ('item.trident.throw', 0.7, 1.16), 'blade_hit': ('item.trident.hit', 0.75, 1.08), 'blade_embed': ('item.trident.hit_ground', 0.7, 0.92), 'conjure': ('item.armor.equip_iron', 0.65, 1.16), 'illusion': ('entity.player.attack.sweep', 0.42, 0.72), 'sorcery': ('entity.evoker.cast_spell', 0.4, 0.92), 'teleport': ('item.chorus_fruit.teleport', 0.38, 1.0), 'time_stop': ('block.beacon.deactivate', 0.36, 0.78), 'time_resume': ('block.beacon.activate', 0.32, 0.92), 'time_slip': ('item.chorus_fruit.teleport', 0.36, 0.8), 'ascend': ('item.armor.equip_netherite', 0.75, 0.82)}
+sound_events = {'rift_open': ('block.glass.break', 0.95, 0.92), 'rift_close': ('block.glass.break', 0.48, 1.18), 'blade_swing': ('entity.player.attack.sweep', 0.8, 1.0), 'blade_throw': ('item.trident.throw', 0.7, 1.16), 'blade_hit': ('item.trident.hit', 0.75, 1.08), 'blade_embed': ('item.trident.hit_ground', 0.7, 0.92), 'conjure': ('item.armor.equip_iron', 0.65, 1.16), 'illusion': ('entity.player.attack.sweep', 0.42, 0.72), 'sorcery': ('entity.evoker.cast_spell', 0.4, 0.92), 'teleport': ('item.chorus_fruit.teleport', 0.38, 1.0), 'time_stop': ('block.beacon.deactivate', 0.36, 0.78), 'time_resume': ('block.beacon.activate', 0.32, 0.92), 'time_slip': ('item.chorus_fruit.teleport', 0.36, 0.8), 'ascend': ('item.armor.equip_netherite', 0.75, 0.82), 'branch_hum': ('block.beacon.ambient', 0.9, 0.55), 'branch_resonance': ('block.conduit.ambient', 0.9, 0.7), 'branch_shimmer': ('block.amethyst_block.resonate', 0.8, 1.35), 'branch_pressure': ('entity.warden.heartbeat', 1.0, 0.6), 'branch_crackle': ('block.amethyst_cluster.hit', 0.7, 1.4), 'branch_ready': ('block.beacon.power_select', 1.0, 1.25), 'branch_open': ('block.end_portal.spawn', 1.0, 0.8), 'branch_release': ('entity.ender_dragon.growl', 1.0, 0.85), 'branch_roar': ('block.portal.ambient', 1.0, 0.5), 'branch_erase': ('entity.elder_guardian.curse', 0.8, 1.35), 'meteor_burn': ('entity.blaze.burn', 1.0, 0.55), 'meteor_roar': ('entity.lightning_bolt.thunder', 1.0, 0.45), 'meteor_impact': ('entity.generic.explode', 1.0, 0.6), 'grip_hold': ('block.beacon.ambient', 0.55, 1.5), 'emerald_cast': ('entity.illusioner.cast_spell', 0.7, 1.1)}
 (ROOT / 'sounds.json').write_text(json.dumps({
     name: {'subtitle': 'subtitles.loki.' + name, 'sounds': [{
         'name': 'minecraft:' + event, 'type': 'event', 'volume': volume, 'pitch': pitch}]}

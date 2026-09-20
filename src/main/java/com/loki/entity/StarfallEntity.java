@@ -17,32 +17,45 @@ import net.minecraftforge.network.NetworkHooks;
 import java.util.UUID;
 
 /**
- * A falling star the sanctum throws at whoever is troubling its owner.
+ * A meteor the sanctum pulls down on whoever is troubling its owner.
  *
- * <p>It comes in high and at an angle, not straight down, and it does not fly true: it wobbles,
- * over-corrects and drifts, closing on its quarry with the unsteady insistence of something that is
- * only half a projectile. It burns brighter the nearer it gets.
+ * <p>It is a falling rock, and it is written like one. It comes in from far above the build limit on a long
+ * diagonal, it <em>accelerates</em> the whole way down under its own weight rather than cruising at a set
+ * speed, and it only steers a little — enough to be Loki's doing, nowhere near enough to read as a guided
+ * missile. It burns hotter the lower and faster it gets, because that is where the air is, and the renderer
+ * and the audio are both driven from that one number.
  *
- * <p>It never touches the island. There is no explosion call anywhere in it — the impact is damage
- * to bodies and a great deal of light, and the throne, the tree and the ground are untouched.
+ * <p>What it does not do is damage the island. There is no explosion call anywhere in it: the impact is
+ * harm to bodies, a great deal of fire and light, and a very loud arrival. The throne, the tree and the
+ * ground are untouched, and the owner is never hurt by it.
  */
 public final class StarfallEntity extends Entity {
     private static final EntityDataAccessor<Integer> QUARRY=SynchedEntityData.defineId(StarfallEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Float> CHARGE=SynchedEntityData.defineId(StarfallEntity.class,EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> HEAT=SynchedEntityData.defineId(StarfallEntity.class,EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Integer> SEED=SynchedEntityData.defineId(StarfallEntity.class,EntityDataSerializers.INT);
 
-    /** Ten hearts where it lands, falling off across a small radius. */
-    public static final float DAMAGE=20,SPLASH_RADIUS=3.2f;
-    private static final int LIFETIME=120;
-    private static final double SPEED=1.05,TURN=.19;
+    /** Thirteen hearts where it lands, falling off across a small radius. */
+    public static final float DAMAGE=26,SPLASH_RADIUS=4;
+    private static final int LIFETIME=340;
+    /** Entry speed, the pull that builds on it, and the speed the air will not let it pass. */
+    private static final double ENTRY=.85,PULL=.12,TERMINAL=3.4;
+    /** How little it corrects. A meteor is not a missile. */
+    private static final double STEER=.035;
 
     private UUID owner;
     private int age;
 
     public StarfallEntity(EntityType<? extends StarfallEntity> type,Level level) {super(type,level);noPhysics=true;}
-    @Override protected void defineSynchedData() {entityData.define(QUARRY,0);entityData.define(CHARGE,0f);}
+    @Override protected void defineSynchedData() {
+        entityData.define(QUARRY,0);entityData.define(CHARGE,0f);entityData.define(HEAT,0f);entityData.define(SEED,0);
+    }
 
-    /** 0 far out, 1 about to land: the client brightens the core and thickens the trail with it. */
+    /** 0 far out, 1 about to land. */
     public float charge() {return entityData.get(CHARGE);}
+    /** How hard it is burning: speed and thickening air together. Drives the flame and the roar. */
+    public float heat() {return entityData.get(HEAT);}
+    public int seed() {return entityData.get(SEED);}
     public int quarryId() {return entityData.get(QUARRY);}
 
     public static void fall(ServerPlayer caster,LivingEntity quarry,Vec3 from) {
@@ -50,11 +63,13 @@ public final class StarfallEntity extends Entity {
         star.owner=caster.getUUID();
         star.setPos(from.x,from.y,from.z);
         star.entityData.set(QUARRY,quarry.getId());
+        star.entityData.set(SEED,caster.getRandom().nextInt(1 << 20));
         Vec3 aim=quarry.getBoundingBox().getCenter().subtract(from);
-        star.setDeltaMovement(aim.lengthSqr()<1e-6?new Vec3(0,-SPEED,0):aim.normalize().scale(SPEED));
+        star.setDeltaMovement(aim.lengthSqr()<1e-6?new Vec3(0,-ENTRY,0):aim.normalize().scale(ENTRY));
         quarry.level().addFreshEntity(star);
-        LokiNetwork.fx(star,"starfall_open");
-        quarry.level().playSound(null,star.blockPosition(),Loki.RIFT_OPEN.get(),SoundSource.AMBIENT,.6f,1.7f);
+        LokiNetwork.fx(star,"meteor_entry");
+        // The sound of something arriving through the air, heard long before it lands.
+        quarry.level().playSound(null,BlockPos.containing(from),Loki.METEOR_ROAR.get(),SoundSource.WEATHER,4.2f,.62f);
     }
 
     @Override public void tick() {
@@ -66,28 +81,31 @@ public final class StarfallEntity extends Entity {
         if(++age>LIFETIME){burst(null);return;}
         Entity quarry=level().getEntity(quarryId());
         Vec3 velocity=getDeltaMovement();
+        // Weight first. It is falling, and everything else is a correction on top of that.
+        velocity=velocity.add(0,-PULL,0);
         if(quarry!=null&&quarry.isAlive()) {
             Vec3 aim=quarry.getBoundingBox().getCenter().subtract(position());
             double distance=aim.length();
-            entityData.set(CHARGE,(float)Math.max(0,Math.min(1,1-distance/48)));
-            if(distance<1.4){burst(quarry);return;}
-            Vec3 want=aim.scale(1/Math.max(1e-4,distance));
-            // Over-correct, then let the wobble pull it off line again: it hunts, it does not track.
-            double wander=age*.31;
-            Vec3 wobble=new Vec3(Math.sin(wander)*.34,Math.sin(wander*.7+1.3)*.12,Math.cos(wander*1.17)*.34);
-            velocity=velocity.add(want.scale(TURN)).add(wobble.scale(.09));
-            double speed=SPEED+charge()*.55;
-            velocity=velocity.normalize().scale(speed);
-        } else velocity=velocity.add(0,-.05,0);
+            entityData.set(CHARGE,(float)Math.max(0,Math.min(1,1-distance/90)));
+            if(distance<1.6){burst(quarry);return;}
+            velocity=velocity.add(aim.scale(STEER/Math.max(1e-4,distance)));
+        }
+        double speed=velocity.length();
+        if(speed>TERMINAL)velocity=velocity.scale(TERMINAL/speed);
         setDeltaMovement(velocity);
+        // Burning hardest when it is fast and low: that is where the atmosphere is.
+        entityData.set(HEAT,(float)Math.min(1,speed/TERMINAL*.65+charge()*.5));
         Vec3 next=position().add(velocity);
-        // The island itself stops the star, but nothing about that damages it.
+        // The island stops the meteor. Nothing about that damages the island.
         var hit=level().clip(new ClipContext(position(),next,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,this));
-        if(hit.getType()!=HitResult.Type.MISS){setPos(hit.getLocation().x,hit.getLocation().y,hit.getLocation().z);burst(null);return;}
+        if(hit.getType()!=HitResult.Type.MISS) {
+            setPos(hit.getLocation().x,hit.getLocation().y,hit.getLocation().z);
+            burst(null);return;
+        }
         setPos(next.x,next.y,next.z);
     }
 
-    /** Light and harm, never terrain. The owner is untouched by every part of it. */
+    /** Fire, harm and a very loud arrival. Never terrain, and never the owner. */
     private void burst(Entity direct) {
         if(isRemoved())return;
         ServerPlayer caster=owner==null||!(level() instanceof ServerLevel level)?null:level.getServer().getPlayerList().getPlayer(owner);
@@ -101,9 +119,11 @@ public final class StarfallEntity extends Entity {
             var source=caster!=null?victim.damageSources().indirectMagic(this,caster):victim.damageSources().magic();
             victim.invulnerableTime=0;
             victim.hurt(source,DAMAGE*share);
+            // It was on fire the whole way down; so is whatever it hit.
+            if(share>.3f&&!victim.fireImmune())victim.setSecondsOnFire(4);
         }
-        LokiNetwork.fx(this,"starfall_impact");
-        level().playSound(null,blockPosition(),Loki.ASCEND.get(),SoundSource.AMBIENT,.85f,1.45f);
+        LokiNetwork.fx(this,"meteor_impact");
+        level().playSound(null,blockPosition(),Loki.METEOR_IMPACT.get(),SoundSource.WEATHER,3.6f,.58f);
         discard();
     }
 
@@ -111,7 +131,8 @@ public final class StarfallEntity extends Entity {
     @Override public boolean canBeCollidedWith() {return false;}
     @Override public boolean isPushable() {return false;}
     @Override public boolean hurt(net.minecraft.world.damagesource.DamageSource source,float amount) {return false;}
-    @Override public boolean shouldRenderAtSqrDistance(double distance) {return distance<36864;}
+    /** Visible from a long way off on purpose: the point is watching it come down. */
+    @Override public boolean shouldRenderAtSqrDistance(double distance) {return distance<90000;}
     @Override protected void readAdditionalSaveData(CompoundTag n) {if(n.hasUUID("owner"))owner=n.getUUID("owner");age=n.getInt("age");}
     @Override protected void addAdditionalSaveData(CompoundTag n) {if(owner!=null)n.putUUID("owner",owner);n.putInt("age",age);}
     @Override public Packet<ClientGamePacketListener> getAddEntityPacket() {return NetworkHooks.getEntitySpawningPacket(this);}

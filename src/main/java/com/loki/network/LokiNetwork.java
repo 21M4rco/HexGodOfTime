@@ -15,7 +15,8 @@ public final class LokiNetwork {
     public static final SimpleChannel CHANNEL=NetworkRegistry.newSimpleChannel(Loki.id("main"),()->"2","2"::equals,"2"::equals);
     /** Highest accepted client action id; see {@link LokiServer#input}. */
     public static final int MAX_ACTION=12;
-    public static final int SYNC=0,ANIMATE=1,FX=2,FROZEN=3,GRIP=4,MEMORY=5,THREADS=6,SLOWED=7,ARCHITECTURE=8,BLEED=9,FIELD=10,DISGUISE=11;
+    public static final int SYNC=0,ANIMATE=1,FX=2,FROZEN=3,GRIP=4,MEMORY=5,THREADS=6,SLOWED=7,ARCHITECTURE=8,BLEED=9,FIELD=10,DISGUISE=11,
+        BRANCH=12,TORRENT=13,ERASURE=14;
     public record Input(int action,int value) {}
     /** A deliberate Fracture selection: a catalogue index and, where the mode needs one, a target. */
     public record Choice(int mode,java.util.UUID target) {}
@@ -40,6 +41,13 @@ public final class LokiNetwork {
     public static void chooseFracture(int mode,java.util.UUID target) {CHANNEL.sendToServer(new Choice(mode,target));}
     public static void to(ServerPlayer p,Message m) {CHANNEL.send(PacketDistributor.PLAYER.with(()->p),m);}
     public static void tracking(Entity p,Message m) {CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(()->p),m);}
+    /**
+     * Everyone close enough to see it, whether or not they happen to be tracking the caster. A
+     * sixty-block torrent reaches players the caster's own tracking range never would.
+     */
+    public static void near(net.minecraft.server.level.ServerLevel level,net.minecraft.world.phys.Vec3 at,double radius,Message m) {
+        CHANNEL.send(PacketDistributor.NEAR.with(()->new PacketDistributor.TargetPoint(at.x,at.y,at.z,radius,level.dimension())),m);
+    }
     public static void sync(ServerPlayer p) {LokiData.refreshQuick(p);tracking(p,new Message(SYNC,p.getId(),light(LokiData.get(p))));}
     /**
      * The routine state packet goes out once a second to everyone tracking the player, so a mimicked
