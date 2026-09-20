@@ -25,9 +25,9 @@ public final class IllusionRenderer extends MobRenderer<IllusionEntity,PlayerMod
     private final PlayerModel<IllusionEntity> classic,slim;
 
     public IllusionRenderer(EntityRendererProvider.Context ctx) {
-        super(ctx,new PlayerModel<>(ctx.bakeLayer(ModelLayers.PLAYER),false),.45f);
+        super(ctx,new ThrowModel(ctx.bakeLayer(ModelLayers.PLAYER),false),.45f);
         classic=model;
-        slim=new PlayerModel<>(ctx.bakeLayer(ModelLayers.PLAYER_SLIM),true);
+        slim=new ThrowModel(ctx.bakeLayer(ModelLayers.PLAYER_SLIM),true);
         addLayer(new HumanoidArmorLayer<>(this,
             new net.minecraft.client.model.HumanoidModel<>(ctx.bakeLayer(ModelLayers.PLAYER_INNER_ARMOR)),
             new net.minecraft.client.model.HumanoidModel<>(ctx.bakeLayer(ModelLayers.PLAYER_OUTER_ARMOR)),
@@ -50,6 +50,21 @@ public final class IllusionRenderer extends MobRenderer<IllusionEntity,PlayerMod
                 pose.popPose();
             }
         });
+    }
+
+    /** Pose the actual arm and sleeve so the held item follows the wind-up and release. */
+    private static final class ThrowModel extends PlayerModel<IllusionEntity> {
+        ThrowModel(net.minecraft.client.model.geom.ModelPart root,boolean slim){super(root,slim);}
+        @Override public void setupAnim(IllusionEntity e,float walk,float amount,float age,float yaw,float pitch) {
+            super.setupAnim(e,walk,amount,age,yaw,pitch);
+            float t=e.throwAge(age-e.tickCount);
+            if(t<0||t>IllusionEntity.THROW_END)return;
+            float rotation=t<5?net.minecraft.util.Mth.lerp(t/5,-.35f,-3.25f)
+                :t<IllusionEntity.THROW_RELEASE?net.minecraft.util.Mth.lerp((t-5)/3,-3.25f,-(float)Math.PI/2)
+                :net.minecraft.util.Mth.lerp((t-IllusionEntity.THROW_RELEASE)/8,-(float)Math.PI/2,-.35f);
+            rightArm.xRot=rotation;rightArm.yRot=0;rightArm.zRot=0;
+            rightSleeve.copyFrom(rightArm);
+        }
     }
 
     @Override public ResourceLocation getTextureLocation(IllusionEntity e) {

@@ -33,7 +33,10 @@ public final class ConjuredWeapon extends Item {
     }
     @Override public InteractionResultHolder<ItemStack> use(Level level,Player player,InteractionHand hand) {
         if(!belongsTo(player.getItemInHand(hand),player))return InteractionResultHolder.fail(player.getItemInHand(hand));
-        if(player instanceof ServerPlayer p)LokiServer.weapon(p,true);
+        if(player instanceof ServerPlayer p) {
+            if(kind==0)LokiServer.weapon(p,true,hand);
+            else LokiServer.weapon(p,true);
+        }
         return InteractionResultHolder.sidedSuccess(player.getItemInHand(hand),level.isClientSide);
     }
     @Override public boolean isEnchantable(ItemStack stack) {return false;}

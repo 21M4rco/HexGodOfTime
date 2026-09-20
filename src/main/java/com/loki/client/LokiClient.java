@@ -61,7 +61,7 @@ public final class LokiClient {
             e.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)r->{
                 LokiLayer.clear();WeaponRenderer.clear();RiftRenderer.clear();RealmSky.clear();CosmicNebula.clear();
                 BranchVfx.clear();TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();
-                DisguiseRenderer.clear();DisguiseRenderer.forgive();Blood.clear();TemporalScreen.close();
+                DisguiseRenderer.clear();DisguiseRenderer.forgive();Blood.clear();WoundAnchor.clear();TemporalScreen.close();
             });
         }
     }
@@ -157,7 +157,7 @@ public final class LokiClient {
             if(e.getOverlay().id().equals(net.minecraftforge.client.gui.overlay.VanillaGuiOverlay.HOTBAR.id()))LokiHud.render(e.getGuiGraphics());
         }
         @SubscribeEvent public static void world(RenderLevelStageEvent e) {
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY)CapeRenderer.beginFrame(e);
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES)WorldEffects.render(e);
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL)TemporalScreen.render(e.getPartialTick());
         }

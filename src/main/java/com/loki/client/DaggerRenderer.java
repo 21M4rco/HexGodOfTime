@@ -33,15 +33,14 @@ public final class DaggerRenderer extends EntityRenderer<ThrownDagger> {
             Vec3 want=WoundAnchor.world(e,host,partial);
             Vec3 self=WoundAnchor.lerpPosition(e,partial);
             pose.translate(want.x-self.x,want.y-self.y,want.z-self.z);
-            pose.mulPose(Axis.YP.rotationDegrees(WoundAnchor.bodyYaw(host,partial)+WoundAnchor.turn(e,host,partial)+e.entryYaw()-90));
-            pose.mulPose(Axis.ZP.rotationDegrees(e.entryPitch()));
+            pose.mulPose(WoundAnchor.rotation(e,host,partial));
         } else {
             pose.mulPose(Axis.YP.rotationDegrees(Mth.lerp(partial,e.yRotO,e.getYRot())-90));
             pose.mulPose(Axis.ZP.rotationDegrees(Mth.lerp(partial,e.xRotO,e.getXRot())));
+            float spin=e.flying()?(e.tickCount+partial)*42+e.roll():e.roll();
+            pose.mulPose(Axis.XP.rotationDegrees(spin));
+            pose.mulPose(Axis.ZP.rotationDegrees(-90));
         }
-        float spin=e.flying()?(e.tickCount+partial)*42+e.roll():e.roll();
-        pose.mulPose(Axis.XP.rotationDegrees(spin));
-        pose.mulPose(Axis.ZP.rotationDegrees(-90));
         pose.scale(SCALE,SCALE,SCALE);
         // The grip sits at the mesh origin, so shift back along the blade to balance it on the flight line.
         pose.translate(0,-.2,0);

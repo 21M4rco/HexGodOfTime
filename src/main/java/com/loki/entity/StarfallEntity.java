@@ -3,6 +3,8 @@ package com.loki.entity;
 import com.loki.Loki;
 import com.loki.network.LokiNetwork;
 import com.loki.server.SanctumWard;
+import com.loki.server.PocketRealm;
+import com.loki.server.Starfall;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
@@ -59,6 +61,8 @@ public final class StarfallEntity extends Entity {
 
     private UUID owner;
     private int age;
+    private int plot;
+    private boolean bounded;
 
     public StarfallEntity(EntityType<? extends StarfallEntity> type,Level level) {super(type,level);noPhysics=true;}
     @Override protected void defineSynchedData() {
@@ -84,6 +88,7 @@ public final class StarfallEntity extends Entity {
     public static void fall(ServerPlayer caster,LivingEntity quarry,Vec3 from) {
         StarfallEntity star=new StarfallEntity(Loki.STARFALL.get(),quarry.level());
         star.owner=caster.getUUID();
+        star.plot=PocketRealm.plotAt(caster.getX(),caster.getZ());star.bounded=PocketRealm.inside(caster.level());
         star.setPos(from.x,from.y,from.z);
         star.entityData.set(QUARRY,quarry.getId());
         star.entityData.set(SEED,caster.getRandom().nextInt(1 << 20));
@@ -110,7 +115,7 @@ public final class StarfallEntity extends Entity {
         Vec3 velocity=getDeltaMovement();
         // Weight first. It is falling, and everything else is a correction on top of that.
         velocity=velocity.add(0,-pull(),0);
-        if(quarry!=null&&quarry.isAlive()) {
+        if(quarry!=null&&quarry.isAlive()&&(!bounded||Starfall.validPoint((ServerLevel)level(),plot,quarry.getX(),quarry.getZ()))) {
             Vec3 aim=quarry.getBoundingBox().getCenter().subtract(position());
             double distance=aim.length();
             entityData.set(CHARGE,(float)Math.max(0,Math.min(1,1-distance/90)));
@@ -124,6 +129,13 @@ public final class StarfallEntity extends Entity {
         // Burning hardest when it is fast and low: that is where the atmosphere is.
         entityData.set(HEAT,(float)Math.min(1,speed/terminal*.65+charge()*.5));
         Vec3 next=position().add(velocity);
+        if(bounded&&!Starfall.validPath((ServerLevel)level(),plot,position(),next)) {
+            // Never follow an escaping quarry over the coast. Keep falling above the last valid
+            // column, preserving vertical acceleration, size, heat and the ordinary impact.
+            velocity=new Vec3(0,velocity.y,0);setDeltaMovement(velocity);
+            next=position().add(velocity);
+            if(!Starfall.validPoint((ServerLevel)level(),plot,getX(),getZ())){discard();return;}
+        }
         Vec3 stopped=obstruction(position(),next);
         if(stopped!=null){setPos(stopped.x,stopped.y,stopped.z);burst(null);return;}
         setPos(next.x,next.y,next.z);
@@ -201,11 +213,13 @@ public final class StarfallEntity extends Entity {
     @Override protected void readAdditionalSaveData(CompoundTag n) {
         if(n.hasUUID("owner"))owner=n.getUUID("owner");
         age=n.getInt("age");
+        bounded=n.getBoolean("bounded");plot=n.getInt("plot");
         if(n.contains("size"))entityData.set(SIZE,Math.max(MIN_SIZE,Math.min(MAX_SIZE,n.getFloat("size"))));
     }
     @Override protected void addAdditionalSaveData(CompoundTag n) {
         if(owner!=null)n.putUUID("owner",owner);
         n.putInt("age",age);
+        n.putBoolean("bounded",bounded);n.putInt("plot",plot);
         n.putFloat("size",size());
     }
     @Override public Packet<ClientGamePacketListener> getAddEntityPacket() {return NetworkHooks.getEntitySpawningPacket(this);}

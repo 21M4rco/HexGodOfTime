@@ -39,6 +39,8 @@ public final class IllusionEntity extends PathfinderMob {
     private static final EntityDataAccessor<Integer> BEHAVIOR=SynchedEntityData.defineId(IllusionEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> QUARRY=SynchedEntityData.defineId(IllusionEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> LOADOUT=SynchedEntityData.defineId(IllusionEntity.class,EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Long> THROW_START=SynchedEntityData.defineId(IllusionEntity.class,EntityDataSerializers.LONG);
+    public static final int THROW_RELEASE=8,THROW_END=16;
     public enum Behavior { APPROACH, STRAFE, FEINT, RETREAT, WATCH, BLINK, THROW }
     /** 0 a single dagger, 1 twin daggers, 2 the Void sword. */
     public static final int DAGGER=0,TWIN=1,SWORD=2;
@@ -48,13 +50,16 @@ public final class IllusionEntity extends PathfinderMob {
     private long expires,nextStrike,nextHunt,nextGlance;
     private int hunted;
     private float glanceYaw;
+    private int throwTarget;
+    private boolean throwIllusory;
+    private ItemStack thrownHand=ItemStack.EMPTY;
 
     public IllusionEntity(EntityType<? extends IllusionEntity> type,Level level) {super(type,level);setPersistenceRequired();}
     public static AttributeSupplier.Builder attributes() {return Mob.createMobAttributes().add(Attributes.MAX_HEALTH,1).add(Attributes.MOVEMENT_SPEED,.31).add(Attributes.FOLLOW_RANGE,32);}
     @Override protected void defineSynchedData() {
         super.defineSynchedData();
         entityData.define(OWNER,Optional.empty());entityData.define(FINAL,false);
-        entityData.define(BEHAVIOR,0);entityData.define(QUARRY,0);entityData.define(LOADOUT,DAGGER);
+        entityData.define(BEHAVIOR,0);entityData.define(QUARRY,0);entityData.define(LOADOUT,DAGGER);entityData.define(THROW_START,-1L);
     }
     @Override protected void registerGoals() {goalSelector.addGoal(0,new FloatGoal(this));}
     public UUID owner() {return entityData.get(OWNER).orElse(null);}
@@ -62,6 +67,10 @@ public final class IllusionEntity extends PathfinderMob {
     public int behavior() {return entityData.get(BEHAVIOR);}
     public boolean aggressive() {return entityData.get(QUARRY)!=0;}
     public int loadout() {return entityData.get(LOADOUT);}
+    public float throwAge(float partial) {
+        long start=entityData.get(THROW_START);
+        return start<0?-1:level().getGameTime()-start+partial;
+    }
     /** Only a copy meant to be mistaken for its caster takes part in target selection. */
     public boolean convincing() {return spec.decoy;}
 
@@ -132,6 +141,7 @@ public final class IllusionEntity extends PathfinderMob {
         if(level().isClientSide)return;
         ServerPlayer p=owner()==null?null:((ServerLevel)level()).getServer().getPlayerList().getPlayer(owner());
         if(p==null||p.level()!=level()||!p.isAlive()||level().getGameTime()>=expires||distanceToSqr(p)>4096){dispel();return;}
+        tickThrow(p);
         LivingEntity enemy=quarry();
         if(enemy!=null&&(enemy.level()!=level()||distanceToSqr(enemy)>2304||!Hostility.hostile(enemy,p))){entityData.set(QUARRY,0);enemy=null;}
         // Striking runs every tick so a copy's cadence matches a person's, while the far more
@@ -200,15 +210,55 @@ public final class IllusionEntity extends PathfinderMob {
         };
         if(spec.behavior!=Behavior.WATCH)getNavigation().moveTo(goal.x,goal.y,goal.z,spec.behavior==Behavior.RETREAT?1.25:1);
         // Only the blade throwers are armed for it, and a swordsman never mimes one.
-        if(spec.behavior==Behavior.THROW&&loadout()!=SWORD&&tickCount%40==getId()%10) {
-            Vec3 from=position().add(0,1.4,0);
-            ThrownDagger.throwFrom(p,from,enemy.getEyePosition().subtract(from),quarry()==null);
-            swing(InteractionHand.MAIN_HAND);
+        if(spec.behavior==Behavior.THROW&&loadout()!=SWORD&&tickCount%40==getId()%10
+            &&throwAge(0)<0&&hasLineOfSight(enemy)&&getMainHandItem().is(Loki.DAGGER.get())) {
+            throwTarget=enemy.getId();throwIllusory=quarry()==null;
+            entityData.set(THROW_START,level().getGameTime());
         }
         if(spec.behavior==Behavior.BLINK&&tickCount%60==getId()%10&&level().noCollision(this,getBoundingBox().move(goal.subtract(position())))) {
             LokiNetwork.fx(this,"dispel");setPos(goal);
         }
         strike(p,enemy);
+    }
+
+    /** One wind-up, one release from the forward hand, then recovery on the existing throw cadence. */
+    private void tickThrow(ServerPlayer caster) {
+        float age=throwAge(0);
+        if(age<0)return;
+        Entity target=level().getEntity(throwTarget);
+        if(target instanceof LivingEntity enemy&&enemy.isAlive()&&Hostility.hostile(enemy,caster)) {
+            getLookControl().setLookAt(enemy,45,45);
+            Vec3 towards=enemy.position().subtract(position());
+            float facing=(float)(-Math.atan2(towards.x,towards.z)*180/Math.PI);
+            setYRot(facing);yBodyRot=facing;
+            if(age==THROW_RELEASE&&hasLineOfSight(enemy)&&getMainHandItem().is(Loki.DAGGER.get())) {
+                Vec3 from=position().add(new Vec3(-.3125,1.375,.625).yRot(-facing*(float)Math.PI/180));
+                ThrownDagger.throwFrom(caster,from,throwAim(from,enemy),throwIllusory);
+                thrownHand=getMainHandItem();setItemInHand(InteractionHand.MAIN_HAND,ItemStack.EMPTY);
+            }
+        }
+        if(age>=THROW_END) {
+            if(!thrownHand.isEmpty())setItemInHand(InteractionHand.MAIN_HAND,thrownHand);
+            thrownHand=ItemStack.EMPTY;throwTarget=0;entityData.set(THROW_START,-1L);
+        }
+    }
+
+    /** Modest movement lead plus the projectile's existing air drag and gravity, without homing. */
+    private static Vec3 throwAim(Vec3 from,LivingEntity target) {
+        Vec3 centre=target.getBoundingBox().getCenter();
+        Vec3 motion=target.getDeltaMovement();
+        if(target.onGround())motion=motion.multiply(1,0,1);
+        if(motion.lengthSqr()>.64)motion=motion.normalize().scale(.8);
+        double flight=from.distanceTo(centre)/1.85;
+        Vec3 aim=centre.subtract(from);
+        for(int i=0;i<4;i++) {
+            double t=Math.max(1,Math.min(25,flight));
+            double drag=(1-Math.pow(.99,t))/.01;
+            double drop=.026*(t-drag)/.01;
+            aim=centre.add(motion.scale(Math.min(12,t))).subtract(from).add(0,drop,0);
+            flight=aim.length()/1.85*t/drag;
+        }
+        return aim;
     }
 
     /** Each decoy owns a separate roaming sector. Never leave an old path pointing at the caster. */
@@ -268,6 +318,7 @@ public final class IllusionEntity extends PathfinderMob {
      * caster, which is what lets a wounded creature turn and fight the thing that actually cut it.
      */
     private void strike(ServerPlayer p,LivingEntity enemy) {
+        if(throwAge(0)>=0)return;
         long now=level().getGameTime();
         if(now<nextStrike||!Hostility.hostile(enemy,p))return;
         double reach=getBbWidth()*.5+enemy.getBbWidth()*.5+(loadout()==SWORD?1.75:1.35);

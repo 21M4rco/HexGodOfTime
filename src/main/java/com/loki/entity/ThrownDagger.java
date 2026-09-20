@@ -41,6 +41,7 @@ public final class ThrownDagger extends ThrowableProjectile {
     /** Which piece of the body is carrying the blade; drives how the wound moves as the body animates. */
     public static final int TORSO=0,HEAD=1,RIGHT_ARM=2,LEFT_ARM=3,RIGHT_LEG=4,LEFT_LEG=5;
     private int life=200;
+    private Vec3 embeddedPosition;
 
     public ThrownDagger(EntityType<? extends ThrownDagger> type,Level level) {super(type,level);}
 
@@ -69,7 +70,7 @@ public final class ThrownDagger extends ThrowableProjectile {
         e.setOwner(p);e.setPos(from.x,from.y,from.z);
         e.entityData.set(ILLUSORY,illusory);
         e.entityData.set(ROLL,p.getRandom().nextFloat()*360);
-        e.shoot(aim.x,aim.y,aim.z,1.85f,illusory?2.5f:.7f);
+        e.shoot(aim.x,aim.y,aim.z,1.85f,.7f);
         p.level().addFreshEntity(e);
         p.level().playSound(null,e.blockPosition(),Loki.BLADE_THROW.get(),SoundSource.PLAYERS,.8f,.95f+p.getRandom().nextFloat()*.12f);
         return e;
@@ -77,6 +78,9 @@ public final class ThrownDagger extends ThrowableProjectile {
 
     @Override protected float getGravity() {return flying()?.026f:0;}
     @Override protected boolean canHitEntity(Entity e) {
+        // The owner is the player for damage credit; friendly copies must not intercept the blade
+        // at its release point (or consume another copy's throw on the way to the quarry).
+        if(e instanceof IllusionEntity clone&&getOwner()!=null&&getOwner().getUUID().equals(clone.owner()))return false;
         return flying()&&e!=getOwner()&&(!(getOwner() instanceof ServerPlayer p)||LokiServer.validTarget(p,e))&&super.canHitEntity(e);
     }
 
@@ -85,6 +89,13 @@ public final class ThrownDagger extends ThrowableProjectile {
         if(state==FLYING) {
             Vec3 velocity=getDeltaMovement();
             super.tick();
+            // ThrowableProjectile advances using its pre-hit velocity even after onHit embeds us.
+            // Restore the server's contact point immediately, without a one-tick ghost continuation.
+            if(!flying()) {
+                setDeltaMovement(Vec3.ZERO);
+                if(embeddedPosition!=null)setPos(embeddedPosition);
+                return;
+            }
             if(velocity.lengthSqr()>1e-6) {
                 setYRot((float)(Mth.atan2(velocity.x,velocity.z)*Mth.RAD_TO_DEG));
                 setXRot((float)(Mth.atan2(velocity.y,velocity.horizontalDistance())*Mth.RAD_TO_DEG));
@@ -93,6 +104,8 @@ public final class ThrownDagger extends ThrowableProjectile {
             if(!level().isClientSide&&tickCount>120)dissolve();
             return;
         }
+        xo=getX();yo=getY();zo=getZ();
+        xOld=getX();yOld=getY();zOld=getZ();
         if(state!=IN_BLOCK) {
             Entity host=level().getEntity(state);
             if(host==null||!host.isAlive()) {
@@ -121,7 +134,7 @@ public final class ThrownDagger extends ThrowableProjectile {
     @Override protected void onHitEntity(EntityHitResult hit) {
         if(level().isClientSide||!flying())return;
         Entity victim=hit.getEntity();
-        Vec3 contact=contact(victim,hit.getLocation());
+        Vec3 contact=contact(victim);
         if(!illusory()&&getOwner() instanceof ServerPlayer p) {
             float damage=5+Math.min(4,com.loki.data.LokiData.mastery(p,Discipline.CONJURATION)*.005f);
             if(victim.hurt(damageSources().thrown(this,p),damage)) {
@@ -138,20 +151,16 @@ public final class ThrownDagger extends ThrowableProjectile {
     }
 
     /**
-     * Resolves where the blade truly met the body. A ray that begins inside the target reports no
-     * crossing at all, which is how a hit ends up reading as the entity's origin — its feet — so that
-     * case falls back to the nearest point on the body instead of trusting the zero.
+     * Vanilla's ThrowableProjectile entity hit may only contain the entity's base position. Re-clip
+     * the actual swept segment; a base point inside the bounding box is not an impact location.
      */
-    private Vec3 contact(Entity victim,Vec3 reported) {
+    private Vec3 contact(Entity victim) {
         AABB box=victim.getBoundingBox();
-        Vec3 candidate=reported;
-        if(candidate==null||!inflated(box).contains(candidate)) {
-            Vec3 from=position();
-            candidate=new Vec3(
+        Vec3 from=position(),to=from.add(getDeltaMovement());
+        Vec3 candidate=box.clip(from,to).orElseGet(()->new Vec3(
                 Mth.clamp(from.x,box.minX,box.maxX),
                 Mth.clamp(from.y,box.minY,box.maxY),
-                Mth.clamp(from.z,box.minZ,box.maxZ));
-        }
+                Mth.clamp(from.z,box.minZ,box.maxZ)));
         // Sink it a little way in along the flight line so the hilt, not the whole blade, stands proud.
         Vec3 heading=getDeltaMovement();
         if(heading.lengthSqr()>1e-6)candidate=candidate.add(heading.normalize().scale(Math.min(.18,victim.getBbWidth()*.3)));
@@ -160,7 +169,6 @@ public final class ThrownDagger extends ThrowableProjectile {
             Mth.clamp(candidate.y,box.minY,box.maxY),
             Mth.clamp(candidate.z,box.minZ,box.maxZ));
     }
-    private static AABB inflated(AABB box) {return box.inflate(.45);}
 
     /** Stores the wound in the victim's own frame, as fractions, plus the angle the steel went in at. */
     private void embed(Entity victim,Vec3 contact) {
@@ -173,9 +181,11 @@ public final class ThrownDagger extends ThrowableProjectile {
         float z=(float)((-relative.x*sin+relative.z*cos)/width);
         entityData.set(OFFSET_X,x);entityData.set(OFFSET_Y,y);entityData.set(OFFSET_Z,z);
         entityData.set(PART,classify(victim,x,y));
-        entityData.set(ENTRY_YAW,Mth.wrapDegrees(getYRot()-yaw));
-        entityData.set(ENTRY_PITCH,getXRot());
+        Vec3 heading=getDeltaMovement();
+        entityData.set(ENTRY_YAW,Mth.wrapDegrees((float)(Mth.atan2(heading.x,heading.z)*Mth.RAD_TO_DEG)+yaw));
+        entityData.set(ENTRY_PITCH,(float)(Mth.atan2(heading.y,heading.horizontalDistance())*Mth.RAD_TO_DEG));
         entityData.set(STATE,victim.getId());
+        embeddedPosition=contact;setPos(contact);noPhysics=true;
     }
 
     /**
@@ -186,8 +196,8 @@ public final class ThrownDagger extends ThrowableProjectile {
     private static int classify(Entity victim,float x,float y) {
         if(!(victim instanceof LivingEntity))return TORSO;
         boolean humanoid=victim.getBbHeight()>1.1&&victim.getBbWidth()<1.3&&victim.getBbHeight()/Math.max(.1f,victim.getBbWidth())>1.6;
-        if(y>.76)return HEAD;
         if(!humanoid)return TORSO;
+        if(y>.76)return HEAD;
         if(y<.46)return x<0?RIGHT_LEG:LEFT_LEG;
         if(Math.abs(x)>.34)return x<0?RIGHT_ARM:LEFT_ARM;
         return TORSO;
@@ -197,6 +207,7 @@ public final class ThrownDagger extends ThrowableProjectile {
         super.onHitBlock(hit);
         if(level().isClientSide||!flying())return;
         setPos(hit.getLocation().subtract(getDeltaMovement().normalize().scale(.12)));
+        embeddedPosition=position();
         entityData.set(STATE,IN_BLOCK);
         setDeltaMovement(Vec3.ZERO);
         life=140;

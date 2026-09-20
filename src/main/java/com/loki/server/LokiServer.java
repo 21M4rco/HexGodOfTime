@@ -309,13 +309,22 @@ public final class LokiServer {
     }
 
     public static void weapon(ServerPlayer p,boolean secondary) {
-        if(TemporalEngine.frozen(p)||!p.isAlive()||p.isSpectator()||!(p.getMainHandItem().getItem() instanceof ConjuredWeapon w))return;
-        if(!ConjuredWeapon.belongsTo(p.getMainHandItem(),p)){p.setItemInHand(InteractionHand.MAIN_HAND,ItemStack.EMPTY);return;}
+        InteractionHand hand=secondary&&p.getMainHandItem().isEmpty()&&p.getOffhandItem().is(Loki.DAGGER.get())
+            ?InteractionHand.OFF_HAND:InteractionHand.MAIN_HAND;
+        weapon(p,secondary,hand);
+    }
+    public static void weapon(ServerPlayer p,boolean secondary,InteractionHand hand) {
+        ItemStack held=p.getItemInHand(hand);
+        if(TemporalEngine.frozen(p)||!p.isAlive()||p.isSpectator()||!(held.getItem() instanceof ConjuredWeapon w))return;
+        if(hand==InteractionHand.OFF_HAND&&(!secondary||w.kind!=0))return;
+        if(!ConjuredWeapon.belongsTo(held,p)){p.setItemInHand(hand,ItemStack.EMPTY);return;}
         long now=LokiData.now(p);Strike prior=STRIKES.get(p.getUUID());
         if(prior!=null&&prior.end>now)return;
         int combo=prior==null||now-prior.end>18?0:(prior.combo+1)%4;
         if(secondary&&w.kind==0) {
             ThrownDagger.throwFrom(p,p.getEyePosition().add(p.getLookAngle().scale(.4)),p.getLookAngle(),false);
+            held.shrink(1);
+            p.containerMenu.broadcastChanges();
             LokiNetwork.animate(p,"dagger_throw");LokiNetwork.fx(p,"throw");
             STRIKES.put(p.getUUID(),new Strike(0,combo,0,now+13));return;
         }
