@@ -46,6 +46,8 @@ public final class LokiServer {
 
     public static void input(ServerPlayer p,int action,int value) {
         long now=LokiData.now(p);
+        if(action==RESYNC){LokiNetwork.sync(p);return;}
+        if(!LokiData.access(p)){notice(p,"Loki powers are locked. An operator must use /loki unlock "+p.getGameProfile().getName()+" on.");return;}
         if(action==SELECT) {
             if(now-INPUT.getOrDefault(p.getUUID(),-100L)<2)return;
             INPUT.put(p.getUUID(),now);
@@ -57,7 +59,6 @@ public final class LokiServer {
             if(ability>=0&&(ability>=Ability.values().length||!LokiData.unlocked(p,Ability.at(ability))))return;
             LokiData.quick(p,slot,ability);LokiNetwork.sync(p);return;
         }
-        if(action==RESYNC){LokiNetwork.sync(p);return;}
         if(TemporalEngine.frozen(p)||p.isSpectator())return;
         // Being erased is not a state anything is cast out of, and a planted caster has only one move
         // left: letting go. Both refusals sit ahead of every other action on purpose.
@@ -316,7 +317,7 @@ public final class LokiServer {
     }
     public static void weapon(ServerPlayer p,boolean secondary,InteractionHand hand) {
         ItemStack held=p.getItemInHand(hand);
-        if(TemporalEngine.frozen(p)||!p.isAlive()||p.isSpectator()||!(held.getItem() instanceof ConjuredWeapon w))return;
+        if(!LokiData.access(p)||TemporalEngine.frozen(p)||!p.isAlive()||p.isSpectator()||!(held.getItem() instanceof ConjuredWeapon w))return;
         if(hand==InteractionHand.OFF_HAND&&(!secondary||w.kind!=0))return;
         if(!ConjuredWeapon.belongsTo(held,p)){p.setItemInHand(hand,ItemStack.EMPTY);return;}
         long now=LokiData.now(p);Strike prior=STRIKES.get(p.getUUID());
@@ -360,6 +361,7 @@ public final class LokiServer {
     public static void tick(ServerPlayer p) {
         long now=LokiData.now(p);CompoundTag d=LokiData.get(p);
         if(!p.isAlive()){Transformation.strip(p);return;}
+        if(!LokiData.access(p)){Transformation.strip(p);CosmicFlight.revoke(p);dismissWeapons(p);return;}
         // The mantle is armour, so it is maintained where the mantle is: every tick, granted and
         // renewed while it is worn and taken off the instant it is not.
         Transformation.sustain(p);
@@ -529,6 +531,25 @@ public final class LokiServer {
         p.level().playSound(null,p.blockPosition(),sound,SoundSource.PLAYERS,.75f,1);
     }
     private static void notice(ServerPlayer p,String text) {p.displayClientMessage(Component.literal(text),true);}
+
+    /** Persisted administrative switch. Turning it off immediately tears down player-owned Loki state. */
+    public static void access(ServerPlayer p,boolean enabled) {
+        LokiData.access(p,enabled);
+        if(!enabled) {
+            LokiData.get(p).putBoolean("ascended",false);
+            dismissWeapons(p);
+            clear(p,false);
+            Iterator<Map.Entry<UUID,Charm>> charms=CHARMS.entrySet().iterator();
+            while(charms.hasNext()) {
+                Charm charm=charms.next().getValue();
+                if(!charm.owner.equals(p.getUUID()))continue;
+                if(charm.mob.isAlive())charm.mob.setTarget(null);
+                charms.remove();
+            }
+            if(PocketRealm.inside(p.level()))PocketRealm.leave(p);
+        }
+        LokiNetwork.sync(p);
+    }
 
     public static void clear(ServerPlayer p,boolean death) {
         Telekinesis.forget(p);Architecture.forget(p);clearIllusions(p);dismissRift(p);TemporalEngine.clear(p);

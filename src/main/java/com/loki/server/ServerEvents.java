@@ -48,6 +48,7 @@ public final class ServerEvents {
     }
     @SubscribeEvent public static void login(PlayerEvent.PlayerLoggedInEvent e) {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
+        if(!LokiData.access(p)){LokiServer.access(p,false);return;}
         LokiData.get(p).remove("transformStart");
         LokiData.get(p).remove("branchStart");
         LokiData.get(p).remove(BranchFistState.UNTIL);
@@ -143,7 +144,7 @@ public final class ServerEvents {
     }
     @SubscribeEvent public static void fall(LivingFallEvent e) {if(e.getEntity() instanceof ServerPlayer p) {
         if(p.getAbilities().flying&&LokiData.get(p).getBoolean("ascended")||LokiData.get(p).getLong("flightLandingGrace")>LokiData.now(p)){e.setCanceled(true);return;}
-        if(LokiData.mastery(p,Discipline.SORCERY)>0)e.setDistance(Math.max(0,e.getDistance()-3));
+        if(LokiData.access(p)&&LokiData.mastery(p,Discipline.SORCERY)>0)e.setDistance(Math.max(0,e.getDistance()-3));
     }}
     @SubscribeEvent public static void breakBlock(net.minecraftforge.event.level.BlockEvent.BreakEvent e) {if(TemporalEngine.frozen(e.getPlayer()))e.setCanceled(true);}
     @SubscribeEvent public static void stopping(ServerStoppingEvent e) {

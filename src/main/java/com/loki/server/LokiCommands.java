@@ -16,6 +16,9 @@ import net.minecraftforge.fml.common.Mod;
 public final class LokiCommands {
     @SubscribeEvent public static void register(RegisterCommandsEvent e) {
         var root=Commands.literal("loki").requires(s->s.hasPermission(2));
+        root.then(Commands.literal("unlock").then(Commands.argument("player",EntityArgument.player())
+            .then(Commands.literal("on").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");LokiServer.access(p,true);c.getSource().sendSuccess(()->Component.literal("Loki powers enabled for "+p.getGameProfile().getName()+"."),true);return 1;}))
+            .then(Commands.literal("off").executes(c->{ServerPlayer p=EntityArgument.getPlayer(c,"player");LokiServer.access(p,false);c.getSource().sendSuccess(()->Component.literal("Loki powers disabled for "+p.getGameProfile().getName()+"."),true);return 1;}))));
         var player=Commands.argument("player",EntityArgument.player());
         for(String verb:new String[]{"set","add"}) {
             var node=Commands.literal(verb);

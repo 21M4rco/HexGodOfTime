@@ -31,7 +31,7 @@ public final class LokiNetwork {
             .decoder(b->new Choice(b.readVarInt(),b.readBoolean()?b.readUUID():null))
             // The server resolves and validates every destination; an index and a name are all the
             // client is trusted with.
-            .consumerMainThread((m,c)->{ServerPlayer p=c.get().getSender();if(p!=null&&p.isAlive())com.loki.server.FractureTravel.choose(p,m.mode,m.target);c.get().setPacketHandled(true);}).add();
+            .consumerMainThread((m,c)->{ServerPlayer p=c.get().getSender();if(p!=null&&p.isAlive()&&LokiData.access(p))com.loki.server.FractureTravel.choose(p,m.mode,m.target);c.get().setPacketHandled(true);}).add();
         CHANNEL.messageBuilder(Message.class,1,NetworkDirection.PLAY_TO_CLIENT)
             .encoder((m,b)->{b.writeVarInt(m.kind);b.writeVarInt(m.entity);b.writeNbt(m.data);})
             .decoder(b->new Message(b.readVarInt(),b.readVarInt(),b.readNbt()))
