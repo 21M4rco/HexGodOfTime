@@ -51,14 +51,13 @@ public final class RiftRenderer extends EntityRenderer<RiftEntity> {
         float vx=VOID_X*ease,vy=VOID_Y*ease;
         for(int i=0;i<RAYS*2;i++) {
             float a=i*Mth.TWO_PI/(RAYS*2),b=(i+1)*Mth.TWO_PI/(RAYS*2);
-            quad(pose,out,0,0,Mth.cos(a)*vx,Mth.sin(a)*vy,Mth.cos(b)*vx,Mth.sin(b)*vy,0,0,-.02f,
-                0x04100c,fade*.94f);
+            quad(pose,out,0,0,Mth.cos(a)*vx,Mth.sin(a)*vy,Mth.cos(b)*vx,Mth.sin(b)*vy,0,0,-.02f,0x04100c,fade*.94f);
         }
         // Timeline light bleeding through from the far side.
         for(int i=0;i<6;i++) {
             float t=(e.tickCount+partial)*.014f+i*.9f;
             float y0=(Mth.sin(t)*.7f)*vy,y1=(Mth.sin(t+1.1f)*.7f)*vy;
-            quad(pose,out,-vx*.85f,y0-.03f,-vx*.85f,y0+.03f,vx*.85f,y1+.03f,vx*.85f,y1-.03f,-.015f,-.015f,-.015f,
+            quad(pose,out,-vx*.85f,y0-.03f,-vx*.85f,y0+.03f,vx*.85f,y1+.03f,vx*.85f,y1-.03f,-.015f,
                 i%2==0?0xd8c07a:0x53d69a,fade*.34f*ease);
         }
 
@@ -74,7 +73,7 @@ public final class RiftRenderer extends EntityRenderer<RiftEntity> {
             quad(pose,out,
                 ax*vx*inner,ay*vy*inner,bx*vx*inner,by*vy*inner,
                 bx*VOID_X*b[1]*outer,by*VOID_Y*b[1]*outer,ax*VOID_X*a[1]*outer,ay*VOID_Y*a[1]*outer,
-                depth,depth,depth*1.6f,colour,fade*.55f*ease);
+                depth,colour,fade*.55f*ease);
             // Bright fracture along the seam between neighbouring shards.
             line(pose,out,ax*vx*inner,ay*vy*inner,ax*VOID_X*a[1]*outer,ay*VOID_Y*a[1]*outer,depth+.01f,
                 .012f,0xeaf4e4,fade*Math.min(1,ease*1.6f));
@@ -96,9 +95,9 @@ public final class RiftRenderer extends EntityRenderer<RiftEntity> {
         return r<<16|g<<8|b;
     }
     private static void quad(PoseStack pose,VertexConsumer out,float x1,float y1,float x2,float y2,float x3,float y3,float x4,float y4,
-                             float z1,float z2,float z3,int colour,float alpha) {
+                             float z,int colour,float alpha) {
         WorldEffects.quad(pose,out,
-            new float[][]{{x1,y1,z1},{x2,y2,z2},{x3,y3,z3},{x4,y4,z3}},
+            new float[][]{{x1,y1,z},{x2,y2,z},{x3,y3,z},{x4,y4,z}},
             new float[][]{{0,0},{1,0},{1,1},{0,1}},15728880,colour,alpha);
     }
     private static void line(PoseStack pose,VertexConsumer out,float x1,float y1,float x2,float y2,float z,float width,int colour,float alpha) {

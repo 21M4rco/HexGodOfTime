@@ -20,3 +20,15 @@ Player Animator remains because its tested integration supplies layered motion. 
 The supplied Kagune archive is a sound-patch package with compiled JARs, rather than a complete normal Java source project. Its character models and sound content were not needed for this conversion.
 
 Both supplied GIF files decoded as one-frame images in the provided copies. Their visible frames were used for the dark crown, deep green mantle and progressive-clothing direction. Full animation timing could not be measured from these copies.
+
+## Second pass
+
+A later iteration reworked the cape, weapon hand alignment, telekinesis, time stop and particles, and added
+the fracture and its pocket dimension, commanded projections, thrown daggers with bleeding, hold-to-shape
+illusory architecture and a quick bar. The reasoning behind the three bug fixes is recorded in the README's
+architecture section, because in each case the defect was a wrong coordinate space or a wrong control law
+rather than a missing feature, and that is the part worth remembering.
+
+Player Animator remains the only third-party dependency. Nothing else was added, because the cloth, mesh,
+particle and post-processing work in this project is done directly against Minecraft's own rendering and
+would not be improved by wrapping it in a library.

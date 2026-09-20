@@ -9,6 +9,7 @@ import net.minecraft.client.particle.*;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureManager;
+import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterParticleProvidersEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -74,8 +75,8 @@ public final class LokiParticles {
             alpha=suspended?Math.min(1,(1-t)*2.4f):(1-t)*(1-t);
             if(!suspended)quadSize*=.982f;
         }
-        record Provider(SpriteSet sprites,float r,float g,float b,double lift,boolean suspended) implements ParticleProvider<Loki.Glow> {
-            @Override public Particle createParticle(Loki.Glow type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
+        record Provider(SpriteSet sprites,float r,float g,float b,double lift,boolean suspended) implements ParticleProvider<SimpleParticleType> {
+            @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
                 return new Drifting(level,x,y,z,vx,vy,vz,sprites,r,g,b,lift,suspended);
             }
         }
@@ -94,8 +95,8 @@ public final class LokiParticles {
         }
         @Override public ParticleRenderType getRenderType() {return ParticleRenderType.PARTICLE_SHEET_TRANSLUCENT;}
         @Override public void tick() {super.tick();alpha=1-age/(float)lifetime*.8f;}
-        record Provider(SpriteSet sprites) implements ParticleProvider<Loki.Glow> {
-            @Override public Particle createParticle(Loki.Glow type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
+        record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
+            @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
                 return new Drip(level,x,y,z,vx,vy,vz,sprites);
             }
         }
@@ -125,8 +126,8 @@ public final class LokiParticles {
             quadSize=peak*(float)Math.sin(Math.min(1,t*1.15)*Math.PI*.85);
             alpha=(1-t)*(1-t*.3f);
         }
-        record Provider(SpriteSet sprites) implements ParticleProvider<Loki.Glow> {
-            @Override public Particle createParticle(Loki.Glow type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
+        record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
+            @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
                 return new Glyph(level,x,y,z,vx,vy,vz,sprites);
             }
         }
@@ -154,8 +155,8 @@ public final class LokiParticles {
             float t=age/(float)lifetime;
             alpha=Math.min(1,(1-t)*1.8f);
         }
-        record Provider(SpriteSet sprites) implements ParticleProvider<Loki.Glow> {
-            @Override public Particle createParticle(Loki.Glow type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
+        record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
+            @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
                 return new Sliver(level,x,y,z,vx,vy,vz,sprites);
             }
         }

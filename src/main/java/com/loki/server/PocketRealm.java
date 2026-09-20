@@ -29,7 +29,7 @@ public final class PocketRealm {
     public static final ResourceKey<Level> KEY=ResourceKey.create(Registries.DIMENSION,Loki.id("pocket"));
     public static final int SIZE=100,SPACING=512,FLOOR_Y=64,WALL=18,COLUMNS=4*SIZE-4;
     private static final int FLOOR_CELLS=SIZE*SIZE,TOTAL=FLOOR_CELLS*2+COLUMNS*WALL;
-    private static final int IMMEDIATE=22,BUDGET=3000;
+    private static final int IMMEDIATE=22,BUDGET=3000,UPDATE_CLIENTS=2;
     private static final List<int[]> PENDING=new ArrayList<>();
 
     /** Persisted plot ledger. Lives in the pocket dimension's own data storage. */
@@ -116,12 +116,11 @@ public final class PocketRealm {
         BlockPos o=origin(plot);
         for(int x=SIZE/2-IMMEDIATE;x<SIZE/2+IMMEDIATE;x++)
             for(int z=SIZE/2-IMMEDIATE;z<SIZE/2+IMMEDIATE;z++) {
-                realm.setBlock(o.offset(x,-1,z),Blocks.POLISHED_BLACKSTONE.defaultBlockState(),Block_UPDATE_CLIENTS);
-                realm.setBlock(o.offset(x,0,z),floor(x,z),Block_UPDATE_CLIENTS);
+                realm.setBlock(o.offset(x,-1,z),Blocks.POLISHED_BLACKSTONE.defaultBlockState(),UPDATE_CLIENTS);
+                realm.setBlock(o.offset(x,0,z),floor(x,z),UPDATE_CLIENTS);
             }
         PENDING.add(new int[]{plot,0});
     }
-    private static final int Block_UPDATE_CLIENTS=2;
 
     public static void tick(ServerLevel level) {
         if(level.dimension()!=KEY)return;
@@ -145,12 +144,12 @@ public final class PocketRealm {
 
     private static void place(ServerLevel level,BlockPos o,int index) {
         if(index<FLOOR_CELLS) {
-            level.setBlock(o.offset(index%SIZE,-1,index/SIZE),Blocks.POLISHED_BLACKSTONE.defaultBlockState(),Block_UPDATE_CLIENTS);
+            level.setBlock(o.offset(index%SIZE,-1,index/SIZE),Blocks.POLISHED_BLACKSTONE.defaultBlockState(),UPDATE_CLIENTS);
             return;
         }
         if(index<FLOOR_CELLS*2) {
             int i=index-FLOOR_CELLS,x=i%SIZE,z=i/SIZE;
-            level.setBlock(o.offset(x,0,z),floor(x,z),Block_UPDATE_CLIENTS);
+            level.setBlock(o.offset(x,0,z),floor(x,z),UPDATE_CLIENTS);
             return;
         }
         int i=index-FLOOR_CELLS*2,column=i/WALL,height=i%WALL;
@@ -159,7 +158,7 @@ public final class PocketRealm {
         else if(column<SIZE*2){x=column-SIZE;z=SIZE-1;}
         else if(column<SIZE*2+SIZE-2){x=0;z=column-SIZE*2+1;}
         else {x=SIZE-1;z=column-(SIZE*2+SIZE-2)+1;}
-        level.setBlock(o.offset(x,height+1,z),wall(x,z,height),Block_UPDATE_CLIENTS);
+        level.setBlock(o.offset(x,height+1,z),wall(x,z,height),UPDATE_CLIENTS);
     }
 
     private static BlockState floor(int x,int z) {
