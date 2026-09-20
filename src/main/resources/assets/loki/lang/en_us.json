@@ -6,13 +6,18 @@
   "item.loki.dagger": "Conjured Dagger",
   "item.loki.laevateinn": "Laevateinn",
   "item.loki.time_stick": "TVA Time Stick",
-  "itemGroup.loki": "Loki \u2014 Glorious Purpose",
+  "itemGroup.loki": "Loki — Glorious Purpose",
   "key.categories.loki": "Loki",
+  "key.loki.flight": "Cosmic Flight (transformed)",
   "key.loki.mastery": "Mastery Archive",
   "key.loki.primary": "Cast / Shape (hold)",
-  "key.loki.release": "Release / Resume Time",
+  "key.loki.release": "Release Hold",
   "key.loki.secondary": "Alternate Action",
   "key.loki.select": "Quick Bar (hold)",
+  "key.loki.time_dilate": "Dilation (Time Slow)",
+  "key.loki.time_resume": "Resume Time",
+  "key.loki.time_rewind": "Personal Rewind",
+  "key.loki.time_stop": "Stillness (Time Stop)",
   "key.loki.transform": "Glorious Purpose",
   "subtitles.loki.ascend": "Glorious purpose",
   "subtitles.loki.blade_embed": "Blade buries itself",
@@ -27,6 +32,5 @@
   "subtitles.loki.teleport": "Teleport",
   "subtitles.loki.time_resume": "Time resumes",
   "subtitles.loki.time_slip": "Time slips",
-  "subtitles.loki.time_stop": "Time stops",
-  "key.loki.flight": "Cosmic Flight (transformed)"
+  "subtitles.loki.time_stop": "Time stops"
 }

@@ -55,9 +55,11 @@ public final class MasteryScreen extends Screen {
         int i=0;
         for(Ability a:list) {
             int y=top+70+i++*card;
-            Button button=Button.builder(Component.literal(a.title),b->choose(a))
+            Button button=Button.builder(Component.literal(a.dedicated?a.title+"   \u00b7   "+key(a):a.title),b->choose(a))
                 .bounds(left+nav+14,y,w-nav-30,21).build();
-            button.active=unlocked(data(),a);
+            // A permanent time command still shows its progress here, but it is fired from its own
+            // key and can never be bound to a quick slot, so it is not selectable.
+            button.active=unlocked(data(),a)&&!a.dedicated;
             button.setTooltip(Tooltip.create(Component.literal(a.description)));
             addRenderableWidget(button);
         }
@@ -76,7 +78,14 @@ public final class MasteryScreen extends Screen {
         }
     }
 
+    /** The permanent key a dedicated command answers to, so the archive can name it. */
+    static String key(Ability a) {
+        int index=switch(a){case TIME_STOP->0;case REWIND->2;case SLOW_FIELD->3;default->-1;};
+        return index<0?"":LokiClient.TIME_KEYS[index].getTranslatedKeyMessage().getString();
+    }
+
     private void choose(Ability a) {
+        if(a.dedicated)return;
         if(binding>=0) {
             QuickBar.assign(binding,a.ordinal());
             binding=-1;
@@ -109,7 +118,8 @@ public final class MasteryScreen extends Screen {
             int y=top+70+i++*card;
             boolean open=unlocked(data(),a);
             String text=open
-                ?(a.cost>0?a.cost+" Temporal Energy":"Sorcery")+"  |  "+a.cooldown/20f+"s recovery"+(a.hold?"  |  hold to shape":"")
+                ?(a.dedicated?"Key "+key(a)+"  |  ":"")+(a.cost>0?a.cost+" Temporal Energy":"Sorcery")
+                    +"  |  "+a.cooldown/20f+"s recovery"+(a.hold?"  |  hold to shape":"")
                 :"Mastery "+a.level+" required";
             g.drawString(font,text,left+nav+17,y+25,open?0x87a48b:0x8c8069,false);
         }

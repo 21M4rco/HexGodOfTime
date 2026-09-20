@@ -30,10 +30,15 @@ public final class CapeRenderer {
         inverseView=new Matrix4f(event.getPoseStack().last().pose()).invert();
         frameCamera=event.getCamera().getPosition();
     }
-    /** Called inside the torso layer, after vanilla and Player Animator have posed the actual body. */
+    /**
+     * Called inside the torso layer, after vanilla and Player Animator have posed the actual body. A
+     * frame that cannot be inverted — an animation that has scaled the torso flat, say — is dropped here
+     * rather than stored, so the solver is never handed a transform whose inverse is infinite.
+     */
     public static void capture(LivingEntity wearer,PoseStack bodyPose) {
-        if(inverseView!=null)FRAMES.put(wearer.getUUID(),new TemporalCloth.BodyFrame(
-            new Matrix4f(inverseView).mul(bodyPose.last().pose()),frameCamera));
+        if(inverseView==null)return;
+        TemporalCloth.BodyFrame frame=new TemporalCloth.BodyFrame(new Matrix4f(inverseView).mul(bodyPose.last().pose()),frameCamera);
+        if(frame.usable())FRAMES.put(wearer.getUUID(),frame);
     }
 
     public static void clear() {CLOTHS.clear();FRAMES.clear();inverseView=null;}
@@ -59,7 +64,7 @@ public final class CapeRenderer {
             if(grow<=0)continue;
             LivingEntity wearer=(LivingEntity)entity;
             TemporalCloth.BodyFrame frame=FRAMES.get(wearer.getUUID());
-            if(frame==null||wearer.isInvisible())continue;
+            if(frame==null||!frame.usable()||wearer.isInvisible())continue;
             if(wearer.position().distanceToSqr(camera)>4096)continue;
             alive.add(wearer.getUUID());
             TemporalCloth cloth=CLOTHS.computeIfAbsent(wearer.getUUID(),k->new TemporalCloth());

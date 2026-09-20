@@ -18,11 +18,20 @@ import org.lwjgl.glfw.GLFW;
  * One mastery key, one quick bar, and contextual primary/secondary actions. Abilities that charge are
  * driven by the press and release of the same key rather than a second binding, so the scheme stays
  * small no matter how much progression adds.
+ *
+ * <p>The time controls are the exception, and deliberately so. Stopping, resuming, rewinding and
+ * dilating are not spells to be scrolled to — they are commands, and each owns a permanent key that
+ * works whatever else is selected. None of them appears in the quick bar at all. The four chosen keys
+ * are unbound in vanilla, so the scheme adds no conflicts.
  */
 public final class LokiClient {
     public static final KeyMapping MENU=key("mastery",GLFW.GLFW_KEY_K),SELECT=key("select",GLFW.GLFW_KEY_V),
         PRIMARY=key("primary",GLFW.GLFW_KEY_R),SECONDARY=key("secondary",GLFW.GLFW_KEY_G),
-        TRANSFORM=key("transform",GLFW.GLFW_KEY_H),RELEASE=key("release",GLFW.GLFW_KEY_X),FLIGHT=key("flight",GLFW.GLFW_KEY_J);
+        TRANSFORM=key("transform",GLFW.GLFW_KEY_H),RELEASE=key("release",GLFW.GLFW_KEY_X),FLIGHT=key("flight",GLFW.GLFW_KEY_J),
+        TIME_STOP=key("time_stop",GLFW.GLFW_KEY_Z),TIME_RESUME=key("time_resume",GLFW.GLFW_KEY_B),
+        TIME_REWIND=key("time_rewind",GLFW.GLFW_KEY_N),TIME_DILATE=key("time_dilate",GLFW.GLFW_KEY_M);
+    /** The permanent time commands, paired with the value {@link LokiServer#TIME} carries for each. */
+    public static final KeyMapping[] TIME_KEYS={TIME_STOP,TIME_RESUME,TIME_REWIND,TIME_DILATE};
     private static KeyMapping key(String name,int key){return new KeyMapping("key.loki."+name,InputConstants.Type.KEYSYM,key,"key.categories.loki");}
     private static boolean primaryDown,selectDown,primaryWasHold;
     private static int repeat;
@@ -30,7 +39,10 @@ public final class LokiClient {
     @Mod.EventBusSubscriber(modid=Loki.ID,value=Dist.CLIENT,bus=Mod.EventBusSubscriber.Bus.MOD)
     public static final class ModBus {
         @SubscribeEvent public static void dimensionEffects(RegisterDimensionSpecialEffectsEvent e){e.register(Loki.id("pocket"),new RealmSky());}
-        @SubscribeEvent public static void keys(RegisterKeyMappingsEvent e){for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT})e.register(k);}
+        @SubscribeEvent public static void keys(RegisterKeyMappingsEvent e) {
+            for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT})e.register(k);
+            for(KeyMapping k:TIME_KEYS)e.register(k);
+        }
         @SubscribeEvent public static void entities(EntityRenderersEvent.RegisterRenderers e) {
             e.registerEntityRenderer(Loki.ILLUSION.get(),IllusionRenderer::new);
             e.registerEntityRenderer(Loki.PROJECTILE.get(),SpellRenderer::new);
@@ -46,7 +58,8 @@ public final class LokiClient {
         }
         @SubscribeEvent public static void reload(RegisterClientReloadListenersEvent e) {
             e.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)r->{
-                LokiLayer.clear();WeaponRenderer.clear();RiftRenderer.clear();RealmSky.clear();CosmicNebula.clear();TemporalScreen.close();
+                LokiLayer.clear();WeaponRenderer.clear();RiftRenderer.clear();RealmSky.clear();CosmicNebula.clear();
+                DisguiseRenderer.clear();DisguiseRenderer.forgive();Blood.clear();TemporalScreen.close();
             });
         }
     }
@@ -82,9 +95,14 @@ public final class LokiClient {
             while(TRANSFORM.consumeClick())LokiNetwork.send(LokiServer.TRANSFORM,0);
             while(RELEASE.consumeClick())LokiNetwork.send(LokiServer.UTILITY,0);
             while(FLIGHT.consumeClick())LokiNetwork.send(LokiServer.FLIGHT,0);
+            for(int i=0;i<TIME_KEYS.length;i++)while(TIME_KEYS[i].consumeClick())LokiNetwork.send(LokiServer.TIME,i);
             drain();
         }
-        private static void drain() {while(PRIMARY.consumeClick());while(SELECT.consumeClick());}
+        private static void drain() {
+            while(PRIMARY.consumeClick());
+            while(SELECT.consumeClick());
+            for(KeyMapping k:TIME_KEYS)while(k.consumeClick());
+        }
 
         @SubscribeEvent public static void scroll(InputEvent.MouseScrollingEvent e) {
             var mc=Minecraft.getInstance();

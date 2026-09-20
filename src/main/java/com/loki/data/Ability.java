@@ -1,7 +1,11 @@
 package com.loki.data;
 import static com.loki.data.Discipline.*;
 
-/** One catalogue entry per castable action. {@code hold} marks abilities that charge while the cast key is held. */
+/**
+ * One catalogue entry per castable action. {@code hold} marks abilities that charge while the cast key is
+ * held; {@code dedicated} marks the core time controls, which own a permanent key each and are therefore
+ * never placed in — nor reachable from — the quick bar.
+ */
 public enum Ability {
     DUPLICATE(MISCHIEF,0,0,80,false,"Living Projection","Create a convincing decoy. Secondary: aim at a foe to send every projection at it, or aim at nothing to dismiss them."),
     PROJECTION_SWAP(MISCHIEF,120,0,100,false,"Sleight of Place","Swap with your nearest projection. Secondary: place a projection at your aim."),
@@ -20,14 +24,17 @@ public enum Ability {
     ENCHANT(ENCHANTMENT,0,0,100,false,"Whispered Allegiance","Charm a creature into following you. Secondary: direct it at your aim."),
     MEMORY(ENCHANTMENT,160,0,120,false,"Memory Echo","Reveal the recent footsteps of a nearby entity."),
     TIME_SLIP(TEMPORAL,0,15,160,false,"Time Slipping","Early slips return to an unstable recent moment. Mastery grants control."),
-    REWIND(TEMPORAL,180,35,360,false,"Personal Rewind","Return to your recent safe position and recover limited health."),
-    SLOW_FIELD(TEMPORAL,320,30,260,false,"Dilation","Slow nearby entities and projectiles without changing server time."),
-    TIME_STOP(TEMPORAL,560,70,600,false,"Stillness","Suspend a local battlefield. Harm dealt to the suspended lands the instant time resumes. Secondary or utility: resume."),
+    REWIND(TEMPORAL,180,35,360,false,true,"Personal Rewind","Return to your recent safe position and recover limited health. Permanent key; never in the quick bar."),
+    SLOW_FIELD(TEMPORAL,320,30,260,false,true,"Dilation","Slow nearby entities and projectiles smoothly, without changing server time. Permanent key; never in the quick bar."),
+    TIME_STOP(TEMPORAL,560,70,600,false,true,"Stillness","Suspend a local battlefield \u2014 bodies, shots, weather and all. Harm dealt to the suspended lands the instant time resumes. Permanent key, with its own key to resume."),
     SELECTIVE_STOP(TEMPORAL,740,30,160,false,"Chosen Moment","Suspend one target. Secondary: exempt one ally from your field."),
     THREADS(PURPOSE,0,25,80,false,"Temporal Threads","Bind a target in time. Secondary: pull it along the strand."),
     ASCENSION(PURPOSE,700,100,400,false,"Glorious Purpose","Weave the final mantle, living cloak and dark crown. While transformed, toggle Cosmic Flight with its key; Space rises and crouch descends.");
-    public final Discipline discipline; public final int level,cost,cooldown; public final boolean hold; public final String title,description;
-    Ability(Discipline d,int l,int cost,int cd,boolean hold,String title,String description) {this.discipline=d;this.level=l;this.cost=cost;this.cooldown=cd;this.hold=hold;this.title=title;this.description=description;}
+    public final Discipline discipline; public final int level,cost,cooldown; public final boolean hold,dedicated; public final String title,description;
+    Ability(Discipline d,int l,int cost,int cd,boolean hold,String title,String description) {this(d,l,cost,cd,hold,false,title,description);}
+    Ability(Discipline d,int l,int cost,int cd,boolean hold,boolean dedicated,String title,String description) {
+        this.discipline=d;this.level=l;this.cost=cost;this.cooldown=cd;this.hold=hold;this.dedicated=dedicated;this.title=title;this.description=description;
+    }
     public static Ability at(int id) {return values()[Math.floorMod(id,values().length)];}
     /** @return the ability for an ordinal, or null when the slot is empty or out of range. */
     public static Ability slot(int id) {return id<0||id>=values().length?null:values()[id];}

@@ -6,42 +6,56 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.*;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.*;
-import net.minecraft.world.entity.projectile.Projectile;
-import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.item.*;
+import net.minecraft.world.entity.projectile.*;
 import net.minecraft.world.phys.*;
 import java.util.*;
 
 /**
- * Local temporal suspension. Each field owns its contribution, so removing one caster never releases another
- * caster's hold. Nothing here touches the server tick rate: affected entities simply have their own ticks
- * stepped down, then withheld. Entities do not snap to a halt — they decelerate over {@link #RAMP} ticks and
- * spin back up the same way — and harm dealt to a suspended body is banked until time resumes.
+ * Local temporal suspension. Each field owns its contribution, so removing one caster never releases
+ * another caster's hold, and nothing here touches the server tick rate.
+ *
+ * <p>Slowed time is a rate, not a stutter. Earlier builds withheld an entity's tick on most ticks,
+ * which is exactly what produced the teleporting: a body would stand perfectly still for four ticks
+ * and then jump a full step. Everything now ticks every tick and instead has its rate of change
+ * scaled — movement and attack speed through attributes, momentum through a single proportional
+ * correction applied only when the rate itself changes, and gravity through a counter-force that
+ * preserves the shape of an arc while stretching it out. The result interpolates on the client the
+ * way ordinary motion does, because as far as the client is concerned it is ordinary motion.
+ *
+ * <p>A full stop still ends in a genuine hold, but it decelerates into it over {@link #RAMP} ticks
+ * and accelerates back out the same way, and harm dealt to a suspended body is banked until its
+ * moment resumes.
  */
 public final class TemporalEngine {
     public record Field(UUID owner,ServerLevel level,Vec3 center,double radius,long started,long expires,boolean stop,UUID target,UUID exempt) {}
     public record Frozen(Entity entity,Vec3 position,Vec3 velocity,float yaw,float pitch,long expires) {}
     private record Banked(float damage,UUID attacker) {}
+
     private static final List<Field> FIELDS=new ArrayList<>();
     private static final Map<UUID,Frozen> FROZEN=new HashMap<>();
     private static final Map<UUID,Long> PLAYER_GRACE=new HashMap<>();
+    /** Entities currently running at a reduced rate, with the rate that has actually been applied. */
     private static final Map<UUID,Entity> SLOWED=new HashMap<>();
-    private static final Map<UUID,Integer> RAMPING=new HashMap<>();
+    private static final Map<UUID,Double> APPLIED=new HashMap<>();
+    /** Bodies spinning back up after a hold released. */
+    private static final Map<UUID,Long> RECOVERING=new HashMap<>();
     private static final Map<UUID,Banked> BANKED=new HashMap<>();
     private static final UUID DILATION_SPEED=UUID.fromString("65b293d4-1384-446d-902c-7a261ca31cf2");
+    private static final UUID DILATION_ATTACK=UUID.fromString("0c6c27e9-1f7d-4c58-9d0a-5b2f6ba0a4c1");
+    private static final UUID DILATION_FLIGHT=UUID.fromString("a7d1f3b2-90c5-4a8e-bd41-2f9c8e1d7a30");
     private static final int MAX_FIELDS=64,MAX_ENTITIES_PER_FIELD=192;
     /** Ticks spent decelerating into, and accelerating out of, a full stop. */
     public static final int RAMP=7;
+    /** How much of normal time a dilated body experiences. */
+    private static final double DILATION=.32;
     private static final float MAX_BANKED=60;
 
     public static boolean frozen(Entity e) {return FROZEN.containsKey(e.getUUID());}
     public static boolean slowed(Entity e) {return SLOWED.containsKey(e.getUUID());}
     public static boolean owns(ServerPlayer p) {return FIELDS.stream().anyMatch(f->f.owner.equals(p.getUUID()));}
-    public static boolean skipTick(Entity e) {
-        if(frozen(e))return true;
-        Integer stride=RAMPING.get(e.getUUID());
-        if(stride!=null&&stride>1)return Math.floorMod(e.level().getGameTime()+e.getId(),stride)!=0;
-        return SLOWED.containsKey(e.getUUID())&&Math.floorMod(e.level().getGameTime()+e.getId(),5)!=0;
-    }
+    /** Only a true hold withholds a tick; a slowed body keeps ticking, it just changes more slowly. */
+    public static boolean skipTick(Entity e) {return frozen(e);}
 
     public static boolean field(ServerPlayer p,boolean stop,Entity target,int ticks) {
         if(FIELDS.size()>=MAX_FIELDS)return false;
@@ -95,8 +109,7 @@ public final class TemporalEngine {
         });
         Map<UUID,Long> desired=new HashMap<>();
         Map<UUID,Entity> entities=new HashMap<>();
-        Map<UUID,Entity> desiredSlow=new HashMap<>();
-        Map<UUID,Integer> desiredRamp=new HashMap<>();
+        Map<UUID,Double> rates=new HashMap<>();
         for(Field f:FIELDS) {
             if(f.level!=level)continue;
             List<Entity> affected=f.target==null
@@ -107,21 +120,23 @@ public final class TemporalEngine {
             for(Entity e:affected) {
                 if(++count>MAX_ENTITIES_PER_FIELD)break;
                 entities.put(e.getUUID(),e);
-                if(!f.stop){desiredSlow.put(e.getUUID(),e);continue;}
+                if(!f.stop){rates.merge(e.getUUID(),DILATION,Math::min);continue;}
                 if(age<RAMP) {
-                    // Still winding down: let the body keep ticking, just far more rarely each tick that passes.
-                    int stride=1+(int)age*2;
-                    desiredRamp.merge(e.getUUID(),stride,Math::max);
-                    e.setDeltaMovement(e.getDeltaMovement().scale(1-age/(double)RAMP));
-                    e.hurtMarked=true;
+                    // Winding down: a smoothly shrinking rate, never a withheld tick.
+                    rates.merge(e.getUUID(),Math.max(.04,1-age/(double)RAMP),Math::min);
                 } else desired.merge(e.getUUID(),f.expires,Math::max);
             }
         }
-        RAMPING.keySet().removeIf(id->level.getEntity(id)!=null&&!desiredRamp.containsKey(id)&&!isResuming(id,now));
-        RAMPING.putAll(desiredRamp);
-        Iterator<Map.Entry<UUID,Entity>> oldSlow=SLOWED.entrySet().iterator();
-        while(oldSlow.hasNext()){var e=oldSlow.next();if(e.getValue().level()==level&&!desiredSlow.containsKey(e.getKey())){slowSync(e.getValue(),false);oldSlow.remove();}}
-        for(var e:desiredSlow.entrySet())if(!SLOWED.containsKey(e.getKey())){SLOWED.put(e.getKey(),e.getValue());slowSync(e.getValue(),true);}
+        // Bodies released from a hold spend a few ticks coming back up to speed.
+        RECOVERING.entrySet().removeIf(e->e.getValue()<now);
+        for(var entry:RECOVERING.entrySet()) {
+            Entity e=level.getEntity(entry.getKey());
+            if(e==null||desired.containsKey(entry.getKey()))continue;
+            entities.putIfAbsent(entry.getKey(),e);
+            double progress=1-(entry.getValue()-now)/(double)RAMP;
+            rates.merge(entry.getKey(),Math.max(.06,Math.min(1,progress)),Math::min);
+        }
+
         List<Frozen> releasing=new ArrayList<>();
         Iterator<Map.Entry<UUID,Frozen>> it=FROZEN.entrySet().iterator();
         while(it.hasNext()) {
@@ -132,39 +147,120 @@ public final class TemporalEngine {
                 it.remove();releasing.add(s);
             }
         }
+
+        // Anything no longer being slowed is returned to full rate before the new rates are applied.
+        for(UUID id:new ArrayList<>(SLOWED.keySet())) {
+            Entity e=SLOWED.get(id);
+            if(e==null||e.level()!=level)continue;
+            if(!rates.containsKey(id)||desired.containsKey(id))rate(e,1);
+        }
+        for(var entry:rates.entrySet()) {
+            Entity e=entities.get(entry.getKey());
+            if(e==null||desired.containsKey(entry.getKey()))continue;
+            rate(e,entry.getValue());
+            drift(e,entry.getValue());
+        }
+
         for(var entry:desired.entrySet()) {
             Entity e=entities.get(entry.getKey());
+            if(e==null)continue;
             Frozen s=FROZEN.get(entry.getKey());
             if(s==null) {
+                rate(e,1);
                 s=new Frozen(e,e.position(),e.getDeltaMovement(),e.getYRot(),e.getXRot(),e instanceof ServerPlayer?Math.min(entry.getValue(),now+60):entry.getValue());
-                FROZEN.put(entry.getKey(),s);RAMPING.remove(entry.getKey());sync(s,true);
+                FROZEN.put(entry.getKey(),s);sync(s,true);
             }
-            e.setPos(s.position);e.setYRot(s.yaw);e.setXRot(s.pitch);e.setDeltaMovement(Vec3.ZERO);e.hurtMarked=true;
-            if(e instanceof LivingEntity l){l.setYHeadRot(s.yaw);l.yBodyRot=s.yaw;l.hurtTime=0;l.invulnerableTime=0;}
-            if(e instanceof ServerPlayer p&&now%5==0)p.connection.teleport(s.position.x,s.position.y,s.position.z,s.yaw,s.pitch);
-            if(now%20==0)sync(s,true);
+            hold(e,s,now);
         }
-        RESUMING.values().removeIf(v->v<now);
         for(Frozen s:releasing)restore(s,now);
     }
 
-    private static final Map<UUID,Long> RESUMING=new HashMap<>();
-    private static boolean isResuming(UUID id,long now) {Long end=RESUMING.get(id);return end!=null&&end>now;}
+    /** Pins a suspended body exactly where its moment caught it, orientation included. */
+    private static void hold(Entity e,Frozen s,long now) {
+        e.setPos(s.position);e.setYRot(s.yaw);e.setXRot(s.pitch);e.setDeltaMovement(Vec3.ZERO);e.hurtMarked=true;
+        e.setOldPosAndRot();
+        if(e instanceof LivingEntity l){l.setYHeadRot(s.yaw);l.yBodyRot=s.yaw;l.hurtTime=0;l.invulnerableTime=0;}
+        if(e instanceof Projectile projectile)projectile.setNoGravity(true);
+        if(e instanceof ServerPlayer p&&now%5==0)p.connection.teleport(s.position.x,s.position.y,s.position.z,s.yaw,s.pitch);
+        if(now%20==0)sync(s,true);
+    }
+
+    /**
+     * Sets how fast a body experiences time. Momentum is corrected only by the ratio between the old
+     * and new rates, so holding a rate steady never compounds into a standstill, and a body that
+     * leaves the field carries exactly the speed it came in with.
+     */
+    private static void rate(Entity e,double factor) {
+        double previous=APPLIED.getOrDefault(e.getUUID(),1.0);
+        if(Math.abs(previous-factor)<1e-4)return;
+        Vec3 velocity=e.getDeltaMovement();
+        if(previous>1e-6&&velocity.lengthSqr()>1e-8) {
+            e.setDeltaMovement(velocity.scale(factor/previous));
+            e.hurtMarked=true;
+        }
+        if(e instanceof LivingEntity living)attributes(living,factor);
+        if(factor>=.999) {
+            APPLIED.remove(e.getUUID());
+            if(SLOWED.remove(e.getUUID())!=null)slowSync(e,false);
+            return;
+        }
+        APPLIED.put(e.getUUID(),factor);
+        if(SLOWED.put(e.getUUID(),e)==null)slowSync(e,true);
+    }
+
+    private static void attributes(LivingEntity living,double factor) {
+        apply(living,Attributes.MOVEMENT_SPEED,DILATION_SPEED,factor);
+        apply(living,Attributes.ATTACK_SPEED,DILATION_ATTACK,factor);
+        apply(living,Attributes.FLYING_SPEED,DILATION_FLIGHT,factor);
+    }
+    private static void apply(LivingEntity living,Attribute type,UUID id,double factor) {
+        AttributeInstance attribute=living.getAttribute(type);
+        if(attribute==null)return;
+        attribute.removeModifier(id);
+        if(factor<.999)attribute.addTransientModifier(new AttributeModifier(id,"Temporal dilation",factor-1,AttributeModifier.Operation.MULTIPLY_TOTAL));
+    }
+
+    /**
+     * Gravity is a rate too. Left alone, a body moving at a third speed would fall at full speed and
+     * an arrow would drop out of the air; countering most of the pull keeps the shape of the arc while
+     * the journey along it stretches out.
+     */
+    private static void drift(Entity e,double factor) {
+        if(e.isNoGravity()||e.onGround())return;
+        double gravity=gravityOf(e);
+        if(gravity<=0)return;
+        e.setDeltaMovement(e.getDeltaMovement().add(0,gravity*(1-factor*factor),0));
+    }
+    private static double gravityOf(Entity e) {
+        if(e instanceof AbstractArrow)return .05;
+        if(e instanceof ThrowableProjectile)return .03;
+        if(e instanceof AbstractHurtingProjectile)return 0;
+        if(e instanceof ItemEntity||e instanceof FallingBlockEntity||e instanceof PrimedTnt)return .04;
+        if(e instanceof ExperienceOrb)return .03;
+        if(e instanceof LivingEntity living)return living.isFallFlying()||living.isInWater()?0:.08;
+        return 0;
+    }
 
     private static boolean eligible(Entity e,Field f) {
         if(PLAYER_GRACE.getOrDefault(e.getUUID(),0L)>e.level().getGameTime())return false;
         if(e.isRemoved()||e.isSpectator()||e.isPassenger()||e.isVehicle()||e.getUUID().equals(f.owner)||e.getUUID().equals(f.exempt))return false;
         if(e instanceof ServerPlayer p&&p.isCreative())return false;
         if(e.position().distanceToSqr(f.center)>f.radius*f.radius&&f.target==null)return false;
-        return e instanceof LivingEntity||e instanceof Projectile||e instanceof ItemEntity;
+        return affectable(e);
+    }
+    /** Everything in the local world that visibly moves under its own steam. */
+    private static boolean affectable(Entity e) {
+        return e instanceof LivingEntity||e instanceof Projectile||e instanceof ItemEntity
+            ||e instanceof FallingBlockEntity||e instanceof PrimedTnt||e instanceof ExperienceOrb;
     }
 
     private static void restore(Frozen s,long now) {
         if(s.entity.isRemoved())return;
         s.entity.setDeltaMovement(s.velocity);s.entity.hurtMarked=true;
+        if(s.entity instanceof Projectile projectile)projectile.setNoGravity(false);
         // Spin back up rather than snapping to full speed, mirroring the way the field took hold.
-        RAMPING.put(s.entity.getUUID(),RAMP*2-1);
-        RESUMING.put(s.entity.getUUID(),now+RAMP);
+        APPLIED.put(s.entity.getUUID(),.06);
+        RECOVERING.put(s.entity.getUUID(),now+RAMP);
         sync(s,false);
         Banked banked=BANKED.remove(s.entity.getUUID());
         if(banked!=null&&banked.damage>0&&s.entity instanceof LivingEntity living) {
@@ -187,14 +283,6 @@ public final class TemporalEngine {
     }
     private static void sync(Frozen s,boolean active) {LokiNetwork.tracking(s.entity,new LokiNetwork.Message(LokiNetwork.FROZEN,s.entity.getId(),tag(s,active)));}
     private static void slowSync(Entity e,boolean active) {
-        if(e instanceof ServerPlayer p) {
-            for(var type:List.of(Attributes.MOVEMENT_SPEED,Attributes.ATTACK_SPEED)) {
-                AttributeInstance attr=p.getAttribute(type);
-                if(attr==null)continue;
-                attr.removeModifier(DILATION_SPEED);
-                if(active)attr.addTransientModifier(new AttributeModifier(DILATION_SPEED,"Temporal dilation",-.8,AttributeModifier.Operation.MULTIPLY_TOTAL));
-            }
-        }
         CompoundTag n=new CompoundTag();n.putBoolean("slowed",active);
         LokiNetwork.tracking(e,new LokiNetwork.Message(LokiNetwork.SLOWED,e.getId(),n));
     }
@@ -221,7 +309,8 @@ public final class TemporalEngine {
     public static void reset() {
         for(Frozen s:FROZEN.values())if(!s.entity.isRemoved()){s.entity.setDeltaMovement(s.velocity);s.entity.hurtMarked=true;sync(s,false);}
         FROZEN.clear();FIELDS.clear();
-        SLOWED.values().forEach(e->slowSync(e,false));SLOWED.clear();
-        PLAYER_GRACE.clear();RAMPING.clear();RESUMING.clear();BANKED.clear();
+        for(Entity e:new ArrayList<>(SLOWED.values()))if(!e.isRemoved())rate(e,1);
+        SLOWED.clear();APPLIED.clear();
+        PLAYER_GRACE.clear();RECOVERING.clear();BANKED.clear();
     }
 }

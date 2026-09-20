@@ -26,16 +26,31 @@ public final class LokiData {
     public static boolean spend(Player p,float v) {if(energy(p)<v)return false;energy(p,energy(p)-v);return true;}
     public static long now(Player p) {return p.level().getGameTime();}
     public static int cooldown(Player p,Ability a) {return (int)Math.max(0,get(p).getLong("cd_"+a.name())-now(p));}
-    public static Ability selected(Player p) {return Ability.at(get(p).getInt("selected"));}
+    public static Ability selected(Player p) {
+        Ability a=Ability.at(get(p).getInt("selected"));
+        if(!a.dedicated)return a;
+        // A save from before the time keys existed can still point the cast key at one of them.
+        for(int id:quick(p)){Ability slotted=Ability.slot(id);if(slotted!=null)return slotted;}
+        return Ability.DUPLICATE;
+    }
 
     /** Eight persisted shortcuts. Empty slots hold -1 so an unlock can claim them without disturbing a chosen layout. */
     public static int[] quick(Player p) {
         int[] slots=get(p).getIntArray("quick");
         if(slots.length!=QUICK_SLOTS) {int[] fresh=new int[QUICK_SLOTS];java.util.Arrays.fill(fresh,-1);get(p).putIntArray("quick",fresh);return fresh;}
+        // The time controls moved onto permanent keys; evict them from layouts saved before that change.
+        boolean evicted=false;
+        for(int i=0;i<QUICK_SLOTS;i++) {
+            Ability a=Ability.slot(slots[i]);
+            if(a!=null&&a.dedicated){slots[i]=-1;evicted=true;}
+        }
+        if(evicted)get(p).putIntArray("quick",slots);
         return slots;
     }
     public static void quick(Player p,int slot,int ability) {
         if(slot<0||slot>=QUICK_SLOTS)return;
+        Ability chosen=Ability.slot(ability);
+        if(chosen!=null&&chosen.dedicated)return;
         int[] slots=quick(p);
         for(int i=0;i<QUICK_SLOTS;i++)if(slots[i]==ability)slots[i]=-1;
         slots[slot]=ability;get(p).putIntArray("quick",slots);
@@ -43,9 +58,12 @@ public final class LokiData {
     /** Fills empty shortcuts with newly unlocked abilities so progression is immediately reachable from the bar. */
     public static void refreshQuick(Player p) {
         int[] slots=quick(p);boolean changed=false;
+        // A layout saved before the time keys existed can still have one of them selected.
+        Ability chosen=Ability.at(get(p).getInt("selected"));
+        if(chosen.dedicated)get(p).putInt("selected",selected(p).ordinal());
         for(int i=0;i<QUICK_SLOTS;i++)if(slots[i]>=0&&!unlocked(p,Ability.at(slots[i]))){slots[i]=-1;changed=true;}
         for(Ability a:Ability.values()) {
-            if(!unlocked(p,a))continue;
+            if(a.dedicated||!unlocked(p,a))continue;
             boolean present=false;for(int v:slots)if(v==a.ordinal())present=true;
             if(present)continue;
             for(int i=0;i<QUICK_SLOTS;i++)if(slots[i]<0){slots[i]=a.ordinal();changed=true;break;}

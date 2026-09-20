@@ -45,12 +45,17 @@ public final class ServerEvents {
     @SubscribeEvent public static void tracking(PlayerEvent.StartTracking e) {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
         TemporalEngine.track(p,e.getTarget());
-        if(e.getTarget() instanceof ServerPlayer q)LokiNetwork.to(p,new LokiNetwork.Message(LokiNetwork.SYNC,q.getId(),LokiData.get(q).copy()));
+        if(!(e.getTarget() instanceof ServerPlayer q))return;
+        LokiNetwork.to(p,new LokiNetwork.Message(LokiNetwork.SYNC,q.getId(),LokiData.get(q).copy()));
+        // A borrowed shape is sent once, not every second, so a new viewer has to be told separately.
+        Masquerade.resend(p,q);
     }
     @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p)LokiServer.clear(p,false);}
     @SubscribeEvent public static void dimension(PlayerEvent.PlayerChangedDimensionEvent e) {if(e.getEntity() instanceof ServerPlayer p){LokiServer.clear(p,false);LokiNetwork.sync(p);}}
     @SubscribeEvent public static void death(LivingDeathEvent e) {
         Bleed.clear(e.getEntity());
+        Threat.forget(e.getEntity());
+        Decoy.release(e.getEntity());
         if(e.getEntity() instanceof ServerPlayer p)LokiServer.clear(p,true);
     }
     @SubscribeEvent public static void clone(PlayerEvent.Clone e) {e.getEntity().getPersistentData().put("Loki",LokiData.get(e.getOriginal()).copy());LokiData.clearTransient(e.getEntity(),e.isWasDeath());}
@@ -67,8 +72,25 @@ public final class ServerEvents {
         // A suspended body cannot be wounded in a moment that is not passing; the harm waits for time to resume.
         if(TemporalEngine.bank(e.getEntity(),e.getAmount(),e.getSource().getEntity())){e.setCanceled(true);return;}
         if(e.getEntity() instanceof ServerPlayer p&&LokiData.get(p).getLong("wardUntil")>LokiData.now(p))e.setAmount(e.getAmount()*.25f);
+        // One ledger serves both deceptions: it tells a projection who has earned a fight, and it tells
+        // a creature choosing between identical figures which of them has actually been cutting it.
+        Threat.record(e.getEntity(),e.getSource().getEntity(),e.getAmount());
     }
-    @SubscribeEvent public static void target(LivingChangeTargetEvent e) {if(e.getEntity() instanceof Mob m&&LokiServer.charmedAgainst(m,e.getNewTarget()))e.setCanceled(true);}
+    /**
+     * Where the deception actually lives. A creature that decides to hunt a keeper has that decision
+     * re-opened across the keeper and every copy of them, and a keeper wearing a borrowed shape is not
+     * recognised at all. Nothing else about vanilla or modded targeting is touched.
+     */
+    @SubscribeEvent public static void target(LivingChangeTargetEvent e) {
+        if(!(e.getEntity() instanceof Mob mob)||mob.level().isClientSide)return;
+        LivingEntity wanted=e.getNewTarget();
+        if(LokiServer.charmedAgainst(mob,wanted)){e.setCanceled(true);return;}
+        if(wanted==null)return;
+        if(wanted instanceof ServerPlayer worn&&Masquerade.deceives(mob,worn)){e.setCanceled(true);return;}
+        if(wanted instanceof com.loki.entity.IllusionEntity){Decoy.observe(mob,wanted);return;}
+        LivingEntity chosen=Decoy.resolve(mob,wanted);
+        if(chosen!=null&&chosen!=wanted)e.setNewTarget(chosen);
+    }
     @SubscribeEvent public static void fall(LivingFallEvent e) {if(e.getEntity() instanceof ServerPlayer p) {
         if(p.getAbilities().flying&&LokiData.get(p).getBoolean("ascended")||LokiData.get(p).getLong("flightLandingGrace")>LokiData.now(p)){e.setCanceled(true);return;}
         if(LokiData.mastery(p,Discipline.SORCERY)>0)e.setDistance(Math.max(0,e.getDistance()-3));

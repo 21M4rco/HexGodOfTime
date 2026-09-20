@@ -21,6 +21,11 @@ import net.minecraftforge.network.NetworkHooks;
  * A conjured blade in flight. It keeps its own orientation, buries itself in whatever it strikes and
  * opens a wound before dissolving. {@code STATE} is the single synced authority on where it lives:
  * {@code 0} in flight, {@code -1} buried in terrain, any other value the id of the body carrying it.
+ *
+ * <p>The contact point is what is remembered, not the victim's feet. It is stored as a fraction of
+ * the struck body's own width and height, in that body's yaw frame, alongside the part it landed in
+ * and the angle it went in at. A blade in the chest therefore stays in the chest while the creature
+ * walks, turns, is knocked back, grows or animates, and a blade in an arm travels with the arm.
  */
 public final class ThrownDagger extends ThrowableProjectile {
     private static final EntityDataAccessor<Integer> STATE=SynchedEntityData.defineId(ThrownDagger.class,EntityDataSerializers.INT);
@@ -28,21 +33,36 @@ public final class ThrownDagger extends ThrowableProjectile {
     private static final EntityDataAccessor<Float> OFFSET_Y=SynchedEntityData.defineId(ThrownDagger.class,EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> OFFSET_Z=SynchedEntityData.defineId(ThrownDagger.class,EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> ROLL=SynchedEntityData.defineId(ThrownDagger.class,EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> ENTRY_YAW=SynchedEntityData.defineId(ThrownDagger.class,EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> ENTRY_PITCH=SynchedEntityData.defineId(ThrownDagger.class,EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Integer> PART=SynchedEntityData.defineId(ThrownDagger.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> ILLUSORY=SynchedEntityData.defineId(ThrownDagger.class,EntityDataSerializers.BOOLEAN);
     public static final int FLYING=0,IN_BLOCK=-1;
+    /** Which piece of the body is carrying the blade; drives how the wound moves as the body animates. */
+    public static final int TORSO=0,HEAD=1,RIGHT_ARM=2,LEFT_ARM=3,RIGHT_LEG=4,LEFT_LEG=5;
     private int life=200;
 
     public ThrownDagger(EntityType<? extends ThrownDagger> type,Level level) {super(type,level);}
 
     @Override protected void defineSynchedData() {
         entityData.define(STATE,FLYING);entityData.define(OFFSET_X,0f);entityData.define(OFFSET_Y,0f);entityData.define(OFFSET_Z,0f);
-        entityData.define(ROLL,0f);entityData.define(ILLUSORY,false);
+        entityData.define(ROLL,0f);entityData.define(ENTRY_YAW,0f);entityData.define(ENTRY_PITCH,0f);
+        entityData.define(PART,TORSO);entityData.define(ILLUSORY,false);
     }
     public int state() {return entityData.get(STATE);}
     public boolean flying() {return state()==FLYING;}
     public boolean illusory() {return entityData.get(ILLUSORY);}
     public float roll() {return entityData.get(ROLL);}
+    public int part() {return entityData.get(PART);}
+    public float entryYaw() {return entityData.get(ENTRY_YAW);}
+    public float entryPitch() {return entityData.get(ENTRY_PITCH);}
+    /** The wound, as a fraction of the carrier's width and height in its own yaw frame. */
     public Vec3 offset() {return new Vec3(entityData.get(OFFSET_X),entityData.get(OFFSET_Y),entityData.get(OFFSET_Z));}
+    /** The body this blade is riding, or null while it is in flight or in terrain. */
+    public Entity carrier() {
+        int state=state();
+        return state==FLYING||state==IN_BLOCK?null:level().getEntity(state);
+    }
 
     public static ThrownDagger throwFrom(ServerPlayer p,Vec3 from,Vec3 aim,boolean illusory) {
         ThrownDagger e=new ThrownDagger(Loki.THROWN_DAGGER.get(),p.level());
@@ -79,10 +99,7 @@ public final class ThrownDagger extends ThrowableProjectile {
                 // The body carrying the blade is gone; let it hang where it fell and fade out quickly.
                 if(!level().isClientSide){entityData.set(STATE,IN_BLOCK);life=Math.min(life,30);}
             } else {
-                Vec3 local=offset();
-                float yaw=host instanceof LivingEntity living?living.yBodyRot:host.getYRot();
-                double sin=Math.sin(-yaw*Mth.DEG_TO_RAD),cos=Math.cos(-yaw*Mth.DEG_TO_RAD);
-                Vec3 world=new Vec3(local.x*cos+local.z*sin,local.y,-local.x*sin+local.z*cos);
+                Vec3 world=carried(host);
                 setPos(host.getX()+world.x,host.getY()+world.y,host.getZ()+world.z);
             }
         }
@@ -90,10 +107,21 @@ public final class ThrownDagger extends ThrowableProjectile {
         if(!level().isClientSide&&--life<=0)dissolve();
     }
 
+    /** The stored fraction turned back into a world offset from the carrier's feet. */
+    private Vec3 carried(Entity host) {
+        Vec3 unit=offset();
+        double width=Math.max(.1,host.getBbWidth()),height=Math.max(.1,host.getBbHeight());
+        double x=unit.x*width,y=unit.y*height,z=unit.z*width;
+        float yaw=bodyYaw(host);
+        double sin=Math.sin(-yaw*Mth.DEG_TO_RAD),cos=Math.cos(-yaw*Mth.DEG_TO_RAD);
+        return new Vec3(x*cos+z*sin,y,-x*sin+z*cos);
+    }
+    private static float bodyYaw(Entity host) {return host instanceof LivingEntity living?living.yBodyRot:host.getYRot();}
+
     @Override protected void onHitEntity(EntityHitResult hit) {
         if(level().isClientSide||!flying())return;
         Entity victim=hit.getEntity();
-        Vec3 contact=hit.getLocation();
+        Vec3 contact=contact(victim,hit.getLocation());
         if(!illusory()&&getOwner() instanceof ServerPlayer p) {
             float damage=5+Math.min(4,com.loki.data.LokiData.mastery(p,Discipline.CONJURATION)*.005f);
             if(victim.hurt(damageSources().thrown(this,p),damage)) {
@@ -104,16 +132,65 @@ public final class ThrownDagger extends ThrowableProjectile {
         level().playSound(null,blockPosition(),Loki.BLADE_HIT.get(),SoundSource.PLAYERS,.9f,1f+random.nextFloat()*.15f);
         LokiNetwork.fx(this,"blade_bite",contact.x,contact.y,contact.z);
         if(illusory()){dissolve();return;}
-        // Store the contact point in the victim's yaw frame so the blade rides along as it turns.
-        float yaw=victim instanceof LivingEntity living?living.yBodyRot:victim.getYRot();
-        Vec3 relative=contact.subtract(victim.position());
-        double sin=Math.sin(yaw*Mth.DEG_TO_RAD),cos=Math.cos(yaw*Mth.DEG_TO_RAD);
-        entityData.set(OFFSET_X,(float)(relative.x*cos+relative.z*sin));
-        entityData.set(OFFSET_Y,(float)relative.y);
-        entityData.set(OFFSET_Z,(float)(-relative.x*sin+relative.z*cos));
-        entityData.set(STATE,victim.getId());
+        embed(victim,contact);
         life=170;
         setDeltaMovement(Vec3.ZERO);
+    }
+
+    /**
+     * Resolves where the blade truly met the body. A ray that begins inside the target reports no
+     * crossing at all, which is how a hit ends up reading as the entity's origin — its feet — so that
+     * case falls back to the nearest point on the body instead of trusting the zero.
+     */
+    private Vec3 contact(Entity victim,Vec3 reported) {
+        AABB box=victim.getBoundingBox();
+        Vec3 candidate=reported;
+        if(candidate==null||!inflated(box).contains(candidate)) {
+            Vec3 from=position();
+            candidate=new Vec3(
+                Mth.clamp(from.x,box.minX,box.maxX),
+                Mth.clamp(from.y,box.minY,box.maxY),
+                Mth.clamp(from.z,box.minZ,box.maxZ));
+        }
+        // Sink it a little way in along the flight line so the hilt, not the whole blade, stands proud.
+        Vec3 heading=getDeltaMovement();
+        if(heading.lengthSqr()>1e-6)candidate=candidate.add(heading.normalize().scale(Math.min(.18,victim.getBbWidth()*.3)));
+        return new Vec3(
+            Mth.clamp(candidate.x,box.minX,box.maxX),
+            Mth.clamp(candidate.y,box.minY,box.maxY),
+            Mth.clamp(candidate.z,box.minZ,box.maxZ));
+    }
+    private static AABB inflated(AABB box) {return box.inflate(.45);}
+
+    /** Stores the wound in the victim's own frame, as fractions, plus the angle the steel went in at. */
+    private void embed(Entity victim,Vec3 contact) {
+        float yaw=bodyYaw(victim);
+        Vec3 relative=contact.subtract(victim.position());
+        double sin=Math.sin(yaw*Mth.DEG_TO_RAD),cos=Math.cos(yaw*Mth.DEG_TO_RAD);
+        double width=Math.max(.1,victim.getBbWidth()),height=Math.max(.1,victim.getBbHeight());
+        float x=(float)((relative.x*cos+relative.z*sin)/width);
+        float y=(float)(relative.y/height);
+        float z=(float)((-relative.x*sin+relative.z*cos)/width);
+        entityData.set(OFFSET_X,x);entityData.set(OFFSET_Y,y);entityData.set(OFFSET_Z,z);
+        entityData.set(PART,classify(victim,x,y));
+        entityData.set(ENTRY_YAW,Mth.wrapDegrees(getYRot()-yaw));
+        entityData.set(ENTRY_PITCH,getXRot());
+        entityData.set(STATE,victim.getId());
+    }
+
+    /**
+     * Which limb took it, in fractions of the body. Only shapes that plausibly have a humanoid
+     * skeleton are split up; anything else is treated as one mass, which is the right answer for a
+     * spider, a slime or a creature no one here has heard of.
+     */
+    private static int classify(Entity victim,float x,float y) {
+        if(!(victim instanceof LivingEntity))return TORSO;
+        boolean humanoid=victim.getBbHeight()>1.1&&victim.getBbWidth()<1.3&&victim.getBbHeight()/Math.max(.1f,victim.getBbWidth())>1.6;
+        if(y>.82)return HEAD;
+        if(!humanoid)return TORSO;
+        if(y<.46)return x<0?RIGHT_LEG:LEFT_LEG;
+        if(Math.abs(x)>.34)return x<0?RIGHT_ARM:LEFT_ARM;
+        return TORSO;
     }
 
     @Override protected void onHitBlock(BlockHitResult hit) {

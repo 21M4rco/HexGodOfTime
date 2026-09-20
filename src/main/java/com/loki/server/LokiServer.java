@@ -19,7 +19,9 @@ import net.minecraft.world.phys.*;
 import java.util.*;
 
 public final class LokiServer {
-    public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11;
+    public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12;
+    /** Values carried by {@link #TIME}: the permanent time controls, each on its own key. */
+    public static final int TIME_HALT=0,TIME_RESUME=1,TIME_REWIND=2,TIME_DILATE=3;
     public record Moment(Vec3 position,float yaw,float pitch,float health) {}
     private record Charm(Mob mob,UUID owner,long end,UUID previous) {}
     private record Strike(int weapon,int combo,long contact,long end) {}
@@ -68,6 +70,7 @@ public final class LokiServer {
         if(action==UTILITY){Telekinesis.release(p,false);Architecture.forget(p);TemporalEngine.clear(p);dismissRift(p);return;}
         if(action==WEAPON){weapon(p,value!=0);return;}
         if(action==FLIGHT){CosmicFlight.toggle(p);return;}
+        if(action==TIME){time(p,value);return;}
         Ability a=action==TRANSFORM?Ability.ASCENSION:LokiData.selected(p);
         // Returning home must never depend on energy, mastery or the entry spell's recovery.
         if(a==Ability.RIFT&&PocketRealm.inside(p.level())&&(action==CAST||action==ALTERNATE||action==HOLD_BEGIN)) {
@@ -103,13 +106,40 @@ public final class LokiServer {
         if(a==Ability.TIME_STOP||a==Ability.SLOW_FIELD){TemporalEngine.clear(p);return true;}
         if(a==Ability.DUPLICATE){return commandOrDismiss(p);}
         if(a==Ability.ARCHITECTURE){Architecture.cycle(p);return true;}
-        if(a==Ability.MASQUERADE){LokiData.get(p).remove("disguise");LokiNetwork.fx(p,"disguise");return true;}
+        if(a==Ability.MASQUERADE){Masquerade.drop(p);return true;}
         if(a==Ability.TELEKINESIS&&Telekinesis.holding(p)){Telekinesis.release(p,true);return true;}
         if(a==Ability.RIFT){return dismissRift(p);}
         if(a==Ability.ENCHANT){direct(p);return true;}
         if(a==Ability.SELECTIVE_STOP&&LokiData.unlocked(p,a)){Entity t=target(p,20);if(t!=null){TemporalEngine.exempt(p,t);notice(p,"Your chosen companion may walk through your stopped time.");}return true;}
         if(a==Ability.DAGGERS||a==Ability.TWIN_DAGGERS||a==Ability.LAEVATEINN){dismissWeapons(p);return true;}
         return false;
+    }
+
+    /**
+     * The permanent time controls. These never enter the quick bar, so they answer their own keys
+     * directly and are reachable the instant they are unlocked, whatever spell is currently selected.
+     */
+    private static void time(ServerPlayer p,int which) {
+        if(which==TIME_RESUME) {
+            if(TemporalEngine.owns(p)){TemporalEngine.clear(p);notice(p,"Time resumes.");}
+            else notice(p,"No moment of yours is being held.");
+            LokiNetwork.sync(p);return;
+        }
+        Ability a=switch(which) {
+            case TIME_HALT -> Ability.TIME_STOP;
+            case TIME_REWIND -> Ability.REWIND;
+            case TIME_DILATE -> Ability.SLOW_FIELD;
+            default -> null;
+        };
+        if(a==null)return;
+        if(!LokiData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return;}
+        if(LokiData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return;}
+        if(LokiData.energy(p)<a.cost){notice(p,"Not enough Temporal Energy.");return;}
+        if(!cast(p,a,false))return;
+        LokiData.spend(p,a.cost);
+        LokiData.get(p).putLong("cd_"+a.name(),LokiData.now(p)+a.cooldown);
+        reward(p,a.discipline,90);
+        LokiNetwork.sync(p);
     }
 
     private static boolean cast(ServerPlayer p,Ability a,boolean secondary) {
@@ -119,11 +149,10 @@ public final class LokiServer {
             case MIRAGE -> {if(!duplicate(p,true,false))return false;LokiData.get(p).putLong("vanishUntil",now+50);p.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.INVISIBILITY,50,0,false,false));return true;}
             case PROJECTION_SWAP -> {if(secondary)return duplicate(p,false,true);return swap(p);}
             case MASQUERADE -> {
-                if(t==null)return false;
-                String type=net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(t.getType()).toString();
-                if(!(t instanceof Player)&&!Set.of("minecraft:zombie","minecraft:skeleton","minecraft:villager","minecraft:pillager","minecraft:witch","minecraft:stray","minecraft:husk").contains(type)){notice(p,"Choose a humanoid target.");return false;}
-                CompoundTag d=new CompoundTag();d.putString("type",type);d.putUUID("uuid",t.getUUID());d.putLong("start",now);d.putLong("end",now+600);
-                LokiData.get(p).put("disguise",d);gesture(p,"illusion","disguise",Loki.ILLUSION_SOUND.get());return true;
+                if(t==null){notice(p,"Look at a creature to borrow its shape.");return false;}
+                if(!(t instanceof LivingEntity)){notice(p,"Only a living shape can be worn.");return false;}
+                if(!Masquerade.assume(p,t)){notice(p,"That shape refuses to be read.");return false;}
+                gesture(p,"illusion","disguise",Loki.ILLUSION_SOUND.get());return true;
             }
             case RIFT -> {return fracture(p);}
             case BOLT -> {SpellProjectile.cast(p,p.getEyePosition().add(look.scale(.5)),look,secondary?1:0,false);gesture(p,"bolt","cast",Loki.SORCERY.get());return true;}
@@ -295,7 +324,7 @@ public final class LokiServer {
             if(cast(p,Ability.TIME_SLIP,false)){LokiData.spend(p,15);d.putLong("cd_TIME_SLIP",now+400);reward(p,Discipline.TEMPORAL,120);}
         }
         if(now%20==0){LokiData.energy(p,LokiData.energy(p)+(d.getBoolean("ascended")?4:2));LokiNetwork.sync(p);}
-        if(d.contains("disguise")&&d.getCompound("disguise").getLong("end")<now){d.remove("disguise");LokiNetwork.sync(p);}
+        if(d.contains("disguise")&&d.getCompound("disguise").getLong("end")<now){Masquerade.drop(p);LokiNetwork.sync(p);}
         if(now%5==0) {
             for(LivingEntity e:p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(12),LivingEntity::isAlive)) {
                 if(WATCHED.size()>256&&!WATCHED.containsKey(e.getUUID()))break;
@@ -336,6 +365,8 @@ public final class LokiServer {
             if(now%10==0){if(c.mob.getTarget()==owner)c.mob.setTarget(null);if(c.mob.getTarget()==null&&c.mob.distanceToSqr(owner)>9)c.mob.getNavigation().moveTo(owner,1.05);}
         }
         Bleed.tick(level);
+        Threat.tick(now);
+        Decoy.tick(now);
         Telekinesis.tickSlams(level);
         PocketRealm.tick(level);
         if(now%200==0)WATCHED.entrySet().removeIf(e->level.getEntity(e.getKey())==null);
@@ -352,6 +383,25 @@ public final class LokiServer {
         }
     }
 
+    /** Cheap enough to ask on every target change: a map lookup, never a world query. */
+    public static boolean hasProjections(UUID owner) {
+        List<UUID> ids=ILLUSIONS.get(owner);
+        return ids!=null&&!ids.isEmpty();
+    }
+    public static List<IllusionEntity> projections(ServerLevel level,UUID owner) {
+        List<UUID> ids=ILLUSIONS.get(owner);
+        if(ids==null||ids.isEmpty())return List.of();
+        List<IllusionEntity> live=new ArrayList<>(ids.size());
+        for(UUID id:ids)if(level.getEntity(id) instanceof IllusionEntity e&&e.isAlive())live.add(e);
+        return live;
+    }
+    /** What the caster is holding right now, or -1 when their hands are empty. */
+    private static int heldLoadout(ServerPlayer p) {
+        if(!(p.getMainHandItem().getItem() instanceof ConjuredWeapon w))return -1;
+        if(w.kind==1)return IllusionEntity.SWORD;
+        return p.getOffhandItem().is(Loki.DAGGER.get())?IllusionEntity.TWIN:IllusionEntity.DAGGER;
+    }
+
     private static List<IllusionEntity> illusions(ServerPlayer p) {
         List<UUID> ids=ILLUSIONS.computeIfAbsent(p.getUUID(),k->new ArrayList<>());
         ids.removeIf(id->!(p.serverLevel().getEntity(id) instanceof IllusionEntity));
@@ -363,17 +413,24 @@ public final class LokiServer {
         int max=1+LokiData.mastery(p,Discipline.MISCHIEF)/180;
         List<IllusionEntity> existing=illusions(p);
         if(existing.size()>=max){notice(p,"Your projections are already at capacity.");return false;}
-        int count=multiple?max-existing.size():1,spawned=0;
+        int count=multiple?max-existing.size():1,spawned=0,mirrored=heldLoadout(p);
         for(int i=0;i<count;i++) {
             double angle=p.getYRot()*Math.PI/180+i*Math.PI*2/count;
             Vec3 pos=aimed?safeAim(p,12):p.position().add(Math.cos(angle)*2,0,Math.sin(angle)*2);
             if(pos==null||!safe(p,pos))continue;
             IllusionEntity e=new IllusionEntity(Loki.ILLUSION.get(),p.level());
             e.setPos(pos);
-            e.configure(p,new IllusionEntity.Spec(240+LokiData.mastery(p,Discipline.MISCHIEF)/2,IllusionEntity.Behavior.values()[(i+existing.size()+p.getRandom().nextInt(7))%7],true,false,true));
+            // The caster's own arms go to the first copy, so the real body is never the odd one out;
+            // the rest cycle through the armoury so a court reads as a company rather than a print run.
+            int loadout=spawned==0&&mirrored>=0?mirrored:(existing.size()+i+p.getId())%3;
+            e.configure(p,new IllusionEntity.Spec(240+LokiData.mastery(p,Discipline.MISCHIEF)/2,IllusionEntity.Behavior.values()[(i+existing.size()+p.getRandom().nextInt(7))%7],true,false,true),loadout);
             p.level().addFreshEntity(e);ILLUSIONS.get(p.getUUID()).add(e.getUUID());spawned++;
         }
-        if(spawned>0)gesture(p,"illusion","cast",Loki.ILLUSION_SOUND.get());
+        if(spawned>0) {
+            gesture(p,"illusion","cast",Loki.ILLUSION_SOUND.get());
+            // Whatever was already hunting the caster now has a choice to make.
+            Decoy.scatter(p);
+        }
         return spawned>0;
     }
     private static boolean swap(ServerPlayer p) {
@@ -409,14 +466,18 @@ public final class LokiServer {
         TRAINING.put(p.getUUID(),now);LokiData.train(p,d,xp);
         if(d==Discipline.TEMPORAL&&LokiData.mastery(p,d)>=800)LokiData.train(p,Discipline.PURPOSE,xp/2);
     }
+    /** Flourishes the copies share, so a burst of sorcery never singles out the body that cast it. */
+    private static final Set<String> MIRRORED=Set.of("cast","conjure","slash","throw","ward","push","hold","disguise");
     private static void gesture(ServerPlayer p,String animation,String fx,SoundEvent sound) {
         LokiNetwork.animate(p,animation);LokiNetwork.fx(p,fx);
+        if(MIRRORED.contains(fx))for(IllusionEntity e:illusions(p))LokiNetwork.fx(e,fx);
         p.level().playSound(null,p.blockPosition(),sound,SoundSource.PLAYERS,.75f,1);
     }
     private static void notice(ServerPlayer p,String text) {p.displayClientMessage(Component.literal(text),true);}
 
     public static void clear(ServerPlayer p,boolean death) {
         Telekinesis.forget(p);Architecture.forget(p);clearIllusions(p);dismissRift(p);TemporalEngine.clear(p);
+        Masquerade.drop(p);Threat.forget(p);
         CosmicFlight.revoke(p);
         HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         LokiData.clearTransient(p,death);
@@ -424,5 +485,6 @@ public final class LokiServer {
     public static void reset() {
         HISTORY.clear();CHARMS.clear();STRIKES.clear();INPUT.clear();TRAINING.clear();ILLUSIONS.clear();WATCHED.clear();RIFTS.clear();
         Telekinesis.reset();Architecture.reset();Bleed.reset();PocketRealm.reset();TemporalEngine.reset();
+        Threat.reset();Decoy.reset();
     }
 }

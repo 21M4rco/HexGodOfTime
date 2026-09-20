@@ -13,6 +13,8 @@ public final class ClientState {
     public static final Set<Integer> SLOWED=new HashSet<>();
     public static final Map<Integer,CompoundTag> FROZEN=new HashMap<>();
     public static final Map<Integer,ThreadLink> THREADS=new HashMap<>();
+    /** Borrowed-shape snapshots, kept apart from the per-second state packet because of their size. */
+    public static final Map<Integer,CompoundTag> DISGUISES=new HashMap<>();
     public record ThreadLink(int target,long until) {}
     private static Object world;
 
@@ -53,6 +55,13 @@ public final class ClientState {
             case LokiNetwork.ARCHITECTURE -> WorldEffects.architecture(m.entity(),m.data());
             case LokiNetwork.BLEED -> WorldEffects.bleeding(m.entity(),m.data().getInt("stacks"));
             case LokiNetwork.FIELD -> WorldEffects.field(m.entity(),m.data());
+            case LokiNetwork.DISGUISE -> {
+                if(m.data().getBoolean("clear"))DISGUISES.remove(m.entity());
+                else {
+                    if(DISGUISES.size()>32)DISGUISES.clear();
+                    DISGUISES.put(m.entity(),m.data());
+                }
+            }
             default -> {}
         }
     }
@@ -60,8 +69,8 @@ public final class ClientState {
     public static void tick() {
         var mc=Minecraft.getInstance();
         if(mc.level!=world) {
-            PLAYERS.clear();FROZEN.clear();SLOWED.clear();THREADS.clear();
-            WorldEffects.clear();LokiSkin.clear();LokiLayer.clear();TemporalScreen.close();
+            PLAYERS.clear();FROZEN.clear();SLOWED.clear();THREADS.clear();DISGUISES.clear();
+            WorldEffects.clear();LokiSkin.clear();LokiLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();
             world=mc.level;
         }
         if(mc.level==null)return;
@@ -77,6 +86,7 @@ public final class ClientState {
         if(now()%100==0) {
             PLAYERS.keySet().removeIf(id->mc.level.getEntity(id)==null);
             FROZEN.keySet().removeIf(id->mc.level.getEntity(id)==null);
+            DISGUISES.keySet().removeIf(id->mc.level.getEntity(id)==null);
         }
         THREADS.entrySet().removeIf(e->e.getValue().until<now());
         WorldEffects.tick();

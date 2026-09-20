@@ -53,6 +53,11 @@ public final class Loki {
     public static final RegistryObject<Glow> SHARD = particle("shard");
     public static final RegistryObject<Glow> MOTE = particle("mote");
     public static final RegistryObject<Glow> BLOOD = particle("blood");
+    /** The nebula family: the soft, layered look the flight cloud established, reusable per ability. */
+    public static final RegistryObject<Glow> NEBULA = particle("nebula");
+    public static final RegistryObject<Glow> VEIL = particle("veil");
+    public static final RegistryObject<Glow> STAR = particle("star");
+    public static final RegistryObject<Glow> SMOKE = particle("smoke");
     private static RegistryObject<Glow> particle(String name) { return PARTICLES.register(name, Glow::new); }
 
     static {

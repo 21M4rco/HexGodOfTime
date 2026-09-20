@@ -5,9 +5,17 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import java.util.Locale;
 
-/** One small bottom-left ability readout; selecting another slot changes its instructions in place. */
+/**
+ * One small bottom-left ability readout; selecting another slot changes its instructions in place.
+ *
+ * <p>Underneath it sits the time bar. Those four are not quick-bar entries and never scroll past:
+ * they are permanent commands, so they are drawn permanently, each beside the key that fires it.
+ */
 public final class LokiHud {
-    private static final int WIDTH=204,HEIGHT=96;
+    private static final int WIDTH=204,HEIGHT=122;
+    /** The dedicated controls, in key order; a null power is the plain resume command. */
+    private static final Ability[] CONTROLS={Ability.TIME_STOP,null,Ability.REWIND,Ability.SLOW_FIELD};
+    private static final String[] CONTROL_NAMES={"Stop","Resume","Rewind","Slow"};
     private static final float SCALE=.8f;
     public static void render(GuiGraphics g) {
         var mc=Minecraft.getInstance();if(mc.player==null||mc.options.hideGui)return;
@@ -38,6 +46,7 @@ public final class LokiHud {
         int start=mc.font.width(value)+14;
         g.fill(start,84,WIDTH-7,88,0xff263e31);
         g.fill(start,84,start+(int)((WIDTH-7-start)*Math.max(0,Math.min(1,energy/max))),88,0xff74d8a6);
+        controls(g,d,energy,94);
         if(QuickBar.open())QuickBar.renderChoices(g,0,-39,WIDTH);
         else if(d.getBoolean("ascended")) {
             String flight=LokiClient.FLIGHT.getTranslatedKeyMessage().getString()+": "+(d.getBoolean("cosmicFlying")?"flying (Space / crouch)":"flight");
@@ -46,6 +55,29 @@ public final class LokiHud {
         g.pose().popPose();
         if(ClientState.frozen(mc.player.getId()))g.drawCenteredString(mc.font,"BETWEEN MOMENTS",screenWidth/2,15,0xd8d6be);
     }
+    /** The permanent time commands: key, name and state, always on screen and never scrollable. */
+    private static void controls(GuiGraphics g,net.minecraft.nbt.CompoundTag d,float energy,int top) {
+        var mc=Minecraft.getInstance();
+        g.fill(0,top-3,WIDTH,top-2,0xff1f3229);
+        g.drawString(mc.font,"TIME CONTROL",7,top,0xc6b98a,false);
+        int cell=(WIDTH-14)/CONTROLS.length;
+        for(int i=0;i<CONTROLS.length;i++) {
+            Ability a=CONTROLS[i];
+            int x=7+i*cell;
+            boolean locked=a!=null&&!MasteryScreen.unlocked(d,a);
+            long cd=a==null?0:Math.max(0,d.getLong("cd_"+a.name())-ClientState.now());
+            boolean poor=a!=null&&energy<a.cost;
+            int accent=locked?0xff44443a:cd>0?0xffbb9256:poor?0xff8f6f5a:0xffcf9f56;
+            g.fill(x,top+11,x+cell-3,top+24,0xa6091612);
+            g.fill(x,top+11,x+1,top+24,accent);
+            String key=LokiClient.TIME_KEYS[i].getTranslatedKeyMessage().getString();
+            g.drawString(mc.font,key,x+4,top+14,locked?0x6f6f60:0xe9f3ec,false);
+            int nameX=x+5+Math.max(8,mc.font.width(key));
+            String label=locked?"Locked":cd>0?String.format(Locale.ROOT,"%.0fs",cd/20f):CONTROL_NAMES[i];
+            g.drawString(mc.font,label,nameX,top+14,locked?0x6d6d5e:cd>0?0xd6b284:poor?0xb08f79:0xd8e6d5,false);
+        }
+    }
+
     private static String primary(Ability a) {
         return switch(a) {
             case RIFT -> "Tap: portal. Hold: pull 5 blocks.";

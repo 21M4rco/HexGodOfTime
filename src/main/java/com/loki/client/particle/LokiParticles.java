@@ -20,6 +20,11 @@ import net.minecraftforge.fml.common.Mod;
  * translucent sheet, which is what makes sorcery read as light rather than as a cloud of squares,
  * and each behaviour carries its own drift, spin and fade so effects can be sparse and still look
  * designed instead of relying on sheer count.
+ *
+ * <p>Nothing here arrives at full strength. Every particle opens over its first few ticks — alpha
+ * and size together — so an effect gathers into existence instead of being switched on. The nebula
+ * family in particular takes its time: a cloud puff spends a fifth of its life growing before it
+ * begins to thin, which is what makes a summoning read as something forming rather than appearing.
  */
 @Mod.EventBusSubscriber(modid=Loki.ID,value=Dist.CLIENT,bus=Mod.EventBusSubscriber.Bus.MOD)
 public final class LokiParticles {
@@ -49,6 +54,19 @@ public final class LokiParticles {
         e.registerSpriteSet(Loki.BLOOD.get(),Drip.Provider::new);
         e.registerSpriteSet(Loki.RUNE.get(),Glyph.Provider::new);
         e.registerSpriteSet(Loki.SHARD.get(),Sliver.Provider::new);
+        e.registerSpriteSet(Loki.NEBULA.get(),set->new Cloud.Provider(set,.22f,.93f,.60f,.62f,true,70));
+        e.registerSpriteSet(Loki.VEIL.get(),set->new Cloud.Provider(set,.52f,.92f,.74f,1.15f,true,90));
+        e.registerSpriteSet(Loki.SMOKE.get(),set->new Cloud.Provider(set,.16f,.29f,.24f,.85f,false,110));
+        e.registerSpriteSet(Loki.STAR.get(),Flare.Provider::new);
+    }
+
+    /**
+     * The shared opening curve. Everything fades and grows through the same smoothstep so separate
+     * effects layered on one another still look like one material catching light.
+     */
+    static float bloom(int age,float partial,float ticks) {
+        float t=Math.max(0,Math.min(1,(age+partial)/Math.max(1,ticks)));
+        return t*t*(3-2*t);
     }
 
     /** Embers and suspended dust: the same motion with different weight. */
@@ -65,6 +83,7 @@ public final class LokiParticles {
             friction=suspended?.995f:.915f;
             lifetime=suspended?70+random.nextInt(50):22+random.nextInt(20);
             quadSize=(suspended?.022f:.075f)*(.7f+random.nextFloat()*.6f);
+            alpha=0;
             pickSprite(sprites);
         }
         @Override public ParticleRenderType getRenderType() {return GLOW;}
@@ -72,7 +91,9 @@ public final class LokiParticles {
             super.tick();
             yd+=lift;
             float t=age/(float)lifetime;
-            alpha=suspended?Math.min(1,(1-t)*2.4f):(1-t)*(1-t);
+            // Suspended dust gathers slowly; an ember catches quickly but still never starts lit.
+            float growth=bloom(age,0,suspended?9:3);
+            alpha=growth*(suspended?Math.min(1,(1-t)*2.4f):(1-t)*(1-t));
             if(!suspended)quadSize*=.982f;
         }
         record Provider(SpriteSet sprites,float r,float g,float b,double lift,boolean suspended) implements ParticleProvider<SimpleParticleType> {
@@ -91,10 +112,11 @@ public final class LokiParticles {
             hasPhysics=true;friction=.98f;gravity=.75f;
             lifetime=26+random.nextInt(18);
             quadSize=.045f+random.nextFloat()*.03f;
+            alpha=0;
             pickSprite(sprites);
         }
         @Override public ParticleRenderType getRenderType() {return ParticleRenderType.PARTICLE_SHEET_TRANSLUCENT;}
-        @Override public void tick() {super.tick();alpha=1-age/(float)lifetime*.8f;}
+        @Override public void tick() {super.tick();alpha=bloom(age,0,2)*(1-age/(float)lifetime*.8f);}
         record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
             @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
                 return new Drip(level,x,y,z,vx,vy,vz,sprites);
@@ -116,6 +138,7 @@ public final class LokiParticles {
             quadSize=.05f;
             roll=random.nextFloat()*6.28f;
             oRoll=roll;
+            alpha=0;
             pickSprite(sprites);
         }
         @Override public ParticleRenderType getRenderType() {return GLOW;}
@@ -124,7 +147,7 @@ public final class LokiParticles {
             oRoll=roll;roll+=spin;
             float t=age/(float)lifetime;
             quadSize=peak*(float)Math.sin(Math.min(1,t*1.15)*Math.PI*.85);
-            alpha=(1-t)*(1-t*.3f);
+            alpha=bloom(age,0,4)*(1-t)*(1-t*.3f);
         }
         record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
             @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
@@ -146,6 +169,7 @@ public final class LokiParticles {
             spin=(random.nextBoolean()?1:-1)*(.12f+random.nextFloat()*.16f);
             roll=random.nextFloat()*6.28f;
             oRoll=roll;
+            alpha=0;
             pickSprite(sprites);
         }
         @Override public ParticleRenderType getRenderType() {return GLOW;}
@@ -153,11 +177,89 @@ public final class LokiParticles {
             super.tick();
             oRoll=roll;roll+=spin;
             float t=age/(float)lifetime;
-            alpha=Math.min(1,(1-t)*1.8f);
+            alpha=bloom(age,0,3)*Math.min(1,(1-t)*1.8f);
         }
         record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
             @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
                 return new Sliver(level,x,y,z,vx,vy,vz,sprites);
+            }
+        }
+    }
+
+    /**
+     * The nebula family: a slow, soft volume that grows open, turns, and drifts apart. This is the
+     * look the flight cloud established, available to any ability that wants weight behind its
+     * sparks rather than more of them.
+     */
+    public static final class Cloud extends TextureSheetParticle {
+        private final float peak,spin;
+        private final boolean additive;
+        private final float open;
+        Cloud(ClientLevel level,double x,double y,double z,double vx,double vy,double vz,SpriteSet sprites,
+              float r,float g,float b,float size,boolean additive,int life) {
+            super(level,x,y,z);
+            xd=vx;yd=vy;zd=vz;
+            rCol=r;gCol=g;bCol=b;
+            this.additive=additive;
+            hasPhysics=false;
+            friction=.965f;
+            lifetime=(int)(life*(.72f+random.nextFloat()*.55f));
+            peak=size*(.62f+random.nextFloat()*.7f);
+            open=lifetime*.28f;
+            spin=(random.nextBoolean()?1:-1)*(.006f+random.nextFloat()*.014f);
+            roll=random.nextFloat()*6.28f;
+            oRoll=roll;
+            quadSize=.01f;
+            alpha=0;
+            pickSprite(sprites);
+        }
+        @Override public ParticleRenderType getRenderType() {return additive?GLOW:ParticleRenderType.PARTICLE_SHEET_TRANSLUCENT;}
+        @Override public void tick() {
+            super.tick();
+            oRoll=roll;roll+=spin;
+            // Rising a little as it expands keeps a cloud from reading as a flat decal.
+            yd+=additive?.0016:.0009;
+            float t=age/(float)lifetime;
+            float growth=bloom(age,0,open);
+            quadSize=peak*(.35f+.65f*growth)*(1+t*.55f);
+            alpha=growth*(1-t)*(1-t)*(additive?.62f:.5f);
+        }
+        record Provider(SpriteSet sprites,float r,float g,float b,float size,boolean additive,int life) implements ParticleProvider<SimpleParticleType> {
+            @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
+                return new Cloud(level,x,y,z,vx,vy,vz,sprites,r,g,b,size,additive,life);
+            }
+        }
+    }
+
+    /** A struck flare: opens fast, holds for an instant, then collapses. Used where a spell lands. */
+    public static final class Flare extends TextureSheetParticle {
+        private final float peak,spin;
+        Flare(ClientLevel level,double x,double y,double z,double vx,double vy,double vz,SpriteSet sprites) {
+            super(level,x,y,z);
+            xd=vx;yd=vy;zd=vz;
+            rCol=.72f;gCol=.98f;bCol=.82f;
+            hasPhysics=false;friction=.88f;
+            lifetime=14+random.nextInt(12);
+            peak=.26f+random.nextFloat()*.22f;
+            spin=(random.nextBoolean()?1:-1)*.03f;
+            roll=random.nextFloat()*6.28f;
+            oRoll=roll;
+            quadSize=.01f;
+            alpha=0;
+            pickSprite(sprites);
+        }
+        @Override public ParticleRenderType getRenderType() {return GLOW;}
+        @Override public void tick() {
+            super.tick();
+            oRoll=roll;roll+=spin;
+            float t=age/(float)lifetime;
+            float growth=bloom(age,0,4);
+            quadSize=peak*growth*(float)Math.max(.15,Math.cos(t*Math.PI*.5));
+            alpha=growth*(1-t)*(1-t*.4f);
+        }
+        record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
+            @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
+                return new Flare(level,x,y,z,vx,vy,vz,sprites);
             }
         }
     }
