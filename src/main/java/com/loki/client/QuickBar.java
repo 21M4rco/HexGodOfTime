@@ -9,7 +9,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.Mth;
 
 /**
- * Eight persisted shortcuts above the hotbar. Holding the select key opens the bar and the mouse wheel
+ * Eight persisted shortcuts in a compact bottom-left selector. Holding the select key opens the bar and the mouse wheel
  * walks it; releasing commits the choice, so switching spells mid-fight costs one gesture rather than a
  * trip through a menu. Slot contents live in player data, so a layout survives relogging and death.
  */
@@ -63,37 +63,21 @@ public final class QuickBar {
         return out.toString();
     }
 
-    public record Layout(int left,int top,int cardWidth,int cardHeight,int width) {}
-    public static Layout layout() {
-        var w=Minecraft.getInstance().getWindow();
-        int card=Math.min(110,(w.getGuiScaledWidth()-28)/4),width=card*4+12;
-        return new Layout((w.getGuiScaledWidth()-width)/2,Math.max(30,w.getGuiScaledHeight()-154),card,38,width);
-    }
     public static Ability displayed() {
         int id=open?slot(ClientState.self(),cursor):ClientState.self().getInt("selected");
-        return id<0?null:Ability.at(id);
+        return Ability.slot(id);
     }
-    public static void render(GuiGraphics g) {
-        var mc=Minecraft.getInstance();if(mc.player==null)return;
-        CompoundTag data=ClientState.self();Layout l=layout();
-        int selected=data.getInt("selected");
-        for(int i=0;i<LokiData.QUICK_SLOTS;i++) {
-            int x=l.left+i%4*(l.cardWidth+4),y=l.top+i/4*(l.cardHeight+4);
-            int id=slot(data,i);boolean active=id>=0&&id==selected,hovered=open&&i==cursor;
-            int border=hovered?0xffffe2a0:active?0xff72f1b2:0xff344f46;
-            g.fill(x,y,x+l.cardWidth,y+l.cardHeight,border);
-            g.fill(x+1,y+1,x+l.cardWidth-1,y+l.cardHeight-1,hovered?0xf3213027:active?0xf3123025:0xeb091610);
+    /** Only three neighboring names appear while choosing; all eight slots remain scrollable. */
+    public static void renderChoices(GuiGraphics g,int x,int y,int width) {
+        if(!open)return;
+        var mc=Minecraft.getInstance();
+        for(int row=-1;row<=1;row++) {
+            int index=Math.floorMod(cursor+row,LokiData.QUICK_SLOTS),id=slot(ClientState.self(),index);
+            int top=y+(row+1)*12;
+            g.fill(x,top,x+width,top+12,row==0?0xe41a3528:0xb509130e);
             Ability a=Ability.slot(id);
-            if(a==null){g.drawString(mc.font,"Empty slot",x+6,y+8,0x81918a,false);continue;}
-            g.fill(x+1,y+1,x+3,y+l.cardHeight-1,0xff000000|a.discipline.color);
-            var lines=mc.font.split(net.minecraft.network.chat.Component.literal(a.title),l.cardWidth-12);
-            for(int line=0;line<Math.min(2,lines.size());line++)g.drawString(mc.font,lines.get(line),x+6,y+5+line*10,active||hovered?0xf3fff7:0xdce9df,false);
-            long cd=Math.max(0,data.getLong("cd_"+a.name())-ClientState.now());
-            boolean home=a==Ability.RIFT&&com.loki.server.PocketRealm.inside(mc.player.level());
-            String status=home?"RETURN":cd>0?String.format(java.util.Locale.ROOT,"%.1fs",cd/20f):data.getFloat("energy")<a.cost?"LOW ENERGY":"READY";
-            int tint=home||cd<=0&&data.getFloat("energy")>=a.cost?0x87d8a8:0xd2b27f;
-            g.drawString(mc.font,status,x+6,y+l.cardHeight-11,tint,false);
-            if(cd>0&&!home)g.fill(x+3,y+l.cardHeight-2,x+3+(int)((l.cardWidth-5)*Math.min(1,cd/(double)Math.max(1,a.cooldown))),y+l.cardHeight-1,0xffd2b27f);
+            String label=(index+1)+"  "+(a==null?"Empty":a.title);
+            g.drawString(mc.font,label,x+5,top+2,row==0?0xe0f5e7:0x819a8b,false);
         }
     }
 }

@@ -98,3 +98,7 @@ Fracture: tap the primary key for a doorway, or hold for 0.6 seconds to gather a
 While transformed, press **J** to toggle Cosmic Flight. **Space** rises and **crouch** descends; vanilla double-jump flight controls also work. Change the binding in Minecraft's Controls menu. A green spatial nebula and star filaments surround flying players.
 
 The HUD shows eight named ability cards with recovery/ready status, selection and energy. Hold the select key and scroll to switch. Existing realms receive the larger island, organic tree/roots and rebuilt throne through a resumable upgrade; no world reset is needed.
+
+### 0.3.2 HUD correction
+
+The HUD is now a compact bottom-left readout. It describes the selected ability's primary and alternate actions, readiness/recovery, energy cost and remaining energy. Hold V and scroll to inspect another bound ability; release to select it. The large eight-card overlay is removed. Decorative effect rings and orbiting wire strands are removed, including those around Cosmic Flight; its nebula clouds remain.

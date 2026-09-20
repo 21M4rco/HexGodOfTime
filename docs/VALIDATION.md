@@ -58,3 +58,11 @@ Base: `0019138521132de36e47f37624155b17a8233d27` (Actions run `35511132447`).
 - The cape retains its original collar anchors, with a smooth wider lower profile. Sky galaxies, meteors and wisps are client-only, and the flight nebula uses depth-sorted emissive cloud layers in world space.
 
 A Minecraft visual or multiplayer playtest has not been performed in this environment. In-game acceptance checks: fresh and existing realms (including interrupted upgrades); full crown and throne silhouette; tap/held entry and exit with players/mobs/items, mounted entities, blocked returns and different source dimensions; normal/Fabulous/shader graphics; flight relog/death/detransformation; cape during turns, stairs and flight; HUD at different GUI scales.
+
+## 0.3.2 — Compact HUD and removal of decorative effect wires
+
+Replaces the eight-card overlay with one 204×96 logical-pixel bottom-left readout rendered at 0.8 scale (about 163×77 GUI pixels). Each selected/bound ability has explicit primary/alternate instructions, recovery, cost and energy. Holding V previews three neighboring slots in place; all eight remain scrollable. On narrow viewports the readout sits above vanilla survival bars.
+
+Removes the shared decorative ring/strand mesh passes from spell, transformation, grip, bind and time-field effects, plus all orbital filaments/cross wires from flight. Existing particles and the spatial cloud nebula remain. Projectile bodies, mirror fractures and shooting-star trails retain their functional silhouettes.
+
+Validation: source diff/remaining caller audit; CI build required. In-game screenshot and multiplayer checks have not been performed here.
