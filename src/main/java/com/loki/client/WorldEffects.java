@@ -160,6 +160,18 @@ public final class WorldEffects {
                 }
                 continue;
             }
+            if(entity instanceof com.loki.entity.StarfallEntity star) {
+                if(star.position().distanceToSqr(eye)>4096)continue;
+                float charge=star.charge();
+                Vec3 back=star.getDeltaMovement().lengthSqr()<1e-6?Vec3.ZERO:star.getDeltaMovement().normalize().scale(-.06);
+                Vfx.cloud(Loki.NEBULA.get(),star.position(),.3+.3*charge,1+(now%2==0?1:0),.01);
+                Vfx.spark(Loki.EMBER.get(),star.position(),back);
+                // Unstable debris: irregular, and heavier as the star closes on its quarry.
+                if(mc.level.random.nextFloat()<.25f+charge*.45f)
+                    Vfx.cone(Loki.SHARD.get(),star.position(),back,1,.06,.09);
+                if(charge>.55f&&now%3==0)Vfx.spark(Loki.STAR.get(),star.position(),Vec3.ZERO);
+                continue;
+            }
             if(!(entity instanceof com.loki.entity.RiftEntity rift)||now%2!=0)continue;
             if(rift.position().distanceToSqr(eye)>2304)continue;
             if(rift.vacuum()) {
@@ -318,6 +330,36 @@ public final class WorldEffects {
                 Vfx.cloud(nebula,at.add(0,1,0),.5+.7*swell,Vfx.count(swell*2.6f),.006);
                 Vfx.spiral(veil,at,.42,1.9,Vfx.count(swell*2f),2.6);
                 if(t>.45f&&t<.6f)Vfx.spark(star,at.add(0,1.1,0),Vec3.ZERO);
+            });
+            // The owner leaving: a bank of nebula far thicker than flight, closing over where they
+            // stood and hanging there after the blow has gone through it.
+            case "demanifest" -> Vfx.bloom(-1,pos,look,26,(at,aim,t)->{
+                float swell=Vfx.swell(t);
+                float rush=t<.25f?1:0;
+                Vfx.cloud(nebula,at.add(0,1,0),.45+.55*Vfx.ease(t),Vfx.count(swell*5f+rush*6f),.014);
+                Vfx.cloud(veil,at.add(0,1,0),.8+.5*Vfx.ease(t),Vfx.count(swell*3f+rush*3f),.008);
+                if(t<.3f)Vfx.column(nebula,at,.4,2.1,Vfx.count(4-t*8),t);
+                if(t<.12f)Vfx.spark(star,at.add(0,1.1,0),Vec3.ZERO);
+            });
+            case "remanifest" -> Vfx.bloom(entity,pos,look,16,(at,aim,t)->{
+                float swell=Vfx.swell(t);
+                Vfx.gather(nebula,at.add(0,1,0),1.5*(1-Vfx.ease(t))+.25,Vfx.count(swell*4f),.14);
+                Vfx.cloud(veil,at.add(0,1,0),.6,Vfx.count(swell*1.6f),.01);
+                if(t>.7f)Vfx.spark(star,at.add(0,1.1,0),Vec3.ZERO);
+            });
+            // A star opening high above, then landing: a green celestial burst, never an explosion.
+            case "starfall_open" -> Vfx.bloom(entity,pos,look,12,(at,aim,t)->{
+                Vfx.cloud(nebula,at,.7,Vfx.count(Vfx.swell(t)*2f),.02);
+                if(t<.2f)Vfx.spark(star,at,Vec3.ZERO);
+            });
+            case "starfall_impact" -> Vfx.bloom(-1,pos,look,22,(at,aim,t)->{
+                float swell=Vfx.swell(t);
+                double radius=.4+4.2*Vfx.ease(Math.min(1,t*1.9f));
+                Vfx.ring(green,at.add(0,.15,0),radius,Vfx.count(swell*7f),.16,.05);
+                Vfx.dome(veil,at.add(0,.7,0),radius*.8,Vfx.count(swell*4f),.02);
+                Vfx.cloud(nebula,at.add(0,.8,0),1.5,Vfx.count(swell*3f),.03);
+                Vfx.cone(Loki.SHARD.get(),at.add(0,.4,0),new Vec3(0,1,0),Vfx.count(swell*4f),.32,.26);
+                if(t<.18f){Vfx.spark(star,at.add(0,.8,0),Vec3.ZERO);Vfx.ring(star,at.add(0,.6,0),1.1,5,.18,.09);}
             });
             case "ascend" -> Vfx.bloom(entity,pos,look,64,(at,aim,t)->{
                 float swell=Vfx.swell(t);

@@ -95,6 +95,28 @@ public final class PocketRealm {
     public static Vec3 centre(int plot) {BlockPos o=origin(plot);return new Vec3(o.getX()+SIZE/2.0,FLOOR_Y+1,o.getZ()+72.0);}
 
     public static boolean inside(Level level) {return KEY.equals(level.dimension());}
+
+    /** The plot whose island a world position falls on, recentred so the shape's negative side counts. */
+    public static int plotAt(double x,double z) {
+        int px=Math.floorDiv(net.minecraft.util.Mth.floor(x)-RealmShape.MIN,SPACING);
+        int pz=Math.floorDiv(net.minecraft.util.Mth.floor(z)-RealmShape.MIN,SPACING);
+        return pz*64+px;
+    }
+    /** True when this player is standing on the island that was allotted to them. */
+    public static boolean ownsHere(ServerPlayer p) {
+        if(!inside(p.level()))return false;
+        CompoundTag d=LokiData.get(p);
+        int mine=d.contains("realmPlot",Tag.TAG_INT)?d.getInt("realmPlot"):realms(p.serverLevel()).plot(p.getUUID());
+        return plotAt(p.getX(),p.getZ())==mine;
+    }
+    /** Local island coordinate for a world coordinate, on the same recentred grid the terrain uses. */
+    public static int local(double world) {
+        return Math.floorMod(net.minecraft.util.Mth.floor(world)-RealmShape.MIN,SPACING)+RealmShape.MIN;
+    }
+    /** Comfortably inside the island's coast, with a margin so nothing is left teetering on the lip. */
+    public static boolean onIsland(double x,double z) {
+        return RealmShape.fraction(local(x),local(z))<=.95;
+    }
     public static boolean crossingCooldown(ServerPlayer p) {
         // Homeward travel is immediate. After returning, outlive every old entry rift so standing
         // on the saved point cannot pull the player straight back into the realm.
@@ -168,53 +190,77 @@ public final class PocketRealm {
         d.putFloat("returnYaw",e.getYRot());d.putFloat("returnPitch",e.getXRot());
     }
 
-    /** All captured visitors enter the caster's plot; every visitor keeps its own persistent way home. */
-    public static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster) {
+    /**
+     * Everything crossing a break obeys that break's destination.
+     *
+     * <p>Inbound, that is the caster's own plot. Outbound, it is the anchor the owner's saved
+     * Fracture mode resolved to when the break was struck — <em>not</em> the travelling entity's
+     * memory of where it was originally seized. A creature dragged into the sanctum in one place and
+     * released in another therefore surfaces beside its captor, which is the whole point of being
+     * the one who owns the door.
+     *
+     * @param spread index within a travelling group, so a crowd fans out around the arrival instead
+     *               of piling into one column
+     */
+    public static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster) {return cross(e,caster,null,0);}
+    public static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster,FractureAnchor anchor,int spread) {
         if(!e.isAlive()||e.isRemoved()||e.isSpectator())return false;
         boolean homeward=inside(e.level());
-        if(homeward&&e instanceof ServerPlayer player)return leave(player);
         CompoundTag d=travelData(e);
-        ServerLevel destination;Vec3 target;
+        ServerLevel destination;Vec3 target;float yaw=e.getYRot(),pitch=e.getXRot();
         int plot=-1;
-        if(!homeward) {
+        if(homeward||anchor!=null) {
+            FractureAnchor exit=anchor!=null?anchor:FractureTravel.exit(caster);
+            if(exit==null)return false;
+            destination=exit.level(caster.server);
+            if(destination==null||inside(destination))destination=caster.server.overworld();
+            target=exit.at();
+            if(e instanceof ServerPlayer)yaw=exit.yaw();
+            if(e instanceof ServerPlayer)pitch=exit.pitch();
+        } else {
             destination=level(caster.server);if(destination==null)return false;
             plot=realms(destination).plot(caster.getUUID());prepare(destination,plot);
             target=centre(plot);remember(e,d);
-        } else {
-            CompoundTag saved=d.contains("returnX")?d:LokiData.get(caster);
-            ResourceLocation id=ResourceLocation.tryParse(saved.getString("returnDim"));
-            destination=id==null?null:caster.server.getLevel(ResourceKey.create(Registries.DIMENSION,id));
-            if(destination==null||inside(destination))destination=caster.server.overworld();
-            target=saved.contains("returnX")?new Vec3(saved.getDouble("returnX"),saved.getDouble("returnY"),saved.getDouble("returnZ"))
-                :Vec3.atBottomCenterOf(destination.getSharedSpawnPos());
-            if(!Double.isFinite(target.x)||!Double.isFinite(target.y)||!Double.isFinite(target.z))return false;
+            yaw=180;pitch=0;
         }
-        Vec3 at=safeArrival(e,destination,target);
+        Vec3 at=safeArrival(e,destination,scatter(target,spread));
+        if(at==null)at=safeArrival(e,destination,target);
         if(at==null)return false;
         if(e instanceof ServerPlayer p) {
-            if(!homeward)d.putInt("realmPlot",plot);
-            if(!move(p,destination,at,d.getFloat("returnYaw"),d.getFloat("returnPitch")))return false;
-            if(homeward)d.remove("realmPlot");
+            if(!homeward&&anchor==null)d.putInt("realmPlot",plot);
+            if(!move(p,destination,at,yaw,pitch))return false;
+            if(homeward||anchor!=null)d.remove("realmPlot");
             LokiNetwork.fx(p,"rift_cross");return true;
         }
         e.stopRiding();e.ejectPassengers();
+        Vec3 landing=at;
         // Forge creates the destination copy through its normal lifecycle, retaining mod entity data.
         net.minecraft.world.entity.Entity moved=e.changeDimension(destination,new net.minecraftforge.common.util.ITeleporter() {
             @Override public net.minecraft.world.level.portal.PortalInfo getPortalInfo(net.minecraft.world.entity.Entity entity,ServerLevel dest,
                     java.util.function.Function<ServerLevel,net.minecraft.world.level.portal.PortalInfo> fallback) {
-                return new net.minecraft.world.level.portal.PortalInfo(at,Vec3.ZERO,entity.getYRot(),entity.getXRot());
+                return new net.minecraft.world.level.portal.PortalInfo(landing,Vec3.ZERO,entity.getYRot(),entity.getXRot());
             }
             @Override public net.minecraft.world.entity.Entity placeEntity(net.minecraft.world.entity.Entity entity,ServerLevel from,ServerLevel dest,float yaw,
                     java.util.function.Function<Boolean,net.minecraft.world.entity.Entity> reposition) {
                 var copy=reposition.apply(false);
-                if(copy!=null){copy.moveTo(at.x,at.y,at.z,entity.getYRot(),entity.getXRot());copy.setDeltaMovement(Vec3.ZERO);copy.resetFallDistance();}
+                if(copy!=null){copy.moveTo(landing.x,landing.y,landing.z,entity.getYRot(),entity.getXRot());copy.setDeltaMovement(Vec3.ZERO);copy.resetFallDistance();}
                 return copy;
             }
         });
         if(moved==null)return false;
         travelData(moved).putLong("riftGraceUntil",caster.server.overworld().getGameTime()+com.loki.entity.RiftEntity.DURATION+20);
+        LokiNetwork.fx(moved,"rift_cross");
         return true;
     }
+
+    /** Fans a travelling group around the arrival point on a golden-angle spiral. */
+    private static Vec3 scatter(Vec3 target,int index) {
+        if(index<=0)return target;
+        double angle=index*2.399963229728653;
+        double radius=1.4+Math.min(4,index*.55);
+        return target.add(Math.cos(angle)*radius,0,Math.sin(angle)*radius);
+    }
+
     public static boolean crossingCooldown(net.minecraft.world.entity.Entity e) {
         if(e instanceof ServerPlayer p)return crossingCooldown(p);
         return !inside(e.level())&&travelData(e).getLong("riftGraceUntil")>((ServerLevel)e.level()).getServer().overworld().getGameTime();
@@ -281,6 +327,7 @@ public final class PocketRealm {
 
     public static void tick(ServerLevel level) {
         if(!inside(level))return;
+        Starfall.tick(level);
         for(ServerPlayer player:level.players())prepare(level,occupiedPlot(player));
         if(!PENDING.isEmpty()) {
             int[] job=PENDING.get(0);
@@ -455,5 +502,5 @@ public final class PocketRealm {
         player.setYRot(0);player.setYHeadRot(0);return true;
     }
 
-    public static void reset() {PENDING.clear();KNEELING.clear();garden=null;oldGarden=null;}
+    public static void reset() {PENDING.clear();KNEELING.clear();garden=null;oldGarden=null;Starfall.reset();SanctumWard.reset();}
 }

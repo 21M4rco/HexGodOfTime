@@ -28,6 +28,8 @@ public final class Loki {
     public static final RegistryObject<EntityType<ThrownDagger>> THROWN_DAGGER = ENTITIES.register("thrown_dagger", () -> EntityType.Builder.<ThrownDagger>of(ThrownDagger::new, MobCategory.MISC).sized(.28f,.28f).clientTrackingRange(8).updateInterval(1).build("loki:thrown_dagger"));
     public static final RegistryObject<EntityType<RiftEntity>> RIFT = ENTITIES.register("rift", () -> EntityType.Builder.<RiftEntity>of(RiftEntity::new, MobCategory.MISC).sized(2.2f,2.8f).clientTrackingRange(10).updateInterval(2).fireImmune().noSummon().build("loki:rift"));
 
+    public static final RegistryObject<EntityType<StarfallEntity>> STARFALL = ENTITIES.register("starfall", () -> EntityType.Builder.<StarfallEntity>of(StarfallEntity::new, MobCategory.MISC).sized(.6f,.6f).clientTrackingRange(12).updateInterval(1).fireImmune().noSummon().build("loki:starfall"));
+
     public static final RegistryObject<EntityType<ThroneSeat>> THRONE_SEAT = ENTITIES.register("throne_seat", () -> EntityType.Builder.<ThroneSeat>of(ThroneSeat::new, MobCategory.MISC).sized(.5f,.2f).clientTrackingRange(8).noSave().noSummon().build("loki:throne_seat"));
 
     public static final RegistryObject<Item> DAGGER = ITEMS.register("dagger", () -> new ConjuredWeapon(0));

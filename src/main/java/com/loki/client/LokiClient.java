@@ -48,6 +48,7 @@ public final class LokiClient {
             e.registerEntityRenderer(Loki.PROJECTILE.get(),SpellRenderer::new);
             e.registerEntityRenderer(Loki.THROWN_DAGGER.get(),DaggerRenderer::new);
             e.registerEntityRenderer(Loki.RIFT.get(),RiftRenderer::new);
+            e.registerEntityRenderer(Loki.STARFALL.get(),StarRenderer::new);
             e.registerEntityRenderer(Loki.THRONE_SEAT.get(),net.minecraft.client.renderer.entity.NoopRenderer::new);
         }
         @SubscribeEvent public static void layers(EntityRenderersEvent.AddLayers e) {
@@ -91,7 +92,12 @@ public final class LokiClient {
             if(!primary&&primaryDown&&primaryWasHold)LokiNetwork.send(LokiServer.HOLD_END,0);
             primaryDown=primary;
 
-            while(SECONDARY.consumeClick())LokiNetwork.send(LokiServer.ALTERNATE,0);
+            // The alternate key is the Fracture's configuration key: it chooses what the cast key
+            // will keep doing. Every other spell keeps its ordinary alternate action.
+            while(SECONDARY.consumeClick()) {
+                if(Ability.at(ClientState.self().getInt("selected"))==Ability.RIFT)FractureScreen.open();
+                else LokiNetwork.send(LokiServer.ALTERNATE,0);
+            }
             while(TRANSFORM.consumeClick())LokiNetwork.send(LokiServer.TRANSFORM,0);
             while(RELEASE.consumeClick())LokiNetwork.send(LokiServer.UTILITY,0);
             while(FLIGHT.consumeClick())LokiNetwork.send(LokiServer.FLIGHT,0);

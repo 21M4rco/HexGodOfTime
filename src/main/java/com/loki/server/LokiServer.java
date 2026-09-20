@@ -72,11 +72,12 @@ public final class LokiServer {
         if(action==FLIGHT){CosmicFlight.toggle(p);return;}
         if(action==TIME){time(p,value);return;}
         Ability a=action==TRANSFORM?Ability.ASCENSION:LokiData.selected(p);
-        // Returning home must never depend on energy, mastery or the entry spell's recovery.
-        if(a==Ability.RIFT&&PocketRealm.inside(p.level())&&(action==CAST||action==ALTERNATE||action==HOLD_BEGIN)) {
+        // Returning home must never depend on energy, mastery or the entry spell's recovery. The way
+        // out follows whatever the owner's saved mode currently points at.
+        if(a==Ability.RIFT&&PocketRealm.inside(p.level())&&(action==CAST||action==HOLD_BEGIN)) {
             UUID active=RIFTS.get(p.getUUID());
-            if(active==null||!(p.serverLevel().getEntity(active) instanceof RiftEntity))fracture(p);
-            if(action==HOLD_BEGIN)armFracture(p);
+            if(active==null||!(p.serverLevel().getEntity(active) instanceof RiftEntity))openFracture(p,FractureTravel.exit(p));
+            if(action==HOLD_BEGIN&&LokiData.fractureMode(p)==com.loki.data.FractureModes.PULL)armFracture(p);
             return;
         }
         if(action==ALTERNATE&&secondary(p,a)){LokiNetwork.sync(p);return;}
@@ -86,8 +87,10 @@ public final class LokiServer {
         if(action==HOLD_BEGIN) {
             if(!a.hold)return;
             if(a==Ability.RIFT) {
-                if(fracture(p)) {
-                    armFracture(p);LokiData.spend(p,a.cost);LokiData.get(p).putLong("cd_"+a.name(),now+a.cooldown);
+                // The cast key always runs whatever the selector last saved; only that mode decides
+                // what a press means, and the pull keeps its own tap-versus-hold distinction.
+                if(FractureTravel.act(p,RiftEntity.HOLD)) {
+                    LokiData.spend(p,a.cost);LokiData.get(p).putLong("cd_"+a.name(),now+a.cooldown);
                     reward(p,a.discipline,90);LokiNetwork.sync(p);
                 }
                 return;
@@ -154,7 +157,7 @@ public final class LokiServer {
                 if(!Masquerade.assume(p,t)){notice(p,"That shape refuses to be read.");return false;}
                 gesture(p,"illusion","disguise",Loki.ILLUSION_SOUND.get());return true;
             }
-            case RIFT -> {return fracture(p);}
+            case RIFT -> {return FractureTravel.act(p,RiftEntity.TAP);}
             case BOLT -> {SpellProjectile.cast(p,p.getEyePosition().add(look.scale(.5)),look,secondary?1:0,false);gesture(p,"bolt","cast",Loki.SORCERY.get());return true;}
             case PUSH -> {for(Entity e:p.level().getEntities(p,p.getBoundingBox().inflate(5),e->validTarget(p,e))){Vec3 away=e.position().subtract(p.position()).normalize();e.setDeltaMovement(away.scale(1.1).add(0,.25,0));e.hurtMarked=true;}gesture(p,"push","push",Loki.SORCERY.get());return true;}
             case BLINK -> {Vec3 destination=safeAim(p,8+LokiData.mastery(p,Discipline.SORCERY)/90.0);if(destination==null)return false;gesture(p,"blink","depart",Loki.TELEPORT.get());teleport(p,destination);LokiNetwork.fx(p,"arrive");return true;}
@@ -202,8 +205,20 @@ public final class LokiServer {
         }
     }
 
+    /** The pull mode: a doorway on a tap, a five-block vacuum when the key is held. */
+    public static boolean pullFracture(ServerPlayer p,int stage) {
+        if(stage==RiftEntity.RELEASE)return false;
+        if(!fracture(p,null))return false;
+        if(stage==RiftEntity.HOLD)armFracture(p);
+        return true;
+    }
+    /** A travel mode: the same break, but pointed somewhere the owner chose. */
+    public static boolean openFracture(ServerPlayer p,FractureAnchor destination) {
+        return destination!=null&&fracture(p,destination);
+    }
+
     /** Cracks the air ahead, or — when already inside the sanctum — opens the way back out. */
-    private static boolean fracture(ServerPlayer p) {
+    private static boolean fracture(ServerPlayer p,FractureAnchor destination) {
         dismissRift(p);
         boolean homeward=PocketRealm.inside(p.level());
         // Place a walk-through door at feet height, not ten blocks away at the eye-ray's height.
@@ -216,7 +231,7 @@ public final class LokiServer {
         }
         if(spot==null&&homeward)spot=p.position();
         if(spot==null){notice(p,"There is no room here for the break to open.");return false;}
-        RiftEntity rift=RiftEntity.open(p,spot,homeward);
+        RiftEntity rift=RiftEntity.open(p,spot,homeward,destination);
         RIFTS.put(p.getUUID(),rift.getUUID());
         // RiftEntity owns the positional crack sound; playing it on the caster doubled the attack.
         LokiNetwork.animate(p,"threads");

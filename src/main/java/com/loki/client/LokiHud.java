@@ -35,9 +35,13 @@ public final class LokiHud {
         g.drawString(mc.font,status+"  |  Cost "+(home?0:a.cost),7,18,cd>0&&!home?0xd2b27f:0x93caaa,false);
         String primary=LokiClient.PRIMARY.getTranslatedKeyMessage().getString();
         String secondary=LokiClient.SECONDARY.getTranslatedKeyMessage().getString();
-        var lines=mc.font.split(net.minecraft.network.chat.Component.literal(primary+"  "+primary(a)),WIDTH-14);
-        for(int i=0;i<Math.min(2,lines.size());i++)g.drawString(mc.font,lines.get(i),7,32+i*10,0xc9d8ce,false);
-        g.drawString(mc.font,secondary+"  "+alternate(a),7,54,0x9cb6a6,false);
+        // The Fracture is configured rather than varied: the cast key keeps doing whatever the
+        // selector last saved, so the saved mode is what the readout has to name.
+        boolean fracture=a==Ability.RIFT;
+        String head=fracture?FractureModes.byId(d.getString("fractureMode")).label(d.getString("fractureTargetName")):primary(a);
+        var lines=mc.font.split(net.minecraft.network.chat.Component.literal(primary+"  "+head),WIDTH-14);
+        for(int i=0;i<Math.min(2,lines.size());i++)g.drawString(mc.font,lines.get(i),7,32+i*10,fracture?0xd8ecdd:0xc9d8ce,false);
+        g.drawString(mc.font,secondary+"  "+(fracture?"Choose Fracture mode":alternate(a)),7,54,fracture?0xc0b184:0x9cb6a6,false);
         String select=LokiClient.SELECT.getTranslatedKeyMessage().getString();
         g.drawString(mc.font,select+" + scroll: choose ability",7,67,0x779d87,false);
         float max=100+MasteryScreen.mastery(d,Discipline.TEMPORAL)*.2f+(d.getBoolean("ascended")?150:0),energy=d.getFloat("energy");

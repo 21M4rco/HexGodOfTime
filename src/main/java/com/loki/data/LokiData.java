@@ -70,6 +70,23 @@ public final class LokiData {
         }
         if(changed)get(p).putIntArray("quick",slots);
     }
+    /**
+     * The saved Fracture mode. Player NBT, so it outlives the menu closing, repeated casts,
+     * dimension changes, death and a server restart alike — and it is never cleared by use.
+     */
+    public static FractureMode fractureMode(Player p) {return FractureModes.byId(get(p).getString("fractureMode"));}
+    public static void fractureMode(Player p,FractureMode mode) {get(p).putString("fractureMode",mode.id);}
+    public static java.util.UUID fractureTarget(Player p) {
+        CompoundTag d=get(p);
+        return d.hasUUID("fractureTarget")?d.getUUID("fractureTarget"):null;
+    }
+    public static String fractureTargetName(Player p) {return get(p).getString("fractureTargetName");}
+    public static void fractureTarget(Player p,java.util.UUID id,String name) {
+        CompoundTag d=get(p);
+        if(id==null){d.remove("fractureTarget");d.remove("fractureTargetName");return;}
+        d.putUUID("fractureTarget",id);d.putString("fractureTargetName",name==null?"":name);
+    }
+
     public static void clearTransient(Player p,boolean death) {
         CompoundTag d=get(p);d.remove("disguise");d.remove("vanishUntil");d.remove("wardUntil");d.remove("held");d.remove("transformStart");d.remove("grip");
         if(death)d.putBoolean("ascended",false);

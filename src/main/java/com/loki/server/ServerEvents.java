@@ -61,10 +61,24 @@ public final class ServerEvents {
         Bleed.clear(e.getEntity());
         Threat.forget(e.getEntity());
         Decoy.release(e.getEntity());
+        Starfall.forget(e.getEntity());
+        SanctumWard.forget(e.getEntity());
         if(e.getEntity() instanceof ServerPlayer p)LokiServer.clear(p,true);
     }
     @SubscribeEvent public static void clone(PlayerEvent.Clone e) {e.getEntity().getPersistentData().put("Loki",LokiData.get(e.getOriginal()).copy());LokiData.clearTransient(e.getEntity(),e.isWasDeath());}
     @SubscribeEvent public static void respawn(PlayerEvent.PlayerRespawnEvent e) {if(e.getEntity() instanceof ServerPlayer p)LokiNetwork.sync(p);}
+    /**
+     * The sanctum's owner cannot be struck inside it. Refusing the attack here, before any damage is
+     * worked out, is what makes it a dodge rather than a cancelled hit: by the time anything could
+     * have landed, they are standing somewhere else.
+     */
+    @SubscribeEvent public static void ward(net.minecraftforge.event.entity.living.LivingAttackEvent e) {
+        if(SanctumWard.evade(e.getEntity()))e.setCanceled(true);
+    }
+    @SubscribeEvent public static void wardProjectile(net.minecraftforge.event.entity.ProjectileImpactEvent e) {
+        if(!(e.getRayTraceResult() instanceof net.minecraft.world.phys.EntityHitResult hit))return;
+        if(SanctumWard.evade(hit.getEntity()))e.setCanceled(true);
+    }
     @SubscribeEvent public static void attack(AttackEntityEvent e) {
         if(TemporalEngine.frozen(e.getEntity())){e.setCanceled(true);return;}
         if(!(e.getEntity() instanceof ServerPlayer p))return;

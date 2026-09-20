@@ -90,5 +90,6 @@ public final class ClientState {
         }
         THREADS.entrySet().removeIf(e->e.getValue().until<now());
         WorldEffects.tick();
+        RealmAmbience.tick();
     }
 }

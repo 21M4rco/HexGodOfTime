@@ -2,6 +2,7 @@ package com.loki.entity;
 
 import com.loki.Loki;
 import com.loki.network.LokiNetwork;
+import com.loki.server.FractureAnchor;
 import com.loki.server.PocketRealm;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
@@ -23,6 +24,15 @@ public final class RiftEntity extends Entity {
     private static final EntityDataAccessor<Boolean> HOMEWARD=SynchedEntityData.defineId(RiftEntity.class,EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> VACUUM=SynchedEntityData.defineId(RiftEntity.class,EntityDataSerializers.BOOLEAN);
     public static final int DURATION=140,OPENING=14,CHARGE_TICKS=12,PULL_TICKS=10;
+    /** Cast-key stages a Fracture mode can respond to. */
+    public static final int TAP=0,HOLD=1,RELEASE=2;
+    /**
+     * Where this particular break leads. Set once, when the break is struck, from the owner's saved
+     * mode — and then it governs everything that walks through, owner and cargo alike. A creature
+     * dragged in at one place therefore surfaces wherever its captor is going, never back where it
+     * was seized.
+     */
+    private FractureAnchor destination;
     private boolean charging;
     private int pullAge;
     private final List<UUID> captured=new ArrayList<>();
@@ -41,8 +51,12 @@ public final class RiftEntity extends Entity {
     public float opening(float partial) {return Math.min(1,(DURATION-life()+partial)/OPENING);}
     public float closing(float partial) {return Math.min(1,(life()-partial)/12f);}
 
-    public static RiftEntity open(ServerPlayer p,Vec3 at,boolean homeward) {
+    public FractureAnchor destination() {return destination;}
+
+    public static RiftEntity open(ServerPlayer p,Vec3 at,boolean homeward) {return open(p,at,homeward,null);}
+    public static RiftEntity open(ServerPlayer p,Vec3 at,boolean homeward,FractureAnchor destination) {
         RiftEntity e=new RiftEntity(Loki.RIFT.get(),p.level());
+        e.destination=destination;
         e.setPos(at.x,at.y,at.z);
         // Stand the break square to the caster so the fracture reads as a mirror rather than an edge.
         e.setYRot(p.getYRot());e.setXRot(0);
@@ -82,7 +96,7 @@ public final class RiftEntity extends Entity {
         if(owner==null)return;
         for(Entity entity:level().getEntities(this,mouth,this::eligible)) {
             if(recent.containsKey(entity.getUUID())||PocketRealm.crossingCooldown(entity))continue;
-            boolean crossed=PocketRealm.cross(entity,owner);
+            boolean crossed=PocketRealm.cross(entity,owner,destination,0);
             recent.put(entity.getUUID(),now+(crossed?60:20));
             if(isRemoved())return;
         }
@@ -106,8 +120,9 @@ public final class RiftEntity extends Entity {
         List<Entity> group=new ArrayList<>();
         for(UUID id:captured){Entity e=source.getEntity(id);if(e!=null&&eligible(e))group.add(e);}
         group.sort(Comparator.comparing(e->e.getUUID().equals(caster)));
-        int failed=0;
-        for(Entity e:group)if(!PocketRealm.cross(e,owner)){e.setDeltaMovement(Vec3.ZERO);failed++;}
+        int failed=0,placed=0;
+        // A spread index keeps the group from stacking into one column at the far end.
+        for(Entity e:group)if(!PocketRealm.cross(e,owner,destination,placed++)){e.setDeltaMovement(Vec3.ZERO);failed++;}
         source.playSound(null,blockPosition(),Loki.RIFT_CLOSE.get(),SoundSource.PLAYERS,.9f,1);
         LokiNetwork.fx(this,"rift_close");discard();
         if(failed>0)owner.displayClientMessage(net.minecraft.network.chat.Component.literal("Some entities could not cross safely and remain at the source."),true);
@@ -123,10 +138,12 @@ public final class RiftEntity extends Entity {
         entityData.set(SEED,n.getInt("seed"));
         entityData.set(HOMEWARD,n.getBoolean("homeward"));
         if(n.hasUUID("caster"))caster=n.getUUID("caster");
+        destination=n.contains("destination")?FractureAnchor.load(n.getCompound("destination")):null;
     }
     @Override protected void addAdditionalSaveData(CompoundTag n) {
         n.putInt("life",life());n.putInt("seed",seed());n.putBoolean("homeward",homeward());
         if(caster!=null)n.putUUID("caster",caster);
+        if(destination!=null)n.put("destination",destination.save());
     }
     @Override public Packet<ClientGamePacketListener> getAddEntityPacket() {return NetworkHooks.getEntitySpawningPacket(this);}
 }
