@@ -42,13 +42,14 @@ public final class LokiServer {
     }
     public static void input(ServerPlayer p,int action,int value) {
         long now=LokiData.now(p);
+        if(action==6){LokiNetwork.sync(p);return;}
+        if(!LokiData.access(p)){notice(p,"Your Loki abilities are locked.");return;}
         if(action==5){if(now-INPUT.getOrDefault(p.getUUID(),-100L)<2)return;INPUT.put(p.getUUID(),now);if(value>=0&&value<Ability.values().length&&LokiData.unlocked(p,Ability.at(value)))LokiData.get(p).putInt("selected",value);LokiNetwork.sync(p);return;}
         if(TemporalEngine.frozen(p)||p.isSpectator())return;
         if(now-INPUT.getOrDefault(p.getUUID(),-100L)<(TemporalEngine.slowed(p)?15:3))return;INPUT.put(p.getUUID(),now);
         if(action==2){release(p,false);TemporalEngine.clear(p);return;}
         if(action==4){weapon(p,value!=0);return;}
         Ability a=action==3?Ability.ASCENSION:LokiData.selected(p);
-        if(action==6){LokiNetwork.sync(p);return;}
         if(action==1&&secondary(p,a)) {LokiNetwork.sync(p);return;}
         if(!LokiData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return;}
         if(LokiData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return;}
@@ -128,7 +129,7 @@ public final class LokiServer {
     }
     private static void dismissWeapons(ServerPlayer p) {for(InteractionHand hand:InteractionHand.values())if(p.getItemInHand(hand).getItem() instanceof ConjuredWeapon&&p.getItemInHand(hand).hasTag()&&p.getItemInHand(hand).getTag().hasUUID("conjurer"))p.setItemInHand(hand,ItemStack.EMPTY);}
     public static void weapon(ServerPlayer p,boolean secondary) {
-        if(TemporalEngine.frozen(p)||!p.isAlive()||p.isSpectator()||!(p.getMainHandItem().getItem() instanceof ConjuredWeapon w))return;
+        if(!LokiData.access(p)||TemporalEngine.frozen(p)||!p.isAlive()||p.isSpectator()||!(p.getMainHandItem().getItem() instanceof ConjuredWeapon w))return;
         long now=LokiData.now(p);Strike prior=STRIKES.get(p.getUUID());if(prior!=null&&prior.end>now)return;
         int combo=prior==null||now-prior.end>18?0:(prior.combo+1)%4;
         if(secondary&&w.kind==0) {SpellProjectile.cast(p,p.getEyePosition(),p.getLookAngle(),2,false);gesture(p,"dagger_throw","conjure",Loki.CONJURE.get());STRIKES.put(p.getUUID(),new Strike(0,combo,0,now+14));return;}
@@ -141,6 +142,7 @@ public final class LokiServer {
     public static void tick(ServerPlayer p) {
         long now=LokiData.now(p);CompoundTag d=LokiData.get(p);
         if(!p.isAlive())return;
+        if(!LokiData.access(p)){dismissWeapons(p);return;}
         if(now%4==0&&!TemporalEngine.frozen(p)) {ArrayDeque<Moment> h=HISTORY.computeIfAbsent(p.getUUID(),k->new ArrayDeque<>());h.addLast(new Moment(p.position(),p.getYRot(),p.getXRot(),p.getHealth()));while(h.size()>50)h.removeFirst();}
         int temporal=LokiData.mastery(p,Discipline.TEMPORAL);
         if(now%200==0&&temporal<160&&LokiData.unlocked(p,Ability.TIME_SLIP)&&!TemporalEngine.frozen(p)&&!p.isPassenger()&&p.getRandom().nextInt(5)==0&&LokiData.energy(p)>=15&&LokiData.cooldown(p,Ability.TIME_SLIP)==0){if(cast(p,Ability.TIME_SLIP,false)){LokiData.spend(p,15);LokiData.get(p).putLong("cd_TIME_SLIP",now+400);reward(p,Discipline.TEMPORAL,120);}}
@@ -195,6 +197,11 @@ public final class LokiServer {
     public static void reward(ServerPlayer p,Discipline d,int xp) {long now=LokiData.now(p);if(now-TRAINING.getOrDefault(p.getUUID(),-100L)<20)return;TRAINING.put(p.getUUID(),now);LokiData.train(p,d,xp);if(d==Discipline.TEMPORAL&&LokiData.mastery(p,d)>=800)LokiData.train(p,Discipline.PURPOSE,xp/2);}
     private static void gesture(ServerPlayer p,String animation,String fx,SoundEvent sound) {LokiNetwork.animate(p,animation);LokiNetwork.fx(p,fx);p.level().playSound(null,p.blockPosition(),sound,SoundSource.PLAYERS,.75f,1);}
     private static void notice(ServerPlayer p,String text) {p.displayClientMessage(Component.literal(text),true);}
+    public static void access(ServerPlayer p,boolean enabled) {
+        LokiData.access(p,enabled);
+        if(!enabled){LokiData.get(p).putBoolean("ascended",false);clear(p,false);dismissWeapons(p);}
+        LokiNetwork.sync(p);
+    }
     public static void clear(ServerPlayer p,boolean death) {release(p,false);clearIllusions(p);TemporalEngine.clear(p);HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());LokiData.clearTransient(p,death);}
     public static void reset() {HISTORY.clear();HELD.clear();CHARMS.clear();STRIKES.clear();INPUT.clear();TRAINING.clear();ILLUSIONS.clear();WATCHED.clear();TemporalEngine.reset();}
 }

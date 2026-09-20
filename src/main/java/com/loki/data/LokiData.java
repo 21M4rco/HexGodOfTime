@@ -9,6 +9,8 @@ public final class LokiData {
         if(!parent.contains("Loki")) {CompoundTag n=new CompoundTag();n.putFloat("energy",100);parent.put("Loki",n);}
         return parent.getCompound("Loki");
     }
+    public static boolean access(Player p) {return get(p).getBoolean("abilitiesEnabled");}
+    public static void access(Player p,boolean enabled) {get(p).putBoolean("abilitiesEnabled",enabled);}
     public static int mastery(Player p,Discipline d) {return MasteryCurve.levelForXp(get(p).getLong("xp_"+d.name()));}
     public static void mastery(Player p,Discipline d,int level) {get(p).putLong("xp_"+d.name(),MasteryCurve.xpForLevel(level));}
     public static void train(Player p,Discipline d,int xp) {get(p).putLong("xp_"+d.name(),Math.min(MasteryCurve.MAX_XP,get(p).getLong("xp_"+d.name())+Math.max(0,xp)));}

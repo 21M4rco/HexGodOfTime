@@ -16,7 +16,7 @@ import net.minecraftforge.fml.common.Mod;
 public final class ServerEvents {
     @SubscribeEvent public static void player(TickEvent.PlayerTickEvent e) {if(e.phase==TickEvent.Phase.END&&e.player instanceof ServerPlayer p)LokiServer.tick(p);}
     @SubscribeEvent public static void level(TickEvent.LevelTickEvent e) {if(e.phase==TickEvent.Phase.START&&e.level instanceof ServerLevel s){TemporalEngine.tick(s);LokiServer.tickLevel(s);}}
-    @SubscribeEvent public static void login(PlayerEvent.PlayerLoggedInEvent e) {if(e.getEntity() instanceof ServerPlayer p){LokiData.get(p).remove("transformStart");LokiNetwork.sync(p);}}
+    @SubscribeEvent public static void login(PlayerEvent.PlayerLoggedInEvent e) {if(e.getEntity() instanceof ServerPlayer p){LokiData.get(p).remove("transformStart");if(LokiData.access(p))LokiNetwork.sync(p);else LokiServer.access(p,false);}}
     @SubscribeEvent public static void tracking(PlayerEvent.StartTracking e) {if(e.getEntity() instanceof ServerPlayer p){TemporalEngine.track(p,e.getTarget());if(e.getTarget() instanceof ServerPlayer q)LokiNetwork.to(p,new LokiNetwork.Message(0,q.getId(),LokiData.get(q).copy()));}}
     @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p)LokiServer.clear(p,false);}
     @SubscribeEvent public static void dimension(PlayerEvent.PlayerChangedDimensionEvent e) {if(e.getEntity() instanceof ServerPlayer p){LokiServer.clear(p,false);LokiNetwork.sync(p);}}
@@ -27,7 +27,7 @@ public final class ServerEvents {
     @SubscribeEvent public static void interact(PlayerInteractEvent e) {if(!e.getLevel().isClientSide&&TemporalEngine.frozen(e.getEntity())&&e.isCancelable())e.setCanceled(true);}
     @SubscribeEvent public static void hurt(LivingHurtEvent e) {if(e.getEntity() instanceof ServerPlayer p&&LokiData.get(p).getLong("wardUntil")>LokiData.now(p))e.setAmount(e.getAmount()*.25f);if(e.getSource().getEntity()!=null&&TemporalEngine.frozen(e.getSource().getEntity()))e.setCanceled(true);}
     @SubscribeEvent public static void target(LivingChangeTargetEvent e) {if(e.getEntity() instanceof Mob m&&LokiServer.charmedAgainst(m,e.getNewTarget()))e.setCanceled(true);}
-    @SubscribeEvent public static void fall(LivingFallEvent e) {if(e.getEntity() instanceof ServerPlayer p&&LokiData.mastery(p,Discipline.SORCERY)>0)e.setDistance(Math.max(0,e.getDistance()-3));}
+    @SubscribeEvent public static void fall(LivingFallEvent e) {if(e.getEntity() instanceof ServerPlayer p&&LokiData.access(p)&&LokiData.mastery(p,Discipline.SORCERY)>0)e.setDistance(Math.max(0,e.getDistance()-3));}
     @SubscribeEvent public static void breakBlock(net.minecraftforge.event.level.BlockEvent.BreakEvent e) {if(TemporalEngine.frozen(e.getPlayer()))e.setCanceled(true);}
     @SubscribeEvent public static void stopping(ServerStoppingEvent e) {for(ServerPlayer p:e.getServer().getPlayerList().getPlayers())LokiServer.clear(p,false);LokiServer.reset();}
 }
