@@ -21,6 +21,9 @@ import net.minecraft.world.level.block.state.BlockState;
 public final class SoftTerrain {
     private SoftTerrain() {}
 
+    /** Past this a block is structural whatever else it looks like, so it sheds fragments rather than dust. */
+    private static final float LOOSE_HARDNESS=.7f;
+
     public static boolean soft(BlockGetter level,BlockPos pos,BlockState state) {
         if(state.isAir()||state.hasBlockEntity())return false;
         if(!state.getFluidState().isEmpty())return false;
