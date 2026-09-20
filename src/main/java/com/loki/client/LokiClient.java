@@ -25,6 +25,7 @@ public final class LokiClient {
         TRANSFORM=key("transform",GLFW.GLFW_KEY_H),RELEASE=key("release",GLFW.GLFW_KEY_X);
     private static KeyMapping key(String name,int key){return new KeyMapping("key.loki."+name,InputConstants.Type.KEYSYM,key,"key.categories.loki");}
     private static boolean primaryDown,selectDown;
+    private static int repeat;
 
     @Mod.EventBusSubscriber(modid=Loki.ID,value=Dist.CLIENT,bus=Mod.EventBusSubscriber.Bus.MOD)
     public static final class ModBus {
@@ -69,7 +70,9 @@ public final class LokiClient {
 
             Ability selected=Ability.at(ClientState.self().getInt("selected"));
             boolean primary=PRIMARY.isDown();
-            if(primary&&!primaryDown)LokiNetwork.send(selected.hold?LokiServer.HOLD_BEGIN:LokiServer.CAST,0);
+            if(primary&&!primaryDown){LokiNetwork.send(selected.hold?LokiServer.HOLD_BEGIN:LokiServer.CAST,0);repeat=0;}
+            // Holding an ordinary spell repeats it; the server's own rate limit and cooldown set the pace.
+            else if(primary&&!selected.hold&&++repeat>=5){repeat=0;LokiNetwork.send(LokiServer.CAST,0);}
             if(!primary&&primaryDown&&selected.hold)LokiNetwork.send(LokiServer.HOLD_END,0);
             primaryDown=primary;
 

@@ -20,7 +20,9 @@ public final class TemporalCloth {
     private static final double LENGTH=1.24,HALF_TOP=.29,HALF_BOTTOM=.47;
     private static final double GRAVITY=.021,DAMPING=.94,SEGMENT=LENGTH/(ROWS-1);
     private static final int PASSES=6;
-    private static final double BODY_RADIUS=.34,TELEPORT=2.5;
+    private static final double TOP_BACK=.22,TELEPORT=2.5;
+    /** The wearer as an upright elliptical column: wide across the shoulders, shallow front to back. */
+    private static final double TORSO_SIDE=.30,TORSO_DEPTH=.20,HIP_SIDE=.25,HIP_DEPTH=.17;
 
     private final double[] x=new double[ROWS*COLS],y=new double[ROWS*COLS],z=new double[ROWS*COLS];
     private final double[] px=new double[ROWS*COLS],py=new double[ROWS*COLS],pz=new double[ROWS*COLS];
@@ -46,7 +48,7 @@ public final class TemporalCloth {
         boolean prone=p.isFallFlying()||p.getPose()==Pose.SWIMMING||p.isVisuallySwimming();
         double shoulder=prone?.42:p.getEyeHeight()-.17;
         Vec3 lean=p.isCrouching()?back.scale(-.15):Vec3.ZERO;
-        Vec3 centre=p.position().add(0,shoulder,0).add(back.scale(prone?.05:.15)).add(lean);
+        Vec3 centre=p.position().add(0,shoulder,0).add(back.scale(prone?.05:TOP_BACK)).add(lean);
 
         if(!ready) {
             reset(centre,sideways,back);
@@ -92,7 +94,7 @@ public final class TemporalCloth {
                     if(col+1<COLS)link(at(row,col),at(row,col+1),2*halfWidth(t)/(COLS-1),.5);
                 }
             }
-            for(int row=1;row<ROWS;row++)for(int col=0;col<COLS;col++)collide(at(row,col),p);
+            for(int row=1;row<ROWS;row++)for(int col=0;col<COLS;col++)collide(at(row,col),p,sideways,back);
         }
         ready=true;
     }
@@ -109,7 +111,7 @@ public final class TemporalCloth {
         for(int row=0;row<ROWS;row++) {
             double t=rowT(row);
             for(int col=0;col<COLS;col++) {
-                Vec3 v=centre.add(sideways.scale(colU(col)*halfWidth(t))).add(back.scale(.02+.14*t)).add(0,-LENGTH*t,0);
+                Vec3 v=centre.add(sideways.scale(colU(col)*halfWidth(t))).add(back.scale(.12*t)).add(0,-LENGTH*t,0);
                 int i=at(row,col);
                 x[i]=px[i]=ox[i]=v.x;y[i]=py[i]=oy[i]=v.y;z[i]=pz[i]=oz[i]=v.z;
             }
@@ -126,20 +128,26 @@ public final class TemporalCloth {
         x[b]-=dx*k*shareB;y[b]-=dy*k*shareB;z[b]-=dz*k*shareB;
     }
 
-    /** Keeps the cloth outside the wearer and above the floor so it never saws through either. */
-    private void collide(int i,LivingEntity p) {
+    /**
+     * Keeps the cloth outside the wearer and above the floor. The body is treated as an upright ellipse in
+     * the wearer's own frame rather than a circle, because a player is far wider across the shoulders than
+     * front to back; a circle fat enough to clear the shoulders would hold the cloak well off the spine.
+     */
+    private void collide(int i,LivingEntity p,Vec3 sideways,Vec3 back) {
         if(y[i]<ground){y[i]=ground;px[i]+=(x[i]-px[i])*.5;pz[i]+=(z[i]-pz[i])*.5;}
-        double top=p.getY()+p.getBbHeight();
-        if(y[i]>top||y[i]<p.getY()-.1)return;
+        if(y[i]>p.getY()+p.getBbHeight()||y[i]<p.getY()-.1)return;
+        boolean torso=y[i]>p.getY()+p.getBbHeight()*.45;
+        double halfSide=torso?TORSO_SIDE:HIP_SIDE,halfDepth=torso?TORSO_DEPTH:HIP_DEPTH;
         double dx=x[i]-p.getX(),dz=z[i]-p.getZ();
-        double flat=Math.sqrt(dx*dx+dz*dz);
-        double radius=y[i]>p.getY()+p.getBbHeight()*.45?BODY_RADIUS:BODY_RADIUS*.8;
-        if(flat>=radius)return;
-        if(flat<1e-6){x[i]+=radius;return;}
-        double scale=radius/flat;
-        x[i]=p.getX()+dx*scale;
-        z[i]=p.getZ()+dz*scale;
+        double side=dx*sideways.x+dz*sideways.z,depth=dx*back.x+dz*back.z;
+        double reach=Math.sqrt(square(side/halfSide)+square(depth/halfDepth));
+        if(reach>=1)return;
+        if(reach<1e-6){depth=halfDepth;side=0;}
+        else {double scale=1/reach;side*=scale;depth*=scale;}
+        x[i]=p.getX()+sideways.x*side+back.x*depth;
+        z[i]=p.getZ()+sideways.z*side+back.z*depth;
     }
+    private static double square(double v) {return v*v;}
 
     /** Interpolated world position of one grid node. */
     public Vec3 node(int row,int col,float partial) {

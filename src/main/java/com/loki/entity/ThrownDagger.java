@@ -51,7 +51,7 @@ public final class ThrownDagger extends ThrowableProjectile {
         e.entityData.set(ROLL,p.getRandom().nextFloat()*360);
         e.shoot(aim.x,aim.y,aim.z,1.85f,illusory?2.5f:.7f);
         p.level().addFreshEntity(e);
-        p.level().playSound(null,p.blockPosition(),Loki.BLADE_THROW.get(),SoundSource.PLAYERS,.8f,.95f+p.getRandom().nextFloat()*.12f);
+        p.level().playSound(null,e.blockPosition(),Loki.BLADE_THROW.get(),SoundSource.PLAYERS,.8f,.95f+p.getRandom().nextFloat()*.12f);
         return e;
     }
 

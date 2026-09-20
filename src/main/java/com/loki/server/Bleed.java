@@ -34,19 +34,20 @@ public final class Bleed {
 
     public static void tick(ServerLevel level) {
         long now=level.getGameTime();
-        Iterator<Map.Entry<UUID,Wound>> it=WOUNDS.entrySet().iterator();
-        while(it.hasNext()) {
-            Map.Entry<UUID,Wound> entry=it.next();
-            if(!(level.getEntity(entry.getKey()) instanceof LivingEntity victim))continue;
-            Wound wound=entry.getValue();
-            if(!victim.isAlive()||now>=wound.expires){it.remove();notifyClients(victim,0);continue;}
+        // Snapshot the keys: a wound that finishes its victim fires a death event, and that clears
+        // entries from this very map while we are still walking it.
+        for(UUID id:new ArrayList<>(WOUNDS.keySet())) {
+            Wound wound=WOUNDS.get(id);
+            if(wound==null)continue;
+            if(!(level.getEntity(id) instanceof LivingEntity victim))continue;
+            if(!victim.isAlive()||now>=wound.expires){WOUNDS.remove(id);notifyClients(victim,0);continue;}
             if(now<wound.next)continue;
             wound.next=now+INTERVAL;
             ServerPlayer owner=level.getServer().getPlayerList().getPlayer(wound.owner);
             var source=owner!=null?owner.damageSources().indirectMagic(owner,owner):level.damageSources().magic();
             victim.hurt(source,.8f*wound.stacks);
             if(owner!=null)LokiServer.reward(owner,Discipline.CONJURATION,20);
-            notifyClients(victim,wound.stacks);
+            if(WOUNDS.containsKey(id))notifyClients(victim,wound.stacks);
         }
     }
 

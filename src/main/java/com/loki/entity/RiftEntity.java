@@ -69,6 +69,7 @@ public final class RiftEntity extends Entity {
             recent.put(player.getUUID(),now+60);
             if(homeward())PocketRealm.leave(player);
             else PocketRealm.enter(player);
+            if(isRemoved())return;
         }
     }
 

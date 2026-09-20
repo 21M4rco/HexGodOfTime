@@ -78,7 +78,15 @@ public final class TemporalEngine {
         return true;
     }
 
+    private static boolean ticking;
+
     public static void tick(ServerLevel level) {
+        if(ticking)return;
+        ticking=true;
+        try {run(level);} finally {ticking=false;}
+    }
+
+    private static void run(ServerLevel level) {
         long now=level.getGameTime();
         FIELDS.removeIf(f->{
             if(f.level!=level)return false;
@@ -109,18 +117,19 @@ public final class TemporalEngine {
                 } else desired.merge(e.getUUID(),f.expires,Math::max);
             }
         }
-        RAMPING.keySet().removeIf(id->!desiredRamp.containsKey(id)&&!isResuming(id,now));
+        RAMPING.keySet().removeIf(id->level.getEntity(id)!=null&&!desiredRamp.containsKey(id)&&!isResuming(id,now));
         RAMPING.putAll(desiredRamp);
         Iterator<Map.Entry<UUID,Entity>> oldSlow=SLOWED.entrySet().iterator();
         while(oldSlow.hasNext()){var e=oldSlow.next();if(e.getValue().level()==level&&!desiredSlow.containsKey(e.getKey())){slowSync(e.getValue(),false);oldSlow.remove();}}
         for(var e:desiredSlow.entrySet())if(!SLOWED.containsKey(e.getKey())){SLOWED.put(e.getKey(),e.getValue());slowSync(e.getValue(),true);}
+        List<Frozen> releasing=new ArrayList<>();
         Iterator<Map.Entry<UUID,Frozen>> it=FROZEN.entrySet().iterator();
         while(it.hasNext()) {
             var entry=it.next();Frozen s=entry.getValue();
             if(s.entity.level()!=level)continue;
             if(!desired.containsKey(entry.getKey())||s.entity.isRemoved()||s.entity instanceof ServerPlayer&&now>=s.expires) {
                 if(s.entity instanceof ServerPlayer){PLAYER_GRACE.put(entry.getKey(),now+100);desired.remove(entry.getKey());}
-                restore(s,now);it.remove();
+                it.remove();releasing.add(s);
             }
         }
         for(var entry:desired.entrySet()) {
@@ -136,6 +145,7 @@ public final class TemporalEngine {
             if(now%20==0)sync(s,true);
         }
         RESUMING.values().removeIf(v->v<now);
+        for(Frozen s:releasing)restore(s,now);
     }
 
     private static final Map<UUID,Long> RESUMING=new HashMap<>();
