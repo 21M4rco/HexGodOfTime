@@ -291,3 +291,30 @@ directional streaking. Cuboids spinning off in all directions read as rubble and
 - That Nothingness cannot be obtained, mined, exploded, pushed by a piston, or picked in creative.
 - Erasure pacing at 7.5s and at 12s — whether it is now too slow to play against rather than only to watch.
 - That no mob tips over and no player corpse is ever visible, from a second client.
+
+
+## 0.4.2 — Meteor size, a tree that stops nothing, and a seat with an owner
+
+- **Meteors vary.** Each picks a width from one to five blocks, weighted low (`roll^2.3`) so most are
+  boulders and a five-block mass is an event. Size drives the renderer's lump cluster, the tail's length
+  and density, the entry and impact volume and pitch, the harm (18 + 7×size) and the splash (2.4 + 0.95×size).
+- **Bigger falls slower.** Terminal speed drops from 3.6 to about 1.5 blocks per tick across the range, and
+  the pull that gets it there drops with it, so a large stone is ponderous rather than merely late.
+  Physically backwards, cinematically right; that is the trade being made on purpose.
+- **The tree stops nothing.** The fall is stepped by hand rather than handed to the level's own clip,
+  because a clip cannot be told to ignore anything. Logs, leaves, the froglight in the boughs, amethyst,
+  flowers and moss are passed straight through; the first genuinely solid thing that is not the tree ends
+  the journey. A meteor that thumps to a halt in the canopy is a meteor that never arrives.
+- **The throne has an owner.** A non-owner clicking it is thrown clear instead of seated; anything living
+  that comes within 2.6 blocks of the seat is thrown clear too, on a five-tick cadence over one small box,
+  only where a player is already standing. The owner seated in their own hall keeps Regeneration II on a
+  four-second lease, so it lapses moments after they stand.
+
+### Not verified — needs a recorded in-game session
+
+- Meteors of each size arriving, and that a large one is visibly slower and visibly heavier.
+- A meteor passing cleanly through the canopy and the trunk with no interaction at all.
+- That a meteor still cannot damage the island, at five-block size.
+- A second player, and a mob, being thrown off the throne; the owner still seated normally; Regeneration
+  present while seated and gone shortly after standing.
+- That the guard does not throw the owner, their mount, or anything they care about that merely walks past.

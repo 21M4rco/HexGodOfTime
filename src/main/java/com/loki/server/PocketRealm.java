@@ -330,6 +330,7 @@ public final class PocketRealm {
     public static void tick(ServerLevel level) {
         if(!inside(level))return;
         Starfall.tick(level);
+        Throne.guard(level);
         for(ServerPlayer player:level.players())prepare(level,occupiedPlot(player));
         if(!PENDING.isEmpty()) {
             int[] job=PENDING.get(0);
@@ -495,6 +496,8 @@ public final class PocketRealm {
         int localX=Math.floorMod(clicked.getX(),SPACING),localZ=Math.floorMod(clicked.getZ(),SPACING);
         if(localX<49||localX>51||localZ<51||localZ>54)return false;
         Vec3 seatAt=new Vec3(clicked.getX()-localX+50.5,FLOOR_Y+6,clicked.getZ()-localZ+53.5);
+        // One person's seat. A visitor asking for it is thrown clear rather than refused politely.
+        if(!ownsHere(player))return Throne.refuse(player,seatAt);
         if(!player.level().getEntitiesOfClass(com.loki.entity.ThroneSeat.class,new net.minecraft.world.phys.AABB(seatAt,seatAt).inflate(2)).isEmpty())return true;
         var seat=new com.loki.entity.ThroneSeat(com.loki.Loki.THRONE_SEAT.get(),player.level());
         seat.setPos(seatAt);seat.setYRot(0);
@@ -504,5 +507,5 @@ public final class PocketRealm {
         player.setYRot(0);player.setYHeadRot(0);return true;
     }
 
-    public static void reset() {PENDING.clear();KNEELING.clear();garden=null;oldGarden=null;Starfall.reset();SanctumWard.reset();}
+    public static void reset() {PENDING.clear();KNEELING.clear();garden=null;oldGarden=null;Starfall.reset();SanctumWard.reset();Throne.reset();}
 }

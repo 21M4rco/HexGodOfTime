@@ -157,12 +157,14 @@ public final class WorldEffects {
                 boolean close=away<6400;
                 if(!close&&now%3!=0)continue;
                 float heat=star.heat();
+                // A five-block mass sheds proportionally more of everything than a boulder does.
+                float bulk=star.bulk();
                 Vec3 back=star.getDeltaMovement().lengthSqr()<1e-6?Vec3.ZERO:star.getDeltaMovement().normalize().scale(-.22);
                 // Flame shed off the stone, cinders torn loose, and the ash column left hanging behind it.
-                Vfx.cone(Loki.METEOR_FIRE.get(),star.position(),back,Vfx.count(close?1.6f+heat*2f:1),.3,.16);
-                Vfx.cloud(Loki.ASH.get(),star.position().add(back.scale(4)),.7+heat,Vfx.count(close?1.2f:.5f),.014);
+                Vfx.cone(Loki.METEOR_FIRE.get(),star.position(),back,Vfx.count((close?1.6f+heat*2f:1)*(1+bulk*1.6f)),.3+bulk*.5,.16+bulk*.3);
+                Vfx.cloud(Loki.ASH.get(),star.position().add(back.scale(4)),(.7+heat)*(1+bulk*1.4),Vfx.count((close?1.2f:.5f)*(1+bulk)),.014);
                 if(close&&mc.level.random.nextFloat()<.35f+heat*.5f)
-                    Vfx.cone(Loki.CINDER.get(),star.position(),back,1,.22,.18);
+                    Vfx.cone(Loki.CINDER.get(),star.position(),back,Vfx.count(1+bulk*2),.22,.18+bulk*.2);
                 if(close&&heat>.6f&&now%3==0)Vfx.spark(Loki.STAR.get(),star.position(),Vec3.ZERO);
                 continue;
             }

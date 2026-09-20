@@ -17,6 +17,8 @@ public final class ThroneSeat extends Entity {
     @Override protected void addAdditionalSaveData(CompoundTag tag) {}
     @Override public void tick() {
         super.tick();setDeltaMovement(Vec3.ZERO);
+        // Sitting in your own hall mends you. Renewed on a short lease, so it lapses when you stand.
+        com.loki.server.Throne.crown(this);
         if(!level().isClientSide&&(getPassengers().isEmpty()||!PocketRealm.inside(level())
             ||!level().getBlockState(blockPosition().below()).is(net.minecraft.world.level.block.Blocks.POLISHED_BLACKSTONE)))discard();
     }

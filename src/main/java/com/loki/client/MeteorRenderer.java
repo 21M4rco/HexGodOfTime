@@ -19,7 +19,8 @@ import net.minecraft.world.phys.Vec3;
  *
  * <p>Two passes and two draw calls: the stone through the ordinary translucent sheet, everything burning
  * through one additive one. The whole silhouette comes from the entity's seed, so no two look alike, and
- * the tail's length and brightness come from the entity's own heat.
+ * the tail's length and brightness come from the entity's own heat and its own bulk — a five-block mass
+ * drags a far longer and heavier trail behind it than a boulder does.
  */
 public final class MeteorRenderer extends EntityRenderer<StarfallEntity> {
     public MeteorRenderer(EntityRendererProvider.Context ctx){super(ctx);}
@@ -37,7 +38,10 @@ public final class MeteorRenderer extends EntityRenderer<StarfallEntity> {
         Vec3 travel=e.getDeltaMovement();
         Vec3 forward=travel.lengthSqr()<1e-8?new Vec3(0,-1,0):travel.normalize();
         Vec3 side=BranchVfx.perpendicular(forward),up=side.cross(forward).normalize();
-        double size=.42+.22*heat;
+        // The lumps sit within about 1.4 half-widths of the centre, so this is the figure that makes the
+        // cluster come out roughly as wide across as the entity says it is: one block, or five.
+        double size=e.size()*.36*(1+.12*heat);
+        float bulk=Mth.clamp(e.bulk(),0,1);
 
         // --- the stone -----------------------------------------------------------------
         // Drawn first and on its own sheet, so the additive fire never has to fight it for a batch.
@@ -65,8 +69,8 @@ public final class MeteorRenderer extends EntityRenderer<StarfallEntity> {
         }
 
         // --- the tail --------------------------------------------------------------------
-        double length=(7+22*heat)*(.55+.45*charge);
-        int steps=Math.max(6,(int)(length/1.4));
+        double length=(6+20*heat)*(.55+.45*charge)*(.85+1.15*bulk);
+        int steps=Math.max(6,Math.min(28,(int)(length/1.4)));
         for(int i=0;i<steps;i++) {
             double t=i/(double)steps,t2=(i+1)/(double)steps;
             Vec3 from=forward.scale(-length*t),to=forward.scale(-length*t2);
@@ -83,7 +87,7 @@ public final class MeteorRenderer extends EntityRenderer<StarfallEntity> {
         }
 
         // --- streaks of ablation torn off the sides --------------------------------------
-        for(int f=0;f<3;f++) {
+        for(int f=0;f<3+(int)(bulk*4);f++) {
             long bolt=(long)(time/2)*7+f+seed;
             double a=TemporalLightning.rand(bolt,1)*Math.PI*2;
             Vec3 out=side.scale(Math.cos(a)).add(up.scale(Math.sin(a)));
