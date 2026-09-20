@@ -66,3 +66,14 @@ Meshes, textures, particle sprites, animation keyframes and original synthesised
 ## Validation status
 
 Build and validation status is recorded in `docs/VALIDATION.md`. A successful Java build does not verify in-game appearance, shader compatibility, multiplayer illusion believability or model alignment. This project must not be described as having passed those checks unless a recorded game test actually establishes them.
+
+## 0.2.1 — World tree and mantle fixes
+
+- The cape seam follows the rendered torso, including Player Animator, crouching and body rotation. The longer hem drags on collision surfaces.
+- A solid black forehead band fits around the Minecraft head and joins both horns.
+- Court of Lies hides the caster completely; projections roam in separate sectors and stop stale paths instead of converging on the caster.
+- Fracture has an eight-second cooldown. Each private realm is an open floating island beneath an emerald galaxy, with a large luminous world tree and a blackstone/gold throne at its heart.
+- Existing sanctums upgrade when their owner enters. Generated walls and matching original floors are replaced; other placed blocks are retained. Construction is budgeted across ticks and its progress survives restarts.
+- Crouch for three seconds on the green/gold arrival sigil to return without spending energy. Fracture also opens the normal return portal.
+
+Client appearance and movement still require in-game verification; compilation alone cannot establish those results.

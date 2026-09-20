@@ -29,6 +29,7 @@ public final class LokiClient {
 
     @Mod.EventBusSubscriber(modid=Loki.ID,value=Dist.CLIENT,bus=Mod.EventBusSubscriber.Bus.MOD)
     public static final class ModBus {
+        @SubscribeEvent public static void dimensionEffects(RegisterDimensionSpecialEffectsEvent e){e.register(Loki.id("pocket"),new RealmSky());}
         @SubscribeEvent public static void keys(RegisterKeyMappingsEvent e){for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE})e.register(k);}
         @SubscribeEvent public static void entities(EntityRenderersEvent.RegisterRenderers e) {
             e.registerEntityRenderer(Loki.ILLUSION.get(),IllusionRenderer::new);
@@ -44,7 +45,7 @@ public final class LokiClient {
         }
         @SubscribeEvent public static void reload(RegisterClientReloadListenersEvent e) {
             e.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)r->{
-                LokiLayer.clear();WeaponRenderer.clear();RiftRenderer.clear();TemporalScreen.close();
+                LokiLayer.clear();WeaponRenderer.clear();RiftRenderer.clear();RealmSky.clear();TemporalScreen.close();
             });
         }
     }
@@ -108,10 +109,11 @@ public final class LokiClient {
             if(e.getOverlay().id().equals(net.minecraftforge.client.gui.overlay.VanillaGuiOverlay.HOTBAR.id()))LokiHud.render(e.getGuiGraphics());
         }
         @SubscribeEvent public static void world(RenderLevelStageEvent e) {
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY)CapeRenderer.beginFrame(e);
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES)WorldEffects.render(e);
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL)TemporalScreen.render(e.getPartialTick());
         }
-        @SubscribeEvent public static void player(RenderPlayerEvent.Pre e){DisguiseRenderer.render(e);if(!e.isCanceled())WorldEffects.beforePlayer(e);}
+        @SubscribeEvent public static void player(RenderPlayerEvent.Pre e){if(ClientState.data(e.getEntity().getId()).getLong("vanishUntil")>ClientState.now()){e.setCanceled(true);return;}DisguiseRenderer.render(e);if(!e.isCanceled())WorldEffects.beforePlayer(e);}
         @SubscribeEvent public static void playerEnd(RenderPlayerEvent.Post e){WorldEffects.afterPlayer(e);}
     }
 }

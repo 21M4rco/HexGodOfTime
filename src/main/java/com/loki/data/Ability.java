@@ -13,7 +13,7 @@ public enum Ability {
     TELEKINESIS(SORCERY,140,0,25,false,"Invisible Hand","Aim to hold an entity; cast again to add another. Scroll to push or pull. Secondary: throw. Utility: release."),
     BLINK(SORCERY,220,0,70,false,"Veilstep","Dissolve and reform at a safe position in your sightline."),
     WARD(SORCERY,330,0,220,false,"Runic Ward","Raise a brief defensive veil while remaining mobile."),
-    RIFT(SORCERY,520,40,900,false,"Fracture","Shatter the surface of reality where you look. The break holds for seven seconds and opens onto a sanctum that answers to you alone."),
+    RIFT(SORCERY,520,40,160,false,"Fracture","Shatter the surface of reality where you look. The break holds for seven seconds and opens onto your emerald galaxy, world tree and throne. Recovers in eight seconds."),
     DAGGERS(CONJURATION,0,0,35,false,"Conjure Daggers","Manifest a dagger into an empty hand. Secondary: dismiss conjurations."),
     TWIN_DAGGERS(CONJURATION,160,0,55,false,"Twin Deceivers","Manifest two daggers, the off hand reversed. Attack: combinations. Use: throw."),
     LAEVATEINN(CONJURATION,380,0,70,false,"Laevateinn","Manifest the Void sword with its own choreography."),

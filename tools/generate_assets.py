@@ -137,15 +137,19 @@ stick.save('time_stick')
 
 # The crown and mantle stay in player-model units: they ride the head and body bones directly.
 crown = Mesh()
-for row in range(4):
-    for i in range(56):
-        points = []
-        for a, r in [(i, row), (i + 1, row), (i + 1, row + 1), (i, row + 1)]:
-            t = a * TAU / 56
-            u = r / 4
-            points.append((math.sin(t) * (.27 + .012 * math.sin(u * math.pi)),
-                           -.40 + u * .11 - math.cos(t) * .025, math.cos(t) * .27))
-        crown.quad(points, 'crown', 7)
+# Full forehead band sits outside the skin/hat cuboid, with solid top and bottom rims.
+for i in range(64):
+    def rim(a, y, radius):
+        angle = a * TAU / 64
+        sx, sz = math.sin(angle), math.cos(angle)
+        return (math.copysign(abs(sx) ** .12, sx) * radius, y,
+                math.copysign(abs(sz) ** .12, sz) * radius)
+    for lo, hi, radius in [(-.445, -.315, .302), (-.445, -.315, .290)]:
+        crown.quad([rim(i, lo, radius), rim(i+1, lo, radius),
+                    rim(i+1, hi, radius), rim(i, hi, radius)], 'forehead_band', 7)
+    for y in (-.445, -.315):
+        crown.quad([rim(i, y, .290), rim(i+1, y, .290),
+                    rim(i+1, y, .302), rim(i, y, .302)], 'forehead_band', 7)
 for sign in (-1, 1):
     centers, radii = [], []
     for i in range(33):

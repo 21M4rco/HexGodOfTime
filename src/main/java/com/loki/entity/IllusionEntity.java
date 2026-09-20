@@ -15,6 +15,8 @@ import net.minecraft.world.entity.ai.attributes.*;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.NetworkHooks;
 import java.util.*;
@@ -76,17 +78,17 @@ public final class IllusionEntity extends PathfinderMob {
         if(tickCount%10!=getId()%10)return;
         if(enemy==null)enemy=level().getEntitiesOfClass(Monster.class,getBoundingBox().inflate(20),e->e.isAlive()&&e.hasLineOfSight(this)).stream().min(Comparator.comparingDouble(e->e.distanceToSqr(this))).orElse(null);
         if(enemy==null) {
-            if(spec.behavior!=Behavior.WATCH&&distanceToSqr(p)>16)getNavigation().moveTo(p,1);
+            idle(p);
             return;
         }
         getLookControl().setLookAt(enemy,35,35);
         if(spec.decoy&&enemy instanceof Mob mob&&(mob.getTarget()==p||mob.getTarget()==null))mob.setTarget(this);
         Vec3 delta=position().subtract(enemy.position()).multiply(1,0,1).normalize();
         if(delta.lengthSqr()<1e-6)delta=new Vec3(1,0,0);
-        double angle=(getId()%7-3)*.4+tickCount*.025;
+        double angle=getId()*2.399963229728653+tickCount*.015;
         Vec3 orbit=new Vec3(Math.cos(angle),0,Math.sin(angle)).scale(3.4);
         Vec3 goal=switch(spec.behavior) {
-            case APPROACH,FEINT -> enemy.position().add(delta.scale(1.4));
+            case APPROACH,FEINT -> enemy.position().add(orbit.normalize().scale(1.6));
             case THROW -> enemy.position().add(delta.scale(7));
             case RETREAT -> position().add(delta.scale(5));
             case STRAFE,BLINK -> enemy.position().add(orbit);
@@ -100,6 +102,41 @@ public final class IllusionEntity extends PathfinderMob {
         }
         if(spec.behavior==Behavior.BLINK&&tickCount%60==getId()%10&&level().noCollision(this,getBoundingBox().move(goal.subtract(position())))) {
             LokiNetwork.fx(this,"dispel");setPos(goal);
+        }
+    }
+
+    /** Each decoy owns a separate roaming sector. Never leave an old path pointing at the caster. */
+    private void idle(ServerPlayer caster) {
+        List<IllusionEntity> peers=level().getEntitiesOfClass(IllusionEntity.class,
+            caster.getBoundingBox().inflate(64),e->Objects.equals(e.owner(),owner())&&e.isAlive());
+        peers.sort(Comparator.comparingInt(Entity::getId));
+        int slot=Math.max(0,peers.indexOf(this)),count=Math.max(1,peers.size());
+        double angle=Math.PI*2*slot/count+.37;
+        // Small, independent wander inside the assigned sector, instead of all sharing a destination.
+        double wander=Math.sin((level().getGameTime()+getId()*37)*.012)*.20;
+        double radius=4.5+(slot%2)*1.5+Math.sin((level().getGameTime()+getId()*51)*.009)*.45;
+        Vec3 goal=caster.position().add(Math.cos(angle+wander)*radius,0,Math.sin(angle+wander)*radius);
+        Vec3 separation=Vec3.ZERO;
+        for(IllusionEntity peer:peers) {
+            if(peer==this)continue;
+            Vec3 away=position().subtract(peer.position()).multiply(1,0,1);
+            double distance=away.length();
+            if(distance<1.8)separation=separation.add(distance<.01
+                ?new Vec3(Math.cos(angle),0,Math.sin(angle)).scale(1.8)
+                :away.scale((1.8-distance)/distance));
+        }
+        if(separation.lengthSqr()>.01)goal=position().add(separation).lerp(goal,.4);
+        var floor=level().clip(new ClipContext(goal.add(0,3,0),goal.add(0,-5,0),
+            ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,this));
+        if(floor.getType()!=HitResult.Type.MISS)goal=new Vec3(goal.x,floor.getLocation().y,goal.z);
+        if(position().subtract(goal).horizontalDistanceSqr()<.36&&separation.lengthSqr()<.01) {
+            getNavigation().stop();
+            getLookControl().setLookAt(caster,20,20);
+        } else if(level().noCollision(this,getBoundingBox().move(goal.subtract(position())))) {
+            getNavigation().moveTo(goal.x,goal.y,goal.z,spec.behavior==Behavior.RETREAT?1.05:.85);
+        } else {
+            // An obstructed sector must not retain the previous path to a shared combat target.
+            getNavigation().stop();
         }
     }
 

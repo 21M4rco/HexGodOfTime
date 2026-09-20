@@ -19,6 +19,9 @@ public final class ClientState {
     public static long now(){return Minecraft.getInstance().level==null?0:Minecraft.getInstance().level.getGameTime();}
     public static CompoundTag data(int id){return PLAYERS.getOrDefault(id,new CompoundTag());}
     public static CompoundTag self(){var p=Minecraft.getInstance().player;return p==null?new CompoundTag():data(p.getId());}
+    public static boolean hidden(Entity entity) {
+        return entity.isInvisible()||data(entity.getId()).getLong("vanishUntil")>now();
+    }
     public static boolean frozen(int id){return FROZEN.containsKey(id);}
     public static float progress(int id,float partial) {
         CompoundTag d=data(id);

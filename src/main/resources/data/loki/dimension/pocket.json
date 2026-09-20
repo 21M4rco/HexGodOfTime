@@ -3,7 +3,7 @@
   "generator": {
     "type": "minecraft:flat",
     "settings": {
-      "biome": "minecraft:the_void",
+      "biome": "loki:pocket",
       "lakes": false,
       "features": false,
       "structure_overrides": [],

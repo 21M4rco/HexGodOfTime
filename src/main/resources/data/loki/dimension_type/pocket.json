@@ -8,13 +8,13 @@
   "has_skylight": false,
   "has_ceiling": false,
   "coordinate_scale": 1.0,
-  "ambient_light": 0.28,
+  "ambient_light": 0.42,
   "fixed_time": 18000,
   "logical_height": 256,
   "height": 256,
   "min_y": 0,
   "infiniburn": "#minecraft:infiniburn_overworld",
-  "effects": "minecraft:the_end",
+  "effects": "loki:pocket",
   "monster_spawn_light_level": 0,
   "monster_spawn_block_light_limit": 0
 }

@@ -2,157 +2,135 @@ package com.loki.client;
 
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Pose;
 import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
 
-/**
- * The cloak is solved in world space, not in the player's model space. Row zero is written directly to the
- * shoulder line every tick, so the cape is attached by construction and cannot drift off the back; every other
- * row is a Verlet particle that simply lags behind. Trailing while running, lift on a fall, the sideways throw
- * of a sharp turn and settling on landing all fall out of that lag rather than being faked with a wave function.
- * Nothing here is networked: it is cosmetic motion derived from movement each client can already see.
- */
+/** World-space cloth with attachment and body collision taken from the rendered torso bone. */
 public final class TemporalCloth {
-    public static final int ROWS=16,COLS=9;
-    private static final double LENGTH=1.24,HALF_TOP=.29,HALF_BOTTOM=.47;
-    private static final double GRAVITY=.021,DAMPING=.94,SEGMENT=LENGTH/(ROWS-1);
-    private static final int PASSES=6;
-    private static final double TOP_BACK=.22,TELEPORT=2.5;
-    /** The wearer as an upright elliptical column: wide across the shoulders, shallow front to back. */
-    private static final double TORSO_SIDE=.30,TORSO_DEPTH=.20,HIP_SIDE=.25,HIP_DEPTH=.17;
-
-    private final double[] x=new double[ROWS*COLS],y=new double[ROWS*COLS],z=new double[ROWS*COLS];
-    private final double[] px=new double[ROWS*COLS],py=new double[ROWS*COLS],pz=new double[ROWS*COLS];
-    private final double[] ox=new double[ROWS*COLS],oy=new double[ROWS*COLS],oz=new double[ROWS*COLS];
+    public static final int ROWS=22,COLS=9;
+    private static final double LENGTH=2.22,HALF_TOP=.29,HALF_BOTTOM=.56;
+    private static final double SEGMENT=LENGTH/(ROWS-1),GRAVITY=.022,DAMPING=.92;
+    private static final int PASSES=10;
+    private final Vec3[] current=new Vec3[ROWS*COLS],previous=new Vec3[ROWS*COLS],old=new Vec3[ROWS*COLS];
+    private final double[] floors=new double[ROWS*COLS];
     private boolean ready;
     private int tick=Integer.MIN_VALUE;
-    private Vec3 anchorCentre=Vec3.ZERO;
-    private double ground=Double.NEGATIVE_INFINITY;
+    private Vec3 centre=Vec3.ZERO,solvedCentre=Vec3.ZERO;
+    private BodyFrame frame;
 
-    private static int at(int row,int col) {return row*COLS+col;}
-    public static double halfWidth(double t) {return HALF_TOP+(HALF_BOTTOM-HALF_TOP)*t;}
-    private static double rowT(int row) {return row/(double)(ROWS-1);}
-    private static double colU(int col) {return col/(double)(COLS-1)*2-1;}
-
-    /** Advances the solve once per game tick. Safe to call every frame. */
-    public void tick(LivingEntity p) {
-        if(tick==p.tickCount)return;
-        tick=p.tickCount;
-        float yaw=p.yBodyRot;
-        double rad=Math.toRadians(yaw);
-        Vec3 sideways=new Vec3(Math.cos(rad),0,Math.sin(rad));
-        Vec3 back=new Vec3(Math.sin(rad),0,-Math.cos(rad));
-        boolean prone=p.isFallFlying()||p.getPose()==Pose.SWIMMING||p.isVisuallySwimming();
-        double shoulder=prone?.42:p.getEyeHeight()-.17;
-        Vec3 lean=p.isCrouching()?back.scale(-.15):Vec3.ZERO;
-        Vec3 centre=p.position().add(0,shoulder,0).add(back.scale(prone?.05:TOP_BACK)).add(lean);
-
-        if(!ready) {
-            reset(centre,sideways,back);
-        } else if(centre.distanceToSqr(anchorCentre)>TELEPORT*TELEPORT) {
-            // Blinking, slipping or changing dimension: carry the cloth along instead of letting it snap taut.
-            Vec3 jump=centre.subtract(anchorCentre);
-            for(int i=0;i<x.length;i++) {
-                x[i]+=jump.x;y[i]+=jump.y;z[i]+=jump.z;
-                px[i]+=jump.x;py[i]+=jump.y;pz[i]+=jump.z;
-            }
+    /** Matrices use camera-relative coordinates, retaining precision far from world origin. */
+    public static final class BodyFrame {
+        private final Matrix4f toWorld,toBody;
+        private final Vec3 camera;
+        public BodyFrame(Matrix4f matrix,Vec3 camera) {
+            toWorld=new Matrix4f(matrix);toBody=new Matrix4f(matrix).invert();this.camera=camera;
         }
-        anchorCentre=centre;
-        System.arraycopy(x,0,ox,0,x.length);System.arraycopy(y,0,oy,0,y.length);System.arraycopy(z,0,oz,0,z.length);
-
-        BlockHitResult hit=p.level().clip(new ClipContext(p.position().add(0,.1,0),p.position().add(0,-3.5,0),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,p));
-        ground=hit.getType()==HitResult.Type.MISS?Double.NEGATIVE_INFINITY:hit.getLocation().y+.02;
-
-        Vec3 motion=p.position().subtract(new Vec3(p.xo,p.yo,p.zo));
-        double speed=motion.horizontalDistance();
-        // A little outward push so the hem never sucks flat onto the legs, plus a slow idle breath.
-        double billow=.006+speed*.05;
-        double breath=Math.sin(p.tickCount*.06)*.0016;
-        for(int row=1;row<ROWS;row++) {
-            double t=rowT(row),loose=.3+.7*t;
-            for(int col=0;col<COLS;col++) {
-                int i=at(row,col);
-                double vx=(x[i]-px[i])*DAMPING,vy=(y[i]-py[i])*DAMPING,vz=(z[i]-pz[i])*DAMPING;
-                double turbulence=Math.sin(p.tickCount*.11+col*1.7+row*.5)*.0011*loose;
-                Vec3 push=back.scale(billow*loose).add(sideways.scale(turbulence+breath*colU(col)));
-                px[i]=x[i];py[i]=y[i];pz[i]=z[i];
-                x[i]+=vx+push.x;
-                y[i]+=vy-GRAVITY*loose;
-                z[i]+=vz+push.z;
-            }
+        private Vec3 world(double x,double y,double z) {
+            Vector3f v=toWorld.transformPosition(new Vector3f((float)x,(float)y,(float)z));
+            return camera.add(v.x,v.y,v.z);
         }
-        for(int col=0;col<COLS;col++)writeAnchor(col,centre,sideways,back);
+        public Vec3 anchor(int col) {
+            double x=(col/(double)(COLS-1)*2-1)*HALF_TOP;
+            // Follow the actual rear arc of collar.obj at t=.5, with a small overlap under the mantle.
+            double rear=Math.sqrt(1-x*x/(.381*.381));
+            return world(x,.055+.035*rear,.2125*rear);
+        }
+        public Vec3 back() {return world(0,0,1).subtract(world(0,0,0)).normalize();}
+        public Vec3 side() {return world(1,0,0).subtract(world(0,0,0)).normalize();}
+        public Vec3 outsideBody(Vec3 point) {
+            Vec3 relative=point.subtract(camera);
+            Vector3f local=toBody.transformPosition(new Vector3f((float)relative.x,(float)relative.y,(float)relative.z));
+            // Keep the entire fabric on the back side, including animated arms and swinging legs.
+            // A radial push can eject particles out the FRONT after a fast turn; this cannot.
+            double width=local.y<.76?.57:.44;
+            if(local.y>=-.52&&local.y<=1.56&&Math.abs(local.x)<width) {
+                float back=local.y<0?.30f:local.y<.76?.22f:.62f;
+                if(local.z<back)return world(local.x,local.y,back);
+            }
+            return point;
+        }
+    }
+
+    private static int at(int row,int col){return row*COLS+col;}
+    public static double halfWidth(double t){return HALF_TOP+(HALF_BOTTOM-HALF_TOP)*t;}
+
+    public void tick(LivingEntity wearer,BodyFrame body) {
+        frame=body;centre=body.anchor(COLS/2);
+        if(!ready||centre.distanceToSqr(solvedCentre)>6.25||wearer.tickCount-tick>5)reset(body,wearer);
+        // The pinned row is evaluated every frame, even if no simulation tick has elapsed.
+        if(tick==wearer.tickCount)return;
+        tick=wearer.tickCount;
+        System.arraycopy(current,0,old,0,current.length);
+        Vec3 back=body.back(),side=body.side();
+        double speed=wearer.getDeltaMovement().horizontalDistance();
+        for(int row=1;row<ROWS;row++)for(int col=0;col<COLS;col++) {
+            int i=at(row,col);double t=row/(double)(ROWS-1);
+            Vec3 velocity=current[i].subtract(previous[i]).scale(DAMPING);
+            previous[i]=current[i];
+            current[i]=current[i].add(velocity).add(0,-GRAVITY,0)
+                .add(back.scale(.003+Math.min(.025,speed*.04)*t))
+                .add(side.scale(Math.sin(wearer.tickCount*.08+row*.4+col)*.0007*t));
+            current[i]=sweep(wearer,previous[i],current[i]);
+            // Each particle samples its own collision surface: steps, slabs and ledges aren't a flat plane.
+            var hit=wearer.level().clip(new ClipContext(current[i].add(0,.3,0),current[i].add(0,-1.1,0),
+                ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,wearer));
+            floors[i]=hit.getType()==HitResult.Type.MISS?Double.NEGATIVE_INFINITY:hit.getLocation().y+.025;
+        }
+        for(int col=0;col<COLS;col++)current[at(0,col)]=body.anchor(col);
         for(int pass=0;pass<PASSES;pass++) {
-            for(int row=1;row<ROWS;row++) {
-                for(int col=0;col<COLS;col++) {
-                    double t=rowT(row);
-                    double restRow=Math.hypot(SEGMENT,halfWidth(t)-halfWidth(rowT(row-1)))*.99;
-                    link(at(row-1,col),at(row,col),restRow,row==1?0:.35);
-                    if(col+1<COLS)link(at(row,col),at(row,col+1),2*halfWidth(t)/(COLS-1),.5);
+            for(int row=1;row<ROWS;row++)for(int col=0;col<COLS;col++) {
+                double t=row/(double)(ROWS-1);
+                link(at(row-1,col),at(row,col),SEGMENT,row==1?0:.45);
+                if(col+1<COLS)link(at(row,col),at(row,col+1),2*halfWidth(t)/(COLS-1),.5);
+                if(col+1<COLS)link(at(row-1,col),at(row,col+1),Math.hypot(SEGMENT,2*halfWidth(t)/(COLS-1)),row==1?0:.5);
+            }
+            for(int i=COLS;i<current.length;i++) {
+                current[i]=body.outsideBody(current[i]);
+                if(current[i].y<floors[i]) {
+                    current[i]=new Vec3(current[i].x,floors[i],current[i].z);
+                    // Friction lets the extra length lie on and drag across the ground.
+                    previous[i]=previous[i].lerp(current[i],.35);
                 }
             }
-            for(int row=1;row<ROWS;row++)for(int col=0;col<COLS;col++)collide(at(row,col),p,sideways,back);
         }
-        ready=true;
+        for(int i=COLS;i<current.length;i++)current[i]=body.outsideBody(sweep(wearer,previous[i],current[i]));
+        solvedCentre=centre;
     }
 
-    private void writeAnchor(int col,Vec3 centre,Vec3 sideways,Vec3 back) {
-        double u=colU(col);
-        Vec3 a=centre.add(sideways.scale(u*HALF_TOP)).add(back.scale(.02*u*u));
-        int i=at(0,col);
-        px[i]=x[i];py[i]=y[i];pz[i]=z[i];
-        x[i]=a.x;y[i]=a.y;z[i]=a.z;
+    private static Vec3 sweep(LivingEntity p,Vec3 from,Vec3 to) {
+        if(from.distanceToSqr(to)<1e-9)return to;
+        var hit=p.level().clip(new ClipContext(from,to,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,p));
+        return hit.getType()==HitResult.Type.MISS?to:hit.getLocation().add(Vec3.atLowerCornerOf(hit.getDirection().getNormal()).scale(.025));
     }
-
-    private void reset(Vec3 centre,Vec3 sideways,Vec3 back) {
-        for(int row=0;row<ROWS;row++) {
-            double t=rowT(row);
-            for(int col=0;col<COLS;col++) {
-                Vec3 v=centre.add(sideways.scale(colU(col)*halfWidth(t))).add(back.scale(.12*t)).add(0,-LENGTH*t,0);
-                int i=at(row,col);
-                x[i]=px[i]=ox[i]=v.x;y[i]=py[i]=oy[i]=v.y;z[i]=pz[i]=oz[i]=v.z;
-            }
+    private void reset(BodyFrame body,LivingEntity wearer) {
+        Vec3 back=body.back(),side=body.side();
+        for(int row=0;row<ROWS;row++)for(int col=0;col<COLS;col++) {
+            double t=row/(double)(ROWS-1),u=col/(double)(COLS-1)*2-1;
+            double drop=wearer.onGround()?Math.min(LENGTH*t,Math.max(.1,centre.y-wearer.getY()-.03)):LENGTH*t;
+            double train=Math.max(0,LENGTH*t-drop);
+            Vec3 v=body.anchor(col).add(side.scale(u*(HALF_BOTTOM-HALF_TOP)*t)).add(back.scale(.18*t+train)).add(0,-drop,0);
+            int i=at(row,col);current[i]=previous[i]=old[i]=v;floors[i]=Double.NEGATIVE_INFINITY;
         }
-        ready=true;
+        solvedCentre=centre;ready=true;tick=Integer.MIN_VALUE;
     }
-
     private void link(int a,int b,double rest,double shareA) {
-        double dx=x[b]-x[a],dy=y[b]-y[a],dz=z[b]-z[a];
-        double d=Math.sqrt(dx*dx+dy*dy+dz*dz);
-        if(d<1e-7)return;
-        double k=(d-rest)/d,shareB=1-shareA;
-        x[a]+=dx*k*shareA;y[a]+=dy*k*shareA;z[a]+=dz*k*shareA;
-        x[b]-=dx*k*shareB;y[b]-=dy*k*shareB;z[b]-=dz*k*shareB;
+        Vec3 delta=current[b].subtract(current[a]);double length=delta.length();
+        if(length<1e-7)return;
+        Vec3 correction=delta.scale((length-rest)/length);
+        current[a]=current[a].add(correction.scale(shareA));current[b]=current[b].subtract(correction.scale(1-shareA));
     }
-
-    /**
-     * Keeps the cloth outside the wearer and above the floor. The body is treated as an upright ellipse in
-     * the wearer's own frame rather than a circle, because a player is far wider across the shoulders than
-     * front to back; a circle fat enough to clear the shoulders would hold the cloak well off the spine.
-     */
-    private void collide(int i,LivingEntity p,Vec3 sideways,Vec3 back) {
-        if(y[i]<ground){y[i]=ground;px[i]+=(x[i]-px[i])*.5;pz[i]+=(z[i]-pz[i])*.5;}
-        if(y[i]>p.getY()+p.getBbHeight()||y[i]<p.getY()-.1)return;
-        boolean torso=y[i]>p.getY()+p.getBbHeight()*.45;
-        double halfSide=torso?TORSO_SIDE:HIP_SIDE,halfDepth=torso?TORSO_DEPTH:HIP_DEPTH;
-        double dx=x[i]-p.getX(),dz=z[i]-p.getZ();
-        double side=dx*sideways.x+dz*sideways.z,depth=dx*back.x+dz*back.z;
-        double reach=Math.sqrt(square(side/halfSide)+square(depth/halfDepth));
-        if(reach>=1)return;
-        if(reach<1e-6){depth=halfDepth;side=0;}
-        else {double scale=1/reach;side*=scale;depth*=scale;}
-        x[i]=p.getX()+sideways.x*side+back.x*depth;
-        z[i]=p.getZ()+sideways.z*side+back.z*depth;
-    }
-    private static double square(double v) {return v*v;}
-
-    /** Interpolated world position of one grid node. */
     public Vec3 node(int row,int col,float partial) {
-        int i=at(Mth.clamp(row,0,ROWS-1),Mth.clamp(col,0,COLS-1));
-        return new Vec3(Mth.lerp(partial,ox[i],x[i]),Mth.lerp(partial,oy[i],y[i]),Mth.lerp(partial,oz[i],z[i]));
+        if(row==0)return frame.anchor(col);
+        int i=at(row,col);
+        Vec3 v=old[i].lerp(current[i],Mth.clamp(partial,0,1));
+        // Frame interpolation must not detach the seam or carry fabric through a newly rotated torso.
+        Vec3 seamDrift=frame.anchor(col).subtract(old[at(0,col)].lerp(current[at(0,col)],partial));
+        v=v.add(seamDrift.scale(Math.max(0,1-row/5.0)));
+        v=frame.outsideBody(v);
+        return new Vec3(v.x,Math.max(v.y,floors[i]),v.z);
     }
-    public boolean ready() {return ready;}
+    public boolean ready(){return ready;}
 }

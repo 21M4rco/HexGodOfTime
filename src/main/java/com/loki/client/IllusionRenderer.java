@@ -32,10 +32,15 @@ public final class IllusionRenderer extends MobRenderer<IllusionEntity,PlayerMod
         addLayer(new RenderLayer<IllusionEntity,PlayerModel<IllusionEntity>>(this) {
             @Override public void render(PoseStack pose,MultiBufferSource buffers,int light,IllusionEntity e,
                                          float a,float b,float partial,float age,float yaw,float pitch) {
-                if(!e.finalForm())return;
+                if(!e.finalForm()||e.isInvisible())return;
                 pose.pushPose();
                 getParentModel().head.translateAndRotate(pose);
                 LokiLayer.crown(pose,buffers,light,1);
+                pose.popPose();
+                pose.pushPose();
+                getParentModel().body.translateAndRotate(pose);
+                CapeRenderer.capture(e,pose);
+                LokiLayer.collar(pose,buffers,light,1);
                 pose.popPose();
             }
         });

@@ -25,5 +25,12 @@ Everything below needs a recorded in-game session and **has not had one**. Nothi
 ## Known limitations
 
 - Illusory architecture re-renders its blocks each frame rather than baking a buffer. It is capped at 620 blocks and 64 blocks of view distance; that is a deliberate trade for a short-lived effect, not a finished optimisation.
-- The sanctum is a bare platform. It is somewhere to build, not somewhere furnished.
 - Compatibility with third-party shader packs is untested.
+
+## 0.2.1 patch
+
+Based on commit `9e17eb0716517e855fd107d0b7ca8db8b5294585` (latest successful push build at the start of this patch).
+
+Source checks: exact torso-pose cape anchors; invisibility and Court of Lies guards; separate projection destinations; Fracture cooldown 160 ticks; matching custom sky ID and dimension type; deterministic tree/throne plan; legacy wall removal and persisted build progress. The asset generator only regenerated crown geometry.
+
+Required game checks: sprint/turn/crouch/fall/teleport cape clearance, Court of Lies while wearing armor, stopped-player projection spacing, fresh and existing sanctum entry, sky under normal/Fabulous graphics, throne access, interrupted construction/restart, return portal and crouch exit. These have not been performed in this environment.

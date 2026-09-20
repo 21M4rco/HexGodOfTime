@@ -38,14 +38,19 @@ public final class LokiLayer extends RenderLayer<AbstractClientPlayer,PlayerMode
 
     @Override public void render(PoseStack pose,MultiBufferSource buffers,int light,AbstractClientPlayer p,float walk,float walkAmount,float partial,float age,float headYaw,float headPitch) {
         float progress=ClientState.progress(p.getId(),partial);
-        if(progress<=0||ClientState.data(p.getId()).contains("disguise"))return;
+        if(p.isSpectator()||ClientState.hidden(p)||progress<=0||ClientState.data(p.getId()).contains("disguise"))return;
         pose.pushPose();getParentModel().head.translateAndRotate(pose);crown(pose,buffers,light,progress);pose.popPose();
         if(progress<.14f)return;
         pose.pushPose();getParentModel().body.translateAndRotate(pose);
+        CapeRenderer.capture(p,pose);
+        collar(pose,buffers,light,progress);
+        pose.popPose();
+    }
+
+    public static void collar(PoseStack pose,MultiBufferSource buffers,int light,float progress) {
         if(collar==null)collar=new AuthoredMesh("collar");
         float rise=Mth.clamp(progress*3,0,1);
         collar.draw(pose,buffers.getBuffer(RenderType.entityCutoutNoCull(CLOTH)),light,
             (g,v)->new AuthoredMesh.Point(v.x(),v.y()*rise,v.z(),v.u(),v.v()));
-        pose.popPose();
     }
 }
