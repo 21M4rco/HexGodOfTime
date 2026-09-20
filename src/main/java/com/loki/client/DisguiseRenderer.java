@@ -68,27 +68,14 @@ public final class DisguiseRenderer {
         if(payload==null||payload.isEmpty())return;
 
         LivingEntity proxy;
-        try {
-            proxy=resolve(p,state,payload,mc);
-        } catch(Exception e) {
-            report(payload.getString("type"),e);
-            return;
-        }
-        if(proxy==null)return;
-
-        try {
-            drive(proxy,p,event.getPartialTick());
-        } catch(Exception e) {
-            report(payload.getString("type"),e);
-            CACHE.remove(p.getId());
-            return;
-        }
-
         EntityRenderer<? super LivingEntity> renderer;
         try {
+            proxy=resolve(p,state,payload,mc);
+            if(proxy==null)return;
+            drive(proxy,p,event.getPartialTick());
             renderer=mc.getEntityRenderDispatcher().getRenderer(proxy);
-        } catch(Exception e) {
-            report(payload.getString("type"),e);
+        } catch(Throwable t) {
+            fail(payload.getString("type"),null,t);
             CACHE.remove(p.getId());
             return;
         }
@@ -100,9 +87,8 @@ public final class DisguiseRenderer {
         pose.pushPose();
         try {
             renderer.render(proxy,p.getYRot(),event.getPartialTick(),pose,event.getMultiBufferSource(),event.getPackedLight());
-        } catch(Exception e) {
-            report(payload.getString("type"),e);
-            BROKEN.add(proxy.getType());
+        } catch(Throwable t) {
+            fail(payload.getString("type"),proxy.getType(),t);
             CACHE.remove(p.getId());
         } finally {
             pose.popPose();
@@ -212,7 +198,17 @@ public final class DisguiseRenderer {
         };
     }
 
-    private static void report(String type,Exception e) {
-        LOGGER.warn("Loki could not wear '{}' fully; falling back for that shape",type,e);
+    private static void report(String type,Throwable t) {
+        LOGGER.warn("Loki could not wear '{}' fully; falling back for that shape",type,t);
+    }
+    /**
+     * A third-party renderer is arbitrary code, and the point of this system is that an unfamiliar
+     * one costs the disguise rather than the session — so anything at all it throws is caught and the
+     * shape is retired. A failure of the virtual machine itself is not ours to swallow.
+     */
+    private static void fail(String type,EntityType<?> shape,Throwable t) {
+        if(t instanceof VirtualMachineError error)throw error;
+        report(type,t);
+        if(shape!=null)BROKEN.add(shape);
     }
 }
