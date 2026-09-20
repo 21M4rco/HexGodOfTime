@@ -73,6 +73,9 @@ public final class ServerEvents {
      * have landed, they are standing somewhere else.
      */
     @SubscribeEvent public static void ward(net.minecraftforge.event.entity.living.LivingAttackEvent e) {
+        // Only something attacking them. A fall, the void or drowning is the island's business and
+        // the owner's own problem; blinking away from gravity would be nonsense.
+        if(e.getSource().getEntity()==null&&e.getSource().getDirectEntity()==null)return;
         if(SanctumWard.evade(e.getEntity()))e.setCanceled(true);
     }
     @SubscribeEvent public static void wardProjectile(net.minecraftforge.event.entity.ProjectileImpactEvent e) {

@@ -1,3 +1,13 @@
+## 0.4.1 — Fracture modes, honest exits and a sanctum that fights back
+
+- **The alternate key now configures the Fracture; the cast key runs it.** With the Fracture selected, the alternate key opens a mode selector. What you pick there is saved and stays saved — through casts, dimension changes, death and a server restart — until you deliberately open the selector and pick something else. The cast key just does whatever is currently saved, as often as you press it. Every other spell keeps its ordinary alternate action.
+- **Six modes.** *Pull Into Fracture* is the original behaviour and keeps its tap-for-a-doorway, hold-for-a-vacuum distinction. *Travel Near Player* saves the person you chose and opens 8–12 blocks from them; if they log out the choice is dropped rather than leaving a stale coordinate. *Nearest Player* is resolved when you cast, not when you chose. *Nether*, *Respawn Point* (bed, anchor, or world spawn when neither stands) and *Normal Return* complete the set.
+- **The live mode is never a guess.** The selector names it at the top and marks its row with a lit border and an ACTIVE marker; the bottom-left readout prints it beside the cast key.
+- **Fixed: transported entities no longer return to where they were captured.** A break now carries the destination your saved mode resolved to when it was struck, and everything that walks through obeys it — you and every creature travelling with you. Drag a mob in at one place, leave somewhere else, and it surfaces beside you. Groups fan out around the arrival instead of stacking into one column.
+- **Inside your own island you cannot be struck.** An attack is refused as it is declared, before any damage is worked out, and in the same instant you are several blocks away: thick nebula closes over where you stood for the blow to pass through, and a smaller bloom marks where you reform. Falls and the void still apply — this answers attackers, not gravity.
+- **The island hunts whoever is troubling you.** Anything hunting you, angry at you, or that has recently drawn your blood draws a green celestial star: high, off-axis, wobbling as it closes, landing for about ten hearts. It calls no explosion, so the throne, the tree and the ground are never touched, and you are immune to every part of it.
+- **Atmosphere, not redesign.** The island itself is untouched. Around it: a few drifting motes and a sparse nebula rim that flows slowly around the coast, sampling only the sections near you and idling entirely outside the dimension.
+
 ## 0.4.0 — Cloak, deception, universal shapes and time control
 
 - **The cloak no longer stretches across the world.** Its solver now enforces two hard geometric limits after every pass and again on the frame the renderer draws, so no part of it can leave the shoulders by more than the fabric hanging above it, or leave the node above it by more than one stretched segment. Torso transforms that cannot be inverted are rejected rather than propagated, per-tick motion is capped, anything non-finite re-seeds the grid from the body, and a hem resting on the ground is dragged along instead of welded to the block it touched.
@@ -40,7 +50,7 @@ Install Player Animator **1.0.2-rc1+1.20** (CurseForge file 4587214) on clients.
 | K | Mastery archive |
 | V *(hold)* | Quick bar — wheel to choose, release to select |
 | R | Cast the selected spell; **hold** for abilities that shape while held |
-| G | Alternate contextual action |
+| G | Alternate contextual action — **Fracture mode selector** while Fracture is selected |
 | H | Glorious Purpose transformation |
 | X | Release held targets / seal your fracture / also resumes your time fields |
 | Z | **Stillness** — suspend the local battlefield |
@@ -61,7 +71,7 @@ The four time controls are not shortcuts and never enter the quick bar. They are
 - **Living Projection** — a decoy that looks, moves and fights like you, down to the name tag. It hunts hostile creatures and anyone who has attacked you, without being told. Creatures choosing between you and your copies cannot tell which is which: the choice is made on distance, sight and who has been hurting them, and never on which one is breathing. Its secondary sends every projection at whatever you are aiming at, or dismisses them all if you aim at nothing.
 - **Invisible Hand** — hold entities and dropped items on a damped spring, several at once with mastery. The wheel pushes and pulls; the secondary hurls, and whatever you hurl takes the impact it was carrying.
 - **Borrowed Reality** — hold the cast key and a false building grows where you aim. It has no collision and is never placed in the world: viewers are handed a design and build the geometry locally, so it can be shown to one chosen pair of eyes.
-- **Fracture** — shatters the air where you look. The break holds for seven seconds and opens onto a private hundred-by-hundred sanctum in its own dimension. Casting it again inside opens the way back.
+- **Fracture** — shatters the air where you look. Where the break leads is chosen once, in the selector on the alternate key, and stays chosen: your sanctum, a named player, whoever is nearest, the Nether, your bed, or the place you left. The break holds for seven seconds, and anything that walks through it follows your destination rather than its own history. Inside your sanctum you cannot be hit, and the island throws falling stars at anyone who tries.
 - **Twin Deceivers** — two daggers, the off hand reversed. Thrown blades fly point-first, bury themselves in what they hit and open bleeding wounds before dissolving.
 - **Masquerade** — wear any living thing in the game, vanilla or modded, keeping that individual creature's variant, colour, size and carried gear rather than its species' default. Creatures read the shape and mostly ignore it, until you attack one.
 - **Stillness** — local suspension that decelerates into and out of a stop rather than snapping, and holds bodies, shots, loose items, falling blocks and the weather alike. Harm you deal to a suspended body is banked and lands the instant time resumes.

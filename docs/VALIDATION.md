@@ -98,3 +98,30 @@ Nothing below should be described as working.
 - A mimic snapshot is capped; a creature that saves more than about seven kilobytes degrades to its scalar state and then to its plain form.
 - A projection does not wear its caster's Mojang cape. Vanilla's cape layer is written against a client player and its swing is driven by fields a projection does not have, so reproducing it needs a layer of its own. This is only visible on a caster who owns a cape and is **not** transformed; the mantle replaces it in the transformed state, where projections matter most. It remains a genuine way to pick out the original in that one case.
 - A projection lasts a few seconds and the caster does not. Watching long enough will always separate them; the goal is that a glance in a fight does not.
+
+## 0.4.1 — Fracture modes, exits and sanctum defence
+
+Base: the 0.4.0 branch head, Actions run `35516710856`.
+
+### Verified in this environment
+
+- Compilation through the **Build Loki** Action, again the only compiler reachable here.
+- The return bug is fixed at its cause rather than patched at its symptom: `PocketRealm.cross` no longer reads a travelling entity's own saved capture point on the way out. A break carries one `FractureAnchor`, resolved from the owner's mode when it was struck, and owner and cargo both use it. There is no code path left that can send a transported entity to where it was seized.
+- Mode state is player NBT and the packet carries an index plus an optional UUID; the server resolves and validates every destination, so a client cannot name one.
+- Starfall contains no explosion call and no block write of any kind, so terrain damage is structurally impossible rather than merely configured off.
+
+### Not verified — needs a recorded game session
+
+- The selector at several GUI scales; the player sub-list with 0, 1 and many players online; scrolling; the ACTIVE marker after each kind of selection.
+- Each mode's destination search in practice: a Nether ceiling, a sealed room, an ocean, a target underground, a target on a roof, a respawn anchor, a destroyed bed.
+- Persistence across relog, death, dimension change and a server restart.
+- Dragging a mixed group in and out, including other players and modded entities, and confirming placement fans out safely at the new exit.
+- The ward under a real volley: melee, arrows, modded projectiles and several attackers at once; the slip never leaving the island; whether the lockout feels like one dodge.
+- Starfall against several hostiles at once for readability and for TPS, and confirming the owner takes nothing from it.
+- Ambient and rim density at low, normal and high particle settings, and the frame cost of the rim while standing on the coast.
+
+### Known limitations
+
+- The ward answers anything with a source entity. Damage with no attacker at all — falling, the void, drowning — is deliberately left alone.
+- `Nearest Player` prefers someone in the same dimension and otherwise takes whoever it can find; it does not rank across dimensions by real distance, because there is no such distance.
+- A break opened by a travel mode is still a walk-through door with the normal seven-second life; travel modes do not use the hold gesture.
