@@ -183,7 +183,7 @@ public final class LokiServer {
             case RIFT -> {return FractureTravel.act(p,RiftEntity.TAP);}
             case BOLT -> {SpellProjectile.cast(p,p.getEyePosition().add(look.scale(.5)),look,secondary?1:0,false);gesture(p,"bolt","cast",Loki.SORCERY.get());return true;}
             case PUSH -> {for(Entity e:p.level().getEntities(p,p.getBoundingBox().inflate(5),e->validTarget(p,e))){Vec3 away=e.position().subtract(p.position()).normalize();e.setDeltaMovement(away.scale(1.1).add(0,.25,0));e.hurtMarked=true;}gesture(p,"push","push",Loki.SORCERY.get());return true;}
-            case BLINK -> {Vec3 destination=safeAim(p,8+LokiData.mastery(p,Discipline.SORCERY)/90.0);if(destination==null)return false;gesture(p,"blink","depart",Loki.TELEPORT.get());teleport(p,destination);LokiNetwork.fx(p,"arrive");return true;}
+            case BLINK -> {Vec3 destination=safeAim(p,8+LokiData.mastery(p,Discipline.SORCERY)/90.0);if(destination==null)return false;gesture(p,"blink","depart",Loki.TELEPORT.get());teleport(p,destination);LokiNetwork.arrival(p);return true;}
             case WARD -> {LokiData.get(p).putLong("wardUntil",now+100);gesture(p,"ward","ward",Loki.SORCERY.get());return true;}
             case TELEKINESIS -> {
                 if(!Telekinesis.grab(p,t))return false;
@@ -223,7 +223,7 @@ public final class LokiServer {
                 LokiNetwork.tracking(p,new LokiNetwork.Message(LokiNetwork.THREADS,p.getId(),n));
                 gesture(p,"threads","bind",Loki.SORCERY.get());return true;
             }
-            case ASCENSION -> {boolean on=!LokiData.get(p).getBoolean("ascended");LokiData.get(p).putBoolean("ascended",on);LokiData.get(p).putLong("transformStart",now);if(!on){CosmicFlight.revoke(p);TimeBranch.cancel(p);Transformation.strip(p);}else Transformation.sustain(p);gesture(p,"ascend",on?"ascend":"dismiss",Loki.ASCEND.get());return true;}
+            case ASCENSION -> {boolean on=!LokiData.get(p).getBoolean("ascended");LokiData.get(p).putBoolean("ascended",on);LokiData.get(p).putLong("transformStart",now);if(!on){CosmicFlight.revoke(p);TimeBranch.cancel(p);Transformation.strip(p);}else Transformation.sustain(p);LokiNetwork.fx(p,on?"ascend":"dismiss");p.level().playSound(null,p.blockPosition(),Loki.ASCEND.get(),SoundSource.PLAYERS,.75f,1);return true;}
             default -> {return false;}
         }
     }
@@ -494,7 +494,7 @@ public final class LokiServer {
         Vec3 old=p.position();
         gesture(p,"blink","depart",Loki.TELEPORT.get());
         teleport(p,e.position());e.setPos(old);
-        LokiNetwork.fx(p,"arrive");return true;
+        LokiNetwork.arrival(p);return true;
     }
     public static void clearIllusions(ServerPlayer p) {illusions(p).forEach(IllusionEntity::dispel);ILLUSIONS.remove(p.getUUID());}
 

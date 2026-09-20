@@ -63,7 +63,7 @@ public final class BranchFist {
         if(event.getEntity()!=primary||!charged(c.player())||!eligible(c.player()))return;
         if(!Erasure.implode(c.player(),event.getEntity(),c.player().getLookAngle()))return;
         // Take the charge before any further callbacks. Keep the accepted punch from killing a weak mob
-        // before its 18-tick destruction; Erasure owns the final death, drops and player respawn.
+        // before its gradual destruction; Erasure owns the final death, drops and player respawn.
         event.setAmount(0);
         var d=LokiData.get(c.player());
         d.remove(BranchFistState.UNTIL);d.remove(BranchFistState.START);

@@ -105,7 +105,7 @@ public final class ErasureRenderer {
             // Finished. Nothing is drawn, and nothing vanilla is drawn either, so the body is simply gone.
             if(phase<0||phase>=1)continue;
             try {
-                if(entry.getValue().implosion())implosion(PAINTER,e,phase,partial,time);
+                if(entry.getValue().implosion())implosion(PAINTER,e,entry.getValue(),phase,partial,time);
                 else {crawl(PAINTER,e,entry.getValue(),phase,partial,time);flare(PAINTER,e,entry.getValue(),phase,partial,time);}
             } catch(Exception ignored) {
                 // A failed auxiliary arc must not interrupt the entity's own render.
@@ -123,15 +123,15 @@ public final class ErasureRenderer {
         return new ErasureBuffer(buffers,pose.last().pose(),entity,f.direction(),fracture,f.power(),f.implosion());
     }
 
-    /** Injection forks across the body, contracts to its centre, then snaps outward with the pieces. */
-    private static void implosion(BranchVfx.Painter painter,Entity e,float phase,float partial,double time) {
+    /** A brief injection flash, followed by slow destabilization as individual body fragments detach. */
+    private static void implosion(BranchVfx.Painter painter,Entity e,Fading fading,float phase,float partial,double time) {
         Vec3 centre=e.getPosition(partial).add(0,e.getBbHeight()*.5,0);
         double w=Math.max(.2,e.getBbWidth()),h=Math.max(.3,e.getBbHeight());
-        float flash=Math.max(0,1-phase*3.5f);
+        float flash=Math.max(0,1-phase*fading.duration()/6f);
         BranchVfx.billboard(painter,BranchVfx.glow(),centre,Math.max(w,h)*(.6-phase*.25),
             time*.4,TemporalPalette.hot((float)time*.07f,.9f),flash*.8f);
         if(phase>.65f)return;
-        double radius=phase<.22f?1-phase*2.7:.4+(phase-.22)*3.5;
+        double radius=phase<.10f?1-phase*1.4:.86+(phase-.10)*.55;
         for(int i=0;i<7;i++) {
             long seed=e.getId()*193L+i+(long)(time/TemporalLightning.FLICKER)*13;
             Vec3 tip=centre.add((TemporalLightning.rand(seed,1)-.5)*w*radius,

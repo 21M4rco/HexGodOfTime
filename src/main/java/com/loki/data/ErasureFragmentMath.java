@@ -9,11 +9,11 @@ public final class ErasureFragmentMath {
         return (x&0xffffff)/(float)0x1000000;
     }
     public static float release(float along,float radial,int seed,boolean implosion) {
-        return implosion?.22f+.12f*clamp(radial)+.07f*noise(seed)
+        return implosion?.10f+.08f*clamp(radial)+.60f*noise(seed)
             :.03f+.63f*clamp(along)+.09f*noise(seed);
     }
     public static float age(float phase,float release,boolean implosion) {
-        return (phase-release)/(implosion?.58f:.24f);
+        return (phase-release)/(implosion?.22f:.24f);
     }
     public static float alpha(float age) {return age<=0?1:clamp((1-age)*1.5f);}
     public static float travel(float age,float power,boolean implosion) {

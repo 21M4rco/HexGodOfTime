@@ -36,7 +36,7 @@ public final class TimeBranchRegressionTest {
         require(t3-t2>t2-t1,"beam fragments failed to accelerate downstream");
         require(BranchFistState.WINDOW==200,"charge is no longer ten seconds");
         require(BranchFistState.RECOVERY<700/3,"tap recovery is not substantially shorter");
-        require(BranchFistState.IMPLOSION<20,"compact implosion is not fast");
+        require(BranchFistState.IMPLOSION==240,"punch must disintegrate gradually over twelve seconds");
         System.out.println("Time Branch input boundaries and fragment invariants passed.");
     }
     private static void require(boolean condition,String message){if(!condition)throw new AssertionError(message);}

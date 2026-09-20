@@ -43,15 +43,17 @@ public final class WorldEffects {
 
     public static void add(int entity,CompoundTag n) {
         String name=n.getString("effect");
+        // All teleport destinations share the same quiet arrival; old effect names remain harmless.
+        if(name.equals("arrive")||name.equals("arrive_realm")||name.equals("rift_cross"))name="nebula_arrival";
         Vec3 pos=new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z"));
         var p=Minecraft.getInstance().player;
         if(p!=null&&p.distanceToSqr(pos)<1600)TemporalScreen.trigger(name,entity==p.getId());
-        if(name.equals("arrive")||name.equals("disguise")||name.equals("rift_cross")||name.equals("arrive_realm"))REFORMING.put(entity,ClientState.now()+18);
+        if(name.equals("disguise"))REFORMING.put(entity,ClientState.now()+18);
         if(name.equals("slip")) {
             SLIPPING.put(entity,ClientState.now()+26);
             for(int i=0;i<5;i++)ECHOES.add(new Echo(entity,pos.add(0,i*.08,i*.12),ClientState.now()+24+i*2));
         }
-        if(name.equals("depart")||name.equals("arrive"))ECHOES.add(new Echo(entity,pos,ClientState.now()+18));
+        if(name.equals("depart"))ECHOES.add(new Echo(entity,pos,ClientState.now()+18));
         emit(name,entity,pos);
     }
 
@@ -222,24 +224,11 @@ public final class WorldEffects {
                 Vfx.column(nebula,at,.42,2.1,Vfx.count(swell*3f),t);
                 Vfx.ring(green,at.add(0,.05,0),.34+.5*Vfx.ease(t),Vfx.count(swell*4f),.06,.04);
             });
-            case "arrive" -> Vfx.bloom(entity,pos,look,16,(at,aim,t)->{
+            // Fixed to the landing point: only nebula, with no portal, rings, shards or body echo.
+            case "nebula_arrival" -> Vfx.bloom(-1,pos,look,24,(at,aim,t)->{
                 float swell=Vfx.swell(t);
-                Vfx.gather(green,at.add(0,.9,0),1.4*(1-Vfx.ease(t))+.2,Vfx.count(swell*4f),.12);
-                Vfx.cloud(nebula,at.add(0,.9,0),.55,Vfx.count(swell*1.6f),.01);
-                if(t>.75f)Vfx.spark(star,at.add(0,1,0),Vec3.ZERO);
-            });
-            // Surfacing inside the sanctum: nebula gathering into the shape of a body, nothing more.
-            // No mirror, no shards, no ring — the break itself is left behind on the other side.
-            case "arrive_realm" -> Vfx.bloom(entity,pos,look,18,(at,aim,t)->{
-                float swell=Vfx.swell(t);
-                Vfx.gather(nebula,at.add(0,1,0),1.1*(1-Vfx.ease(t))+.2,Vfx.count(swell*2.4f),.09);
-                Vfx.cloud(veil,at.add(0,.9,0),.5,Vfx.count(swell*1.2f),.006);
-            });
-            case "rift_cross" -> Vfx.bloom(entity,pos,look,16,(at,aim,t)->{
-                float swell=Vfx.swell(t);
-                Vfx.ring(gold,at.add(0,1,0),.9*(1-Vfx.ease(t))+.1,Vfx.count(swell*4f),-.05,0);
-                Vfx.cone(Loki.SHARD.get(),at.add(0,1.1,0),aim,Vfx.count(swell*2.5f),.16,.09);
-                Vfx.cloud(nebula,at.add(0,1,0),.6,Vfx.count(swell),.012);
+                Vfx.cloud(nebula,at.add(0,.85,0),.65+Vfx.ease(t)*.35,Vfx.count(swell*2.8f),.012);
+                Vfx.column(nebula,at,.45,1.8,Vfx.count(swell*1.6f),t);
             });
             case "fracture","rift_open" -> Vfx.bloom(entity,pos,look,22,(at,aim,t)->{
                 float swell=Vfx.swell(t);

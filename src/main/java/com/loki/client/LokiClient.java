@@ -93,7 +93,7 @@ public final class LokiClient {
             Ability selected=Ability.at(ClientState.self().getInt("selected"));
             boolean primary=PRIMARY.isDown();
             // A cast that was interrupted needs a real release before it counts as pressed again.
-            if(primaryLatched){if(primary)primary=false;else primaryLatched=false;}
+            if(primaryLatched){if(primaryPhysicallyDown())primary=false;else primaryLatched=false;}
             boolean branchInput=BranchKeyInput.tick(primary,primaryDown);
             if(branchInput)primaryWasHold=false;
             if(!branchInput&&primary&&!primaryDown){primaryWasHold=selected.hold;LokiNetwork.send(selected.hold?LokiServer.HOLD_BEGIN:LokiServer.CAST,0);repeat=0;}
@@ -118,8 +118,17 @@ public final class LokiClient {
         /** Called when the world changes underfoot: a held cast must not survive the crossing. */
         static void releaseHeldCast() {
             BranchKeyInput.cancel(false);
-            if(primaryDown||PRIMARY.isDown())primaryLatched=true;
+            if(primaryDown||primaryPhysicallyDown())primaryLatched=true;
             primaryDown=false;
+        }
+        private static boolean primaryPhysicallyDown() {
+            InputConstants.Key key=PRIMARY.getKey();
+            long window=Minecraft.getInstance().getWindow().getWindow();
+            if(key.getType()==InputConstants.Type.MOUSE)
+                return GLFW.glfwGetMouseButton(window,key.getValue())==GLFW.GLFW_PRESS;
+            if(key.getType()==InputConstants.Type.KEYSYM&&key.getValue()!=GLFW.GLFW_KEY_UNKNOWN)
+                return InputConstants.isKeyDown(window,key.getValue());
+            return PRIMARY.isDown();
         }
         private static void drain() {
             while(PRIMARY.consumeClick());

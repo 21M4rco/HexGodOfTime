@@ -133,7 +133,7 @@ final class ErasureBuffer implements MultiBufferSource {
             float t=ErasureFragmentMath.clamp(age),scale=1;
             offset.zero();spin.identity();
             if(implosion) {
-                float collapse=.58f*ErasureFragmentMath.clamp(phase/.22f);
+                float collapse=.14f*ErasureFragmentMath.clamp(phase/.10f);
                 offset.set(radial).mul(-collapse);scale=1-collapse;
             }
             if(age>0) {

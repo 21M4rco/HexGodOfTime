@@ -1,4 +1,4 @@
-# Time Branch Unleashing — 0.4.1
+# Time Branch Unleashing — 0.4.2
 
 Based on `a2e334de619926cb1815fdca5207a46d4e75ebfd`, the exact revision built by
 GitHub Actions run 35524169474.
@@ -9,7 +9,7 @@ GitHub Actions run 35524169474.
 - The charge lasts 10 seconds and allows normal movement. An accepted empty
   right-main-hand melee hit consumes it once. A left-arm swing, held weapon,
   missed swing, block hit, shielded/cancelled hit or another spell does not.
-- The punched living target collapses, scatters and disintegrates in 18 ticks.
+- The punched living target destabilizes and loses body fragments gradually over 12 seconds.
   Existing erasure target protections and server death/removal logic apply.
   Multipart hits resolve to their parent; no nearby-target query or explosion.
 - Hold past the tap window to enter the original hold-and-release beam path.
@@ -36,3 +36,14 @@ crowd (one victim); expire or cancel the charge; die/relog/change dimension;
 observe from a second client; compare vanilla players, small mobs and custom
 modded models under the beam. Visual quality and third-party renderer behavior
 require this in-game check and are not proven by compilation.
+
+Follow-up presentation patch:
+
+- Punch fragments now leave at staggered times across a 12-second sequence and
+  individually fade; the contact flash stays brief. Full beam timing is untouched.
+- All arrival locations receive only nebular particles, fixed at the landing point,
+  without portal rings, shards, body echoes or a forced reforming body pose.
+  The source entrance portal remains. The cast-key interruption latch now reads
+  the physical key/button so terrain loading cannot reopen a portal on arrival.
+- Transformation and de-transformation no longer dispatch the ascend body animation.
+  Skin changes, cape, crown/horns, particles, sounds and transformation mechanics remain.

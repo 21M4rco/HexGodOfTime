@@ -64,6 +64,13 @@ public final class LokiNetwork {
         return copy;
     }
     public static void animate(ServerPlayer p,String name) {CompoundTag d=new CompoundTag();d.putString("animation",name);tracking(p,new Message(ANIMATE,p.getId(),d));}
+    /** Arrival has no RiftEntity. Nearby viewers receive the nebula even before tracking starts. */
+    public static void arrival(Entity entity) {
+        if(!(entity.level() instanceof net.minecraft.server.level.ServerLevel level))return;
+        CompoundTag d=new CompoundTag();d.putString("effect","nebula_arrival");
+        d.putDouble("x",entity.getX());d.putDouble("y",entity.getY());d.putDouble("z",entity.getZ());
+        near(level,entity.position(),64,new Message(FX,entity.getId(),d));
+    }
     public static void fx(Entity p,String name) {fx(p,name,p.getX(),p.getY(),p.getZ());}
     public static void fx(Entity p,String name,double x,double y,double z) {
         CompoundTag d=new CompoundTag();d.putString("effect",name);d.putDouble("x",x);d.putDouble("y",y);d.putDouble("z",z);tracking(p,new Message(FX,p.getId(),d));
