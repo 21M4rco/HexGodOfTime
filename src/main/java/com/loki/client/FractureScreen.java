@@ -245,9 +245,14 @@ public final class FractureScreen extends Screen {
         return font.plainSubstrByWidth(text,width-font.width("…"))+"…";
     }
 
-    /** Opened from the alternate key while the Fracture is the selected spell. */
+    /**
+     * Opened from the alternate key while the Fracture is selected — and only from inside the
+     * sanctum. Out in the world the break has exactly one destination, so there is nothing here to
+     * choose and the panel stays shut.
+     */
     public static void open() {
         Minecraft mc=Minecraft.getInstance();
-        if(mc.player!=null)mc.setScreen(new FractureScreen());
+        if(mc.player==null||!com.loki.server.PocketRealm.inside(mc.player.level()))return;
+        mc.setScreen(new FractureScreen());
     }
 }

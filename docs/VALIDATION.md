@@ -124,4 +124,5 @@ Base: the 0.4.0 branch head, Actions run `35516710856`.
 
 - The ward answers anything with a source entity. Damage with no attacker at all — falling, the void, drowning — is deliberately left alone.
 - `Nearest Player` prefers someone in the same dimension and otherwise takes whoever it can find; it does not rank across dimensions by real distance, because there is no such distance.
-- A break opened by a travel mode is still a walk-through door with the normal seven-second life; travel modes do not use the hold gesture.
+- A break opened by a travel mode is still a walk-through door with the normal seven-second life. Holding the cast key inside the sanctum arms the vacuum for every mode, so cargo can be dragged out to any destination; outside, holding always means the inbound pull.
+- The selector is refused outside the sanctum on both sides: the panel will not open, and the server drops a selection packet from a player who is not inside one. The saved mode itself is untouched by leaving and re-entering.

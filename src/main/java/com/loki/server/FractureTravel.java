@@ -55,6 +55,8 @@ public final class FractureTravel {
     public static void choose(ServerPlayer owner,int index,UUID target) {
         FractureMode mode=FractureModes.byIndex(index);
         if(mode==null)return;
+        // The panel is shut outside the sanctum; the server does not take its word for that.
+        if(!selectable(owner))return;
         if(mode.needsTarget) {
             ServerPlayer chosen=target==null?null:owner.server.getPlayerList().getPlayer(target);
             if(chosen==null||chosen==owner) {
@@ -73,8 +75,12 @@ public final class FractureTravel {
      * @return true when the cast happened and should be charged for
      */
     public static boolean act(ServerPlayer owner,int stage) {
+        // Out in the world the break leads one place: in. Whatever is saved describes the way out
+        // and waits until the owner is standing in the sanctum to mean anything, so a cast here
+        // always takes the caster — and, held, everything within five blocks of them — inside.
+        if(!PocketRealm.inside(owner.level()))return LokiServer.pullFracture(owner,stage);
         FractureMode mode=mode(owner);
-        // The pull is the original behaviour and keeps its own tap/hold distinction untouched.
+        // The pull keeps its own tap/hold distinction untouched.
         if(mode==FractureModes.PULL)return LokiServer.pullFracture(owner,stage);
         if(stage==RiftEntity.RELEASE)return false;
         FractureAnchor anchor=resolve(owner);
@@ -98,6 +104,9 @@ public final class FractureTravel {
         FractureAnchor anchor=mode==FractureModes.PULL?towardReturn(owner):resolve(owner);
         return anchor!=null?anchor:towardReturn(owner);
     }
+
+    /** Whether the owner may choose a destination right now: only from inside the sanctum. */
+    public static boolean selectable(ServerPlayer owner) {return PocketRealm.inside(owner.level());}
 
     // ------------------------------------------------------------------ resolvers ---
 

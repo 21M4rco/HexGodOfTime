@@ -98,11 +98,12 @@ public final class LokiClient {
             if(!primary&&primaryDown&&primaryWasHold)LokiNetwork.send(LokiServer.HOLD_END,0);
             primaryDown=primary;
 
-            // The alternate key is the Fracture's configuration key: it chooses what the cast key
-            // will keep doing. Every other spell keeps its ordinary alternate action.
+            // The alternate key configures the Fracture, but only inside the sanctum, which is the
+            // only place the break has a choice to make. Outside it there is one destination and the
+            // cast key is the whole control. Every other spell keeps its ordinary alternate action.
             while(SECONDARY.consumeClick()) {
-                if(Ability.at(ClientState.self().getInt("selected"))==Ability.RIFT)FractureScreen.open();
-                else LokiNetwork.send(LokiServer.ALTERNATE,0);
+                if(Ability.at(ClientState.self().getInt("selected"))!=Ability.RIFT)LokiNetwork.send(LokiServer.ALTERNATE,0);
+                else FractureScreen.open();
             }
             while(TRANSFORM.consumeClick())LokiNetwork.send(LokiServer.TRANSFORM,0);
             while(RELEASE.consumeClick())LokiNetwork.send(LokiServer.UTILITY,0);

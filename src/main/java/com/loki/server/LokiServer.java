@@ -77,7 +77,9 @@ public final class LokiServer {
         if(a==Ability.RIFT&&PocketRealm.inside(p.level())&&(action==CAST||action==HOLD_BEGIN)) {
             UUID active=RIFTS.get(p.getUUID());
             if(active==null||!(p.serverLevel().getEntity(active) instanceof RiftEntity))openFracture(p,FractureTravel.exit(p));
-            if(action==HOLD_BEGIN&&LokiData.fractureMode(p)==com.loki.data.FractureModes.PULL)armFracture(p);
+            // Holding drags everything nearby out with the owner, whatever the destination is: that
+            // is how a captive taken in at one place is released somewhere else entirely.
+            if(action==HOLD_BEGIN)armFracture(p);
             return;
         }
         if(action==ALTERNATE&&secondary(p,a)){LokiNetwork.sync(p);return;}
