@@ -49,6 +49,8 @@ public final class TemporalEngine {
     public static final int RAMP=7;
     /** How much of normal time a dilated body experiences. */
     private static final double DILATION=.32;
+    /** The rate a body resumes at the instant a hold lets go, before the ramp brings it back to one. */
+    private static final double RESUME_RATE=.06;
     private static final float MAX_BANKED=60;
 
     public static boolean frozen(Entity e) {return FROZEN.containsKey(e.getUUID());}
@@ -134,7 +136,7 @@ public final class TemporalEngine {
             if(e==null||desired.containsKey(entry.getKey()))continue;
             entities.putIfAbsent(entry.getKey(),e);
             double progress=1-(entry.getValue()-now)/(double)RAMP;
-            rates.merge(entry.getKey(),Math.max(.06,Math.min(1,progress)),Math::min);
+            rates.merge(entry.getKey(),Math.max(RESUME_RATE,Math.min(1,progress)),Math::min);
         }
 
         List<Frozen> releasing=new ArrayList<>();
@@ -151,7 +153,8 @@ public final class TemporalEngine {
         // Anything no longer being slowed is returned to full rate before the new rates are applied.
         for(UUID id:new ArrayList<>(SLOWED.keySet())) {
             Entity e=SLOWED.get(id);
-            if(e==null||e.level()!=level)continue;
+            if(e==null||e.isRemoved()){SLOWED.remove(id);APPLIED.remove(id);RECOVERING.remove(id);continue;}
+            if(e.level()!=level)continue;
             if(!rates.containsKey(id)||desired.containsKey(id))rate(e,1);
         }
         for(var entry:rates.entrySet()) {
@@ -180,7 +183,6 @@ public final class TemporalEngine {
         e.setPos(s.position);e.setYRot(s.yaw);e.setXRot(s.pitch);e.setDeltaMovement(Vec3.ZERO);e.hurtMarked=true;
         e.setOldPosAndRot();
         if(e instanceof LivingEntity l){l.setYHeadRot(s.yaw);l.yBodyRot=s.yaw;l.hurtTime=0;l.invulnerableTime=0;}
-        if(e instanceof Projectile projectile)projectile.setNoGravity(true);
         if(e instanceof ServerPlayer p&&now%5==0)p.connection.teleport(s.position.x,s.position.y,s.position.z,s.yaw,s.pitch);
         if(now%20==0)sync(s,true);
     }
@@ -256,10 +258,11 @@ public final class TemporalEngine {
 
     private static void restore(Frozen s,long now) {
         if(s.entity.isRemoved())return;
-        s.entity.setDeltaMovement(s.velocity);s.entity.hurtMarked=true;
-        if(s.entity instanceof Projectile projectile)projectile.setNoGravity(false);
-        // Spin back up rather than snapping to full speed, mirroring the way the field took hold.
-        APPLIED.put(s.entity.getUUID(),.06);
+        // Spin back up rather than snapping to full speed, mirroring the way the field took hold. The
+        // speed handed back has to match the rate the body is marked as running at, or the ramp's
+        // proportional correction inflates it instead of easing it.
+        s.entity.setDeltaMovement(s.velocity.scale(RESUME_RATE));s.entity.hurtMarked=true;
+        APPLIED.put(s.entity.getUUID(),RESUME_RATE);
         RECOVERING.put(s.entity.getUUID(),now+RAMP);
         sync(s,false);
         Banked banked=BANKED.remove(s.entity.getUUID());

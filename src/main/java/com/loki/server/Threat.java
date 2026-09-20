@@ -28,6 +28,11 @@ public final class Threat {
     /** Records that {@code attacker} harmed {@code victim}; both directions are useful to different callers. */
     public static void record(LivingEntity victim,Entity attacker,float amount) {
         if(attacker==null||victim==null||attacker==victim)return;
+        // Both questions this table answers involve a keeper or one of their copies on one side of
+        // the blow; recording the rest of the world's quarrels would only crowd the bound.
+        if(!(victim instanceof net.minecraft.world.entity.player.Player
+            ||attacker instanceof net.minecraft.world.entity.player.Player
+            ||attacker instanceof com.loki.entity.IllusionEntity))return;
         long now=victim.level().getGameTime();
         Map<UUID,Mark> sources=HARMED.get(victim.getUUID());
         if(sources==null) {

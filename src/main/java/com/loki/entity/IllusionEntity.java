@@ -100,11 +100,9 @@ public final class IllusionEntity extends PathfinderMob {
     private void mirrorEffects(ServerPlayer p) {
         removeAllEffects();
         for(MobEffectInstance effect:p.getActiveEffects()) {
-            if(effect.getEffect().getCategory()==MobEffectCategory.HARMFUL&&!effect.getEffect().isBeneficial()) {
-                if(effect.getEffect()!=MobEffects.GLOWING&&effect.getEffect()!=MobEffects.BLINDNESS)continue;
-            }
-            if(effect.getEffect()==MobEffects.POISON||effect.getEffect()==MobEffects.WITHER||effect.getEffect()==MobEffects.HARM)continue;
-            addEffect(new MobEffectInstance(effect.getEffect(),Math.min(effect.getDuration(),spec.lifespan+40),
+            MobEffect kind=effect.getEffect();
+            if(kind==MobEffects.POISON||kind==MobEffects.WITHER||kind==MobEffects.HARM)continue;
+            addEffect(new MobEffectInstance(kind,Math.min(effect.getDuration(),spec.lifespan+40),
                 effect.getAmplifier(),effect.isAmbient(),effect.isVisible(),effect.showIcon()));
         }
     }
@@ -186,7 +184,9 @@ public final class IllusionEntity extends PathfinderMob {
             double radians=Math.toRadians(glanceYaw);
             getLookControl().setLookAt(enemy.getX()-Math.sin(radians)*3,enemy.getEyeY()+random.nextGaussian(),enemy.getZ()+Math.cos(radians)*3);
         }
-        if(spec.decoy&&enemy instanceof Mob mob&&(mob.getTarget()==p||mob.getTarget()==null))mob.setTarget(this);
+        // Provoke a creature that is fighting nobody. One that is already hunting the caster is left
+        // to the weighted draw in Decoy, so copies neither lose that contest by default nor win it.
+        if(spec.decoy&&enemy instanceof Mob mob&&mob.getTarget()==null)mob.setTarget(this);
         Vec3 delta=position().subtract(enemy.position()).multiply(1,0,1).normalize();
         if(delta.lengthSqr()<1e-6)delta=new Vec3(1,0,0);
         double angle=getId()*2.399963229728653+tickCount*.015;

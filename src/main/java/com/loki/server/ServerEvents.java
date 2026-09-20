@@ -46,7 +46,7 @@ public final class ServerEvents {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
         TemporalEngine.track(p,e.getTarget());
         if(!(e.getTarget() instanceof ServerPlayer q))return;
-        LokiNetwork.to(p,new LokiNetwork.Message(LokiNetwork.SYNC,q.getId(),LokiData.get(q).copy()));
+        LokiNetwork.syncTo(p,q);
         // A borrowed shape is sent once, not every second, so a new viewer has to be told separately.
         Masquerade.resend(p,q);
     }

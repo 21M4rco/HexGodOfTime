@@ -186,7 +186,7 @@ public final class ThrownDagger extends ThrowableProjectile {
     private static int classify(Entity victim,float x,float y) {
         if(!(victim instanceof LivingEntity))return TORSO;
         boolean humanoid=victim.getBbHeight()>1.1&&victim.getBbWidth()<1.3&&victim.getBbHeight()/Math.max(.1f,victim.getBbWidth())>1.6;
-        if(y>.82)return HEAD;
+        if(y>.76)return HEAD;
         if(!humanoid)return TORSO;
         if(y<.46)return x<0?RIGHT_LEG:LEFT_LEG;
         if(Math.abs(x)>.34)return x<0?RIGHT_ARM:LEFT_ARM;

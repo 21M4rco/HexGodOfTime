@@ -37,6 +37,10 @@ public final class LokiNetwork {
      * entity's full snapshot — which can run to kilobytes — never rides along with it. Only the small
      * descriptor travels here; {@link com.loki.server.Masquerade} sends the body once, on change.
      */
+    /** The same trimmed state, addressed to one viewer that has just started tracking the player. */
+    public static void syncTo(ServerPlayer viewer,ServerPlayer subject) {
+        to(viewer,new Message(SYNC,subject.getId(),light(LokiData.get(subject))));
+    }
     private static CompoundTag light(CompoundTag data) {
         CompoundTag copy=data.copy();
         if(copy.contains("disguise"))copy.getCompound("disguise").remove("nbt");
