@@ -87,7 +87,11 @@ public final class PocketRealm {
     public static Vec3 centre(int plot) {BlockPos o=origin(plot);return new Vec3(o.getX()+SIZE/2.0,FLOOR_Y+1,o.getZ()+72.0);}
 
     public static boolean inside(Level level) {return KEY.equals(level.dimension());}
-    public static boolean crossingCooldown(ServerPlayer p) {return LokiData.get(p).getLong("riftGraceUntil")>p.server.overworld().getGameTime();}
+    public static boolean crossingCooldown(ServerPlayer p) {
+        // Homeward travel is immediate. After returning, outlive every old entry rift so standing
+        // on the saved point cannot pull the player straight back into the realm.
+        return !inside(p.level())&&LokiData.get(p).getLong("riftGraceUntil")>p.server.overworld().getGameTime();
+    }
 
     public static ServerLevel level(MinecraftServer server) {return server.getLevel(KEY);}
 
@@ -165,7 +169,7 @@ public final class PocketRealm {
             return false;
         }
         p.setDeltaMovement(Vec3.ZERO);p.resetFallDistance();
-        LokiData.get(p).putLong("riftGraceUntil",p.server.overworld().getGameTime()+60);
+        LokiData.get(p).putLong("riftGraceUntil",p.server.overworld().getGameTime()+com.loki.entity.RiftEntity.DURATION+20);
         return true;
     }
 
