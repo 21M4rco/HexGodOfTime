@@ -160,12 +160,12 @@ public final class PocketRealm {
             return;
         }
         int i=index-FLOOR_CELLS*2,column=i/WALL,height=i%WALL;
-        int x,z;
-        if(column<SIZE){x=column;z=0;}
-        else if(column<SIZE*2){x=column-SIZE;z=SIZE-1;}
-        else if(column<SIZE*2+SIZE-2){x=0;z=column-SIZE*2+1;}
-        else {x=SIZE-1;z=column-(SIZE*2+SIZE-2)+1;}
-        level.setBlock(o.offset(x,height+1,z),wall(x,z,height),UPDATE_CLIENTS);
+        int x,z,along;
+        if(column<SIZE){x=column;z=0;along=x;}
+        else if(column<SIZE*2){x=column-SIZE;z=SIZE-1;along=x;}
+        else if(column<SIZE*2+SIZE-2){x=0;z=column-SIZE*2+1;along=z;}
+        else {x=SIZE-1;z=column-(SIZE*2+SIZE-2)+1;along=z;}
+        level.setBlock(o.offset(x,height+1,z),wall(along,height),UPDATE_CLIENTS);
     }
 
     private static BlockState floor(int x,int z) {
@@ -176,8 +176,9 @@ public final class PocketRealm {
         if(x%10==0||z%10==0)return Blocks.POLISHED_BLACKSTONE_BRICKS.defaultBlockState();
         return Blocks.DEEPSLATE_TILES.defaultBlockState();
     }
-    private static BlockState wall(int x,int z,int height) {
-        boolean pillar=x%10==0||z%10==0||x==SIZE-1||z==SIZE-1;
+    /** {@code along} runs with the wall, so pillars land at the same spacing on all four sides. */
+    private static BlockState wall(int along,int height) {
+        boolean pillar=along%10==0;
         if(height==WALL-1)return Blocks.POLISHED_BLACKSTONE.defaultBlockState();
         if(pillar&&(height==5||height==11))return Blocks.GLOWSTONE.defaultBlockState();
         if(pillar)return Blocks.CHISELED_POLISHED_BLACKSTONE.defaultBlockState();
