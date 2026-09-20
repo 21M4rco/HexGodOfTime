@@ -133,8 +133,14 @@ public final class Nothingness extends SavedData {
     public static void restoreAll(ServerLevel level) {
         Nothingness data=of(level);
         if(data.wounds.isEmpty())return;
-        for(Wound w:new ArrayList<>(data.wounds.values()))if(level.hasChunkAt(w.pos))data.restore(level,w);
-        data.wounds.clear();
+        for(Wound w:new ArrayList<>(data.wounds.values())) {
+            // Only what can actually be reached. A position whose chunk is already gone keeps its record
+            // and is restored, overdue, the next time that chunk loads — dropping it here because the
+            // server happened to be closing is exactly the permanent loss this class exists to prevent.
+            if(!level.hasChunkAt(w.pos))continue;
+            data.restore(level,w);
+            data.wounds.remove(w.pos.asLong());
+        }
         data.setDirty();
     }
 
