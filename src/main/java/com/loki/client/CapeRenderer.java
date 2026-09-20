@@ -99,7 +99,7 @@ public final class CapeRenderer {
     }
 
     private static int shade(float v) {
-        int tone=Math.round(255-52*Mth.clamp(v,0,1));
+        int tone=Math.round(88-20*Mth.clamp(v,0,1));
         return tone<<16|tone<<8|tone;
     }
     private static float[] vec(Vec3 v) {return new float[]{(float)v.x,(float)v.y,(float)v.z};}

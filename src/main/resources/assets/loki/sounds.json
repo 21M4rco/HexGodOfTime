@@ -1,64 +1,12 @@
 {
-  "ascend": {
-    "subtitle": "subtitles.loki.ascend",
+  "rift_open": {
+    "subtitle": "subtitles.loki.rift_open",
     "sounds": [
       {
-        "name": "loki:ascend",
-        "stream": true
-      }
-    ]
-  },
-  "blade_embed": {
-    "subtitle": "subtitles.loki.blade_embed",
-    "sounds": [
-      {
-        "name": "loki:blade_embed",
-        "stream": false
-      }
-    ]
-  },
-  "blade_hit": {
-    "subtitle": "subtitles.loki.blade_hit",
-    "sounds": [
-      {
-        "name": "loki:blade_hit",
-        "stream": false
-      }
-    ]
-  },
-  "blade_swing": {
-    "subtitle": "subtitles.loki.blade_swing",
-    "sounds": [
-      {
-        "name": "loki:blade_swing",
-        "stream": false
-      }
-    ]
-  },
-  "blade_throw": {
-    "subtitle": "subtitles.loki.blade_throw",
-    "sounds": [
-      {
-        "name": "loki:blade_throw",
-        "stream": false
-      }
-    ]
-  },
-  "conjure": {
-    "subtitle": "subtitles.loki.conjure",
-    "sounds": [
-      {
-        "name": "loki:conjure",
-        "stream": false
-      }
-    ]
-  },
-  "illusion": {
-    "subtitle": "subtitles.loki.illusion",
-    "sounds": [
-      {
-        "name": "loki:illusion",
-        "stream": false
+        "name": "minecraft:block.glass.break",
+        "type": "event",
+        "volume": 0.95,
+        "pitch": 0.92
       }
     ]
   },
@@ -66,17 +14,76 @@
     "subtitle": "subtitles.loki.rift_close",
     "sounds": [
       {
-        "name": "loki:rift_close",
-        "stream": false
+        "name": "minecraft:block.glass.break",
+        "type": "event",
+        "volume": 0.48,
+        "pitch": 1.18
       }
     ]
   },
-  "rift_open": {
-    "subtitle": "subtitles.loki.rift_open",
+  "blade_swing": {
+    "subtitle": "subtitles.loki.blade_swing",
     "sounds": [
       {
-        "name": "loki:rift_open",
-        "stream": false
+        "name": "minecraft:entity.player.attack.sweep",
+        "type": "event",
+        "volume": 0.8,
+        "pitch": 1.0
+      }
+    ]
+  },
+  "blade_throw": {
+    "subtitle": "subtitles.loki.blade_throw",
+    "sounds": [
+      {
+        "name": "minecraft:item.trident.throw",
+        "type": "event",
+        "volume": 0.7,
+        "pitch": 1.16
+      }
+    ]
+  },
+  "blade_hit": {
+    "subtitle": "subtitles.loki.blade_hit",
+    "sounds": [
+      {
+        "name": "minecraft:item.trident.hit",
+        "type": "event",
+        "volume": 0.75,
+        "pitch": 1.08
+      }
+    ]
+  },
+  "blade_embed": {
+    "subtitle": "subtitles.loki.blade_embed",
+    "sounds": [
+      {
+        "name": "minecraft:item.trident.hit_ground",
+        "type": "event",
+        "volume": 0.7,
+        "pitch": 0.92
+      }
+    ]
+  },
+  "conjure": {
+    "subtitle": "subtitles.loki.conjure",
+    "sounds": [
+      {
+        "name": "minecraft:item.armor.equip_iron",
+        "type": "event",
+        "volume": 0.65,
+        "pitch": 1.16
+      }
+    ]
+  },
+  "illusion": {
+    "subtitle": "subtitles.loki.illusion",
+    "sounds": [
+      {
+        "name": "minecraft:entity.player.attack.sweep",
+        "type": "event",
+        "volume": 0.42,
+        "pitch": 0.72
       }
     ]
   },
@@ -84,8 +91,10 @@
     "subtitle": "subtitles.loki.sorcery",
     "sounds": [
       {
-        "name": "loki:sorcery",
-        "stream": false
+        "name": "minecraft:entity.evoker.cast_spell",
+        "type": "event",
+        "volume": 0.4,
+        "pitch": 0.92
       }
     ]
   },
@@ -93,26 +102,10 @@
     "subtitle": "subtitles.loki.teleport",
     "sounds": [
       {
-        "name": "loki:teleport",
-        "stream": false
-      }
-    ]
-  },
-  "time_resume": {
-    "subtitle": "subtitles.loki.time_resume",
-    "sounds": [
-      {
-        "name": "loki:time_resume",
-        "stream": false
-      }
-    ]
-  },
-  "time_slip": {
-    "subtitle": "subtitles.loki.time_slip",
-    "sounds": [
-      {
-        "name": "loki:time_slip",
-        "stream": false
+        "name": "minecraft:item.chorus_fruit.teleport",
+        "type": "event",
+        "volume": 0.38,
+        "pitch": 1.0
       }
     ]
   },
@@ -120,8 +113,43 @@
     "subtitle": "subtitles.loki.time_stop",
     "sounds": [
       {
-        "name": "loki:time_stop",
-        "stream": false
+        "name": "minecraft:block.beacon.deactivate",
+        "type": "event",
+        "volume": 0.36,
+        "pitch": 0.78
+      }
+    ]
+  },
+  "time_resume": {
+    "subtitle": "subtitles.loki.time_resume",
+    "sounds": [
+      {
+        "name": "minecraft:block.beacon.activate",
+        "type": "event",
+        "volume": 0.32,
+        "pitch": 0.92
+      }
+    ]
+  },
+  "time_slip": {
+    "subtitle": "subtitles.loki.time_slip",
+    "sounds": [
+      {
+        "name": "minecraft:item.chorus_fruit.teleport",
+        "type": "event",
+        "volume": 0.36,
+        "pitch": 0.8
+      }
+    ]
+  },
+  "ascend": {
+    "subtitle": "subtitles.loki.ascend",
+    "sounds": [
+      {
+        "name": "minecraft:item.armor.equip_netherite",
+        "type": "event",
+        "volume": 0.75,
+        "pitch": 0.82
       }
     ]
   }

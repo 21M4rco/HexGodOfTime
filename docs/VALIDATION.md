@@ -34,3 +34,14 @@ Based on commit `9e17eb0716517e855fd107d0b7ca8db8b5294585` (latest successful pu
 Source checks: exact torso-pose cape anchors; invisibility and Court of Lies guards; separate projection destinations; Fracture cooldown 160 ticks; matching custom sky ID and dimension type; deterministic tree/throne plan; legacy wall removal and persisted build progress. The asset generator only regenerated crown geometry.
 
 Required game checks: sprint/turn/crouch/fall/teleport cape clearance, Court of Lies while wearing armor, stopped-player projection spacing, fresh and existing sanctum entry, sky under normal/Fabulous graphics, throne access, interrupted construction/restart, return portal and crouch exit. These have not been performed in this environment.
+
+
+## 0.3.0 patch
+
+Base: `b613213476ce543ad954fb31066bf880a3eeaad1`, latest successful build at the start of this task.
+
+Validation added: `verifyRealmShape` checks island bounds, land area, non-cylindrical shoreline, underside taper, a flat throne/arrival approach, and flood-fill connectivity. It runs as part of Gradle `check` and `build`. All 14 sound references were checked against the Minecraft 1.20.1 client `sounds.json`.
+
+Runtime checks still required: two players enter/exit from different dimensions and positions; exit immediately after entry with zero energy; saved return after reconnect/restart; blocked/missing return dimension fallback; Q/CTRL-Q/inventory/death/hopper weapon drops; transferred inventory weapons; throne sit/dismount/dimension change; new and existing island upgrades/restart; cloth in motion; portal mirror appearance and sound balance.
+
+No Minecraft client or dedicated-server playtest was available in the editing environment.

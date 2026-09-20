@@ -10,8 +10,8 @@ import org.joml.Vector3f;
 
 /** World-space cloth with attachment and body collision taken from the rendered torso bone. */
 public final class TemporalCloth {
-    public static final int ROWS=22,COLS=9;
-    private static final double LENGTH=2.22,HALF_TOP=.29,HALF_BOTTOM=.56;
+    public static final int ROWS=22,COLS=13;
+    private static final double LENGTH=2.22,HALF_TOP=.29,HALF_BOTTOM=.98;
     private static final double SEGMENT=LENGTH/(ROWS-1),GRAVITY=.022,DAMPING=.92;
     private static final int PASSES=10;
     private final Vec3[] current=new Vec3[ROWS*COLS],previous=new Vec3[ROWS*COLS],old=new Vec3[ROWS*COLS];
@@ -83,9 +83,11 @@ public final class TemporalCloth {
         for(int pass=0;pass<PASSES;pass++) {
             for(int row=1;row<ROWS;row++)for(int col=0;col<COLS;col++) {
                 double t=row/(double)(ROWS-1);
-                link(at(row-1,col),at(row,col),SEGMENT,row==1?0:.45);
+                double u=col/(double)(COLS-1)*2-1;
+                double flare=u*(halfWidth(t)-halfWidth((row-1)/(double)(ROWS-1)));
+                link(at(row-1,col),at(row,col),Math.hypot(SEGMENT,flare),row==1?0:.45);
                 if(col+1<COLS)link(at(row,col),at(row,col+1),2*halfWidth(t)/(COLS-1),.5);
-                if(col+1<COLS)link(at(row-1,col),at(row,col+1),Math.hypot(SEGMENT,2*halfWidth(t)/(COLS-1)),row==1?0:.5);
+                if(col+1<COLS)link(at(row-1,col),at(row,col+1),Math.hypot(SEGMENT,2*halfWidth(t)/(COLS-1)+flare),row==1?0:.5);
             }
             for(int i=COLS;i<current.length;i++) {
                 current[i]=body.outsideBody(current[i]);

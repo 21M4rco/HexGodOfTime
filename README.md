@@ -1,3 +1,16 @@
+## 0.3.0 — Fracture and world-tree island
+
+- Fracture inside the realm opens a return portal without an energy/mastery/cooldown requirement. Walk through to return to your own saved dimension, position and facing. A short crossing grace period prevents bouncing back into the entry portal. The arrival sigil remains a crouch-to-exit fallback.
+- Dropped conjured daggers, Laevateinn and time sticks dissolve before spawning or being picked up, including inventory tosses and death drops. Transferred weapons cannot be used by another player. Thrown attack daggers still embed and dissolve as before.
+- Recorded Minecraft glass/weapon/material sounds replace the old synthetic audio. The portal's duplicate opening sound is removed. Resource-pack sample overrides are respected.
+- Black metal horns, charcoal/gray outfit and a broader, flaring charcoal cape; shoulder attachment stays on the posed torso.
+- Larger seeded mirror fractures with jagged apertures, uneven splinters and persistent branching cracks.
+- A roughly 150-block-wide irregular island with more than twice the old land area, a deeply tapered rocky underside, rolling edges, sprawling/forked surface roots, hanging roots, luminous flower groves and a much larger branching tree.
+- A thick carved throne, solid seat, wide stair approach, armrests and horned root crown. Right-click the seat to sit; sneak to stand.
+- Existing plot coordinates and return sigils stay in place. V3 generation checkpoints resume after restart. The upgrade replaces matching old generated states and leaves other occupied blocks alone. Blocks a player placed that exactly match the original generated block at the same position cannot be distinguished from the original.
+
+Install the normal `loki-0.3.0.jar` from **Build Loki**; `loki-0.3.0-sources.jar` contains source code. The mod still targets Forge 1.20.1 and retains its existing Player Animator dependency. Client/server playtesting remains necessary; compilation does not certify visual or multiplayer behavior.
+
 # Loki — Glorious Purpose
 
 Minecraft **1.20.1**, Forge **47.4.10**, Java **17**. This is a development build, not a certified final release.

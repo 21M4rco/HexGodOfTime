@@ -1,7 +1,7 @@
-"""Reproducible authored meshes, textures, particle sprites, animations and original audio.
+"""Reproducible authored meshes, textures, particle sprites, animations and recorded-Foley mappings.
 
-Requires Pillow and ffmpeg, and nothing else: the synthesis below is plain Python so the
-asset pipeline stays as portable as the rest of the project.
+Requires Pillow. Audio references samples from the installed Minecraft assets; no audio
+is redistributed or synthesized.
 
 Weapon geometry is authored directly in Minecraft item-model units, where 1.0 is one block and
 the grip sits at the origin with the blade running up +Y. WeaponRenderer only has to place that
@@ -336,232 +336,14 @@ for kind in ['dagger', 'twin', 'sword']:
 
 
 # ------------------------------------------------------------------- audio ---
-# Original synthesis only; nothing is sampled from film or game sources. Each sound is built
-# from its own recipe rather than one shared formula, so steel reads as steel and time does not.
-
-RATE = 22050
-
-
-def silence(duration):
-    return [0.0] * int(RATE * duration)
-
-
-def add(buffer, start, samples, gain=1.0):
-    offset = int(start * RATE)
-    for i, s in enumerate(samples):
-        j = offset + i
-        if 0 <= j < len(buffer):
-            buffer[j] += s * gain
-
-
-def noise(duration, seed):
-    r = random.Random(seed)
-    return [r.uniform(-1, 1) for _ in range(int(RATE * duration))]
-
-
-def bandpass(samples, centre, q, sweep=0.0):
-    """One resonant biquad, optionally sweeping its centre across the buffer."""
-    out = [0.0] * len(samples)
-    x1 = x2 = y1 = y2 = 0.0
-    n = max(1, len(samples) - 1)
-    for i, x in enumerate(samples):
-        f = centre * (1 + sweep * i / n)
-        w = TAU * min(f, RATE * .45) / RATE
-        alpha = math.sin(w) / (2 * q)
-        cosw = math.cos(w)
-        b0, b2 = alpha, -alpha
-        a0, a1, a2 = 1 + alpha, -2 * cosw, 1 - alpha
-        y = (b0 * x + b2 * x2 - a1 * y1 - a2 * y2) / a0
-        x2, x1 = x1, x
-        y2, y1 = y1, y
-        out[i] = y
-    return out
-
-
-def envelope(samples, attack, decay, power=1.6):
-    n = len(samples)
-    a = max(1, int(attack * RATE))
-    out = [0.0] * n
-    for i, s in enumerate(samples):
-        rise = min(1.0, i / a)
-        fall = math.exp(-i / RATE / max(1e-4, decay)) ** power
-        out[i] = s * rise * fall
-    return out
-
-
-def partials(duration, base, ratios, decays, gains, detune=0.0, seed=0):
-    r = random.Random(seed)
-    n = int(RATE * duration)
-    out = [0.0] * n
-    for ratio, decay, gain in zip(ratios, decays, gains):
-        f = base * ratio * (1 + r.uniform(-detune, detune))
-        w = TAU * f / RATE
-        for i in range(n):
-            out[i] += math.sin(w * i) * gain * math.exp(-i / RATE / decay)
-    return out
-
-
-def sweep(duration, start, end, gain=1.0, shape=1.0):
-    n = int(RATE * duration)
-    out = [0.0] * n
-    phase = 0.0
-    for i in range(n):
-        t = (i / n) ** shape
-        f = start + (end - start) * t
-        phase += TAU * f / RATE
-        out[i] = math.sin(phase) * gain
-    return out
-
-
-def comb(samples, delay, feedback, mix=.35):
-    """A cheap tail so impacts sit in a space instead of stopping dead."""
-    d = int(delay * RATE)
-    out = list(samples)
-    for i in range(d, len(out)):
-        out[i] += out[i - d] * feedback
-    return [s * (1 - mix) + o * mix for s, o in zip(samples, out)]
-
-
-def swing(seed, duration=.42, centre=1500, sweep_amount=1.5, gain=.62):
-    body = bandpass(noise(duration, seed), centre, 1.5, sweep_amount)
-    body = envelope(body, .035, duration * .28, 1.3)
-    ring = envelope(partials(duration, 2400, [1, 2.37, 3.61], [.10, .07, .05], [.20, .10, .06], .01, seed), .004, .09)
-    out = silence(duration)
-    add(out, 0, body, gain)
-    add(out, duration * .30, ring, .35)
-    return out
-
-
-def blade_hit(seed):
-    duration = .58
-    out = silence(duration)
-    # Transient: the instant of contact.
-    add(out, 0, envelope(noise(.04, seed), .0006, .012, 1.0), .95)
-    # Steel: inharmonic partials that ring and die unevenly.
-    add(out, .002, partials(.5, 1180, [1, 2.71, 4.13, 5.87, 7.94], [.22, .16, .11, .07, .05],
-                            [.34, .22, .15, .09, .05], .012, seed), .8)
-    # Body: a low thud so it lands on something rather than in the air.
-    add(out, .004, envelope(bandpass(noise(.2, seed + 7), 180, 1.1), .002, .07, 1.2), .55)
-    return comb(out, .031, .26, .22)
-
-
-def rift(opening):
-    duration = 1.5 if opening else 1.1
-    out = silence(duration)
-    r = random.Random(9901 if opening else 9902)
-    # A spray of glass fractures, packed toward the moment the surface gives way.
-    for i in range(46):
-        t = (i / 46) ** (.6 if opening else 2.0) * duration * .62
-        seed = r.randrange(1 << 20)
-        piece = envelope(partials(.20, r.uniform(1500, 5200), [1, 2.44, 3.93], [.07, .05, .03],
-                                  [.3, .18, .1], .02, seed), .0008, .05)
-        add(out, t, piece, r.uniform(.12, .38))
-    if opening:
-        add(out, 0, envelope(sweep(.95, 60, 520, 1.0, 2.2), .55, .5, .8), .40)   # reverse-style swell
-        add(out, .55, envelope(sweep(.9, 240, 44, 1.0, .6), .004, .35), .42)     # the drop through
-    else:
-        add(out, 0, envelope(sweep(.8, 420, 70, 1.0, 1.4), .02, .28), .45)
-    return comb(out, .057, .34, .30)
-
-
-def stillness():
-    duration = 2.6
-    out = silence(duration)
-    # A long inhale that arrives at a single glassy stop, then a low bed that simply holds.
-    add(out, 0, envelope(sweep(1.05, 38, 300, 1.0, 2.6), .85, .6, .7), .34)
-    add(out, .90, envelope(partials(.7, 2050, [1, 2.83, 5.41], [.30, .18, .10], [.30, .16, .08], .008, 5), .0009, .22), .55)
-    add(out, .92, envelope(noise(.05, 31), .0005, .014), .30)
-    drone = partials(1.7, 63, [1, 1.5, 2.01, 3.02], [2.0, 1.6, 1.3, .9], [.26, .13, .10, .05], .004, 12)
-    add(out, .92, envelope(drone, .18, 1.1, .8), .40)
-    return comb(out, .083, .40, .34)
-
-
-def resume():
-    duration = 1.0
-    out = silence(duration)
-    add(out, 0, envelope(bandpass(noise(.6, 77), 500, .9, 4.0), .02, .2, 1.1), .5)
-    add(out, .22, envelope(partials(.6, 320, [1, 2.02, 3.05], [.28, .2, .14], [.3, .16, .09], .01, 78), .006, .22), .45)
-    return comb(out, .041, .25, .2)
-
-
-def shimmer(duration, base, bright, wobble=0.0, seed=1):
-    """Loki's own sorcery: clean, sharp, a little uncanny."""
-    out = partials(duration, base, [1, 1.5, 2.0, 3.0, 4.5], [duration * .5] * 5,
-                   [.30, .16, .12, .07, .04], .004, seed)
-    air = envelope(bandpass(noise(duration, seed + 3), bright, 2.2, .6), .01, duration * .3)
-    out = [a + b * .28 for a, b in zip(out, air)]
-    if wobble:
-        out = [s * (1 + wobble * math.sin(TAU * 6.5 * i / RATE)) for i, s in enumerate(out)]
-    return envelope(out, .008, duration * .38)
-
-
-def unstable(duration=1.35):
-    """Time slipping: the sound should not sit still or resolve."""
-    out = silence(duration)
-    r = random.Random(4242)
-    for i in range(7):
-        t = r.uniform(0, duration * .6)
-        seg = sweep(r.uniform(.18, .4), r.uniform(90, 900), r.uniform(60, 1400), 1.0, r.uniform(.4, 2.2))
-        add(out, t, envelope(seg, .003, .12), r.uniform(.22, .5))
-    add(out, 0, envelope(bandpass(noise(duration, 55), 240, .8, 3.0), .01, .35, 1.1), .38)
-    return [s * (1 + .5 * math.sin(TAU * (3 + 9 * i / len(out)) * i / RATE)) for i, s in enumerate(out)]
-
-
-def ascension():
-    duration = 7.0
-    out = silence(duration)
-    for i, (ratio, delay) in enumerate([(1, 0), (1.5, .8), (2, 1.9), (3, 3.1), (4.5, 4.2)]):
-        voice = partials(duration - delay, 82 * ratio, [1, 2, 3], [4.0, 3.0, 2.2], [.24, .10, .05], .003, 100 + i)
-        add(out, delay, envelope(voice, 1.2, 3.4, .7), .55)
-    add(out, 2.4, envelope(bandpass(noise(4.0, 66), 900, 1.2, 1.4), 1.6, 1.8, .8), .18)
-    add(out, 5.4, envelope(partials(1.5, 1240, [1, 2.71, 4.2], [.6, .4, .3], [.26, .14, .08], .01, 9), .3, .55), .35)
-    return comb(out, .127, .32, .3)
-
-
-def embed():
-    """Steel into stone or bone: a dull thunk with a short, choked metal ring."""
-    duration = .34
-    out = silence(duration)
-    add(out, 0, envelope(bandpass(noise(duration, 404), 145, 1.0), .0009, .05, 1.1), .85)
-    add(out, .003, partials(duration, 640, [1, 3.11, 5.2], [.16, .10, .06], [.30, .15, .07], .015, 404), .55)
-    return comb(out, .027, .22, .2)
-
-
-designs = {
-    'blade_swing': lambda: swing(101),
-    'blade_throw': lambda: swing(202, .30, 2100, 2.4, .70),
-    'blade_hit': lambda: blade_hit(303),
-    'blade_embed': embed,
-    'rift_open': lambda: rift(True),
-    'rift_close': lambda: rift(False),
-    'time_stop': stillness,
-    'time_resume': resume,
-    'time_slip': unstable,
-    'sorcery': lambda: shimmer(.60, 660, 3400, 0, 11),
-    'illusion': lambda: shimmer(.85, 880, 4200, .12, 22),
-    'teleport': lambda: shimmer(1.00, 440, 2600, .06, 33),
-    'conjure': lambda: shimmer(.70, 1180, 5200, 0, 44),
-    'ascend': ascension,
-}
-
-for name, build in designs.items():
-    samples = build()
-    peak = max(1e-6, max(abs(s) for s in samples))
-    gain = .92 / peak
-    frames = b''.join(struct.pack('<h', int(max(-1, min(1, s * gain)) * 32000)) for s in samples)
-    wav = ROOT / f'sounds/{name}.wav'
-    with wave.open(str(wav), 'wb') as out:
-        out.setnchannels(1)
-        out.setsampwidth(2)
-        out.setframerate(RATE)
-        out.writeframes(frames)
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(wav), '-c:a', 'libvorbis', '-q:a', '4',
-                    str(ROOT / f'sounds/{name}.ogg')], check=True)
-    wav.unlink()
-
-(ROOT / 'sounds.json').write_text(json.dumps(
-    {name: {'subtitle': 'subtitles.loki.' + name, 'sounds': [{'name': 'loki:' + name, 'stream': name == 'ascend'}]}
-     for name in sorted(designs)}, indent=2) + '\n')
+# Reference the installed game's recorded Foley. Do not regenerate the old oscillators/noise beds.
+# These are event references, preserving sample variation and user resource-pack overrides.
+sound_events = {'rift_open': ('block.glass.break', 0.95, 0.92), 'rift_close': ('block.glass.break', 0.48, 1.18), 'blade_swing': ('entity.player.attack.sweep', 0.8, 1.0), 'blade_throw': ('item.trident.throw', 0.7, 1.16), 'blade_hit': ('item.trident.hit', 0.75, 1.08), 'blade_embed': ('item.trident.hit_ground', 0.7, 0.92), 'conjure': ('item.armor.equip_iron', 0.65, 1.16), 'illusion': ('entity.player.attack.sweep', 0.42, 0.72), 'sorcery': ('entity.evoker.cast_spell', 0.4, 0.92), 'teleport': ('item.chorus_fruit.teleport', 0.38, 1.0), 'time_stop': ('block.beacon.deactivate', 0.36, 0.78), 'time_resume': ('block.beacon.activate', 0.32, 0.92), 'time_slip': ('item.chorus_fruit.teleport', 0.36, 0.8), 'ascend': ('item.armor.equip_netherite', 0.75, 0.82)}
+(ROOT / 'sounds.json').write_text(json.dumps({
+    name: {'subtitle': 'subtitles.loki.' + name, 'sounds': [{
+        'name': 'minecraft:' + event, 'type': 'event', 'volume': volume, 'pitch': pitch}]}
+    for name, (event, volume, pitch) in sound_events.items()
+}, indent=2) + '\n')
 
 subtitles = {
     'blade_swing': 'Blade cuts air', 'blade_throw': 'Dagger thrown', 'blade_hit': 'Blade strikes',
@@ -577,4 +359,4 @@ lang.update({'subtitles.loki.' + k: v for k, v in subtitles.items()})
 langpath.write_text(json.dumps(lang, indent=2, sort_keys=True) + '\n')
 
 print(f'Generated 5 authored meshes, 6 particle sprites, {len(list((ROOT/"player_animation").glob("*.json")))} animations '
-      f'and {len(designs)} original sounds.')
+      f'and {len(sound_events)} recorded-Foley event mappings.')

@@ -36,6 +36,7 @@ public final class LokiClient {
             e.registerEntityRenderer(Loki.PROJECTILE.get(),SpellRenderer::new);
             e.registerEntityRenderer(Loki.THROWN_DAGGER.get(),DaggerRenderer::new);
             e.registerEntityRenderer(Loki.RIFT.get(),RiftRenderer::new);
+            e.registerEntityRenderer(Loki.THRONE_SEAT.get(),net.minecraft.client.renderer.entity.NoopRenderer::new);
         }
         @SubscribeEvent public static void layers(EntityRenderersEvent.AddLayers e) {
             for(String skin:e.getSkins()) {

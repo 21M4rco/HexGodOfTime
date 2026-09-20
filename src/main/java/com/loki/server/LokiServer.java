@@ -64,6 +64,12 @@ public final class LokiServer {
         if(action==UTILITY){Telekinesis.release(p,false);Architecture.forget(p);TemporalEngine.clear(p);dismissRift(p);return;}
         if(action==WEAPON){weapon(p,value!=0);return;}
         Ability a=action==TRANSFORM?Ability.ASCENSION:LokiData.selected(p);
+        // Returning home must never depend on energy, mastery or the entry spell's recovery.
+        if(a==Ability.RIFT&&PocketRealm.inside(p.level())&&(action==CAST||action==ALTERNATE)) {
+            UUID active=RIFTS.get(p.getUUID());
+            if(active==null||!(p.serverLevel().getEntity(active) instanceof RiftEntity))fracture(p);
+            return;
+        }
         if(action==ALTERNATE&&secondary(p,a)){LokiNetwork.sync(p);return;}
         if(!LokiData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return;}
         if(LokiData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return;}
@@ -157,12 +163,21 @@ public final class LokiServer {
     /** Cracks the air ahead, or — when already inside the sanctum — opens the way back out. */
     private static boolean fracture(ServerPlayer p) {
         dismissRift(p);
-        boolean homeward=p.level().dimension()==PocketRealm.KEY;
-        Vec3 spot=safeAim(p,10);
+        boolean homeward=PocketRealm.inside(p.level());
+        // Place a walk-through door at feet height, not ten blocks away at the eye-ray's height.
+        Vec3 forward=new Vec3(p.getLookAngle().x,0,p.getLookAngle().z).normalize();
+        if(forward.lengthSqr()<.01)forward=new Vec3(0,0,1);
+        Vec3 spot=null;
+        for(double distance=3;distance>=1;distance-=.5) {
+            Vec3 candidate=p.position().add(forward.scale(distance));
+            if(safe(p,candidate)){spot=candidate;break;}
+        }
+        if(spot==null&&homeward)spot=p.position();
         if(spot==null){notice(p,"There is no room here for the break to open.");return false;}
         RiftEntity rift=RiftEntity.open(p,spot,homeward);
         RIFTS.put(p.getUUID(),rift.getUUID());
-        gesture(p,"threads","fracture",Loki.RIFT_OPEN.get());
+        // RiftEntity owns the positional crack sound; playing it on the caster doubled the attack.
+        LokiNetwork.animate(p,"threads");
         return true;
     }
     private static boolean dismissRift(ServerPlayer p) {
@@ -212,6 +227,7 @@ public final class LokiServer {
 
     public static void weapon(ServerPlayer p,boolean secondary) {
         if(TemporalEngine.frozen(p)||!p.isAlive()||p.isSpectator()||!(p.getMainHandItem().getItem() instanceof ConjuredWeapon w))return;
+        if(!ConjuredWeapon.belongsTo(p.getMainHandItem(),p)){p.setItemInHand(InteractionHand.MAIN_HAND,ItemStack.EMPTY);return;}
         long now=LokiData.now(p);Strike prior=STRIKES.get(p.getUUID());
         if(prior!=null&&prior.end>now)return;
         int combo=prior==null||now-prior.end>18?0:(prior.combo+1)%4;

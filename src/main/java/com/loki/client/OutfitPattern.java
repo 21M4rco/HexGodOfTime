@@ -18,14 +18,14 @@ public final class OutfitPattern {
         for(int y=0;y<height;y++)for(int x=0;x<perimeter;x++) {
             boolean torso=width==8;
             int noise=Math.floorMod(x*17+y*31+x*y,9)-4;
-            int color=torso?abgr(19+noise,35+noise,28+noise):abgr(14+noise,25+noise,21+noise);
-            if(y>8&&!torso&&!arm)color=abgr(12+noise/2,15+noise/2,14+noise/2);
-            if(torso&&((x-depth>=0&&x-depth<width&&y<5&&Math.abs(x-depth-width/2)==y/2)||(y==9&&x>=depth&&x<depth+width)))color=abgr(100+noise,86+noise,48+noise);
-            if(torso&&x%4==0&&y<9)color=abgr(28+noise,42+noise,30+noise);
-            if(arm&&y==8)color=abgr(84,76,45);
+            int color=torso?abgr(25+noise,26+noise,28+noise):abgr(18+noise,19+noise,21+noise);
+            if(y>8&&!torso&&!arm)color=abgr(12+noise/2,13+noise/2,15+noise/2);
+            if(torso&&((x-depth>=0&&x-depth<width&&y<5&&Math.abs(x-depth-width/2)==y/2)||(y==9&&x>=depth&&x<depth+width)))color=abgr(85+noise,88+noise,94+noise);
+            if(torso&&x%4==0&&y<9)color=abgr(39+noise,41+noise,45+noise);
+            if(arm&&y==8)color=abgr(74,77,82);
             paint(ox+x,oy+depth+y,ex+x,ey+depth+y,color,start+(end-start)*y/height+Math.abs(x-perimeter/2f)*.003f);
         }
-        for(int y=0;y<depth;y++)for(int x=0;x<width*2;x++)paint(ox+depth+x,oy+y,ex+depth+x,ey+y,abgr(19,32,24),start+(x>=width?end-start:0));
+        for(int y=0;y<depth;y++)for(int x=0;x<width*2;x++)paint(ox+depth+x,oy+y,ex+depth+x,ey+y,abgr(25,26,28),start+(x>=width?end-start:0));
     }
     private void paint(int x,int y,int ex,int ey,int c,float t) {if(x<64&&y<64){colors[y*64+x]=c;threshold[y*64+x]=t;}if(ex<64&&ey<64){erase[ey*64+ex]=true;threshold[ey*64+ex]=t;}}
     public int pixel(int base,int x,int y,float progress,boolean ignoredA,boolean ignoredB) {

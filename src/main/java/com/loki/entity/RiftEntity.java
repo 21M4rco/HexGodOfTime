@@ -41,9 +41,9 @@ public final class RiftEntity extends Entity {
         e.setYRot(p.getYRot());e.setXRot(0);
         e.caster=p.getUUID();
         e.entityData.set(SEED,p.getRandom().nextInt(1<<20));
-        e.entityData.set(HOMEWARD,homeward);
+        e.entityData.set(HOMEWARD,PocketRealm.inside(p.level()));
         p.level().addFreshEntity(e);
-        p.level().playSound(null,e.blockPosition(),Loki.RIFT_OPEN.get(),SoundSource.PLAYERS,1.1f,1);
+        p.level().playSound(null,e.blockPosition(),Loki.RIFT_OPEN.get(),SoundSource.PLAYERS,.85f,.96f+p.getRandom().nextFloat()*.08f);
         LokiNetwork.fx(e,"rift_open");
         return e;
     }
@@ -65,10 +65,11 @@ public final class RiftEntity extends Entity {
         recent.values().removeIf(v->v<now);
         AABB mouth=new AABB(getX()-1.1,getY()-.2,getZ()-1.1,getX()+1.1,getY()+2.4,getZ()+1.1);
         for(ServerPlayer player:level().getEntitiesOfClass(ServerPlayer.class,mouth,p->p.isAlive()&&!p.isSpectator())) {
-            if(recent.containsKey(player.getUUID()))continue;
-            recent.put(player.getUUID(),now+60);
-            if(homeward())PocketRealm.leave(player);
-            else PocketRealm.enter(player);
+            if(recent.containsKey(player.getUUID())||PocketRealm.crossingCooldown(player))continue;
+            // The actual dimension is authoritative, including rifts saved by an older version.
+            boolean crossed=PocketRealm.inside(level())?PocketRealm.leave(player):PocketRealm.enter(player);
+            if(crossed)recent.put(player.getUUID(),now+60);
+            else recent.put(player.getUUID(),now+20);
             if(isRemoved())return;
         }
     }

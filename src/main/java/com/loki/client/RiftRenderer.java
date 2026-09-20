@@ -7,106 +7,71 @@ import net.minecraft.client.renderer.*;
 import net.minecraft.client.renderer.entity.*;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.*;
+import java.util.*;
 
-/**
- * The break in reality. A ring of irregular glass shards is struck outward from a single point of impact,
- * the fractures between them race ahead of the shards themselves, and behind it all sits a dark opening
- * that is not part of this world. The layout is derived from the entity's seed, so every viewer sees the
- * same fracture and it stays put frame to frame instead of shimmering.
- */
+/** Seeded, jagged mirror fragments: connected seams remain visible for the whole crossing window. */
 public final class RiftRenderer extends EntityRenderer<RiftEntity> {
-    private static final int SHARDS=26,RAYS=13;
-    private static final float HEIGHT=1.35f,VOID_X=.62f,VOID_Y=.94f;
-    private static float[][] layout;
-
+    private static final int SHARDS=19;
+    private static final Map<Integer,float[][]> LAYOUTS=new LinkedHashMap<>();
     public RiftRenderer(EntityRendererProvider.Context ctx){super(ctx);}
     @Override public ResourceLocation getTextureLocation(RiftEntity e){return WorldEffects.WHITE;}
     @Override public boolean shouldRender(RiftEntity e,net.minecraft.client.renderer.culling.Frustum frustum,double x,double y,double z){return true;}
-    public static void clear(){layout=null;}
+    public static void clear(){LAYOUTS.clear();}
 
-    /** Angle, outer radius and depth offset per shard, generated once and reused for every rift. */
-    private static float[][] layout() {
-        if(layout!=null)return layout;
-        layout=new float[SHARDS][3];
-        RandomSource random=RandomSource.create(0x10C1);
+    private static float[][] layout(int seed) {
+        float[][] cached=LAYOUTS.get(seed);if(cached!=null)return cached;
+        RandomSource random=RandomSource.create(seed);
+        float[][] points=new float[SHARDS][7];
         for(int i=0;i<SHARDS;i++) {
-            float angle=i*Mth.TWO_PI/SHARDS+(random.nextFloat()-.5f)*.16f;
-            layout[i]=new float[]{angle,.95f+random.nextFloat()*.85f,(random.nextFloat()-.5f)*.16f};
+            float a=(i+(random.nextFloat()-.5f)*.7f)*Mth.TWO_PI/SHARDS;
+            float inner=.78f+random.nextFloat()*.32f,mid=1.45f+random.nextFloat()*.85f;
+            float reach=2.6f+random.nextFloat()*1.35f,bend=(random.nextFloat()-.5f)*.28f;
+            points[i]=new float[]{Mth.cos(a)*inner,Mth.sin(a)*inner*1.48f,
+                Mth.cos(a+bend)*mid,Mth.sin(a+bend)*mid*1.2f,
+                Mth.cos(a-bend*.6f)*reach,Mth.sin(a-bend*.6f)*reach,
+                (random.nextFloat()-.5f)*.20f};
         }
-        return layout;
+        if(LAYOUTS.size()>=64)LAYOUTS.remove(LAYOUTS.keySet().iterator().next());
+        LAYOUTS.put(seed,points);return points;
     }
-
     @Override public void render(RiftEntity e,float entityYaw,float partial,PoseStack pose,MultiBufferSource buffers,int light) {
-        float open=e.opening(partial),close=e.closing(partial);
-        if(open<=0)return;
-        int seed=e.seed();
-        pose.pushPose();
-        pose.translate(0,HEIGHT,0);
-        pose.mulPose(Axis.YP.rotationDegrees(-e.getYRot()));
+        float open=e.opening(partial),fade=Mth.clamp(e.closing(partial),0,1);
+        if(open<=0||fade<=0)return;
+        float ease=open*open*(3-2*open),crack=Mth.clamp(open*2.8f,0,1);
+        float[][] p=layout(e.seed());
+        pose.pushPose();pose.translate(0,1.48,0);pose.mulPose(Axis.YP.rotationDegrees(-e.getYRot()));
         VertexConsumer out=buffers.getBuffer(RenderType.entityTranslucent(WorldEffects.WHITE));
-        float ease=open*open*(3-2*open);
-        float fade=Math.min(1,close);
-
-        // The opening itself: a dark aperture that widens as the surface gives way.
-        float vx=VOID_X*ease,vy=VOID_Y*ease;
-        for(int i=0;i<RAYS*2;i++) {
-            float a=i*Mth.TWO_PI/(RAYS*2),b=(i+1)*Mth.TWO_PI/(RAYS*2);
-            quad(pose,out,0,0,Mth.cos(a)*vx,Mth.sin(a)*vy,Mth.cos(b)*vx,Mth.sin(b)*vy,0,0,-.02f,0x04100c,fade*.94f);
-        }
-        // Timeline light bleeding through from the far side.
-        for(int i=0;i<6;i++) {
-            float t=(e.tickCount+partial)*.014f+i*.9f;
-            float y0=(Mth.sin(t)*.7f)*vy,y1=(Mth.sin(t+1.1f)*.7f)*vy;
-            quad(pose,out,-vx*.85f,y0-.03f,-vx*.85f,y0+.03f,vx*.85f,y1+.03f,vx*.85f,y1-.03f,-.015f,
-                i%2==0?0xd8c07a:0x53d69a,fade*.34f*ease);
-        }
-
-        float[][] shards=layout();
         for(int i=0;i<SHARDS;i++) {
-            float[] a=shards[i],b=shards[(i+1)%SHARDS];
-            float drift=(1-ease)*.55f+(1-fade)*1.4f;
-            float depth=a[2]+drift*.35f;
-            float inner=1+drift*.5f,outer=ease+drift;
-            float ax=Mth.cos(a[0]),ay=Mth.sin(a[0]),bx=Mth.cos(b[0]),by=Mth.sin(b[0]);
-            float tone=.62f+((seed>>i%16&1)==0?.22f:0f)+(i%3)*.05f;
-            int colour=tint(tone);
-            quad(pose,out,
-                ax*vx*inner,ay*vy*inner,bx*vx*inner,by*vy*inner,
-                bx*VOID_X*b[1]*outer,by*VOID_Y*b[1]*outer,ax*VOID_X*a[1]*outer,ay*VOID_Y*a[1]*outer,
-                depth,colour,fade*.55f*ease);
-            // Bright fracture along the seam between neighbouring shards.
-            line(pose,out,ax*vx*inner,ay*vy*inner,ax*VOID_X*a[1]*outer,ay*VOID_Y*a[1]*outer,depth+.01f,
-                .012f,0xeaf4e4,fade*Math.min(1,ease*1.6f));
-        }
-        // Fractures race past the shards while the surface is still breaking.
-        float reach=Math.min(1,open*1.9f);
-        for(int i=0;i<SHARDS;i++) {
-            float[] a=shards[i];
-            float ax=Mth.cos(a[0]),ay=Mth.sin(a[0]);
-            float far=a[1]*reach*1.55f;
-            line(pose,out,ax*VOID_X*a[1],ay*VOID_Y*a[1],ax*VOID_X*far,ay*VOID_Y*far,a[2]+.02f,
-                .007f*(1-reach*.6f),0xd8e9d4,fade*(1-reach)*.9f);
+            float[] a=p[i],b=p[(i+1)%SHARDS];
+            // An irregular polygon, not an ellipse. The shards open away from this torn edge.
+            quad(pose,out,0,0,a[0]*ease,a[1]*ease,b[0]*ease,b[1]*ease,0,0,-.035f,0x04090b,fade*.98f);
+            float drift=(1-ease)*.22f+(1-fade)*.7f,z=a[6]+drift;
+            float ax=a[0]*ease,ay=a[1]*ease,bx=b[0]*ease,by=b[1]*ease;
+            float mx=a[2]*(1+drift),my=a[3]*(1+drift),nx=b[2]*(1+drift),ny=b[3]*(1+drift);
+            // Alternating triangles and large splinters break up the otherwise regular radial wedges.
+            quad(pose,out,ax,ay,mx,my,nx,ny,bx,by,z,i%3==0?0xa7bccb:0x607780,fade*ease*(i%4==0?.36f:.19f));
+            if(i%3==0)quad(pose,out,mx,my,a[4]*crack,a[5]*crack,nx,ny,mx,my,z+.012f,0xc6d9e4,fade*ease*.13f);
+            seam(pose,out,ax,ay,mx*crack,my*crack,z+.025f,.018f,fade*ease);
+            seam(pose,out,mx*crack,my*crack,a[4]*crack,a[5]*crack,z+.025f,.010f,fade*crack);
+            seam(pose,out,ax,ay,bx,by,.035f,.018f,fade*ease);
+            if(i%3!=1)seam(pose,out,mx*crack,my*crack,nx*crack,ny*crack,z+.03f,.009f,fade*crack*.8f);
+            // Off-axis forks give each main crack a brittle, branching mirror-break silhouette.
+            float fx=Mth.lerp(.62f,mx,a[4])*crack,fy=Mth.lerp(.62f,my,a[5])*crack;
+            float dx=(a[4]-mx),dy=(a[5]-my),side=i%2==0?1:-1;
+            seam(pose,out,fx,fy,fx+dx*.26f-dy*.34f*side,fy+dy*.26f+dx*.34f*side,z+.04f,.008f,fade*crack*.8f);
         }
         pose.popPose();
     }
-
-    private static int tint(float tone) {
-        int r=Mth.clamp((int)(tone*215),0,255),g=Mth.clamp((int)(tone*238),0,255),b=Mth.clamp((int)(tone*224),0,255);
-        return r<<16|g<<8|b;
+    private static void seam(PoseStack pose,VertexConsumer out,float x1,float y1,float x2,float y2,float z,float width,float alpha) {
+        line(pose,out,x1,y1,x2,y2,z,width*3,0x708f9d,alpha*.16f);
+        line(pose,out,x1,y1,x2,y2,z+.002f,width,0xe7f0f5,alpha);
     }
-    private static void quad(PoseStack pose,VertexConsumer out,float x1,float y1,float x2,float y2,float x3,float y3,float x4,float y4,
-                             float z,int colour,float alpha) {
-        WorldEffects.quad(pose,out,
-            new float[][]{{x1,y1,z},{x2,y2,z},{x3,y3,z},{x4,y4,z}},
-            new float[][]{{0,0},{1,0},{1,1},{0,1}},15728880,colour,alpha);
+    private static void quad(PoseStack pose,VertexConsumer out,float x1,float y1,float x2,float y2,float x3,float y3,float x4,float y4,float z,int color,float alpha) {
+        WorldEffects.quad(pose,out,new float[][]{{x1,y1,z},{x2,y2,z},{x3,y3,z},{x4,y4,z}},new float[][]{{0,0},{1,0},{1,1},{0,1}},15728880,color,alpha);
     }
-    private static void line(PoseStack pose,VertexConsumer out,float x1,float y1,float x2,float y2,float z,float width,int colour,float alpha) {
-        float dx=x2-x1,dy=y2-y1;
-        float length=Mth.sqrt(dx*dx+dy*dy);
-        if(length<1e-4f)return;
+    private static void line(PoseStack pose,VertexConsumer out,float x1,float y1,float x2,float y2,float z,float width,int color,float alpha) {
+        float dx=x2-x1,dy=y2-y1,length=Mth.sqrt(dx*dx+dy*dy);if(length<1e-4f)return;
         float nx=-dy/length*width,ny=dx/length*width;
-        WorldEffects.quad(pose,out,
-            new float[][]{{x1-nx,y1-ny,z},{x1+nx,y1+ny,z},{x2+nx,y2+ny,z},{x2-nx,y2-ny,z}},
-            new float[][]{{0,0},{1,0},{1,1},{0,1}},15728880,colour,alpha);
+        quad(pose,out,x1-nx,y1-ny,x1+nx,y1+ny,x2+nx,y2+ny,x2-nx,y2-ny,z,color,alpha);
     }
 }

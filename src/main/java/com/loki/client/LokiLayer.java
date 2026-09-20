@@ -16,7 +16,7 @@ import net.minecraft.util.Mth;
  * fixed to the shoulders instead of inheriting a mirrored model transform.
  */
 public final class LokiLayer extends RenderLayer<AbstractClientPlayer,PlayerModel<AbstractClientPlayer>> {
-    public static final ResourceLocation MATERIAL=Loki.id("textures/material.png"),CLOTH=Loki.id("textures/cloth.png");
+    public static final ResourceLocation MATERIAL=Loki.id("textures/material.png"),CLOTH=new ResourceLocation("minecraft","textures/block/gray_wool.png");
     private static AuthoredMesh crown,collar;
     public LokiLayer(RenderLayerParent<AbstractClientPlayer,PlayerModel<AbstractClientPlayer>> parent){super(parent);}
     public static void clear(){crown=null;collar=null;CapeRenderer.clear();}
@@ -25,6 +25,8 @@ public final class LokiLayer extends RenderLayer<AbstractClientPlayer,PlayerMode
         if(crown==null)crown=new AuthoredMesh("crown");
         float growth=Mth.clamp((progress-.42f)/.53f,0,1);
         crown.draw(pose,buffers.getBuffer(RenderType.entityCutoutNoCull(MATERIAL)),light,(group,v)->{
+            // All crown surfaces sample the neutral dark-metal band, including the raised horn ridges.
+            v=new AuthoredMesh.Point(v.x(),v.y(),v.z(),(5+(v.u()*8)%1)/8,v.v());
             if(group.startsWith("horn")) {
                 float t=Mth.clamp((-v.y()-.42f)/.85f,0,1);
                 if(t>growth)return null;
@@ -33,7 +35,7 @@ public final class LokiLayer extends RenderLayer<AbstractClientPlayer,PlayerMode
                 return new AuthoredMesh.Point(anchor+(v.x()-anchor)*s,v.y(),v.z(),v.u(),v.v());
             }
             return progress<.35f?null:v;
-        });
+        },(group,v)->group.equals("horn_ridge")?new int[]{194,190,209}:new int[]{133,130,143});
     }
 
     @Override public void render(PoseStack pose,MultiBufferSource buffers,int light,AbstractClientPlayer p,float walk,float walkAmount,float partial,float age,float headYaw,float headPitch) {
@@ -51,6 +53,6 @@ public final class LokiLayer extends RenderLayer<AbstractClientPlayer,PlayerMode
         if(collar==null)collar=new AuthoredMesh("collar");
         float rise=Mth.clamp(progress*3,0,1);
         collar.draw(pose,buffers.getBuffer(RenderType.entityCutoutNoCull(CLOTH)),light,
-            (g,v)->new AuthoredMesh.Point(v.x(),v.y()*rise,v.z(),v.u(),v.v()));
+            (g,v)->new AuthoredMesh.Point(v.x(),v.y()*rise,v.z(),v.u(),v.v()),(g,v)->new int[]{82,84,89});
     }
 }

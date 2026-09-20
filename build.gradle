@@ -4,9 +4,10 @@ plugins {
     id 'org.spongepowered.mixin' version '0.7.+'
 }
 group = 'com.loki'
-version = '0.2.1'
+version = '0.3.0'
 base { archivesName = 'loki' }
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+java.withSourcesJar()
 minecraft {
     mappings channel: 'official', version: '1.20.1'
     copyIdeResources = true
@@ -36,3 +37,12 @@ jar {
     manifest { attributes('MixinConfigs': 'loki.mixins.json') }
     finalizedBy 'reobfJar'
 }
+
+// Geometry regression checks run on every compile action without launching a Minecraft client.
+tasks.register('verifyRealmShape', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.loki.server.RealmShapeTest'
+    enableAssertions = true
+}
+tasks.named('check') { dependsOn 'verifyRealmShape' }

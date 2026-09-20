@@ -16,6 +16,28 @@ import net.minecraftforge.fml.common.Mod;
 
 @Mod.EventBusSubscriber(modid=Loki.ID)
 public final class ServerEvents {
+    /** Cancel the spawn itself, before pickup, hoppers or another mod can collect a dropped illusion. */
+    @SubscribeEvent public static void conjuredDrop(net.minecraftforge.event.entity.EntityJoinLevelEvent e) {
+        if(!e.getLevel().isClientSide&&e.getEntity() instanceof net.minecraft.world.entity.item.ItemEntity item
+            &&item.getItem().getItem() instanceof ConjuredWeapon) {e.setCanceled(true);item.discard();}
+    }
+    @SubscribeEvent public static void conjuredToss(ItemTossEvent e) {
+        if(e.getEntity().getItem().getItem() instanceof ConjuredWeapon) {
+            e.setCanceled(true);e.getEntity().discard();
+            if(e.getPlayer() instanceof ServerPlayer p)LokiNetwork.fx(p,"dispel");
+        }
+    }
+    @SubscribeEvent public static void conjuredPickup(EntityItemPickupEvent e) {
+        if(e.getItem().getItem().getItem() instanceof ConjuredWeapon){e.setCanceled(true);e.getItem().discard();}
+    }
+    @SubscribeEvent public static void conjuredDeathDrops(LivingDropsEvent e) {
+        e.getDrops().removeIf(item->item.getItem().getItem() instanceof ConjuredWeapon);
+    }
+    @SubscribeEvent public static void throne(PlayerInteractEvent.RightClickBlock e) {
+        if(e.getEntity() instanceof ServerPlayer p&&PocketRealm.sit(p,e.getPos())) {
+            e.setCanceled(true);e.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
+        }
+    }
     @SubscribeEvent public static void player(TickEvent.PlayerTickEvent e) {if(e.phase==TickEvent.Phase.END&&e.player instanceof ServerPlayer p)LokiServer.tick(p);}
     @SubscribeEvent public static void level(TickEvent.LevelTickEvent e) {if(e.phase==TickEvent.Phase.START&&e.level instanceof ServerLevel s){TemporalEngine.tick(s);LokiServer.tickLevel(s);}}
     @SubscribeEvent public static void login(PlayerEvent.PlayerLoggedInEvent e) {if(e.getEntity() instanceof ServerPlayer p){LokiData.get(p).remove("transformStart");LokiNetwork.sync(p);}}
