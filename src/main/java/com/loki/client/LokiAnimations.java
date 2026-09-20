@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 
 public final class LokiAnimations {
    private static final ResourceLocation LAYER = Loki.id("casting");
-   private static final Set<String> OWN_FIRST_PERSON_ARM = Set.of();
+   private static final Set<String> OWN_FIRST_PERSON_ARM = Set.of("branch_punch");
    private static final Logger LOGGER = LogUtils.getLogger();
 
    private LokiAnimations() {

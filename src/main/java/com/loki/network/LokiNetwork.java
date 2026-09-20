@@ -12,9 +12,9 @@ import net.minecraftforge.network.*;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class LokiNetwork {
-    public static final SimpleChannel CHANNEL=NetworkRegistry.newSimpleChannel(Loki.id("main"),()->"2","2"::equals,"2"::equals);
+    public static final SimpleChannel CHANNEL=NetworkRegistry.newSimpleChannel(Loki.id("main"),()->"3","3"::equals,"3"::equals);
     /** Highest accepted client action id; see {@link LokiServer#input}. */
-    public static final int MAX_ACTION=12;
+    public static final int MAX_ACTION=13;
     public static final int SYNC=0,ANIMATE=1,FX=2,FROZEN=3,GRIP=4,MEMORY=5,THREADS=6,SLOWED=7,ARCHITECTURE=8,BLEED=9,FIELD=10,DISGUISE=11,
         BRANCH=12,TORRENT=13,ERASURE=14;
     public record Input(int action,int value) {}
@@ -31,7 +31,7 @@ public final class LokiNetwork {
             .decoder(b->new Choice(b.readVarInt(),b.readBoolean()?b.readUUID():null))
             // The server resolves and validates every destination; an index and a name are all the
             // client is trusted with.
-            .consumerMainThread((m,c)->{ServerPlayer p=c.get().getSender();if(p!=null&&p.isAlive())com.loki.server.FractureTravel.choose(p,m.mode,m.target);c.get().setPacketHandled(true);}).add();
+            .consumerMainThread((m,c)->{ServerPlayer p=c.get().getSender();if(p!=null&&p.isAlive()&&LokiData.access(p))com.loki.server.FractureTravel.choose(p,m.mode,m.target);c.get().setPacketHandled(true);}).add();
         CHANNEL.messageBuilder(Message.class,1,NetworkDirection.PLAY_TO_CLIENT)
             .encoder((m,b)->{b.writeVarInt(m.kind);b.writeVarInt(m.entity);b.writeNbt(m.data);})
             .decoder(b->new Message(b.readVarInt(),b.readVarInt(),b.readNbt()))
@@ -48,7 +48,11 @@ public final class LokiNetwork {
     public static void near(net.minecraft.server.level.ServerLevel level,net.minecraft.world.phys.Vec3 at,double radius,Message m) {
         CHANNEL.send(PacketDistributor.NEAR.with(()->new PacketDistributor.TargetPoint(at.x,at.y,at.z,radius,level.dimension())),m);
     }
-    public static void sync(ServerPlayer p) {LokiData.refreshQuick(p);tracking(p,new Message(SYNC,p.getId(),light(LokiData.get(p))));}
+    public static void sync(ServerPlayer p) {
+        // Locking the mod must hide it, not erase the player's saved loadout.
+        if(LokiData.access(p))LokiData.refreshQuick(p);
+        tracking(p,new Message(SYNC,p.getId(),light(LokiData.get(p))));
+    }
     /**
      * The routine state packet goes out once a second to everyone tracking the player, so a mimicked
      * entity's full snapshot — which can run to kilobytes — never rides along with it. Only the small
@@ -64,6 +68,13 @@ public final class LokiNetwork {
         return copy;
     }
     public static void animate(ServerPlayer p,String name) {CompoundTag d=new CompoundTag();d.putString("animation",name);tracking(p,new Message(ANIMATE,p.getId(),d));}
+    /** Arrival has no RiftEntity. Nearby viewers receive the nebula even before tracking starts. */
+    public static void arrival(Entity entity) {
+        if(!(entity.level() instanceof net.minecraft.server.level.ServerLevel level))return;
+        CompoundTag d=new CompoundTag();d.putString("effect","nebula_arrival");
+        d.putDouble("x",entity.getX());d.putDouble("y",entity.getY());d.putDouble("z",entity.getZ());
+        near(level,entity.position(),64,new Message(FX,entity.getId(),d));
+    }
     public static void fx(Entity p,String name) {fx(p,name,p.getX(),p.getY(),p.getZ());}
     public static void fx(Entity p,String name,double x,double y,double z) {
         CompoundTag d=new CompoundTag();d.putString("effect",name);d.putDouble("x",x);d.putDouble("y",y);d.putDouble("z",z);tracking(p,new Message(FX,p.getId(),d));

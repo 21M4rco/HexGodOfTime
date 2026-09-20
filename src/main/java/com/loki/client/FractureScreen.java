@@ -85,7 +85,7 @@ public final class FractureScreen extends Screen {
     }
 
     private void commit(int mode,UUID target) {
-        LokiNetwork.chooseFracture(mode,target);
+        if(LokiClient.enabled())LokiNetwork.chooseFracture(mode,target);
         onClose();
     }
 
@@ -252,7 +252,7 @@ public final class FractureScreen extends Screen {
      */
     public static void open() {
         Minecraft mc=Minecraft.getInstance();
-        if(mc.player==null||!com.loki.server.PocketRealm.inside(mc.player.level()))return;
+        if(mc.player==null||!LokiClient.enabled()||!com.loki.server.PocketRealm.inside(mc.player.level()))return;
         mc.setScreen(new FractureScreen());
     }
 }

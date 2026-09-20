@@ -10,10 +10,14 @@ public final class LokiData {
         if(!parent.contains("Loki")) {CompoundTag n=new CompoundTag();n.putFloat("energy",100);parent.put("Loki",n);}
         return parent.getCompound("Loki");
     }
+    /** Administrative entitlement. Missing NBT is deliberately false: nobody has Loki powers by default. */
+    public static boolean access(Player p) {return get(p).getBoolean("abilitiesEnabled");}
+    public static void access(Player p,boolean enabled) {get(p).putBoolean("abilitiesEnabled",enabled);}
     public static int mastery(Player p,Discipline d) {return MasteryCurve.levelForXp(get(p).getLong("xp_"+d.name()));}
     public static void mastery(Player p,Discipline d,int level) {get(p).putLong("xp_"+d.name(),MasteryCurve.xpForLevel(level));}
     public static void train(Player p,Discipline d,int xp) {get(p).putLong("xp_"+d.name(),Math.min(MasteryCurve.MAX_XP,get(p).getLong("xp_"+d.name())+Math.max(0,xp)));}
     public static boolean unlocked(Player p,Ability a) {
+        if(!access(p))return false;
         if(get(p).getBoolean("unlock_"+a.name()))return true;
         int total=0;for(Discipline d:Discipline.values())if(d!=Discipline.TEMPORAL&&d!=Discipline.PURPOSE)total+=mastery(p,d);
         if(a.discipline==Discipline.TEMPORAL&&total<600)return false;
@@ -89,6 +93,7 @@ public final class LokiData {
 
     public static void clearTransient(Player p,boolean death) {
         CompoundTag d=get(p);d.remove("disguise");d.remove("vanishUntil");d.remove("wardUntil");d.remove("held");d.remove("transformStart");d.remove("grip");
+        d.remove(BranchFistState.UNTIL);d.remove(BranchFistState.START);d.remove(BranchFistState.IMPACT);
         if(death)d.putBoolean("ascended",false);
     }
 }

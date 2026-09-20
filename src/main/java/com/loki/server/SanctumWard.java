@@ -32,7 +32,7 @@ public final class SanctumWard {
 
     /** True when this player is standing in the sanctum that belongs to them. */
     public static boolean owner(Entity e) {
-        return e instanceof ServerPlayer p&&PocketRealm.inside(p.level())&&PocketRealm.ownsHere(p);
+        return e instanceof ServerPlayer p&&LokiData.access(p)&&PocketRealm.inside(p.level())&&PocketRealm.ownsHere(p);
     }
 
     /**

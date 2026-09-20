@@ -38,11 +38,12 @@ public final class Erasure {
 
     private static final class Fading {
         final LivingEntity victim;final UUID caster;final Vec3 direction;
-        final long start;final int duration;final boolean gravity,noAi,silent;
+        final long start;final int duration;final boolean gravity,noAi,silent,implosion;final float power;
         Fading(LivingEntity victim,UUID caster,Vec3 direction,long start,int duration,
-               boolean gravity,boolean noAi,boolean silent) {
+               boolean gravity,boolean noAi,boolean silent,boolean implosion,float power) {
             this.victim=victim;this.caster=caster;this.direction=direction;
             this.start=start;this.duration=duration;this.gravity=gravity;this.noAi=noAi;this.silent=silent;
+            this.implosion=implosion;this.power=power;
         }
     }
     /**
@@ -65,20 +66,35 @@ public final class Erasure {
      * @return true when this call is what caught it, so the caster's sweep does not double up.
      */
     public static boolean begin(ServerPlayer caster,LivingEntity victim,Vec3 direction,float power) {
+        return begin(caster,victim,direction,power,false);
+    }
+    public static boolean implode(ServerPlayer caster,LivingEntity victim,Vec3 direction) {
+        return begin(caster,victim,direction,.8f,true);
+    }
+    private static boolean begin(ServerPlayer caster,LivingEntity victim,Vec3 direction,float power,boolean implosion) {
         if(victim==null||!victim.isAlive()||erasing(victim)||FADING.size()>=MAX)return false;
         if(victim==caster||!LokiServer.validTarget(caster,victim))return false;
         // Somebody's own animal is not what this is for.
         if(victim instanceof TamableAnimal pet&&caster.getUUID().equals(pet.getOwnerUUID()))return false;
-        int duration=(victim instanceof Player?PLAYER_TICKS:MOB_TICKS)+(int)(power*CHARGE_TICKS);
+        int duration=implosion?com.loki.data.BranchFistState.IMPLOSION
+            :(victim instanceof Player?PLAYER_TICKS:MOB_TICKS)+(int)(power*CHARGE_TICKS);
         Fading fading=new Fading(victim,caster.getUUID(),direction.normalize(),victim.level().getGameTime(),
-            duration,victim.isNoGravity(),victim instanceof Mob m&&m.isNoAi(),victim.isSilent());
+            duration,victim.isNoGravity(),victim instanceof Mob m&&m.isNoAi(),victim.isSilent(),implosion,power);
         FADING.put(victim.getUUID(),fading);
         hold(fading);
+        LokiNetwork.tracking(victim,message(fading));
+        return true;
+    }
+    private static LokiNetwork.Message message(Fading fading) {
         CompoundTag n=new CompoundTag();
         n.putDouble("dx",fading.direction.x);n.putDouble("dy",fading.direction.y);n.putDouble("dz",fading.direction.z);
-        n.putInt("duration",duration);n.putFloat("power",power);n.putLong("start",fading.start);
-        LokiNetwork.tracking(victim,new LokiNetwork.Message(LokiNetwork.ERASURE,victim.getId(),n));
-        return true;
+        n.putInt("duration",fading.duration);n.putFloat("power",fading.power);n.putLong("start",fading.start);
+        n.putBoolean("implosion",fading.implosion);
+        return new LokiNetwork.Message(LokiNetwork.ERASURE,fading.victim.getId(),n);
+    }
+    public static void track(ServerPlayer viewer,Entity victim) {
+        Fading fading=FADING.get(victim.getUUID());
+        if(fading!=null)LokiNetwork.to(viewer,message(fading));
     }
 
     /** One pass per level tick: keep every caught body still, then finish the ones whose time is up. */
@@ -177,7 +193,11 @@ public final class Erasure {
 
     public static void forget(Entity e) {
         Fading f=e==null?null:FADING.remove(e.getUUID());
-        if(f!=null)release(f);
+        if(f!=null) {
+            release(f);
+            CompoundTag n=new CompoundTag();n.putBoolean("clear",true);
+            LokiNetwork.tracking(f.victim,new LokiNetwork.Message(LokiNetwork.ERASURE,f.victim.getId(),n));
+        }
     }
     public static void reset() {FADING.values().forEach(Erasure::release);FADING.clear();}
 }

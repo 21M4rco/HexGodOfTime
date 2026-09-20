@@ -48,8 +48,12 @@ public final class ServerEvents {
     }
     @SubscribeEvent public static void login(PlayerEvent.PlayerLoggedInEvent e) {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
+        if(!LokiData.access(p)){LokiServer.access(p,false);return;}
         LokiData.get(p).remove("transformStart");
         LokiData.get(p).remove("branchStart");
+        LokiData.get(p).remove(BranchFistState.UNTIL);
+        LokiData.get(p).remove(BranchFistState.START);
+        LokiData.get(p).remove(BranchFistState.IMPACT);
         // Attribute modifiers are saved with the player, so a session that ended mid-transformation would
         // otherwise hand the armour back for free. Re-derived from the mantle, never inherited.
         Transformation.strip(p);
@@ -59,6 +63,7 @@ public final class ServerEvents {
     @SubscribeEvent public static void tracking(PlayerEvent.StartTracking e) {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
         TemporalEngine.track(p,e.getTarget());
+        Erasure.track(p,e.getTarget());
         if(!(e.getTarget() instanceof ServerPlayer q))return;
         LokiNetwork.syncTo(p,q);
         // A borrowed shape is sent once, not every second, so a new viewer has to be told separately.
@@ -105,6 +110,9 @@ public final class ServerEvents {
         if(e.getLevel().isClientSide||!e.isCancelable())return;
         if(TemporalEngine.frozen(e.getEntity())||Erasure.erasing(e.getEntity())||TimeBranch.planted(e.getEntity()))e.setCanceled(true);
     }
+    @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
+    public static void branchPunch(LivingDamageEvent e) {BranchFist.damage(e);}
+
     @SubscribeEvent public static void hurt(LivingHurtEvent e) {
         if(Erasure.erasing(e.getSource().getEntity())){e.setCanceled(true);return;}
         // A body being taken out of the timeline cannot be hurt out of it. Without this, anything else
@@ -136,7 +144,7 @@ public final class ServerEvents {
     }
     @SubscribeEvent public static void fall(LivingFallEvent e) {if(e.getEntity() instanceof ServerPlayer p) {
         if(p.getAbilities().flying&&LokiData.get(p).getBoolean("ascended")||LokiData.get(p).getLong("flightLandingGrace")>LokiData.now(p)){e.setCanceled(true);return;}
-        if(LokiData.mastery(p,Discipline.SORCERY)>0)e.setDistance(Math.max(0,e.getDistance()-3));
+        if(LokiData.access(p)&&LokiData.mastery(p,Discipline.SORCERY)>0)e.setDistance(Math.max(0,e.getDistance()-3));
     }}
     @SubscribeEvent public static void breakBlock(net.minecraftforge.event.level.BlockEvent.BreakEvent e) {if(TemporalEngine.frozen(e.getPlayer()))e.setCanceled(true);}
     @SubscribeEvent public static void stopping(ServerStoppingEvent e) {

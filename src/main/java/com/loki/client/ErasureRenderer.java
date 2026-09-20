@@ -10,11 +10,11 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 import java.util.*;
 
-/** Time erasure keeps the registered entity model and fades its real vertices along the torrent. */
+/** Progressive, textured model fragments: downstream beam stripping or a compact inward/outward burst. */
 public final class ErasureRenderer {
     private ErasureRenderer() {}
 
-    private record Fading(Vec3 direction,long start,int duration,float power) {}
+    private record Fading(Vec3 direction,long start,int duration,float power,boolean implosion) {}
     private static final Map<Integer,Fading> FADING=new HashMap<>();
     /** The original buildup before the directional fade starts. */
     private static final float TAKEOVER=.18f;
@@ -27,10 +27,11 @@ public final class ErasureRenderer {
     public static void clear() {FADING.clear();ErasureBuffer.clear();}
 
     public static void begin(int entity,CompoundTag n) {
+        if(n.getBoolean("clear")){FADING.remove(entity);return;}
         Vec3 direction=new Vec3(n.getDouble("dx"),n.getDouble("dy"),n.getDouble("dz"));
         if(direction.lengthSqr()<1e-8)direction=new Vec3(1,0,0);
         if(FADING.size()>48)FADING.clear();
-        FADING.put(entity,new Fading(direction.normalize(),n.getLong("start"),Math.max(1,n.getInt("duration")),n.getFloat("power")));
+        FADING.put(entity,new Fading(direction.normalize(),n.getLong("start"),Math.max(1,n.getInt("duration")),n.getFloat("power"),n.getBoolean("implosion")));
         var mc=Minecraft.getInstance();
         if(mc.level!=null&&mc.level.getEntity(entity)!=null)
             BranchAudio.erase(mc.level.getEntity(entity).position());
@@ -42,7 +43,7 @@ public final class ErasureRenderer {
         if(f==null)return -1;
         return Mth.clamp((ClientState.now()+partial-f.start())/(float)f.duration(),0,1);
     }
-    /** Hide only once the real model has finished fading, including the subsequent corpse. */
+    /** Hide only when every surface fragment has finished, including the subsequent corpse. */
     public static boolean consumed(Entity e) {
         float p=progress(e.getId(),Minecraft.getInstance().getFrameTime());
         return p>=1;
@@ -56,7 +57,8 @@ public final class ErasureRenderer {
         long now=ClientState.now();
         FADING.entrySet().removeIf(e->{
             Entity victim=mc.level.getEntity(e.getKey());
-            if(victim==null)return true;
+            if(victim==null)return now>e.getValue().start()+e.getValue().duration()+GRACE;
+            if(e.getValue().implosion()&&victim instanceof net.minecraft.world.entity.LivingEntity living){living.hurtTime=0;living.deathTime=0;}
             long over=now-e.getValue().start()-e.getValue().duration();
             if(over<GRACE)return false;
             // Past the sequence. A body that has gone, or that genuinely survived, can be let go of. One
@@ -73,6 +75,7 @@ public final class ErasureRenderer {
             Fading f=entry.getValue();
             float phase=Mth.clamp((now-f.start())/(float)f.duration(),0,1);
             if(phase>=1)continue;
+            if(f.implosion())continue;
             Vec3 front=e.position().add(0,e.getBbHeight()*(1-phase*.7),0);
             // Dust, wisps and threads, all swept the way the torrent was going.
             Vfx.cone(Loki.TEMPORAL_DUST.get(),front,f.direction(),Vfx.count(3+f.power()*3),.34,.16);
@@ -102,8 +105,8 @@ public final class ErasureRenderer {
             // Finished. Nothing is drawn, and nothing vanilla is drawn either, so the body is simply gone.
             if(phase<0||phase>=1)continue;
             try {
-                crawl(PAINTER,e,entry.getValue(),phase,partial,time);
-                flare(PAINTER,e,entry.getValue(),phase,partial,time);
+                if(entry.getValue().implosion())implosion(PAINTER,e,entry.getValue(),phase,partial,time);
+                else {crawl(PAINTER,e,entry.getValue(),phase,partial,time);flare(PAINTER,e,entry.getValue(),phase,partial,time);}
             } catch(Exception ignored) {
                 // A failed auxiliary arc must not interrupt the entity's own render.
             }
@@ -115,9 +118,27 @@ public final class ErasureRenderer {
     public static MultiBufferSource fadingBuffers(Entity entity,float partial,PoseStack pose,MultiBufferSource buffers) {
         Fading f=FADING.get(entity.getId());
         float phase=progress(entity.getId(),partial);
-        if(f==null||phase<TAKEOVER)return buffers;
-        return new ErasureBuffer(buffers,pose.last().pose(),entity,f.direction(),
-            Mth.clamp((phase-TAKEOVER)/(1-TAKEOVER),0,1),f.power());
+        if(f==null||(!f.implosion()&&phase<TAKEOVER))return buffers;
+        float fracture=f.implosion()?phase:Mth.clamp((phase-TAKEOVER)/(1-TAKEOVER),0,1);
+        return new ErasureBuffer(buffers,pose.last().pose(),entity,f.direction(),fracture,f.power(),f.implosion());
+    }
+
+    /** A brief injection flash, followed by slow destabilization as individual body fragments detach. */
+    private static void implosion(BranchVfx.Painter painter,Entity e,Fading fading,float phase,float partial,double time) {
+        Vec3 centre=e.getPosition(partial).add(0,e.getBbHeight()*.5,0);
+        double w=Math.max(.2,e.getBbWidth()),h=Math.max(.3,e.getBbHeight());
+        float flash=Math.max(0,1-phase*fading.duration()/6f);
+        BranchVfx.billboard(painter,BranchVfx.glow(),centre,Math.max(w,h)*(.6-phase*.25),
+            time*.4,TemporalPalette.hot((float)time*.07f,.9f),flash*.8f);
+        if(phase>.65f)return;
+        double radius=phase<.10f?1-phase*1.4:.86+(phase-.10)*.55;
+        for(int i=0;i<7;i++) {
+            long seed=e.getId()*193L+i+(long)(time/TemporalLightning.FLICKER)*13;
+            Vec3 tip=centre.add((TemporalLightning.rand(seed,1)-.5)*w*radius,
+                (TemporalLightning.rand(seed,2)-.5)*h*radius,(TemporalLightning.rand(seed,3)-.5)*w*radius);
+            TemporalLightning.draw(painter,BranchVfx.strand(),TemporalLightning.bolt(seed,centre,tip,5,w*.1,1),
+                .022,(float)(time*.07+i*.14),(1-phase)*.85f);
+        }
     }
 
     /** A hot sheet of light exactly where the front is cutting, so the cut itself is visible. */

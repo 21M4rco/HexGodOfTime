@@ -9,7 +9,7 @@ public final class CosmicFlight {
     private CosmicFlight() {}
     public static void tick(ServerPlayer p) {
         var d=LokiData.get(p);var a=p.getAbilities();
-        boolean allowed=p.isAlive()&&d.getBoolean("ascended")&&!p.isSpectator();
+        boolean allowed=LokiData.access(p)&&p.isAlive()&&d.getBoolean("ascended")&&!p.isSpectator();
         if(!allowed){revoke(p);return;}
         if(!d.getBoolean("flightGranted")) {
             d.putBoolean("flightHadMayfly",a.mayfly&&!p.isCreative());
@@ -24,7 +24,7 @@ public final class CosmicFlight {
         }
     }
     public static void toggle(ServerPlayer p) {
-        if(!LokiData.get(p).getBoolean("ascended")||p.isSpectator()||p.isPassenger()||TemporalEngine.frozen(p))return;
+        if(!LokiData.access(p)||!LokiData.get(p).getBoolean("ascended")||p.isSpectator()||p.isPassenger()||TemporalEngine.frozen(p))return;
         tick(p);
         p.getAbilities().flying=!p.getAbilities().flying;
         p.resetFallDistance();p.onUpdateAbilities();

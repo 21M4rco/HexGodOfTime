@@ -32,7 +32,7 @@ public final class Transformation {
     /** Renewed every second on a five-second lease, so the grant always trails the mantle. */
     private static final int LEASE=100,RENEW=20;
 
-    public static boolean transformed(ServerPlayer p) {return LokiData.get(p).getBoolean("ascended");}
+    public static boolean transformed(ServerPlayer p) {return LokiData.access(p)&&LokiData.get(p).getBoolean("ascended");}
 
     /** Called every player tick. Grants on the first tick of the mantle and renews while it is worn. */
     public static void sustain(ServerPlayer p) {

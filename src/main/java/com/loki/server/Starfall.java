@@ -28,7 +28,7 @@ public final class Starfall {
         if(now%SWEEP!=0)return;
         if(now%400==0)NEXT.entrySet().removeIf(e->e.getValue()<now-1200);
         for(ServerPlayer owner:level.players()) {
-            if(!PocketRealm.ownsHere(owner)||owner.isSpectator())continue;
+            if(!com.loki.data.LokiData.access(owner)||!PocketRealm.ownsHere(owner)||owner.isSpectator())continue;
             int plot=PocketRealm.plotAt(owner.getX(),owner.getZ());
             AABB bounds=bounds(level,plot);
             int flying=level.getEntitiesOfClass(StarfallEntity.class,bounds).size();

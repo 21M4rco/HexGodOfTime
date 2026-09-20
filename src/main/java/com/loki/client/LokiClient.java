@@ -35,6 +35,8 @@ public final class LokiClient {
     private static KeyMapping key(String name,int key){return new KeyMapping("key.loki."+name,InputConstants.Type.KEYSYM,key,"key.categories.loki");}
     private static boolean primaryDown,selectDown,primaryWasHold,primaryLatched;
     private static int repeat;
+    /** The server syncs this flag. Missing/false means this client gets no Loki UI or controls at all. */
+    public static boolean enabled(){return ClientState.self().getBoolean("abilitiesEnabled");}
 
     @Mod.EventBusSubscriber(modid=Loki.ID,value=Dist.CLIENT,bus=Mod.EventBusSubscriber.Bus.MOD)
     public static final class ModBus {
@@ -54,7 +56,7 @@ public final class LokiClient {
         @SubscribeEvent public static void layers(EntityRenderersEvent.AddLayers e) {
             for(String skin:e.getSkins()) {
                 net.minecraft.client.renderer.entity.player.PlayerRenderer renderer=e.getSkin(skin);
-                if(renderer!=null)renderer.addLayer(new LokiLayer(renderer));
+                if(renderer!=null){renderer.addLayer(new LokiLayer(renderer));renderer.addLayer(new BranchFistLayer(renderer));}
             }
         }
         @SubscribeEvent public static void reload(RegisterClientReloadListenersEvent e) {
@@ -72,13 +74,25 @@ public final class LokiClient {
             if(e.phase!=TickEvent.Phase.END)return;
             ClientState.tick();
             Minecraft mc=Minecraft.getInstance();
-            if(mc.player==null){primaryDown=false;selectDown=false;QuickBar.closeBar(false);return;}
+            if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;selectDown=false;QuickBar.closeBar(false);return;}
+            if(!enabled()) {
+                // Locked means invisible and inert, not merely server-rejected. Swallow every Loki input
+                // and close any Loki-only screen immediately when access is revoked.
+                BranchKeyInput.cancel(false);
+                primaryLatched=primaryPhysicallyDown();
+                primaryDown=false;primaryWasHold=false;repeat=0;
+                selectDown=SELECT.isDown();
+                QuickBar.closeBar(false);
+                if(mc.screen instanceof MasteryScreen||mc.screen instanceof FractureScreen)mc.setScreen(null);
+                drain();return;
+            }
             if(mc.screen!=null) {
+                BranchKeyInput.cancel(true);
                 // Ending the hold here means the key is no longer "down" as far as this loop knows,
                 // so a key that is still physically held would read as a brand new press the moment
                 // the screen closes. Crossing a dimension puts the terrain screen up mid-hold, which
                 // is exactly how arriving in the sanctum used to open a second break on arrival.
-                if(primaryDown){primaryDown=false;primaryLatched=true;LokiNetwork.send(LokiServer.HOLD_END,0);}
+                if(primaryDown){primaryDown=false;primaryLatched=true;if(primaryWasHold)LokiNetwork.send(LokiServer.HOLD_END,0);}
                 if(selectDown){selectDown=false;QuickBar.closeBar(false);}
                 drain();return;
             }
@@ -92,11 +106,13 @@ public final class LokiClient {
             Ability selected=Ability.at(ClientState.self().getInt("selected"));
             boolean primary=PRIMARY.isDown();
             // A cast that was interrupted needs a real release before it counts as pressed again.
-            if(primaryLatched){if(primary)primary=false;else primaryLatched=false;}
-            if(primary&&!primaryDown){primaryWasHold=selected.hold;LokiNetwork.send(selected.hold?LokiServer.HOLD_BEGIN:LokiServer.CAST,0);repeat=0;}
+            if(primaryLatched){if(primaryPhysicallyDown())primary=false;else primaryLatched=false;}
+            boolean branchInput=BranchKeyInput.tick(primary,primaryDown);
+            if(branchInput)primaryWasHold=false;
+            if(!branchInput&&primary&&!primaryDown){primaryWasHold=selected.hold;LokiNetwork.send(selected.hold?LokiServer.HOLD_BEGIN:LokiServer.CAST,0);repeat=0;}
             // Holding an ordinary spell repeats it; the server's own rate limit and cooldown set the pace.
-            else if(primary&&!selected.hold&&++repeat>=5){repeat=0;LokiNetwork.send(LokiServer.CAST,0);}
-            if(!primary&&primaryDown&&primaryWasHold)LokiNetwork.send(LokiServer.HOLD_END,0);
+            else if(!branchInput&&primary&&!selected.hold&&++repeat>=5){repeat=0;LokiNetwork.send(LokiServer.CAST,0);}
+            if(!branchInput&&!primary&&primaryDown&&primaryWasHold)LokiNetwork.send(LokiServer.HOLD_END,0);
             primaryDown=primary;
 
             // The alternate key configures the Fracture, but only inside the sanctum, which is the
@@ -114,18 +130,28 @@ public final class LokiClient {
         }
         /** Called when the world changes underfoot: a held cast must not survive the crossing. */
         static void releaseHeldCast() {
-            if(primaryDown||PRIMARY.isDown())primaryLatched=true;
+            BranchKeyInput.cancel(false);
+            if(primaryDown||primaryPhysicallyDown())primaryLatched=true;
             primaryDown=false;
         }
+        private static boolean primaryPhysicallyDown() {
+            InputConstants.Key key=PRIMARY.getKey();
+            long window=Minecraft.getInstance().getWindow().getWindow();
+            if(key.getType()==InputConstants.Type.MOUSE)
+                return GLFW.glfwGetMouseButton(window,key.getValue())==GLFW.GLFW_PRESS;
+            if(key.getType()==InputConstants.Type.KEYSYM&&key.getValue()!=GLFW.GLFW_KEY_UNKNOWN)
+                return InputConstants.isKeyDown(window,key.getValue());
+            return PRIMARY.isDown();
+        }
         private static void drain() {
-            while(PRIMARY.consumeClick());
-            while(SELECT.consumeClick());
+            for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT})
+                while(k.consumeClick());
             for(KeyMapping k:TIME_KEYS)while(k.consumeClick());
         }
 
         @SubscribeEvent public static void scroll(InputEvent.MouseScrollingEvent e) {
             var mc=Minecraft.getInstance();
-            if(mc.player==null||mc.screen!=null)return;
+            if(mc.player==null||mc.screen!=null||!enabled())return;
             if(QuickBar.scroll(e.getScrollDelta())){e.setCanceled(true);return;}
             if(ClientState.self().getInt("grip")>0) {
                 // Both hands are busy holding something; the wheel pushes and pulls it instead of the hotbar.
@@ -135,7 +161,7 @@ public final class LokiClient {
         }
         @SubscribeEvent public static void mouse(InputEvent.InteractionKeyMappingTriggered e) {
             var mc=Minecraft.getInstance();
-            if(mc.player==null||mc.screen!=null)return;
+            if(mc.player==null||mc.screen!=null||!enabled())return;
             if(!(mc.player.getMainHandItem().getItem() instanceof ConjuredWeapon)||!(e.isAttack()||e.isUseItem()))return;
             e.setCanceled(true);e.setSwingHand(false);
             if(!ClientState.frozen(mc.player.getId()))LokiNetwork.send(LokiServer.WEAPON,e.isUseItem()?1:0);

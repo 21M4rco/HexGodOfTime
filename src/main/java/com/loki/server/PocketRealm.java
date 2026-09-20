@@ -127,6 +127,7 @@ public final class PocketRealm {
 
     /** @return true when the caster was actually moved, so the rift only reports success on a real crossing. */
     public static boolean enter(ServerPlayer p) {
+        if(!LokiData.access(p)){p.displayClientMessage(Component.literal("Loki powers are locked."),true);return false;}
         ServerLevel realm=level(p.server);
         if(realm==null){p.displayClientMessage(Component.literal("The sanctum will not open; its dimension is missing."),true);return false;}
         if(inside(p.level()))return false;
@@ -142,7 +143,7 @@ public final class PocketRealm {
         if(!move(p,realm,spawn,180,0))return false;
         // Arriving in the sanctum is quiet: a small bloom of nebula where the body reforms, and no
         // second break hanging in the air beside it.
-        LokiNetwork.fx(p,"arrive_realm");
+        LokiNetwork.arrival(p);
         p.displayClientMessage(Component.literal("Your world tree. Fracture to leave, or crouch on the arrival sigil."),true);
         return true;
     }
@@ -171,7 +172,7 @@ public final class PocketRealm {
         if(home==null)return false;
         if(!move(p,destination,home,d.getFloat("returnYaw"),d.getFloat("returnPitch")))return false;
         d.remove("realmPlot");
-        LokiNetwork.fx(p,"rift_cross");
+        LokiNetwork.arrival(p);
         return true;
     }
 
@@ -232,7 +233,7 @@ public final class PocketRealm {
             if(!homeward&&anchor==null)d.putInt("realmPlot",plot);
             if(!move(p,destination,at,yaw,pitch))return false;
             if(homeward||anchor!=null)d.remove("realmPlot");
-            LokiNetwork.fx(p,inside(destination)?"arrive_realm":"rift_cross");return true;
+            LokiNetwork.arrival(p);return true;
         }
         e.stopRiding();e.ejectPassengers();
         Vec3 landing=at;
@@ -251,7 +252,7 @@ public final class PocketRealm {
         });
         if(moved==null)return false;
         travelData(moved).putLong("riftGraceUntil",caster.server.overworld().getGameTime()+com.loki.entity.RiftEntity.DURATION+20);
-        LokiNetwork.fx(moved,inside(destination)?"arrive_realm":"rift_cross");
+        LokiNetwork.arrival(moved);
         return true;
     }
 
