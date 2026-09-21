@@ -1,6 +1,6 @@
-# Warping — 0.5.2-warping
+# Warping — 0.5.3-warping
 
-Portal update based on the linked successful run at `296c0e9271c207e0fc46c7874471832ecc0d37e1`.
+Sun, Void Sea and portal silhouette patch based on `7e4f41b230538a6b0aecfd7c2610091aa0f9e5bb`.
 Existing ability ordinals are preserved. Warping is appended to the existing catalogue at Sorcery mastery 800.
 No existing mastery thresholds, abilities, transformation stats or fracture destinations are rebalanced.
 
@@ -26,8 +26,8 @@ The 8-second maximum hold releases a stable charge. Access to the return action 
 
 | Destination | Geometry and environment | Threat |
 | --- | --- | --- |
-| Sun | 68-block luminous photosphere, contained lava core, violet cosmic sky and stellar streaks | Entry 56 blocks above the photosphere; escalating heat and fire damage |
-| Void Sea | Procedurally infinite 135-block-deep black ocean with no land | Custom 650-health articulated abyssal leviathan, circling underwater and lunging for 60 base damage per bite |
+| Sun | 70-block textured photosphere, contained lava core, anchored plasma flares and Fracture-style stellar galaxies | Escalating stellar heat damages survival casters and captives, including fire-resistant creatures |
+| Void Sea | Procedurally infinite 135-block-deep dark ocean with a bright blue Fracture-style nebula and spiral galaxies | Custom 650-health articulated abyssal leviathan with emissive cyan eyes, gills, fins and dorsal markings, circling underwater and lunging for 60 base damage per bite |
 | Gravity Well | Black singularity, tilted spinning accretion disk and inward debris trails | Directional gravity grows toward the center; increasing central damage |
 | Shattered World | Broken and inverted islands, ruined towers, forest fragments and hanging water | Periodic gravity surges; combat across separated terrain |
 | Time Storm | Broken platforms and branching temporal structures | Recent-position rewinds and intermittent movement disruption |
@@ -39,8 +39,8 @@ The 8-second maximum hold releases a stable charge. Access to the return action 
 Each destination is a distinct registered dimension. Casters receive separated 1024-block-spaced instances.
 Prepared instances are reused per caster/destination to prevent canceled charges generating unlimited terrain.
 Generation is budgeted to 4096 block placements per realm tick. An unfinished destination cannot receive victims.
-Nothingness uses the existing persistent block restoration ledger; original block entities and inventories are retained.
-The caster can enter their own portal, including in creative mode. Other Loki-capable and creative players remain excluded from trap targeting. Loki-capable players retain protection from realm environmental penalties.
+Warping draws a continuous Nothingness surface clipped to the same polygon as the glass. It no longer replaces whole floor blocks. The original terrain, block entities and inventories remain intact. Time Branch Nothingness blocks still use their existing persistent restoration ledger.
+The caster can enter their own portal, including in creative mode. Other Loki-capable and creative players remain excluded from trap targeting. Loki-capable players retain environmental protection in the other eight destinations; the Sun harms survival casters too. `/kill` bypasses all mod damage wards. Solar heat is a separate, armor-bypassing damage type, so normal fire resistance does not make a star harmless; creative and spectator modes retain their normal protections.
 Released portals continue for 200 server ticks independently of caster movement, ability selection, death or logout. Each entity crosses a given portal only once, so returning with R does not immediately trap the caster again. The leviathan remains hostile to all survival players.
 Flight permission is managed by the existing flight system and revoked on leaving as appropriate.
 
@@ -48,8 +48,9 @@ Flight permission is managed by the existing flight system and revoked on leavin
 
 The floor window uses a depth-tested stencil aperture. Jagged fractures expose a spatial destination scene during charging and keep their irregular broken-mirror outline on release.
 Branching glass cracks, layered edge glow, reflective tinted facets and a staggered burst of rising triangular shards frame the destination. The closing facets return during the final 0.7 seconds. Server collision uses the exact same outline as the open stencil window.
-Only whole interior floor cells are temporarily replaced, and the original floor is restored when the ten-second window expires. Preview clocks track the prepared destination instance.
-The aperture and destination share procedural celestial geometry and the deterministic terrain blueprint.
+The black backing, destination stencil, glass facets and entry boundary share the exact polygon, including edges that cross fractional block coordinates. The ground needs no replacement or restoration when the ten-second window expires. Preview clocks track the prepared destination instance.
+The aperture and destination share procedural celestial geometry and the deterministic terrain blueprint. Sun and Void Sea reuse the Fracture sky renderer with stellar-violet and ocean-blue palettes; the original emerald Fracture palette is preserved.
+The photosphere is an opaque depth-tested surface. Its corona and anchored flares add light without writing depth, and realm geometry renders before particles with explicit depth state so foreground player bodies remain visible.
 Preview architecture is an untextured geometric representation of that blueprint; it is not a second live Minecraft world renderer.
 Previews show authored initial hazards rather than live remote entities or player-made terrain changes.
 The feature requires a depth-stencil render target. Forge's standard render target is enabled through its stencil API.
@@ -58,5 +59,5 @@ Compatibility with third-party shader pipelines and alternate framebuffer implem
 ## Verification
 
 The normal GitHub build compiles and reobfuscates the JAR, includes a source JAR, and runs existing regression checks plus Warping's geometry/timing checks.
-The dedicated-server smoke workflow boots a disposable server world to catch datapack and server-side class-loading failures.
+The dedicated-server smoke workflow boots a disposable server world to catch datapack and server-side class-loading failures, then checks the Sun caster damage gate, actual generic-kill damage in all nine destinations, fire-resistant/fire-immune solar victims and creative-mode exposure. Its test listener is loaded only with `-PwarpingSmoke` and is excluded from release JARs.
 These checks do not replace an in-game visual and multiplayer playtest. In particular, aperture depth composition, moving-platform behavior, shader compatibility and leviathan animation require client testing.

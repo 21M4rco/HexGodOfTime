@@ -72,10 +72,10 @@ public final class WarpRealms {
                 AbyssalLeviathan hunter=HexGodOfStories.LEVIATHAN.get().create(l);
                 if(hunter!=null){hunter.moveTo(e.getX()+45,Math.min(120,e.getY()-16),e.getZ()+24,0,0);l.addFreshEntity(hunter);}
             }
-            if(Warping.sovereign(e)){e.fallDistance=0;if(e.getY()<0)e.teleportTo(e.getX(),180,e.getZ());continue;}
+            if(Warping.sovereign(e)&&d!=Destination.SUN){e.fallDistance=0;if(e.getY()<0)e.teleportTo(e.getX(),180,e.getZ());continue;}
             if(e instanceof net.minecraft.world.entity.player.Player p&&p.isCreative())continue;
             switch(d){
-                case SUN -> {double dist=e.position().distanceTo(new Vec3(cell,94,0));if(dist<42){e.setSecondsOnFire(8);if(now%10==0)e.hurt(l.damageSources().onFire(),dist<34?36:8);}}
+                case SUN -> solarExposure(l,e,cell,now);
                 case VOID_SEA -> {}
                 case GRAVITY_WELL -> {
                     Vec3 toward=new Vec3(cell,96,0).subtract(e.position());double dist=toward.length();
@@ -102,6 +102,17 @@ public final class WarpRealms {
             }
         }
         if(d==Destination.TIME_STORM&&now%200==0)HISTORY.keySet().removeIf(id->l.getEntity(id)==null);
+    }
+    private static final net.minecraft.resources.ResourceKey<net.minecraft.world.damagesource.DamageType> SOLAR_HEAT=
+        net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DAMAGE_TYPE,HexGodOfStories.id("solar_heat"));
+    /** Stellar heat is not ordinary fire: the mantle's fire resistance cannot make the Sun harmless. */
+    public static void solarExposure(ServerLevel level,Entity entity,double cell,long now){
+        if(!entity.isAlive()||entity.isSpectator()||entity instanceof net.minecraft.world.entity.player.Player p&&p.isCreative())return;
+        float damage=WarpMath.solarDamage(entity.position().distanceTo(new Vec3(cell,WarpMath.SUN_Y,0)));
+        if(damage<=0)return;
+        entity.setSecondsOnFire(8);
+        if(now%10==0)entity.hurt(new net.minecraft.world.damagesource.DamageSource(
+            level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.DAMAGE_TYPE).getHolderOrThrow(SOLAR_HEAT)),damage);
     }
     private static void populate(ServerLevel l,Destination d,double cell){
         if(d==Destination.VOID_SEA){AbyssalLeviathan leviathan=HexGodOfStories.LEVIATHAN.get().create(l);if(leviathan!=null){leviathan.moveTo(cell+24,109,24,0,0);l.addFreshEntity(leviathan);}}

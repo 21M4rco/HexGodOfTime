@@ -12,8 +12,17 @@ import java.util.*;
 /** Destination and aperture share this scene. Architecture comes from the server's generation blueprint. */
 public final class WarpScene {
     private static final Map<Destination,VertexBuffer> TERRAIN=new EnumMap<>(Destination.class);
-    public static void clear(){TERRAIN.values().forEach(VertexBuffer::close);TERRAIN.clear();}
+    public static void clear(){TERRAIN.values().forEach(VertexBuffer::close);TERRAIN.clear();SunRenderer.clear();}
     public static void sky(PoseStack pose,Destination d,double time){
+        if(d==Destination.SUN||d==Destination.VOID_SEA){
+            // Same detailed sky in the portal and in the destination, at the preview's spatial scale.
+            float near=RenderSystem.getShaderFogStart(),far=RenderSystem.getShaderFogEnd();
+            pose.pushPose();pose.translate(0,110,0);pose.scale(3,3,3);
+            net.minecraft.client.renderer.FogRenderer.setupNoFog();
+            try{RealmSky.drawBackdrop(pose,RenderSystem.getProjectionMatrix(),(float)time,d==Destination.VOID_SEA?RealmSky.Palette.OCEAN:RealmSky.Palette.STELLAR);}
+            finally{pose.popPose();RenderSystem.setShaderFogStart(near);RenderSystem.setShaderFogEnd(far);RenderSystem.disableCull();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();}
+            return;
+        }
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
         BufferBuilder b=Tesselator.getInstance().getBuilder();b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);Matrix4f m=pose.last().pose();
         WarpMesh.sphere(b,m,new Vec3(0,110,0),310,310,310,0x020106,1,32,0,false);
@@ -40,21 +49,13 @@ public final class WarpScene {
         BufferUploader.drawWithShader(b.end());
     }
     public static void draw(PoseStack pose,Destination d,double time,long age,boolean preview){
+        if(d==Destination.SUN){SunRenderer.draw(pose,time);return;}
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
         if(preview&&d!=Destination.SUN&&d!=Destination.VOID_SEA){
             VertexBuffer mesh=TERRAIN.computeIfAbsent(d,WarpScene::bakeTerrain);mesh.bind();mesh.drawWithShader(pose.last().pose(),RenderSystem.getProjectionMatrix(),GameRenderer.getPositionColorShader());VertexBuffer.unbind();
         }
         BufferBuilder b=Tesselator.getInstance().getBuilder();b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);Matrix4f m=pose.last().pose();
         switch(d){
-            case SUN -> {
-                Vec3 c=new Vec3(0,94,0);WarpMesh.sphere(b,m,c,34,34,34,0xffb537,1,64,time,true);
-                for(int i=1;i<=5;i++)WarpMesh.sphere(b,m,c,34+i*.9,34+i*.9,34+i*.9,0xff922f,.035f,40,time,false);
-                for(int i=0;i<12;i++){
-                    double a=i*Math.PI/6+time*.001;Vec3 root=c.add(Math.cos(a)*33,Math.sin(a)*33,Math.sin(a*3)*5);
-                    WarpMesh.ring(b,m,root,2.5+Math.sin(time*.018+i),.35,0xffc563,.65f,a,time*.003);
-                }
-                for(int i=0;i<110;i++){double a=i*2.399,timeShift=(time*.15+i*4)%45;Vec3 p=c.add(Math.cos(a)*(36+timeShift*.1),Math.sin(a)*(36+timeShift*.1),Math.sin(i*5.7)*25);WarpMesh.box(b,m,p.x,p.y,p.z,.18,.18,.18,0xffe2a0,(float)(1-timeShift/45));}
-            }
             case VOID_SEA -> {
                 if(preview){WarpMesh.box(b,m,-250,0,-250,500,136,500,0x020810,1);for(int i=0;i<90;i++){double x=Math.sin(i*5.2)*180,z=Math.cos(i*3.7)*180;WarpMesh.ribbon(b,m,new Vec3(x,136.03,z),new Vec3(x+5,136.03,z+Math.sin(time*.03+i)),.08,0x244454,.5f);}leviathanSilhouette(b,m,time);}
             }

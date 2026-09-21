@@ -28,17 +28,23 @@ public final class WarpRenderer {
     public static void render(RenderLevelStageEvent e){
         var mc=Minecraft.getInstance();if(mc.level==null)return;
         var pose=e.getPoseStack();Vec3 camera=e.getCamera().getPosition();double time=mc.level.getGameTime()+e.getPartialTick();
-        Destination d=Destination.from(mc.level);
-        if(d!=null){
-            pose.pushPose();pose.translate(WarpMath.cellX(camera.x)-camera.x,-camera.y,-camera.z);
-            RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();RenderSystem.disableCull();RenderSystem.setShaderColor(1,1,1,1);
-            try{WarpScene.draw(pose,d,time,realm.contains("time")?realm.getLong("age")+(long)time-realm.getLong("time"):0,false);}finally{pose.popPose();RenderSystem.enableCull();RenderSystem.disableBlend();}
-        }
         WINDOWS.values().removeIf(n->!n.getString("dimension").equals(mc.level.dimension().location().toString())||n.getLong("until")<=mc.level.getGameTime());
         if(WINDOWS.isEmpty())return;
         // Forge exposes a depth-stencil target. No alternate world load, invasive renderer replacement or recursion.
         if(!mc.getMainRenderTarget().isStencilEnabled())mc.getMainRenderTarget().enableStencil();
         for(CompoundTag n:WINDOWS.values())window(pose,camera,time,n);
+    }
+    /** Render spatial realm geometry before particles, with explicit depth state independent of effects. */
+    public static void renderRealm(RenderLevelStageEvent e){
+        var mc=Minecraft.getInstance();if(mc.level==null)return;
+        var pose=e.getPoseStack();Vec3 camera=e.getCamera().getPosition();double time=mc.level.getGameTime()+e.getPartialTick();
+        Destination d=Destination.from(mc.level);
+        if(d!=null){
+            pose.pushPose();pose.translate(WarpMath.cellX(camera.x)-camera.x,-camera.y,-camera.z);
+            RenderSystem.enableDepthTest();RenderSystem.depthFunc(GL11.GL_LEQUAL);RenderSystem.depthMask(true);
+            RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();RenderSystem.disableCull();RenderSystem.setShaderColor(1,1,1,1);
+            try{WarpScene.draw(pose,d,time,realm.contains("time")?realm.getLong("age")+(long)time-realm.getLong("time"):0,false);}finally{pose.popPose();RenderSystem.enableCull();RenderSystem.disableBlend();RenderSystem.depthMask(true);RenderSystem.enableDepthTest();RenderSystem.setShaderColor(1,1,1,1);}
+        }
     }
     private static void window(PoseStack pose,Vec3 camera,double time,CompoundTag n){
         Vec3 at=new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z"));
@@ -55,6 +61,9 @@ public final class WarpRenderer {
             RenderSystem.colorMask(false,false,false,false);RenderSystem.depthMask(false);RenderSystem.enableDepthTest();
             aperture(pose.last().pose(),half,progress);
             GL11.glStencilMask(0);GL11.glStencilFunc(GL11.GL_EQUAL,1,255);GL11.glStencilOp(GL11.GL_KEEP,GL11.GL_KEEP,GL11.GL_KEEP);
+            // Draw the Nothingness backing from the EXACT aperture polygon, including fractional edges.
+            RenderSystem.colorMask(true,true,true,true);aperture(pose.last().pose(),half,progress);
+            RenderSystem.colorMask(false,false,false,false);
             // Reset depth only inside the visible opening. The surrounding terrain and creatures remain occluders.
             RenderSystem.depthMask(true);GL11.glDepthFunc(GL11.GL_ALWAYS);GL11.glDepthRange(1,1);aperture(pose.last().pose(),half,progress);GL11.glDepthRange(0,1);GL11.glDepthFunc(GL11.GL_LEQUAL);
             RenderSystem.colorMask(true,true,true,true);RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
@@ -63,6 +72,7 @@ public final class WarpRenderer {
                 WarpScene.sky(pose,d,time);
                 WarpScene.draw(pose,d,time,open?n.getLong("realmAge")+(long)Math.max(0,time-n.getLong("sent")):0,true);
             }finally{pose.popPose();}
+            RenderSystem.disableCull();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
             // Restore the floor depth after drawing the remote scene, so it cannot occlude unrelated world effects.
             RenderSystem.colorMask(false,false,false,false);GL11.glDepthFunc(GL11.GL_ALWAYS);aperture(pose.last().pose(),half,progress);GL11.glDepthFunc(GL11.GL_LEQUAL);RenderSystem.colorMask(true,true,true,true);
             GL11.glDisable(GL11.GL_STENCIL_TEST);RenderSystem.depthMask(false);
@@ -75,7 +85,7 @@ public final class WarpRenderer {
     private static void aperture(Matrix4f m,double half,double progress){
         BufferBuilder b=Tesselator.getInstance().getBuilder();b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);
         for(int i=0;i<WarpMath.EDGE_COUNT;i++)
-            WarpMesh.quad(b,m,Vec3.ZERO,boundary(i,half,progress),boundary(i+1,half,progress),Vec3.ZERO,0xffffff,1);
+            WarpMesh.quad(b,m,Vec3.ZERO,boundary(i,half,progress),boundary(i+1,half,progress),Vec3.ZERO,0x000000,1);
         BufferUploader.drawWithShader(b.end());
     }
     /** Cracks race across glass, then the facets kick upward and expose the dimensional window. */

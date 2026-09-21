@@ -48,5 +48,7 @@
   "subtitles.hexgodofstories.teleport": "Teleport",
   "subtitles.hexgodofstories.time_resume": "Time resumes",
   "subtitles.hexgodofstories.time_slip": "Time slips",
-  "subtitles.hexgodofstories.time_stop": "Time stops"
+  "subtitles.hexgodofstories.time_stop": "Time stops",
+  "death.attack.hexgodofstories.solar_heat": "%1$s was consumed by the Sun",
+  "death.attack.hexgodofstories.solar_heat.player": "%1$s was cast into the Sun by %2$s"
 }

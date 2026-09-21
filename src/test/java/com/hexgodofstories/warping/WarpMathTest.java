@@ -39,6 +39,10 @@ public final class WarpMathTest {
         check(WarpMath.ceiling(2000)-WarpMath.floor(2000)<1.8,"final gap really crushes a standing victim");
         check(WarpMath.cellX(1024+200)==1024&&WarpMath.cellX(2048-100)==2048,"separate instances remain separate");
         for(int t=0;t<100000;t+=13)check(WarpMath.fallingY(175,t)>=48&&WarpMath.fallingY(175,t)<240,"endless fall has bounded coordinates");
+        check(WarpMath.solarDamage(WarpMath.SUN_CORONA)==0,"outside corona is safe");
+        check(WarpMath.solarDamage(WarpMath.SUN_CORONA-.01)>0,"corona inflicts heat");
+        check(WarpMath.solarDamage(WarpMath.SUN_RADIUS-.01)>WarpMath.solarDamage(WarpMath.SUN_RADIUS+.01),"photosphere is lethal faster than corona");
+        check(WarpMath.SUN_RADIUS>33+Math.sqrt(3),"photosphere encloses every corner of the existing magma shell");
         System.out.println("Warping geometry and timing checks passed");
     }
     private static void check(boolean value,String message){if(!value)throw new AssertionError(message);}

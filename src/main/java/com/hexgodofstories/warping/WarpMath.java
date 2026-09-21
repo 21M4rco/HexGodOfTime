@@ -4,6 +4,8 @@ package com.hexgodofstories.warping;
 public final class WarpMath {
     public static final int MIN_CHARGE=24,FULL_CHARGE=100,MAX_HOLD=160,OPEN_TICKS=200;
     public static final int EDGE_COUNT=32;
+    public static final double SUN_Y=94,SUN_RADIUS=35,SUN_CORONA=42;
+    public static float solarDamage(double distance){return distance<SUN_RADIUS?36:distance<SUN_CORONA?8:0;}
     public static double width(int ticks){return 2+8*Math.min(1,Math.max(0,ticks)/(double)FULL_CHARGE);}
     /** Fixed, angular mirror outline. The renderer and server use the same polygon at every size. */
     public static double edgeX(int i,double half){return edge(i,half,true);}

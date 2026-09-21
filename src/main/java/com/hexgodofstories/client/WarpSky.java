@@ -11,7 +11,7 @@ import org.joml.Matrix4f;
 
 public final class WarpSky extends DimensionSpecialEffects {
     public WarpSky(){super(Float.NaN,false,SkyType.NONE,true,false);}
-    public Vec3 getBrightnessDependentFogColor(Vec3 color,float sun){return new Vec3(.012,.008,.022);}
+    public Vec3 getBrightnessDependentFogColor(Vec3 color,float sun){return net.minecraft.client.Minecraft.getInstance().level!=null&&Destination.from(net.minecraft.client.Minecraft.getInstance().level)==Destination.VOID_SEA?new Vec3(.025,.10,.24):new Vec3(.012,.008,.022);}
     public boolean isFoggyAt(int x,int z){return false;}
     @Override public float[] getSunriseColor(float time,float partial){return null;}
     @Override public boolean renderClouds(ClientLevel l,int ticks,float p,PoseStack pose,double x,double y,double z,Matrix4f projection){return true;}
@@ -19,9 +19,13 @@ public final class WarpSky extends DimensionSpecialEffects {
     @Override public boolean tickRain(ClientLevel l,int ticks,Camera camera){return true;}
     @Override public boolean renderSky(ClientLevel l,int ticks,float partial,PoseStack pose,Camera camera,Matrix4f projection,boolean foggy,Runnable setupFog){
         Destination d=Destination.from(l);if(d==null||foggy)return true;
-        RenderSystem.depthMask(false);RenderSystem.disableCull();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();FogRenderer.setupNoFog();
-        pose.pushPose();pose.scale(.3f,.3f,.3f);pose.translate(0,-110,0);
-        try{WarpScene.sky(pose,d,ticks+partial);}finally{pose.popPose();RenderSystem.enableCull();RenderSystem.disableBlend();RenderSystem.depthMask(true);setupFog.run();}
+        RenderSystem.enableDepthTest();RenderSystem.depthMask(false);RenderSystem.disableCull();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();FogRenderer.setupNoFog();
+        pose.pushPose();
+        try{
+            if(d==Destination.SUN||d==Destination.VOID_SEA)
+                RealmSky.drawBackdrop(pose,projection,ticks+partial,d==Destination.VOID_SEA?RealmSky.Palette.OCEAN:RealmSky.Palette.STELLAR);
+            else{pose.scale(.3f,.3f,.3f);pose.translate(0,-110,0);WarpScene.sky(pose,d,ticks+partial);}
+        }finally{pose.popPose();RenderSystem.enableCull();RenderSystem.disableBlend();RenderSystem.depthMask(true);setupFog.run();}
         return true;
     }
 }

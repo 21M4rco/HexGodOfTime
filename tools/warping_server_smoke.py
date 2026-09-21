@@ -16,7 +16,7 @@ run = Path('run')
 run.mkdir(exist_ok=True)
 (run / 'eula.txt').write_text('eula=true\n')
 (run / 'server.properties').write_text('level-name=warping-smoke\nonline-mode=false\nserver-port=0\nview-distance=2\nsimulation-distance=2\n')
-proc = subprocess.Popen(['gradle', '--no-daemon', 'runServer'], stdout=subprocess.PIPE,
+proc = subprocess.Popen(['gradle', '--no-daemon', '-PwarpingSmoke', 'runServer'], stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT, text=True, start_new_session=True)
 lines = queue.Queue()
 def read_output():
@@ -25,6 +25,7 @@ def read_output():
 threading.Thread(target=read_output, daemon=True).start()
 end = time.monotonic() + 240
 ready = False
+regressions = False
 with open('warping-server-smoke.log', 'w') as log:
     try:
         while time.monotonic() < end and proc.poll() is None:
@@ -37,6 +38,9 @@ with open('warping-server-smoke.log', 'w') as log:
             print(line, end='', flush=True)
             if re.search(r'Done \([\d.]+s\)!', line):
                 ready = True
+            if 'WARPING_SERVER_REGRESSIONS_PASSED' in line:
+                regressions = True
+            if ready and regressions:
                 break
     finally:
         if proc.poll() is None:
@@ -46,6 +50,6 @@ with open('warping-server-smoke.log', 'w') as log:
             except subprocess.TimeoutExpired:
                 os.killpg(proc.pid, signal.SIGKILL)
                 proc.wait()
-if not ready:
-    sys.exit('Dedicated server did not reach a ready state; see warping-server-smoke.log')
-print('Dedicated-server startup and datapack load passed.')
+if not ready or not regressions:
+    sys.exit('Dedicated server startup or Warping regression checks failed; see warping-server-smoke.log')
+print('Dedicated-server startup, datapack load, solar damage and kill regression checks passed.')

@@ -20,7 +20,7 @@ public final class Warping {
     private static final Map<UUID,Charge> PORTALS=new HashMap<>();
     private static final class Charge {
         final ServerLevel level;final Vec3 at;final Destination destination;final long start;final double cell;final int ownerId;
-        long opened=-1;int held;final Set<UUID> moved=new HashSet<>();final List<BlockPos> replaced=new ArrayList<>();
+        long opened=-1;int held;final Set<UUID> moved=new HashSet<>();
         Charge(ServerPlayer p,Vec3 at,Destination d,double cell){level=p.serverLevel();this.at=at;destination=d;start=level.getGameTime();this.cell=cell;ownerId=p.getId();}
     }
     public static boolean charging(ServerPlayer p){return CHARGES.containsKey(p.getUUID());}
@@ -57,17 +57,9 @@ public final class Warping {
         CHARGES.remove(p.getUUID());PORTALS.put(p.getUUID(),c);
         HexData.spend(p,Ability.WARPING.cost);HexData.get(p).putLong("cd_WARPING",HexData.now(p)+Ability.WARPING.cooldown);
         HexServer.reward(p,Ability.WARPING.discipline,90);HexNetwork.sync(p);
-        // Existing persistence/restoration code owns every replaced block, including block entities.
-        double r=WarpMath.width(c.held)*.5;
-        for(int x=(int)Math.ceil(c.at.x-r);x<c.at.x+r;x++)for(int z=(int)Math.ceil(c.at.z-r);z<c.at.z+r;z++){
-            BlockPos b=BlockPos.containing(x,c.at.y-.1,z);
-            // Only replace whole cells inside the mirror, keeping the jagged perimeter on intact terrain.
-            boolean interior=true;
-            for(int dx=0;dx<=1;dx++)for(int dz=0;dz<=1;dz++)
-                interior&=WarpMath.inside(b.getX()+dx-c.at.x,b.getZ()+dz-c.at.z,c.held);
-            if(!interior)continue;
-            if(c.level.getBlockState(b).getDestroySpeed(c.level,b)>=0&&Nothingness.take(c.level,b,c.opened+WarpMath.OPEN_TICKS))c.replaced.add(b);
-        }
+        // The black surface and glass share a sub-block polygon on the client. Do not voxelize it
+        // into Nothingness cubes: their square tops protrude past the cracks and cannot match the rim.
+        // Ground collision stays intact until an entity's feet enter the authoritative polygon.
         WarpRealms.start(p.server.getLevel(c.destination.key),c.cell);
         HexData.get(p).putDouble("warpCell_"+c.destination.name(),c.cell);
         c.level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.RIFT_OPEN.get(),SoundSource.PLAYERS,1.25f,1.15f);
@@ -92,7 +84,7 @@ public final class Warping {
             Charge c=entry.getValue();if(c.level!=level)continue;
             long now=level.getGameTime();
             if(!WarpMath.openAt(c.opened,now)){
-                Nothingness.restoreDue(level,c.replaced);PORTALS.remove(entry.getKey());send(c,true);
+                PORTALS.remove(entry.getKey());send(c,true);
                 level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.RIFT_CLOSE.get(),SoundSource.PLAYERS,.8f,.7f);continue;
             }
             double r=WarpMath.width(c.held)*.5;
