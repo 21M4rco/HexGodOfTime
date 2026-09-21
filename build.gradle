@@ -91,6 +91,16 @@ tasks.register('verifyVoidSea', JavaExec) {
 }
 tasks.named('check') { dependsOn 'verifyVoidSea' }
 
+// The Void Sea's swell: that it never opens a hole in the water, runs one way, leaves the deep
+// calm, and stays cheap to resolve. No Minecraft world required; the ocean is a formula.
+tasks.register('verifyVoidSeaWaves', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.hexgodofstories.warping.VoidSeaWaveTest'
+    enableAssertions = true
+}
+tasks.named('check') { dependsOn 'verifyVoidSeaWaves' }
+
 // Exercise real movement history, late-tracking checkpoints, and 3D render orientation.
 tasks.register('verifyPilgrimMotion', JavaExec) {
     dependsOn testClasses

@@ -182,12 +182,29 @@ public final class HexClient {
             input.jumping=false;input.shiftKeyDown=false;
             e.getEntity().setSprinting(false);
         }
+        /**
+         * The Void Sea's swell, on the one player whose movement this client owns.
+         *
+         * <p>The server runs exactly the same call on exactly the same formula, from the realm's
+         * own tick, so the two agree without a packet: the server decides what the water is doing
+         * and the client cannot choose differently, while the local copy is what makes being
+         * carried feel like being carried rather than like being corrected.
+         */
+        @SubscribeEvent public static void voidSeaSwell(TickEvent.PlayerTickEvent e) {
+            if(e.phase!=TickEvent.Phase.START)return;
+            Minecraft mc=Minecraft.getInstance();
+            if(mc.level==null||e.player!=mc.player)return;
+            com.hexgodofstories.warping.VoidSeaWaves.apply(e.player,mc.level.getGameTime());
+        }
         @SubscribeEvent public static void hud(RenderGuiOverlayEvent.Post e) {
             if(e.getOverlay().id().equals(net.minecraftforge.client.gui.overlay.VanillaGuiOverlay.HOTBAR.id()))HexHud.render(e.getGuiGraphics());
         }
         @SubscribeEvent public static void world(RenderLevelStageEvent e) {
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES)WarpRenderer.renderRealm(e);
+            // Straight after the water itself, which is after every entity has been drawn: the
+            // swell can only ever blend over what is under it, never reveal it.
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS)VoidSeaWaveRenderer.render(e);
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES){WorldEffects.render(e);WarpRenderer.render(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL)TemporalScreen.render(e.getPartialTick());
         }

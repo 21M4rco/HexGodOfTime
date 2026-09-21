@@ -289,3 +289,90 @@ crossing the waterline or a head coming up under a boat all read at full strengt
 itself in the water returns full visibility and gets ordinary fog, light and line of sight. The
 cutout pass is kept while nothing is being dimmed, so a fully exposed creature draws exactly as it
 did before any of this existed; only a faded one switches to a blended pass.
+
+## 0.5.9 — a sea that moves
+
+Base: successful Actions run 35632793742, commit 5ac87716547bcbe3f9faa2c8fc07ffa4245c66d8.
+An addition to the Void Sea and nothing else. Hexor's model, textures, animations, AI, navigation,
+combat, naming, death message and the underwater concealment of 0.5.8 are all untouched; the only
+edits outside the three new files are three wiring lines and the sound table.
+
+### The field
+
+The ocean is a formula, not blocks. `VoidSeaWaves` answers "how far is the surface above the still
+waterline here, now" as a pure function of position and game time, so the server can ask what the
+water is doing under a swimmer and every client can ask what it looks like to the horizon, and the
+two agree with no packet between them. Game time is already synchronised; that is the whole of the
+shared state. Nothing ticks, nothing is stored, nothing is sent.
+
+Waves are not spawned. Each of four size classes bins the axis it travels along, and a hash of the
+bin index decides whether that bin carries a wave and what shape it has. A wave's amplitude,
+wavelength, crest profile and bend are therefore properties of its bin rather than of the moment it
+was asked about, so nothing can flicker or mutate while it runs; randomness only ever decides what
+exists and how far apart. Resolving every wave that can reach a 224 block patch returns at most
+sixteen of them, and a frame resolves them once and then reads them thousands of times.
+
+One heading for the realm, and every class runs along it. Crests bend — a wavefront that is a ruler
+reads as a wall rather than as water — but the bend is a shape across the front, not a change of
+course, so nothing crosses anything. The classes travel at different speeds, bigger faster, which
+is both how real water disperses and what stops the composite ever repeating. The crest profile is
+steep on the face it is running into and long behind, with a smaller crest following, so a swell
+rises, breaks over and draws out rather than passing as a hill.
+
+At one point in the sea that produces roughly sixty crests over seven minutes: median height under
+two blocks, the largest over seven, gaps from one second to thirty-five.
+
+### What it does to people
+
+Reading the field and its rate of change under a swimmer gives a flow along the heading and a rise
+and fall, and the swimmer's own motion is drawn toward both a fraction at a time. It is momentum,
+not a shove — no damage, no knockback, no events. Set against Minecraft's water drag it comes out
+at about a third of swim speed under the standing chop, twice swim speed under an ordinary wave
+where holding a position stops being possible, and near four times it under one of the big swells.
+
+Waves are felt less with depth, per wave, at that wave's own scale: about a third of the surface at
+fifteen blocks down, a twentieth at forty, nothing by eighty. The surface is the dangerous place
+and the deep is calm, which is the half of this the hunter lives in.
+
+**Hexor is exempt, and exempt by construction.** The apply method's first line returns for anything
+that is not a player. That is the whole of it — a guard rather than a test against the creature's
+class, so there is no list it could be added back to and no future edit that quietly puts it on
+one. It swims a sea that, as far as its own movement is concerned, is still flat. Nothing about it
+was buffed; everything it gains, it gains because the water has hold of the person it is hunting.
+
+### Drawing it
+
+A heightfield around the camera, rebuilt each frame at five block samples out to the render
+distance, laid over the water the realm already has. No block is moved and no chunk is remeshed.
+The formula takes a fractional tick, so the motion is as smooth as the frame rate however rarely
+anything on the server runs. The mesh tapers to nothing at its rim and meets the flat water beyond
+it; it fades out in the few blocks nearest the camera, so swimming through a crest does not fill
+the screen.
+
+### Why the waves cannot uncover the creature
+
+Three reasons, each sufficient alone.
+
+**The surface only ever rises.** Every term of the field is non-negative, so the drawn surface sits
+at or above the still waterline everywhere, always. A trough is the absence of a crest, never a dip
+below the water that is already there. There is no geometry anywhere in this that can thin the
+column between the sky and what is under it — waves put water in front of the hunter and can never
+take any away. `VoidSeaWaveTest` fails the build if that ever stops being true.
+
+**It draws after the entities do.** `AFTER_TRANSLUCENT_BLOCKS` comes after everything alive is
+already on the screen, so the surface blends over the creature and never under it. All a crest
+passing overhead can do to a submerged body is hide more of it.
+
+**It has no say in the matter regardless.** Concealment is decided in `LeviathanWaterVeil` from the
+still waterline and the camera. The wave height is not an input to it, and neither the field nor
+the renderer is on its path, so a swell towering over a swimmer and a dead calm hand that code
+exactly the same numbers. Nothing in 0.5.8 was modified, bypassed or re-entered.
+
+### Voice
+
+Everything Hexor made a noise with is now the water reacting to it — jaws, tendrils, the tail, the
+charge, the breach, the scream, being struck. Only the roar is still its own, and it is the
+supplied clip. Both places that can call for it, the scheduled ambient and the moment it tips into
+frenzy, go through one gate that refuses while the clip is already sounding and counts the next
+silence from the end of it, so the one voice it has can never become two. Call sites, volumes and
+ranges in the Java are unchanged; only what comes out of the speaker is different.

@@ -1,0 +1,177 @@
+package com.hexgodofstories.client;
+
+import com.hexgodofstories.warping.Destination;
+import com.hexgodofstories.warping.VoidSea;
+import com.hexgodofstories.warping.VoidSeaWaves;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.client.event.RenderLevelStageEvent;
+import org.joml.Matrix3f;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
+
+/**
+ * Draws the Void Sea's swell.
+ *
+ * <p>A heightfield around the camera, rebuilt every frame from {@link VoidSeaWaves} and laid over
+ * the water the realm already has. No block is moved and no chunk is remeshed: the ocean is a
+ * formula and this is a picture of it, sampled at a few thousand points and interpolated between
+ * them. The formula takes a fractional tick, so the motion is as smooth as the frame rate however
+ * rarely anything on the server runs.
+ *
+ * <p><b>Why this cannot uncover the creature.</b> Three reasons, each sufficient alone.
+ *
+ * <p>The surface only ever rises. Every term of the wave field is non-negative by construction, so
+ * this mesh sits at or above the still waterline everywhere, always. A trough here is the absence
+ * of a crest and never a dip below the water that is already there, so nothing in this system can
+ * thin the column between the sky and what is under it. Waves put water in front of the hunter;
+ * they can never take any away.
+ *
+ * <p>It draws after the entities do. The stage it runs in comes after everything alive is already
+ * on the screen, so this surface blends over the creature and never under it. All a crest passing
+ * overhead can do to a submerged body is hide more of it.
+ *
+ * <p>And it has no say in the matter regardless. Concealment is decided in {@code
+ * LeviathanWaterVeil}, from the still waterline and the camera — neither of which this touches.
+ * The wave height is not an input to it and this class is not on its path, so a swell towering
+ * over a swimmer and a dead calm hand that code exactly the same numbers.
+ */
+public final class VoidSeaWaveRenderer {
+    private VoidSeaWaveRenderer() { }
+
+    /** Blocks between grid samples. Close enough that a crest reads as curved, not as a staircase. */
+    private static final int CELL = 5;
+    /** Where the vanilla fluid surface of a full water block actually sits inside its block. */
+    private static final double WATER_TOP = 0.8888889;
+    /** Clear of that surface even at dead calm, so the two never argue over the same depth. */
+    private static final double LIFT = 0.06;
+    private static final float ALPHA = 0.38f;
+    /** Blocks over which the mesh settles back onto the flat water at its outer edge. */
+    private static final double SKIRT = 52.0;
+    /** The camera is inside the water it is drawing, so the first few blocks of it are faded out. */
+    private static final double NEAR_IN = 2.0, NEAR_OUT = 7.0;
+    /** Beyond this much height difference the sea is not usefully on screen. */
+    private static final double RANGE_Y = 420.0;
+
+    private static float[] field = new float[0];
+    private static int span = -1;
+
+    // Resolved once a frame and read by every vertex. Rendering is single threaded.
+    private static double camX, camY, camZ, originX, originZ, waterline;
+    private static int points, radius, light;
+    private static float tintR, tintG, tintB;
+
+    public static void render(RenderLevelStageEvent event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || Destination.from(mc.level) != Destination.VOID_SEA) return;
+
+        Vec3 camera = event.getCamera().getPosition();
+        waterline = VoidSea.SURFACE + WATER_TOP;
+        if (Math.abs(camera.y - waterline) > RANGE_Y) return;
+        camX = camera.x; camY = camera.y; camZ = camera.z;
+
+        radius = Mth.clamp(mc.options.getEffectiveRenderDistance() * 16, 96, 224);
+        int cells = (2 * radius) / CELL;
+        points = cells + 1;
+        if (span != points) { span = points; field = new float[points * points]; }
+
+        // Snapped to the cell grid, so vertices hold still in the world as the camera moves through
+        // them rather than swimming along with it.
+        originX = Math.floor(camX / CELL) * CELL - radius;
+        originZ = Math.floor(camZ / CELL) * CELL - radius;
+        double time = mc.level.getGameTime() + event.getPartialTick();
+
+        // The dozen or so waves that can reach this patch, resolved once for the whole frame rather
+        // than re-derived at each of several thousand grid points.
+        VoidSeaWaves.Wave[] waves = VoidSeaWaves.collect(camX, camZ, radius + CELL * 2.0, time);
+        for (int i = 0; i < points; i++) {
+            double x = originX + i * CELL;
+            for (int j = 0; j < points; j++) {
+                double z = originZ + j * CELL;
+                // Tapered to nothing at the rim, so the mesh meets the flat water it sits on
+                // instead of ending in a wall.
+                field[i * points + j] =
+                    (float) ((LIFT + VoidSeaWaves.height(x, z, 0, time, waves)) * skirt(x, z));
+            }
+        }
+
+        light = LevelRenderer.getLightColor(mc.level, BlockPos.containing(camX, VoidSea.SURFACE + 1, camZ));
+        int tint = mc.level.getBiome(BlockPos.containing(camX, VoidSea.SURFACE, camZ)).value().getWaterColor();
+        tintR = (tint >> 16 & 0xFF) / 255f; tintG = (tint >> 8 & 0xFF) / 255f; tintB = (tint & 0xFF) / 255f;
+        Vector3f look = event.getCamera().getLookVector();
+
+        PoseStack pose = event.getPoseStack();
+        pose.pushPose();
+        pose.translate(-camX, -camY, -camZ);
+        Matrix4f matrix = pose.last().pose();
+        Matrix3f normal = pose.last().normal();
+        var buffers = mc.renderBuffers().bufferSource();
+        // Blended, unculled, and drawn after the entity pass: over the creature, never under it.
+        RenderType type = RenderType.entityTranslucent(WorldEffects.WHITE);
+        VertexConsumer buffer = buffers.getBuffer(type);
+
+        for (int i = 0; i < cells; i++) {
+            for (int j = 0; j < cells; j++) {
+                double dx = originX + (i + 0.5) * CELL - camX, dz = originZ + (j + 0.5) * CELL - camZ;
+                double flat = dx * dx + dz * dz;
+                if (flat > radius * (double) radius) continue;
+                // Only cells squarely behind the viewer are dropped, well outside any field of view
+                // the game offers, so nothing can pop in at the edge of the screen.
+                if (flat > 24 * 24 && (dx * look.x() + dz * look.z()) / Math.sqrt(flat) < -0.5) continue;
+                corner(buffer, matrix, normal, i, j);
+                corner(buffer, matrix, normal, i, j + 1);
+                corner(buffer, matrix, normal, i + 1, j + 1);
+                corner(buffer, matrix, normal, i + 1, j);
+            }
+        }
+        pose.popPose();
+        buffers.endBatch(type);
+    }
+
+    /** One at the heart of the patch, easing to nothing over the last stretch before the rim. */
+    private static double skirt(double x, double z) {
+        double reach = Math.sqrt(sqr(x - camX) + sqr(z - camZ));
+        return Mth.clamp((radius - reach) / SKIRT, 0, 1);
+    }
+
+    private static void corner(VertexConsumer buffer, Matrix4f matrix, Matrix3f normals, int i, int j) {
+        float height = field[i * points + j];
+        double x = originX + i * CELL, z = originZ + j * CELL, y = waterline + height;
+
+        // Slope taken from the samples either side. Flat water is lit plainly and the faces of a
+        // swell catch the light, which is what makes the shape legible from a distance.
+        float dx = (sample(i + 1, j) - sample(i - 1, j)) / (2f * CELL);
+        float dz = (sample(i, j + 1) - sample(i, j - 1)) / (2f * CELL);
+        float inverse = (float) (1.0 / Math.sqrt(dx * dx + dz * dz + 1.0));
+        float nx = -dx * inverse, ny = inverse, nz = -dz * inverse;
+        float shade = 0.62f + 0.38f * ny + Math.min(0.22f, height * 0.035f);
+
+        double distance = Math.sqrt(sqr(x - camX) + sqr(y - camY) + sqr(z - camZ));
+        float near = (float) Mth.clamp((distance - NEAR_IN) / (NEAR_OUT - NEAR_IN), 0, 1);
+        // Crests sit a little more solidly than the water between them, which reads as the light
+        // catching a face rather than as the sheet changing opacity.
+        float body = 0.82f + 0.18f * Mth.clamp(height / 3f, 0f, 1f);
+        float alpha = ALPHA * near * body * (float) skirt(x, z);
+
+        buffer.vertex(matrix, (float) (x - camX), (float) (y - camY), (float) (z - camZ))
+            .color(tintR * shade, tintG * shade, tintB * shade, alpha)
+            .uv(0.5f, 0.5f)
+            .overlayCoords(OverlayTexture.NO_OVERLAY)
+            .uv2(light)
+            .normal(normals, nx, ny, nz)
+            .endVertex();
+    }
+
+    private static float sample(int i, int j) {
+        return field[Mth.clamp(i, 0, points - 1) * points + Mth.clamp(j, 0, points - 1)];
+    }
+
+    private static double sqr(double v) { return v * v; }
+}

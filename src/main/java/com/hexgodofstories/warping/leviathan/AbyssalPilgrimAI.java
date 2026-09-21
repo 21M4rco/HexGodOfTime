@@ -329,7 +329,7 @@ public final class AbyssalPilgrimAI {
         // this long cannot turn onto a point it is already almost on top of, and trying reads as a
         // lap around them.
         self.control().moveTo(hunt.approachPoint(1.0), 2.1, 0.7f);
-        if (stateTicks == 1) self.voice(HexGodOfStories.PILGRIM_ROAR.get(), 112f, 0.8f);
+        if (stateTicks == 1) roar(HexGodOfStories.PILGRIM_ROAR.get(), 112f, 0.8f, 900 + random.nextInt(1400));
         if (!combat.ready()) return;
         LeviathanAttack pick = pickAttack(random, target, hunt.targetDistance(), true);
         if (pick != null) commit(pick, target);
@@ -476,13 +476,29 @@ public final class AbyssalPilgrimAI {
         if (--callTimer > 0) return;
         RandomSource random = self.getRandom();
         boolean far = !hunt.hasTarget() || hunt.targetDistance() > 260;
-        self.voice(HexGodOfStories.HEXOR_AMBIENT.get(),
-            far ? 150f : state.hidden() ? 72f : 100f,
-            (far ? 0.58f : 0.74f) + random.nextFloat() * 0.16f);
-        callPlaying = HexGodOfStories.HEXOR_AMBIENT_TICKS;
         // Counted from the moment the clip finishes rather than from the moment it starts, so the
         // silence is the number written here and not that number minus seven seconds.
-        callTimer = (far ? 1500 : 1100) + random.nextInt(far ? 2100 : 1700);
+        roar(HexGodOfStories.HEXOR_AMBIENT.get(),
+            far ? 150f : state.hidden() ? 72f : 100f,
+            (far ? 0.58f : 0.74f) + random.nextFloat() * 0.16f,
+            (far ? 1500 : 1100) + random.nextInt(far ? 2100 : 1700));
+    }
+
+    /**
+     * Sounds the one voice the creature has, unless that voice is already sounding.
+     *
+     * <p>Everything else Hexor used to make a noise with is now the water reacting to it, so this
+     * is the only thing it says and there are two places that can ask for it: the scheduled call,
+     * and the moment it tips into frenzy. Both come through here, because seven seconds of roar
+     * started on top of seven seconds of roar is two creatures rather than one, and the gap the
+     * caller hands over is then counted from the end of the clip rather than the start of it.
+     */
+    private boolean roar(net.minecraft.sounds.SoundEvent voice, float volume, float pitch, int gap) {
+        if (callPlaying > 0) return false;
+        self.voice(voice, volume, pitch);
+        callPlaying = HexGodOfStories.HEXOR_AMBIENT_TICKS;
+        callTimer = gap;
+        return true;
     }
 
     public void noteKill() {

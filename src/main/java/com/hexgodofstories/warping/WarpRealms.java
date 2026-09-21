@@ -73,7 +73,10 @@ public final class WarpRealms {
             if(!j.blocks.hasNext()){ledger(l).ready.add((long)j.cell);ledger(l).setDirty();populate(l,d,j.cell);it.remove();}
         }
         long now=l.getGameTime();
-        if(d==Destination.VOID_SEA)com.hexgodofstories.warping.leviathan.PilgrimWarden.tick(l,now);
+        if(d==Destination.VOID_SEA){com.hexgodofstories.warping.leviathan.PilgrimWarden.tick(l,now);
+            // The swell, applied to the players in it and to nothing else. No block is touched
+            // and nothing is scanned: a handful of evaluations of a formula, per player, per tick.
+            VoidSeaWaves.tick(l,now);}
         List<Entity> active=new ArrayList<>();l.getAllEntities().forEach(active::add);
         for(Entity e:active){
             if(!e.isAlive()||e.isSpectator()||(d!=Destination.GRAVITY_WELL&&(e instanceof WarpHazard||e instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity)))continue;
