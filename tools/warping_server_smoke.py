@@ -26,6 +26,7 @@ threading.Thread(target=read_output, daemon=True).start()
 end = time.monotonic() + 240
 ready = False
 regressions = False
+pilgrim = False
 with open('warping-server-smoke.log', 'w') as log:
     try:
         while time.monotonic() < end and proc.poll() is None:
@@ -40,7 +41,9 @@ with open('warping-server-smoke.log', 'w') as log:
                 ready = True
             if 'WARPING_SERVER_REGRESSIONS_PASSED' in line:
                 regressions = True
-            if ready and regressions:
+            if 'PILGRIM_SERVER_REGRESSIONS_PASSED' in line:
+                pilgrim = True
+            if ready and regressions and pilgrim:
                 break
     finally:
         if proc.poll() is None:
@@ -50,6 +53,6 @@ with open('warping-server-smoke.log', 'w') as log:
             except subprocess.TimeoutExpired:
                 os.killpg(proc.pid, signal.SIGKILL)
                 proc.wait()
-if not ready or not regressions:
+if not ready or not regressions or not pilgrim:
     sys.exit('Dedicated server startup or Warping regression checks failed; see warping-server-smoke.log')
 print('Dedicated-server startup, datapack load, solar damage and kill regression checks passed.')

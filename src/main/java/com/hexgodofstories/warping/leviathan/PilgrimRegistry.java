@@ -25,7 +25,7 @@ public final class PilgrimRegistry extends SavedData {
 
     @Nullable private UUID pilgrim;
     /** Consecutive lookups that failed while the claimed chunk was being held. Not persisted. */
-    private transient int misses;
+    private transient long missingSince = -1;
     private int lastChunkX, lastChunkZ;
     private boolean located;
 
@@ -61,6 +61,8 @@ public final class PilgrimRegistry extends SavedData {
 
     public void claim(UUID id, ChunkPos at) {
         this.pilgrim = id;
+        missingSince = -1;
+        setDirty();
         remember(at);
     }
 
@@ -72,13 +74,16 @@ public final class PilgrimRegistry extends SavedData {
 
     @Nullable public ChunkPos lastSeen() { return located ? new ChunkPos(lastChunkX, lastChunkZ) : null; }
 
-    public void found() { misses = 0; }
+    public void found() { missingSince = -1; }
 
     /**
      * A claim on a creature that never loads would leave the realm empty forever, so the claim is
      * only trusted for as long as it takes a held chunk to bring it back.
      */
-    public boolean stale() { return ++misses > 12; }
+    public boolean stale(long now) {
+        if (missingSince < 0) missingSince = now;
+        return now - missingSince >= 200;
+    }
 
     /** Only ever called when the claimed creature is gone for good. */
     public void release() {

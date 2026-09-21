@@ -42,6 +42,7 @@ public final class AbyssalPilgrimAI {
     private long lastKill;
     private int followUp = -1;
     private int alertCooldown;
+    private int waterPursuit;
 
     public AbyssalPilgrimAI(AbyssalPilgrimEntity self) {
         this.self = self;
@@ -57,8 +58,9 @@ public final class AbyssalPilgrimAI {
      * deliberately imperfect long range knowledge: it gets an exact position and commits.
      */
     public void alert(Entity prey) {
-        if (alertCooldown > 0 || prey == null || !prey.isAlive()) return;
+        if (prey == null || !prey.isAlive() || prey.level() != self.level()) return;
         alertCooldown = 80;
+        waterPursuit = 240;
         hunt.focus(prey);
         hunt.sharpen(prey);
         frenzy = Math.min(1f, frenzy + 0.10f);
@@ -92,7 +94,11 @@ public final class AbyssalPilgrimAI {
         if (followUp >= 0) { LeviathanAttack next = LeviathanAttack.byId(followUp); followUp = -1; if (combat.ready()) { combat.begin(next, hunt.target()); return; } }
 
         stateTicks++;
-        if (stateTicks >= stateLimit) chooseState(random);
+        if (waterPursuit > 0 && hunt.hasTarget()) {
+            waterPursuit--;
+            hunt.sharpen(hunt.target());
+            if (state != LeviathanState.HUNT) setState(LeviathanState.HUNT);
+        } else if (stateTicks >= stateLimit) chooseState(random);
 
         switch (state) {
             case SEARCH -> search(level);

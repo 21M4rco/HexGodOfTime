@@ -79,6 +79,9 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
         this.setPersistenceRequired();
         this.moveControl = new LeviathanMoveControl(this);
         this.navigation = new LeviathanNavigation(this, level);
+        this.lookControl = new net.minecraft.world.entity.ai.control.LookControl(this) {
+            @Override public void tick() { /* 3D pitch is owned by LeviathanMoveControl. */ }
+        };
         this.parts = buildParts();
         if (!level.isClientSide) this.ai = new AbyssalPilgrimAI(this);
     }

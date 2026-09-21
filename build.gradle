@@ -4,7 +4,7 @@ plugins {
     id 'org.spongepowered.mixin' version '0.7.+'
 }
 group = 'com.hexgodofstories'
-version = '0.5.4-abyssal-pilgrim'
+version = '0.5.5-abyssal-hunt'
 base { archivesName = 'hexgodofstories' }
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 java.withSourcesJar()

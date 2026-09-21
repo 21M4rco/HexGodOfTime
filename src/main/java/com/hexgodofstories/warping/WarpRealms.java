@@ -44,7 +44,10 @@ public final class WarpRealms {
         if(e instanceof ServerPlayer p){
             if(Destination.from(old)==null)HexData.get(p).put("warpReturn",new FractureAnchor(old.dimension(),p.position(),p.getYRot(),p.getXRot()).save());
             p.stopRiding();p.teleportTo(to,pos.x,pos.y,pos.z,p.getYRot(),p.getXRot());
-            if(owner){com.hexgodofstories.server.CosmicFlight.tick(p);p.getAbilities().flying=true;p.onUpdateAbilities();}
+            if(d==Destination.VOID_SEA){
+                com.hexgodofstories.server.CosmicFlight.tick(p);
+                if(!p.isCreative()&&!p.isSpectator()){p.getAbilities().flying=false;p.onUpdateAbilities();}
+            }else if(owner){com.hexgodofstories.server.CosmicFlight.tick(p);p.getAbilities().flying=true;p.onUpdateAbilities();}
         }else{
             e.stopRiding();e.changeDimension(to,new ITeleporter(){public Entity placeEntity(Entity entity,ServerLevel current,ServerLevel dest,float yaw,java.util.function.Function<Boolean,Entity> reposition){Entity moved=reposition.apply(false);if(moved!=null){moved.moveTo(pos.x,pos.y,pos.z,yaw,0);moved.setDeltaMovement(0,-.3,0);moved.fallDistance=0;}return moved;}});
         }

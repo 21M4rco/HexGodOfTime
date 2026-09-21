@@ -1,7 +1,7 @@
 name: Warping dedicated server smoke
 on:
   push:
-    branches: [codex/warping]
+    branches: [codex/warping, claude/eager-cerf-ujhdbd]
   workflow_dispatch:
 concurrency:
   group: warping-smoke-${{ github.ref }}

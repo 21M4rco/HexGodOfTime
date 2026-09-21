@@ -64,7 +64,7 @@ public final class PilgrimWarden {
 
     /** Holds one chunk in an entity ticking state for the lifetime of the ticket. */
     public static void hold(ServerLevel level, ChunkPos pos) {
-        level.getChunkSource().addRegionTicket(HUNT, pos, 2, pos);
+        level.getChunkSource().addRegionTicket(HUNT, pos, 2, pos, true);
     }
 
     // ------------------------------------------------------------------ the one occupant
@@ -79,7 +79,7 @@ public final class PilgrimWarden {
 
         // Common path: a UUID lookup, no world sweep.
         if (registry.claimed()) {
-            if (level.getEntity(registry.pilgrim()) instanceof AbyssalPilgrimEntity owner && owner.isAlive() && !owner.isDying()) {
+            if (level.getEntity(registry.pilgrim()) instanceof AbyssalPilgrimEntity owner && owner.isAlive()) {
                 registry.found();
                 ChunkPos at = new ChunkPos(owner.blockPosition());
                 registry.remember(at);
@@ -87,7 +87,7 @@ public final class PilgrimWarden {
                 return owner;
             }
             ChunkPos last = registry.lastSeen();
-            if (last != null && !registry.stale()) {
+            if (last != null && !registry.stale(level.getGameTime())) {
                 // It exists, it is only unloaded. Pull its chunk back rather than spawn a rival.
                 hold(level, last);
                 return null;
@@ -97,7 +97,7 @@ public final class PilgrimWarden {
         }
 
         // Rare path: adopt whatever is actually in the realm, and remove every rival.
-        List<AbyssalPilgrimEntity> loaded = level.getEntitiesOfClass(AbyssalPilgrimEntity.class, EVERYWHERE, e -> e.isAlive() && !e.isDying());
+        List<AbyssalPilgrimEntity> loaded = level.getEntitiesOfClass(AbyssalPilgrimEntity.class, EVERYWHERE, e -> e.isAlive());
         if (!loaded.isEmpty()) {
             AbyssalPilgrimEntity keep = loaded.get(0);
             for (int i = 1; i < loaded.size(); i++) loaded.get(i).discard();
@@ -105,7 +105,11 @@ public final class PilgrimWarden {
             registry.found();
             return keep;
         }
-        return spawn(level, null);
+        Vec3 anchor = null;
+        for (ServerPlayer player : level.players()) {
+            if (!player.isSpectator() && !player.isCreative()) { anchor = player.position(); break; }
+        }
+        return spawn(level, anchor);
     }
 
     /** Creates the realm's occupant. Refuses if one is already claimed and reachable. */
@@ -119,16 +123,19 @@ public final class PilgrimWarden {
         double angle = random.nextDouble() * Mth.TWO_PI;
         // Close enough to sit inside a normal simulation distance on arrival, so the hunt begins at
         // once. Depth costs nothing here, because chunk ticking is horizontal.
-        double radius = 80 + random.nextDouble() * 70;
+        double radius = 65 + random.nextDouble() * 25;
         double x = anchor.x + Math.cos(angle) * radius;
         double z = anchor.z + Math.sin(angle) * radius;
-        double y = Mth.clamp(anchor.y - 110 - random.nextDouble() * 160, VoidSea.FLOOR + 40, VoidSea.SURFACE - 45);
+        double y = Mth.clamp(Math.min(anchor.y, VoidSea.SURFACE) - 35 - random.nextDouble() * 20, VoidSea.FLOOR + 40, VoidSea.SURFACE - 25);
 
+        ChunkPos spawnChunk = new ChunkPos(BlockPos.containing(x, y, z));
+        hold(level, spawnChunk);
+        level.getChunk(spawnChunk.x, spawnChunk.z);
         AbyssalPilgrimEntity pilgrim = HexGodOfStories.PILGRIM.get().create(level);
         if (pilgrim == null) return null;
         pilgrim.moveTo(x, y, z, random.nextFloat() * 360f, 0f);
         pilgrim.finalizeSpawn(level, level.getCurrentDifficultyAt(BlockPos.containing(x, y, z)), MobSpawnType.STRUCTURE, null, null);
-        level.addFreshEntity(pilgrim);
+        if (!level.addFreshEntity(pilgrim)) return null;
         ChunkPos at = new ChunkPos(pilgrim.blockPosition());
         registry.claim(pilgrim.getUUID(), at);
         hold(level, at);
@@ -140,23 +147,18 @@ public final class PilgrimWarden {
     /** Cheap upkeep. Most ticks do nothing at all. */
     public static void tick(ServerLevel level, long now) {
         List<ServerPlayer> players = level.players();
-        if (players.isEmpty()) {
-            boolean prey = false;
-            for (net.minecraft.world.entity.Entity entity : level.getAllEntities()) {
-                if (!(entity instanceof AbyssalPilgrimEntity) && entity.isAlive()
-                        && (entity instanceof LivingEntity || entity instanceof net.minecraft.world.entity.vehicle.Boat)) {
-                    prey = true;
-                    break;
-                }
-            }
-            if (!prey) return;
-        }
 
         if (now % 20 == 0) {
             ChunkPos last = PilgrimRegistry.of(level).lastSeen();
             if (last != null) hold(level, last);
         }
-        if (now % 40 == 0) ensure(level);
+        if (now % 40 == 0) {
+            AbyssalPilgrimEntity owner = ensure(level);
+            if (owner != null) {
+                for (net.minecraft.world.entity.Entity entity : level.getAllEntities())
+                    if (entity instanceof AbyssalPilgrimEntity rival && rival != owner) rival.discard();
+            }
+        }
         if (now % 10 == 0) detectEntries(level, players, now % 200 == 0);
         if (now % 200 == 0 && !players.isEmpty()) reposition(level, players);
     }
@@ -169,37 +171,21 @@ public final class PilgrimWarden {
      * scenery. A dry to wet transition now reaches the creature with an exact position attached.
      */
     private static void detectEntries(ServerLevel level, List<ServerPlayer> players, boolean sweep) {
-        Set<UUID> seen = new HashSet<>();
-        for (ServerPlayer player : players) {
-            if (player.isSpectator() || player.isCreative()) continue;
-            seen.add(player.getUUID());
-            check(level, player, sweep);
-            // Anything that came in with them counts too: mobs, summons, anything thrown in.
-            for (LivingEntity other : level.getEntitiesOfClass(LivingEntity.class, player.getBoundingBox().inflate(96),
-                    e -> e.isAlive() && !(e instanceof AbyssalPilgrimEntity) && !(e instanceof Player))) {
-                seen.add(other.getUUID());
-                check(level, other, sweep);
-            }
-        }
-        WET.retainAll(seen);
-    }
-
-    /**
-     * Leaving the water is not an escape, so being above it counts as being in the realm. A flyer
-     * within reach of a breach is hunted exactly like a swimmer; the periodic sweep re-flags anyone
-     * hovering out there who is not currently being hunted.
-     */
-    private static void check(ServerLevel level, LivingEntity entity, boolean sweep) {
-        boolean wet = entity.isInWater() || entity.getY() <= VoidSea.SURFACE;
-        boolean aloft = !wet && entity.getY() <= VoidSea.SURFACE + 160;
-        UUID id = entity.getUUID();
-        if (!wet && !aloft) { WET.remove(id); return; }
-        boolean entered = WET.add(id);
-        if (!entered && !sweep) return;
+        Set<UUID> wetNow = new HashSet<>();
         AbyssalPilgrimEntity pilgrim = ensure(level);
-        if (pilgrim == null || pilgrim.ai() == null) return;
-        if (!entered && pilgrim.ai().hunt().target() == entity) return;   // already on them
-        pilgrim.ai().alert(entity);
+        if (pilgrim == null || pilgrim.ai() == null || pilgrim.isDying()) return;
+        net.minecraft.world.entity.Entity entrant = null;
+        for (net.minecraft.world.entity.Entity entity : level.getAllEntities()) {
+            if (!(entity instanceof LivingEntity) || entity instanceof AbyssalPilgrimEntity
+                    || !entity.isAlive() || entity.isSpectator()
+                    || entity instanceof Player p && p.isCreative()) continue;
+            // Airborne presence is handled by global hunting. WET must only track actual water.
+            if (!entity.isInWater()) continue;
+            wetNow.add(entity.getUUID());
+            if (!WET.contains(entity.getUUID()) && (entrant == null || entity instanceof Player)) entrant = entity;
+        }
+        if (entrant != null) pilgrim.ai().alert(entrant);
+        WET.clear(); WET.addAll(wetNow);
     }
 
     /**
@@ -232,7 +218,7 @@ public final class PilgrimWarden {
         PilgrimRegistry registry = PilgrimRegistry.of(level);
         if (!registry.claimed()) registry.claim(pilgrim.getUUID(), new ChunkPos(pilgrim.blockPosition()));
         else if (!registry.owns(pilgrim.getUUID())) { pilgrim.discard(); return; }
-        if (level.players().isEmpty()) return;
+
         ChunkPos pos = new ChunkPos(pilgrim.blockPosition());
         registry.remember(pos);
         hold(level, pos);
