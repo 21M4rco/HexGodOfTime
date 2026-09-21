@@ -21,14 +21,33 @@ The Void Sea was 135 blocks of water, which is less than the creature is long. I
 | water column | 135 | **935** |
 | clear sky above the waterline | ~245 | 262 |
 | waterline | y 135 | y 249 |
+| floor | bedrock | **Nothingness** (unmineable, no item form) |
 
 `VoidSea.java` holds these as constants and `VoidSeaShapeTest` fails the build if the constants and
 the shipped dimension JSON ever disagree. Arrival height and the sovereign's out-of-world rescue
 were both keyed to the old floor of y=0 and have been corrected.
 
-Warping partitions each realm into 1024-block cells along X, one per opened portal. The Pilgrim is
-bound to its own cell, so two parties warping at once never share a hunter and never meet a
-neighbour's.
+## One, always, forever
+
+There is a single Abyssal Pilgrim. Not one per player, not one per Warping cell — one, for the
+realm. The whole sea is its territory and it crosses cells freely, so two parties in the Void Sea
+at once share the same god rather than each getting a copy. If it is busy with someone else, you
+are safe for a while, and when it arrives it is *the* one.
+
+Three things make that literally true rather than approximately true:
+
+- **Never multiple.** Its identity is persisted to the save file (`PilgrimRegistry`, a `SavedData`
+  on the Void Sea), so the claim survives a restart — an in-memory record would come back empty,
+  and an empty record is indistinguishable from "no creature exists", which is how duplicates get
+  born. Any leviathan in the realm that is not the claimed one is removed on sight.
+- **Never despawns.** Persistence-required, despawn rules overridden to no-ops, and `hurt()` always
+  refuses — so `/kill` does not touch it either. The only removal is the operator death sequence,
+  and even that is temporary: once the claim goes stale the realm raises another.
+- **Always present.** A creature that hunts from beyond sight spends most of its life outside
+  simulation distance, where Minecraft does not tick entities at all. It holds a chunk ticket on
+  itself and renews it as it moves. When a lookup finds nothing, the realm pulls its last known
+  chunk back in rather than concluding it is gone — and only gives up on the claim after the held
+  chunk has had time to deliver it.
 
 ## Structure
 

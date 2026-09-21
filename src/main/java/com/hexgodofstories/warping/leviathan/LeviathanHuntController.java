@@ -1,6 +1,5 @@
 package com.hexgodofstories.warping.leviathan;
 
-import com.hexgodofstories.warping.VoidSea;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -148,7 +147,7 @@ public final class LeviathanHuntController {
 
     private Vec3 clampToWater(Vec3 point) {
         double y = Mth.clamp(point.y, floor() + 8, waterline() - 4);
-        return new Vec3(VoidSea.clampX(self.cell(), point.x), y, VoidSea.clampZ(point.z));
+        return new Vec3(point.x, y, point.z);
     }
 
     /** Held below and behind, on a slow orbit, at a depth that keeps the body invisible. */
@@ -190,8 +189,7 @@ public final class LeviathanHuntController {
         Vec3 anchor = estimate;
         double radius = 90 + self.getRandom().nextDouble() * 70;
         double angle = self.getRandom().nextDouble() * Mth.TWO_PI;
-        return new Vec3(VoidSea.clampX(self.cell(), anchor.x + Math.cos(angle) * radius), waterline() - 2.5,
-            VoidSea.clampZ(anchor.z + Math.sin(angle) * radius));
+        return new Vec3(anchor.x + Math.cos(angle) * radius, waterline() - 2.5, anchor.z + Math.sin(angle) * radius);
     }
 
     /** Wide, aimless sweeps when nothing is being hunted. */

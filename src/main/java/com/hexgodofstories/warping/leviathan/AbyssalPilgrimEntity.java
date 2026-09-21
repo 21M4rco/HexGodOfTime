@@ -71,8 +71,6 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
     private int terrainClock;
     /** Client side, used to fade ambience and decide appendage detail. */
     private double viewerDistance = 1024;
-    /** The Warping cell this creature owns. It never leaves it, so two portals never share a hunter. */
-    private double cell = Double.NaN;
 
     public AbyssalPilgrimEntity(EntityType<? extends AbyssalPilgrimEntity> type, Level level) {
         super(type, level);
@@ -160,8 +158,6 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
     public float bank(float partial) { return Mth.lerp(partial, prevBank, bank); }
     public double viewerDistance() { return viewerDistance; }
     public void setViewerDistance(double distance) { this.viewerDistance = distance; }
-    public double cell() { return Double.isNaN(cell) ? com.hexgodofstories.warping.WarpMath.cellX(getX()) : cell; }
-    public void setCell(double cell) { this.cell = cell; }
 
     // ------------------------------------------------------------------ world queries
 
@@ -235,11 +231,10 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
             if (isDying()) tickDeathSequence();
             Vec3 motion = getDeltaMovement();
             if (motion.lengthSqr() > 1.0E-8) {
-                // Stay inside this portal's cell, off the floor, and under the ceiling a breach needs.
-                double nx = VoidSea.clampX(cell(), getX() + motion.x);
-                double nz = VoidSea.clampZ(getZ() + motion.z);
+                // Nothing bounds it horizontally; the whole sea is its territory. Only the floor
+                // and the ceiling a full breach needs are enforced.
                 double ny = Mth.clamp(getY() + motion.y, cachedFloor + 3.5, Math.min(cachedSurface + 190, VoidSea.MAX_Y - 12));
-                setPos(nx, ny, nz);
+                setPos(getX() + motion.x, ny, getZ() + motion.z);
             }
             setYHeadRot(getYRot());
             if (tickCount % 2 == 0) bodyContact();
@@ -346,7 +341,6 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
         tag.putByte("PilgrimState", (byte) state().ordinal());
         tag.putFloat("PilgrimFrenzy", frenzy());
         tag.putInt("PilgrimDying", dying());
-        if (!Double.isNaN(cell)) tag.putDouble("PilgrimCell", cell);
         if (ai != null) ai.save(tag);
     }
 
@@ -356,7 +350,6 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
         setState(LeviathanState.byId(tag.getByte("PilgrimState")));
         setFrenzy(tag.getFloat("PilgrimFrenzy"));
         this.entityData.set(DYING, tag.getInt("PilgrimDying"));
-        if (tag.contains("PilgrimCell")) cell = tag.getDouble("PilgrimCell");
         if (ai != null) ai.load(tag);
         segments.reset(position(), getYRot(), getXRot());
     }

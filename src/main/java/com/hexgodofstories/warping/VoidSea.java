@@ -39,12 +39,9 @@ public final class VoidSea {
     public static final int ARRIVAL = SURFACE + 3;
 
     /**
-     * Realms are partitioned into 1024 block cells along X (see {@link WarpMath#cellX}). The
-     * creature is kept inside its own cell so two parties warping at once never share a hunter.
+     * The realm has one occupant and the whole sea is its territory, so nothing bounds it
+     * horizontally: it crosses Warping's cells freely and goes wherever the prey is. The only
+     * bound that exists is the water column itself.
      */
-    public static final double CELL_HALF = 500.0;
-    public static final double RANGE_Z = 950.0;
-
-    public static double clampX(double cell, double x) { return Math.max(cell - CELL_HALF, Math.min(cell + CELL_HALF, x)); }
-    public static double clampZ(double z) { return Math.max(-RANGE_Z, Math.min(RANGE_Z, z)); }
+    public static double clampY(double y) { return Math.max(FLOOR + 6, Math.min(SURFACE + 200, y)); }
 }

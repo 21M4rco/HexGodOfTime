@@ -111,7 +111,7 @@ public final class WarpRealms {
             level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.DAMAGE_TYPE).getHolderOrThrow(SOLAR_HEAT)),damage);
     }
     private static void populate(ServerLevel l,Destination d,double cell){
-        if(d==Destination.VOID_SEA)com.hexgodofstories.warping.leviathan.PilgrimWarden.ensure(l,cell);
+        if(d==Destination.VOID_SEA)com.hexgodofstories.warping.leviathan.PilgrimWarden.ensure(l);
         if(d==Destination.FALLING_WORLD||d==Destination.FROZEN_MOMENT){
             Random r=new Random(819+d.ordinal());int count=d==Destination.FALLING_WORLD?48:32;
             for(int i=0;i<count;i++){WarpHazard h=HexGodOfStories.WARP_HAZARD.get().create(l);if(h==null)continue;

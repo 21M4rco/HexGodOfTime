@@ -74,7 +74,7 @@ public final class HexCommands {
             return list.size();}));
         pilgrim.then(Commands.literal("summon").executes(c->{
             ServerPlayer p=c.getSource().getPlayerOrException();ServerLevel level=p.serverLevel();
-            var q=com.hexgodofstories.warping.leviathan.PilgrimWarden.ensure(level,com.hexgodofstories.warping.WarpMath.cellX(p.getX()));
+            var q=com.hexgodofstories.warping.leviathan.PilgrimWarden.ensure(level);
             if(q==null){c.getSource().sendFailure(Component.literal("No hunter in this cell yet; try /hgos pilgrim spawn."));return 0;}
             // Deliberately the most visible placement possible: dead ahead, level with the eye,
             // facing the caster. If nothing appears after this, the creature is present and the
@@ -92,7 +92,7 @@ public final class HexCommands {
             return 1;}));
         pilgrim.then(Commands.literal("spawn").executes(c->{
             ServerPlayer p=c.getSource().getPlayerOrException();
-            var q=com.hexgodofstories.warping.leviathan.PilgrimWarden.spawn(p.serverLevel(),com.hexgodofstories.warping.WarpMath.cellX(p.getX()),p.position());
+            var q=com.hexgodofstories.warping.leviathan.PilgrimWarden.spawn(p.serverLevel(),p.position());
             c.getSource().sendSuccess(()->Component.literal(q==null?"The abyss refused.":"The Abyssal Pilgrim has been given this ocean."),true);
             return q==null?0:1;}));
         pilgrim.then(Commands.literal("purge").executes(c->{
