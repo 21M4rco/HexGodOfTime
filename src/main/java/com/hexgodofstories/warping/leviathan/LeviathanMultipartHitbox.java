@@ -1,5 +1,6 @@
 package com.hexgodofstories.warping.leviathan;
 
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
@@ -31,6 +32,11 @@ public final class LeviathanMultipartHitbox extends PartEntity<AbyssalPilgrimEnt
     public Section section() { return section; }
     public int index() { return index; }
     public AbyssalPilgrimEntity leviathan() { return parent; }
+
+    // A hitbox carries no state of its own: the parent owns everything and repositions it each tick.
+    @Override protected void defineSynchedData() { }
+    @Override protected void readAdditionalSaveData(CompoundTag tag) { }
+    @Override protected void addAdditionalSaveData(CompoundTag tag) { }
 
     @Override public EntityDimensions getDimensions(Pose pose) { return size; }
 

@@ -228,7 +228,7 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
         super.tick();
 
         if (!level().isClientSide) {
-            if (isDying()) tickDeath();
+            if (isDying()) tickDeathSequence();
             Vec3 motion = getDeltaMovement();
             if (motion.lengthSqr() > 1.0E-8) {
                 // Stay inside this portal's cell, off the floor, and under the ceiling a breach needs.
@@ -280,7 +280,8 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
         }
     }
 
-    private void tickDeath() {
+    /** Named apart from LivingEntity#tickDeath: this creature never dies the vanilla way. */
+    private void tickDeathSequence() {
         int t = dying();
         this.entityData.set(DYING, t + 1);
         // Coordination fails first, then the body simply stops holding itself up.

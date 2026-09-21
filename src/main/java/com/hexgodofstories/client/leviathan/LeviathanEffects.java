@@ -38,7 +38,6 @@ public final class LeviathanEffects {
         double distance = mc.player.position().distanceTo(at);
         float falloff = (float) Mth.clamp(1.0 - distance / (90.0 + power * 70.0), 0.0, 1.0);
         if (falloff <= 0.001f) return;
-        RandomSource random = mc.level.random;
 
         switch (effect) {
             case "breach" -> {
