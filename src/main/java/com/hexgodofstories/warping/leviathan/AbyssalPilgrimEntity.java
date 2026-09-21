@@ -74,7 +74,7 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
 
     public AbyssalPilgrimEntity(EntityType<? extends AbyssalPilgrimEntity> type, Level level) {
         super(type, level);
-        this.noCulling = true;
+        this.noCulling = false;
         this.setNoGravity(true);
         this.setPersistenceRequired();
         this.moveControl = new LeviathanMoveControl(this);
@@ -193,6 +193,9 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
     }
 
     @Override public boolean isInvulnerableTo(DamageSource source) { return !isDying(); }
+    @Override public boolean isPickable() { return false; }
+    @Override public boolean canRide(Entity vehicle) { return false; }
+    @Override public void knockback(double strength, double x, double z) { }
     @Override public boolean isPushable() { return false; }
     @Override public void push(double x, double y, double z) { }
     @Override protected void pushEntities() { }
@@ -243,7 +246,7 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
                 setPos(getX() + motion.x, ny, getZ() + motion.z);
             }
             setYHeadRot(getYRot());
-            if (tickCount % 2 == 0) bodyContact();
+
         }
 
         bank += Mth.wrapDegrees(bankIntent - bank) * 0.12f;
@@ -252,43 +255,47 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
         segments.push(position(), getYRot(), getXRot());
         segments.rebuild();
         positionParts();
+        if (!level().isClientSide) {
+            if (tickCount % 2 == 0) bodyContact();
+            if (tickCount % 40 == 0)
+                HexNetwork.tracking(this, new HexNetwork.Message(HexNetwork.PILGRIM_PATH, getId(), segments.snapshot()));
+        }
 
         // Client only presentation lives in a class the dedicated server never resolves.
         if (level().isClientSide) net.minecraftforge.fml.DistExecutor.unsafeRunWhenOn(net.minecraftforge.api.distmarker.Dist.CLIENT,
             () -> () -> com.hexgodofstories.client.leviathan.LeviathanClientHooks.clientTick(this));
     }
 
-    /**
-     * Full body contact. Anything overlapping a segment is shoved clear of it, and a body moving at
-     * speed hurts on the way past. Without this a hundred and sixty blocks of creature read as
-     * scenery: it would slide through a swimmer and neither would notice.
-     */
+    /** The jaw chamber is thirteen blocks ahead of the cranial pivot in the authored model. */
+    public Vec3 mouthPosition() { return position().add(getLookAngle().scale(13.0)); }
+
+    /** Apply contact to the actual section volumes, including boats and moving modded objects. */
     private void bodyContact() {
         if (isDying() || !segments.primed()) return;
-        List<LivingEntity> near = level().getEntitiesOfClass(LivingEntity.class, segments.bounds(),
-            e -> e != this && e.isAlive() && !(e instanceof AbyssalPilgrimEntity)
-                 && !(e instanceof net.minecraft.world.entity.player.Player p && (p.isCreative() || p.isSpectator())));
-        if (near.isEmpty()) return;
+        List<Entity> near = level().getEntities(this, segments.bounds().inflate(24), e ->
+            e.isAlive() && !e.isSpectator() && !(e instanceof AbyssalPilgrimEntity)
+            && !(e instanceof LeviathanMultipartHitbox) && e != held()
+            && (e instanceof LivingEntity || e instanceof net.minecraft.world.entity.vehicle.Boat
+                || e.getDeltaMovement().lengthSqr() > 0.0025)
+            && !(e instanceof net.minecraft.world.entity.player.Player p && p.isCreative()));
         double speed = getDeltaMovement().length();
-        for (LivingEntity victim : near) {
-            int index = segments.nearest(victim.position());
-            Vec3 centre = segments.segment(index);
-            double reach = LeviathanSegmentController.radius(index) + victim.getBbWidth() * 0.5;
-            Vec3 away = victim.position().subtract(centre);
-            double distance = away.length();
-            if (distance > reach) continue;
-            away = distance < 1.0E-4 ? new Vec3(0, 1, 0) : away.scale(1.0 / distance);
-            double shove = 0.30 + speed * 0.85;
-            victim.setDeltaMovement(victim.getDeltaMovement().scale(0.55).add(away.scale(shove)));
-            victim.hurtMarked = true;
-            victim.fallDistance = 0;
-            if (speed > 0.5 && tickCount % 10 == 0) victim.hurt(damageSources().mobAttack(this), (float) (2.0 + speed * 4.0));
+        for (Entity victim : near) {
+            for (LeviathanMultipartHitbox part : parts) {
+                if (!part.getBoundingBox().intersects(victim.getBoundingBox())) continue;
+                Vec3 away = victim.position().subtract(part.getBoundingBox().getCenter());
+                away = away.lengthSqr() < 1.0E-6 ? new Vec3(0, 1, 0) : away.normalize();
+                victim.setDeltaMovement(victim.getDeltaMovement().scale(0.55).add(away.scale(0.30 + speed * 0.85)));
+                victim.hurtMarked = true; victim.fallDistance = 0;
+                if (speed > 0.5 && tickCount % 10 == 0 && attack() != LeviathanAttack.FAKE_ATTACK)
+                    victim.hurt(damageSources().mobAttack(this), (float) (2.0 + speed * 4.0));
+                break;
+            }
         }
     }
 
     private void positionParts() {
         for (int i = 0; i < parts.length; i++) {
-            Vec3 p = segments.segment(i);
+            Vec3 p = i == 0 ? mouthPosition() : segments.segment(i);
             LeviathanMultipartHitbox part = parts[i];
             part.setPos(p.x, p.y - part.getBbHeight() * 0.5, p.z);
             part.xo = p.x; part.yo = p.y; part.zo = p.z;

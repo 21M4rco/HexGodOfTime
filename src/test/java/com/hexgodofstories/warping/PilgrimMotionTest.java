@@ -1,0 +1,44 @@
+package com.hexgodofstories.warping;
+
+import com.hexgodofstories.warping.leviathan.LeviathanSegmentController;
+import net.minecraft.world.phys.Vec3;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
+
+public final class PilgrimMotionTest {
+    public static void main(String[] args) {
+        LeviathanSegmentController path = new LeviathanSegmentController();
+        path.reset(Vec3.ZERO, 0, 0);
+        // Slow motion must accumulate distance without eating the historical curve.
+        for (int t = 1; t <= 2000; t++) {
+            double a = t * 0.0025;
+            path.push(new Vec3(60 * (1 - Math.cos(a)), 8 * Math.sin(a * 0.5), 60 * Math.sin(a)), 0, 0);
+            path.rebuild();
+        }
+        for (int i = 1; i < LeviathanSegmentController.SEGMENTS; i++) {
+            double spacing = path.segment(i).distanceTo(path.segment(i - 1));
+            check(spacing > 5.9 && spacing <= 6.001, "curve keeps joint spacing: " + spacing);
+        }
+        LeviathanSegmentController lateViewer = new LeviathanSegmentController();
+        lateViewer.acceptSnapshot(path.snapshot());
+        for (int i = 0; i < LeviathanSegmentController.SEGMENTS; i++)
+            check(path.segment(i).distanceTo(lateViewer.segment(i)) < 0.002, "late viewer reconstructs joint " + i);
+        path.push(new Vec3(1000, 100, 1000), 90, 0);
+        path.rebuild();
+        check(path.segment(21).distanceTo(path.segment(0)) < 127, "teleport does not drag old body across world");
+        // Verify composed banking survives GeckoLib's Z-Y-X Euler convention, including vertical dives.
+        for (float yaw : new float[]{-179, -90, 0, 73, 179}) for (float pitch : new float[]{-88,-40,0,40,88}) {
+            float y = (float)Math.toRadians(180-yaw), p = (float)Math.toRadians(-pitch);
+            Quaternionf expected = new Quaternionf().rotateY(y).rotateX(p).rotateZ(0.6f);
+            Vector3f euler = expected.getEulerAnglesZYX(new Vector3f());
+            Quaternionf rendered = new Quaternionf().rotateZ(euler.z).rotateY(euler.y).rotateX(euler.x);
+            Vector3f a = expected.transform(new Vector3f(0,0,-1));
+            Vector3f b = rendered.transform(new Vector3f(0,0,-1));
+            check(a.distance(b) < 0.0001, "render heading survives bank at " + yaw + ", " + pitch);
+        }
+        System.out.println("PilgrimMotionTest: slow curves, late tracking, teleport reset and 3D rotations passed.");
+    }
+    private static void check(boolean condition, String message) {
+        if (!condition) throw new AssertionError(message);
+    }
+}

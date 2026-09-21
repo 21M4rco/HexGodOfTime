@@ -74,6 +74,8 @@ public final class ServerEvents {
     }
     @SubscribeEvent public static void tracking(PlayerEvent.StartTracking e) {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
+        if (e.getTarget() instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity pilgrim)
+            HexNetwork.to(p, new HexNetwork.Message(HexNetwork.PILGRIM_PATH, pilgrim.getId(), pilgrim.segments().snapshot()));
         TemporalEngine.track(p,e.getTarget());
         Erasure.track(p,e.getTarget());
         if(!(e.getTarget() instanceof ServerPlayer q))return;

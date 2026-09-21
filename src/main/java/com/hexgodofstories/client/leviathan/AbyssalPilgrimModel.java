@@ -85,9 +85,13 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
             bone.setPosZ((float) offset.z * 16f - bone.getPivotZ());
             float yaw = i == 0 ? Mth.rotLerp(partial, entity.yRotO, entity.getYRot()) : segments.yaw(i, partial);
             float pitch = i == 0 ? Mth.lerp(partial, entity.xRotO, entity.getXRot()) : segments.pitch(i, partial);
-            bone.setRotY((180f - yaw) * Mth.DEG_TO_RAD);
-            bone.setRotX(-pitch * Mth.DEG_TO_RAD);
-            bone.setRotZ(0);
+            // Compose local banking after heading/pitch, then express it in GeckoLib's Z-Y-X order.
+            org.joml.Vector3f angles = new org.joml.Quaternionf()
+                .rotateY((180f - yaw) * Mth.DEG_TO_RAD)
+                .rotateX(-pitch * Mth.DEG_TO_RAD)
+                .rotateZ((i == 0 ? entity.bank(partial) : segments.roll(i, partial)) * Mth.DEG_TO_RAD)
+                .getEulerAnglesZYX(new org.joml.Vector3f());
+            bone.setRotX(angles.x); bone.setRotY(angles.y); bone.setRotZ(angles.z);
         }
     }
 
@@ -99,8 +103,8 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
         }
         float open = jawOpen(entity, partial);
         GeoBone upper = bone("upper_jaw"), lower = bone("lower_jaw");
-        if (upper != null) upper.setRotX(-open * 0.30f);
-        if (lower != null) lower.setRotX(open * 0.98f);
+        if (upper != null) upper.setRotX(open * 0.30f);
+        if (lower != null) lower.setRotX(-open * 0.98f);
         // The jaw does not just hinge, it splits.
         GeoBone left = bone("jaw_split_left"), right = bone("jaw_split_right");
         if (left != null) { left.setRotY(open * 0.58f); left.setRotZ(open * 0.26f); }

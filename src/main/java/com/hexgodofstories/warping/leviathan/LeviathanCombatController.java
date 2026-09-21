@@ -36,6 +36,7 @@ public final class LeviathanCombatController {
     @Nullable private Entity victim;
     private int tick;
     private int cooldown;
+    private int breachPreparation;
     private Vec3 anchor = Vec3.ZERO;
     private double orbit;
     private int orbitSign = 1;
@@ -58,6 +59,7 @@ public final class LeviathanCombatController {
         attack = pattern;
         victim = target;
         tick = 0;
+        breachPreparation = 0;
         struck.clear();
         crossedSurface = splashed = escapeWindow = false;
         anchor = target != null ? target.position() : self.position();
@@ -79,6 +81,10 @@ public final class LeviathanCombatController {
     }
 
     public void tick() {
+        if (crossedSurface && !splashed && self.getY() < self.surfaceY() - 1) {
+            splashed = true;
+            impact(new Vec3(self.getX(), self.surfaceY(), self.getZ()));
+        }
         if (cooldown > 0) cooldown--;
         if (attack == null) return;
         if (victim != null && (!victim.isAlive() || victim.level() != self.level())) victim = null;
@@ -313,11 +319,20 @@ public final class LeviathanCombatController {
         double line = self.surfaceY();
         Vec3 aim = victim != null ? victim.position() : self.position().add(0, 40, 0);
         if (tick < attack.windup) {
-            // Retreat, straighten, and light up. This is the tell the player is given.
-            double dive = Math.max(self.floorY() + 16, line - 110);
-            steer(new Vec3(aim.x, dive, aim.z), 1.8, 0.55f);
+            breachPreparation++;
+            double dive = Math.max(self.floorY() + 16, line - 125);
+            Vec3 launch = new Vec3(anchor.x, dive, anchor.z);
+            if (tick < attack.windup - 20) {
+                steer(launch, 2.1, 0.85f);
+                // Finish the physical descent before starting the ascent, with a bounded fallback.
+                if (tick == attack.windup - 21 && self.position().distanceToSqr(launch) > 24 * 24
+                        && breachPreparation < 180) tick--;
+            } else {
+                steer(new Vec3(aim.x, Math.max(line + 40, aim.y + 22), aim.z), 1.2, 1.0f);
+                if (tick == attack.windup - 1 && self.getXRot() > -65 && breachPreparation < 240) tick--;
+            }
             self.setGlow(Mth.clamp(tick / (float) attack.windup, 0.2f, 1f));
-            if (tick == 0) self.voice(HexGodOfStories.PILGRIM_BREACH_CHARGE.get(), 110f, 0.7f);
+            if (breachPreparation == 1) self.voice(HexGodOfStories.PILGRIM_BREACH_CHARGE.get(), 110f, 0.7f);
         } else if (tick < attack.windup + attack.active) {
             self.setGlow(1f);
             steer(new Vec3(aim.x, aim.y + 22, aim.z), 3.4, 0.45f);
@@ -404,7 +419,7 @@ public final class LeviathanCombatController {
     }
 
     public Vec3 mouth() {
-        return self.segments().segment(0).add(self.getLookAngle().scale(LeviathanSegmentController.radius(0) * 1.15));
+        return self.mouthPosition();
     }
 
     private List<LivingEntity> contacts(LeviathanMultipartHitbox.Section section, double inflate) {

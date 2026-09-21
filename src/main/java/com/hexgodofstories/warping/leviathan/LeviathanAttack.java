@@ -25,7 +25,7 @@ public enum LeviathanAttack {
     /** Strike upward through the surface at boats and anything floating. */
     SURFACE_RAM(20, 14, 26, 26, false),
     /** Leave the water completely with the jaws open, hunting anything airborne. */
-    BREACH_BITE(34, 60, 44, 95, true),
+    BREACH_BITE(70, 120, 80, 150, true),
     /** Throw a held victim into the air and try to meet them on the way down. */
     AIR_THROW(14, 40, 30, 10, false),
     /** A full windup that is abandoned on purpose. Never deals damage. */
@@ -46,6 +46,6 @@ public enum LeviathanAttack {
     public int total() { return windup + active + recover; }
     public boolean lethal() { return this != FAKE_ATTACK; }
     /** Patterns that need the creature to leave the water. */
-    public boolean aerial() { return this == BREACH_BITE || this == AIR_THROW; }
+    public boolean aerial() { return this == BREACH_BITE || this == AIR_THROW || this == DEEP_CHARGE || this == SURFACE_RAM; }
     public static LeviathanAttack byId(int id) { return values()[Math.floorMod(id, values().length)]; }
 }

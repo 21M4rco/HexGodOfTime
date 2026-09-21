@@ -169,6 +169,41 @@ public final class LeviathanSegmentController {
         }
     }
 
+    /** Compact server path checkpoint; decorative bones are never sent. */
+    public net.minecraft.nbt.CompoundTag snapshot() {
+        net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
+        tag.putDouble("x", leading.x); tag.putDouble("y", leading.y); tag.putDouble("z", leading.z);
+        int samples = Math.min(count, 260); // 156 blocks of history, beyond the last logical joint.
+        java.nio.ByteBuffer bytes = java.nio.ByteBuffer.allocate(samples * 12);
+        for (int i = 0; i < samples; i++) {
+            Vec3 relative = node(i).subtract(leading);
+            bytes.putFloat((float) relative.x).putFloat((float) relative.y).putFloat((float) relative.z);
+        }
+        tag.putByteArray("path", bytes.array());
+        return tag;
+    }
+
+    public void acceptSnapshot(net.minecraft.nbt.CompoundTag tag) {
+        byte[] data = tag.getByteArray("path");
+        if (data.length < 24 || data.length % 12 != 0 || data.length > MAX_NODES * 12) return;
+        Vec3 anchor = new Vec3(tag.getDouble("x"), tag.getDouble("y"), tag.getDouble("z"));
+        boolean initial = !primed;
+        count = data.length / 12; head = 0;
+        java.nio.ByteBuffer bytes = java.nio.ByteBuffer.wrap(data);
+        for (int k = 0; k < count; k++) {
+            int index = Math.floorMod(-k, MAX_NODES);
+            nx[index] = anchor.x + bytes.getFloat();
+            ny[index] = anchor.y + bytes.getFloat();
+            nz[index] = anchor.z + bytes.getFloat();
+        }
+        leading = anchor; primed = true;
+        backward = node(1).subtract(node(0)).normalize();
+        rebuild();
+        if (initial) for (int i = 0; i < SEGMENTS; i++) {
+            previous[i] = seg[i]; prevYaw[i] = yaw[i]; prevPitch[i] = pitch[i]; prevRoll[i] = roll[i];
+        }
+    }
+
     /** Collision volume for one joint, in world space. */
     public AABB box(int i) {
         double r = radius(i);

@@ -1,132 +1,63 @@
-# The Abyssal Pilgrim
+# The Abyssal Pilgrim — 0.5.4
 
-Replaces the Void Sea's previous hunter (`AbyssalLeviathan`, 58 lines, 650 health, nearest-target
-then swim-straight then bite). Both that entity and its immediate-mode renderer are deleted.
+Base: successful Actions run 35602014851, commit 3d415465288b5231db5b369cc43d6b196b3ad050.
+Forge 1.20.1, GeckoLib 4.4.9. Changes are scoped to the existing Void Sea Pilgrim and its integration.
 
-Target: Minecraft 1.20.1, Forge 47.4.10, Java 17, GeckoLib 4.4.
+## Reference rebuild
 
-## What it is
+The authored geometry now contains 22 logical joints and 1,550 cuboids, approximately 152 blocks
+nose to tail. The layered, flattened cranial shield has longitudinal irregular teeth, independent
+upper/lower/split jaws, exposed violet sensory nodes, trailing cheek tendrils, three prominent swept
+dorsal sails, paired curved hanging ribs, overlapping armor and a tapered forked whip tail.
+`tools/generate_pilgrim.py` is the reproducible asset source. Existing texture/audio assets remain.
+This is an interpretation of the supplied image, not a pixel-identical reconstruction or a claim
+of an in-game visual match. A single image does not specify hidden surfaces.
 
-A single articulated creature roughly 160 blocks nose to tail, built from 22 logical joints, that
-owns the Void Sea. It cannot be damaged, knocked back, pushed, stunned, mounted, leashed, charmed,
-frozen or affected by potions. It does not need provocation and it has no passive or neutral state.
+## Movement and rendering fixes
 
-## The realm was rebuilt for it
+The original Euler-difference parent chain accumulated incorrect 3D rotations; head tracking and
+keyframed waves also moved the whole spine away from server contact volumes. Each logical joint is
+now a direct child of root and placed on the interpolated historical world path. Heading, pitch
+and local banking are composed as rotations before conversion to GeckoLib's Z-Y-X convention.
+Decorative appendages still use the existing animation clips and procedural secondary motion.
+Head tracking no longer transforms following joints. Jaw posing is applied once rather than added
+to a second set of jaw keyframes; airborne bites retain an open mouth through their active phase.
 
-The Void Sea was 135 blocks of water, which is less than the creature is long. It is now:
+The realm uses its actual fixed waterline/floor instead of surface heightmaps, which can include
+player platforms. Breach preparation waits for descent and alignment, with bounded timeouts. The
+longer active/recovery windows allow ascent, ballistic flight and re-entry. Impact detection can
+outlive the attack clock. Full-body culling uses the reconstructed body bounds plus appendage margin.
 
-| | before | after |
-|---|---|---|
-| `min_y` / `height` | 0 / 384 | −768 / 1280 |
-| water column | 135 | **935** |
-| clear sky above the waterline | ~245 | 262 |
-| waterline | y 135 | y 249 |
-| floor | bedrock | **Nothingness** (unmineable, no item form) |
+## Hunting and contact
 
-`VoidSea.java` holds these as constants and `VoidSeaShapeTest` fails the build if the constants and
-the shipped dimension JSON ever disagree. Arrival height and the sovereign's out-of-world rescue
-were both keyed to the old floor of y=0 and have been corrected.
+Target selection scans loaded entities throughout the dimension at most once per second while
+acquiring, including mobs, summons, boats and moving nonliving entities. Players retain priority;
+creative/spectator immunity remains. No chunks are loaded merely to find arbitrary prey.
+Unloaded non-player entities cannot be detected until Minecraft loads them again.
 
-## The realm is a place, not an instance
-
-Every Warping portal used to be handed its own 1024 block slice, so each trip was a fresh private
-copy of the destination. That is now one shared realm per destination, identical on every opening:
-`WarpRealms.CELL` is fixed at 0 and the per-player slices stored in old saves are ignored rather
-than honoured. The Void Sea in particular only means anything if it is the same ocean, with the
-same god in it, every single time the way is opened.
-
-The Void Sea is also marked as the dangerous one everywhere it is named: its destination colour is
-red, which tints the portal mirror itself, and in the selector (G) its button is red, bold and
-framed, under a standing warning line.
-
-## One, always, forever
-
-There is a single Abyssal Pilgrim. Not one per player, not one per Warping cell — one, for the
-realm. The whole sea is its territory and it crosses cells freely, so two parties in the Void Sea
-at once share the same god rather than each getting a copy. If it is busy with someone else, you
-are safe for a while, and when it arrives it is *the* one.
-
-Three things make that literally true rather than approximately true:
-
-- **Never multiple.** Its identity is persisted to the save file (`PilgrimRegistry`, a `SavedData`
-  on the Void Sea), so the claim survives a restart — an in-memory record would come back empty,
-  and an empty record is indistinguishable from "no creature exists", which is how duplicates get
-  born. Any leviathan in the realm that is not the claimed one is removed on sight.
-- **Never despawns.** Persistence-required, despawn rules overridden to no-ops, and `hurt()` always
-  refuses — so `/kill` does not touch it either. The only removal is the operator death sequence,
-  and even that is temporary: once the claim goes stale the realm raises another.
-- **Always present.** A creature that hunts from beyond sight spends most of its life outside
-  simulation distance, where Minecraft does not tick entities at all. It holds a chunk ticket on
-  itself and renews it as it moves. When a lookup finds nothing, the realm pulls its last known
-  chunk back in rather than concluding it is gone — and only gives up on the claim after the held
-  chunk has had time to deliver it.
-
-## Structure
-
-| Concern | Class |
-|---|---|
-| Entity, immortality, multipart, GeckoLib | `warping/leviathan/AbyssalPilgrimEntity` |
-| State machine, toying repertoire, mood | `warping/leviathan/AbyssalPilgrimAI` |
-| Target choice, stalking geometry | `warping/leviathan/LeviathanHuntController` |
-| The thirteen attack patterns | `warping/leviathan/LeviathanCombatController` |
-| Body reconstruction from movement history | `warping/leviathan/LeviathanSegmentController` |
-| 3D steering, turn-rate limits, ballistic air | `warping/leviathan/LeviathanMoveControl` |
-| Open-water navigation | `warping/leviathan/LeviathanNavigation` |
-| Per-joint collision volumes | `warping/leviathan/LeviathanMultipartHitbox` |
-| One creature per cell, no wildlife | `warping/leviathan/PilgrimWarden` |
-| Posing, jaw, glow, appendages | `client/leviathan/AbyssalPilgrimModel` |
-| Renderer and emissive pass | `client/leviathan/AbyssalPilgrimRenderer`, `AbyssalPilgrimGlowLayer` |
-| Secondary motion, LOD, head tracking | `client/leviathan/LeviathanSegmentRenderController` |
-| Shake, spray, the standing tremor | `client/leviathan/LeviathanEffects` |
-
-## Body
-
-Joints are resolved by walking back along the creature's own recorded path, sampled by distance
-rather than by tick. Spacing therefore stays constant whether it is drifting at a tenth of a block
-per tick or breaching at three, and it does not bunch up when stationary. S-curves, coils, spirals,
-vertical loops and full-body turns all fall out of the head's motion; nothing about them is
-authored.
-
-The model is a 22-bone parent chain, so only the angle between a joint and the one in front of it is
-ever written. Keyframed clips supply undulation and character; the procedural pass is **additive**
-on top of them, not a replacement.
-
-Joint spacing appears twice — `LeviathanSegmentController.SPACING` (6.0 blocks) and the model's
-pivot step (96 units). If those two ever drift apart every hitbox silently detaches from the visible
-body, so the build test asserts they match.
+Natural/chunk-generation/patrol spawns are denied in this realm. The former periodic category purge
+was removed: imported animals must remain prey, not vanish. The singleton registry and chunk-ticket
+lifecycle remain in place. Body contact includes boats/moving objects and is checked against actual
+multipart volumes after segment reconstruction. The head contact volume and held victim position
+are centered on the visible jaw chamber, thirteen blocks ahead of the skull pivot. Fake attacks do
+not inflict contact damage. Parts are not pickable; the parent rejects normal damage, knockback and
+riding. Arbitrary third-party code that forcibly deletes or rewrites entities is not controlled.
 
 ## Networking
 
-**No body data is sent.** Every client runs the same segment controller against the entity's own
-interpolated position, so a 160-block creature costs what a squid costs. The only leviathan packets
-are rare presentation events (breach, impact, scream) and a handful of synced bytes: state, attack,
-glow, frenzy, held target, look target. Glow is quantised to 1/16 and the visual pulse is derived
-client-side from state and time, so a smoothly brightening creature sends nothing.
+The server controls AI, attacks, motion and collision. Clients reconstruct the body locally between
+compact path checkpoints: 260 relative float triplets (3,120 bytes plus NBT headers) once every forty
+ticks, plus a snapshot on tracking start. These restore the real curved body for new viewers and
+limit accumulated client drift. Decorative bones are never networked. Existing state, glow, target
+and attack metadata and presentation event packets remain.
 
-## Deliberate decisions
+## Verification and limits
 
-- **Immortality vs. a death sequence.** "Immortal to everything" and "has a death animation" only
-  reconcile if death is administrative. `hurt()` always returns false; blows land, play a dull
-  refusal cue and change nothing. `beginDeath()` is the sinking sequence and nothing in normal play
-  can reach it.
-- **It keeps its toys alive.** Anything it grabs or deliberately releases is given water breathing.
-  Drowning would rob it of the rest of the hunt. A dragged victim is never taken more than 150
-  blocks below the surface for the same reason.
-- **Collision is manual.** A 160-block body is never run through vanilla collision. Contact forces
-  are applied from the segment volumes, which is what makes per-section damage honest: a tail sweep
-  can only hurt with the tail.
-- **Glow is geometry.** The emissive mask covers only the glow-organ bones, and the model hides and
-  scales those bones from behaviour, so "dim while stalking" and "extinguished while ambushing" are
-  real changes rather than a colour multiply. The model is never buried under particles.
+`verifyVoidSea` checks realm constants, geometry size, required bones, animation references and audio.
+`verifyPilgrimMotion` exercises slow curved movement, joint spacing, late-viewer checkpoint recovery,
+teleport history reset and banked 3D orientation. GitHub Actions builds the mod and runs these checks.
 
-## Not yet verified
-
-Everything below needs a running game and is **not** established by a successful compile:
-
-- In-game appearance, proportions and whether the body reads at 160 blocks.
-- Bone rotation sign conventions. `AbyssalPilgrimModel.YAW_SIGN` / `PITCH_SIGN` / `ROLL_SIGN` exist
-  precisely so an inverted spine is a one-character fix; which signs are correct can only be seen.
-- Breach arc timing, water-crossing feel and camera shake magnitude.
-- Whether 935 blocks of water costs measurable client frame time at high render distance.
-- Multiplayer behaviour with several players in one cell, and target switching.
-- GeckoLib 4.4.9 resolving and its exact API surface.
+A successful build does not establish visual quality, breach timing, multiplayer feel, sound mixing
+or performance in a populated modpack. These still require Minecraft client/server playtesting.
+Existing stalk/toy/ambush/frenzy behavior, attack repertoire, sound bank and administrative sinking
+sequence were retained. Normal gameplay cannot trigger the death sequence.
