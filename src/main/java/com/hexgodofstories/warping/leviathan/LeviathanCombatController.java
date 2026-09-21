@@ -49,6 +49,8 @@ public final class LeviathanCombatController {
     private boolean connected;
     /** The same, narrowed to the tick it happened on. Cleared at the top of every tick. */
     private boolean landedThisTick;
+    /** Ticks before the jaws may be heard working again. */
+    private int chewCooldown;
     /** How far below the waterline a dragged victim is ever taken. */
     private static final double DRAG_LIMIT = 150.0;
     /** How far above the waterline a leap will ever aim. Higher than this, flight has won. */
@@ -111,6 +113,7 @@ public final class LeviathanCombatController {
             impact(new Vec3(self.getX(), self.surfaceY(), self.getZ()));
         }
         if (cooldown > 0) cooldown--;
+        if (chewCooldown > 0) chewCooldown--;
         if (attack == null) return;
         if (victim != null && (!victim.isAlive() || victim.level() != self.level())) victim = null;
 
@@ -189,8 +192,10 @@ public final class LeviathanCombatController {
                 if (hit == victim && attack.canHold && self.getRandom().nextFloat() < 0.55f) takeHold(hit);
             }
         } else if (self.held() != null) {
-            // Held in the jaws: shaken rather than killed, if patience allows it.
+            // Held in the jaws: shaken rather than killed, if patience allows it. Whether or not it
+            // has decided to finish them, it chews, on its own rhythm rather than on this clock.
             shakeVictim(0.9f);
+            eat(30f, false);
             if (tick % 9 == 0 && self.held() instanceof LivingEntity living) damage(living, 2.5f, 0);
         }
     }
@@ -701,7 +706,27 @@ public final class LeviathanCombatController {
         self.setHeldId(entity.getId());
         // It keeps what it is playing with alive. Drowning would rob it of the rest of the hunt.
         entity.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, LUNG, 0, false, false, false));
+        // The water it displaced, and then what the jaws found inside it.
         self.voice(HexGodOfStories.PILGRIM_GRAB.get(), 26f, 0.9f);
+        eat(32f, true);
+    }
+
+    /**
+     * The sound of something being eaten.
+     *
+     * <p>Three recordings of the same jaws share one sound event, so the game draws a different one
+     * on every play and a long meal never becomes a loop. Every one of them is pitched well under
+     * where it was recorded, because the thing doing the chewing is a hundred and fifty blocks long
+     * and bone at its recorded pitch reads as a dog with a biscuit.
+     *
+     * <p>The cooldown is a chewing rhythm rather than a rate limit: about a second and a half to
+     * two and a half between mouthfuls, which at this pitch is roughly the length of one. Catching
+     * something and killing it both insist, because those are the moments worth hearing.
+     */
+    void eat(float volume, boolean insist) {
+        if (chewCooldown > 0 && !insist) return;
+        chewCooldown = 30 + self.getRandom().nextInt(22);
+        self.voice(HexGodOfStories.HEXOR_EAT.get(), volume, 0.45f + self.getRandom().nextFloat() * 0.17f);
     }
 
     private void carryHeld() {

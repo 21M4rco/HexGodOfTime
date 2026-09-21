@@ -196,6 +196,43 @@ public final class VoidSeaShapeTest {
         int actual = (int) Math.ceil(samples * 20.0 / rate);
         check(ticks >= actual, "HEXOR_AMBIENT_TICKS (" + ticks + ") covers the clip's " + actual + " ticks");
         check(ticks <= actual + 40, "HEXOR_AMBIENT_TICKS (" + ticks + ") is not wildly longer than the clip");
+
+        jawsAreThreeDistinctMonoClips(root, sounds);
+    }
+
+    /**
+     * The jaws: three recordings under one sound event, each of them mono and each of them
+     * different.
+     *
+     * <p>Mono for the same reason the roar is — a stereo clip plays flat inside the player's head,
+     * and not being able to tell which direction the chewing is coming from is the exact opposite
+     * of the point. Three, and genuinely three, because the whole reason for splitting the source
+     * up was that a meal should not sound like a loop; shipping the same slice three times would
+     * satisfy every other check here and quietly undo that.
+     */
+    private static void jawsAreThreeDistinctMonoClips(Path root, String sounds) throws Exception {
+        check(sounds.contains("\"hexor_eat\":{"), "sounds.json registers hexor_eat");
+        byte[][] clips = new byte[3][];
+        for (int n = 1; n <= 3; n++) {
+            Path clip = root.resolve("src/main/resources/assets/hexgodofstories/sounds/hexor_eat_" + n + ".ogg");
+            check(Files.isRegularFile(clip) && Files.size(clip) > 512, "hexor_eat_" + n + ".ogg is present and not empty");
+            check(sounds.contains("\"hexgodofstories:hexor_eat_" + n + "\""), "hexor_eat can draw variant " + n);
+            clips[n - 1] = Files.readAllBytes(clip);
+            int header = indexOf(clips[n - 1], new byte[] { 1, 'v', 'o', 'r', 'b', 'i', 's' });
+            check(header >= 0, "hexor_eat_" + n + ".ogg carries a Vorbis identification header");
+            int channels = clips[n - 1][header + 11] & 0xFF;
+            check(channels == 1, "hexor_eat_" + n + ".ogg is mono, so the jaws have a direction (" + channels + " channels)");
+            long rate = (clips[n - 1][header + 12] & 0xFFL) | (clips[n - 1][header + 13] & 0xFFL) << 8
+                      | (clips[n - 1][header + 14] & 0xFFL) << 16 | (clips[n - 1][header + 15] & 0xFFL) << 24;
+            double seconds = lastGranule(clips[n - 1]) / (double) Math.max(1, rate);
+            // Played well under recorded pitch, so the clip stretches. Past this it would still be
+            // sounding when the next mouthful starts and the rhythm would smear into a drone.
+            check(seconds > 0.2 && seconds < 2.0, "hexor_eat_" + n + ".ogg is a mouthful, not a meal (" + seconds + "s)");
+        }
+        for (int a = 0; a < 3; a++)
+            for (int b = a + 1; b < 3; b++)
+                check(!java.util.Arrays.equals(clips[a], clips[b]),
+                    "hexor_eat_" + (a + 1) + " and hexor_eat_" + (b + 1) + " are different recordings");
     }
 
     private static int indexOf(byte[] haystack, byte[] needle) {

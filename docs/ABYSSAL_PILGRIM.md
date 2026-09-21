@@ -376,3 +376,32 @@ supplied clip. Both places that can call for it, the scheduled ambient and the m
 frenzy, go through one gate that refuses while the clip is already sounding and counts the next
 silence from the end of it, so the one voice it has can never become two. Call sites, volumes and
 ranges in the Java are unchanged; only what comes out of the speaker is different.
+
+## 0.5.10 — the jaws
+
+Base: successful Actions run 35635814686, commit 1e05f948548abe56effd2268e4996f50b01e2c8e.
+Audio and three call sites; nothing else.
+
+The supplied bone-crushing recording is eighteen seconds of crunching in loose clusters. Rather
+than trim it to one clip, the three strongest passages were located by onset strength and sustained
+energy — 5.09s, 9.48s and 13.77s, a little over a second each — and cut out with a four millisecond
+fade in, so there is no click at the edit, and a seventy millisecond fade out, so each one dies
+away rather than stopping. Each is normalised and downmixed to mono, because Minecraft's sound
+engine can only place a mono buffer in the world and not being able to hear which direction the
+chewing is coming from is the opposite of the point.
+
+All three live under one sound event, so the game draws a different one on every play and a long
+meal never turns into a loop. Every play is pitched between 0.45 and 0.62 — well under where the
+recording sits, because the thing doing the chewing is a hundred and fifty blocks long and bone at
+its recorded pitch reads as a dog with a biscuit. At that pitch each clip runs about two seconds.
+
+It sounds whenever Hexor eats, which is three moments: the jaws closing on something, which insists
+and layers over the water it displaced; the chewing while something is held in them, which is
+throttled to a mouthful every second and a half to two and a half so it reads as a rhythm rather
+than a drone; and the kill, which insists. The water effects of 0.5.9 are unchanged and the roar
+still has its own gate; this is a third voice, and the only one that is neither.
+
+`VoidSeaShapeTest` fails the build if any of the three stops being mono, if any of them grows long
+enough to still be sounding when the next mouthful starts, or if two of them ever become the same
+recording — which would pass every other check here while quietly undoing the reason for splitting
+the source up at all.

@@ -206,6 +206,20 @@
       }
     ]
   },
+  "hexor_eat": {
+    "subtitle": "subtitles.hexgodofstories.hexor_eat",
+    "sounds": [
+      {
+        "name": "hexgodofstories:hexor_eat_1"
+      },
+      {
+        "name": "hexgodofstories:hexor_eat_2"
+      },
+      {
+        "name": "hexgodofstories:hexor_eat_3"
+      }
+    ]
+  },
   "illusion": {
     "subtitle": "subtitles.hexgodofstories.illusion",
     "sounds": [

@@ -62,6 +62,11 @@ public final class HexGodOfStories {
      * and refuses to start a second one over the top of the first.
      */
     public static final RegistryObject<SoundEvent> HEXOR_AMBIENT = sound("hexor_ambient");
+    /**
+     * The jaws working. Three recordings of the same set of them live under this one name, so the
+     * game picks a different one on every play and a long meal never turns into a loop.
+     */
+    public static final RegistryObject<SoundEvent> HEXOR_EAT = sound("hexor_eat");
     /** How long {@link #HEXOR_AMBIENT} runs for, in ticks. Kept here so the AI can space around it. */
     public static final int HEXOR_AMBIENT_TICKS = 136;
     /**

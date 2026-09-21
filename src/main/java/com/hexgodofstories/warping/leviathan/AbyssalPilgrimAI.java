@@ -502,6 +502,8 @@ public final class AbyssalPilgrimAI {
     }
 
     public void noteKill() {
+        // The one mouthful that is never throttled away.
+        combat.eat(42f, true);
         lastKill = self.level().getGameTime();
         frenzy = Math.max(0f, frenzy - 0.35f);
         patience = Math.min(1f, patience + 0.2f);
