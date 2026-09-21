@@ -52,6 +52,13 @@ public final class RealmLayout {
                 }
             }
         }
+        if(d==Destination.END_OF_TIME||d==Destination.TIME_STORM){
+            b.entrySet().removeIf(e->e.getValue().is(Blocks.DARK_OAK_LEAVES));
+            b.replaceAll((p,state)->state.is(Blocks.GRASS_BLOCK)?Blocks.COARSE_DIRT.defaultBlockState():state.is(Blocks.DARK_OAK_LOG)?Blocks.STRIPPED_DARK_OAK_LOG.defaultBlockState():state);
+        }
+        int landing=d==Destination.SHATTERED_WORLD?136:126;
+        if(d==Destination.SHATTERED_WORLD||d==Destination.TIME_STORM||d==Destination.FROZEN_MOMENT||d==Destination.END_OF_TIME)
+            b.entrySet().removeIf(e->Math.abs(e.getKey().getX())<=2&&Math.abs(e.getKey().getZ())<=2&&e.getKey().getY()>landing&&e.getKey().getY()<landing+16);
         return b.entrySet().stream().map(e->new Voxel(e.getKey(),e.getValue())).toList();
     }
     private static void island(Map<BlockPos,BlockState>b,int cx,int cy,int cz,int radius,boolean inverted,Random r){

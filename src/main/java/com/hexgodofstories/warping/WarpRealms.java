@@ -62,7 +62,7 @@ public final class WarpRealms {
                 case VOID_SEA -> {}
                 case GRAVITY_WELL -> {
                     Vec3 toward=new Vec3(cell,96,0).subtract(e.position());double dist=toward.length();
-                    e.setDeltaMovement(e.getDeltaMovement().scale(.96).add(toward.normalize().scale(WarpMath.pull(dist))));e.hurtMarked=true;
+                    e.setDeltaMovement(e.getDeltaMovement().scale(.96).add(toward.normalize().scale(WarpMath.pull(dist))).add(0,e.isNoGravity()?0:.08,0));e.hurtMarked=true;
                     if(dist<23&&now%10==0)e.hurt(l.damageSources().magic(),(float)(4+(23-dist)*2));
                 }
                 case SHATTERED_WORLD -> {
@@ -76,7 +76,9 @@ public final class WarpRealms {
                 case FALLING_WORLD -> {if(e.getY()<48){e.teleportTo(e.getX(),231,e.getZ());e.fallDistance=0;}if(e.getDeltaMovement().y>-.15)e.setDeltaMovement(e.getDeltaMovement().add(0,-.035,0));}
                 case FROZEN_MOMENT -> {}
                 case CRUSHING_REALM -> {
-                    double ceiling=WarpMath.ceiling(age);if(e.getY()+e.getBbHeight()>ceiling){e.teleportTo(e.getX(),Math.max(99,ceiling-e.getBbHeight()),e.getZ());e.setDeltaMovement(e.getDeltaMovement().x,Math.min(0,e.getDeltaMovement().y),e.getDeltaMovement().z);if(now%10==0)e.hurt(l.damageSources().inWall(),ceiling<103?20:6);}
+                    double floor=WarpMath.floor(age)+1,ceiling=WarpMath.ceiling(age);
+                    if(e.getY()<floor&&e.getY()>90){e.teleportTo(e.getX(),floor,e.getZ());e.fallDistance=0;}
+                    if(e.getY()+e.getBbHeight()>ceiling){e.teleportTo(e.getX(),Math.max(floor,ceiling-e.getBbHeight()),e.getZ());e.setDeltaMovement(e.getDeltaMovement().x,Math.min(0,e.getDeltaMovement().y),e.getDeltaMovement().z);if(now%10==0)e.hurt(l.damageSources().inWall(),ceiling-floor<2?20:6);}
                     if(Math.abs(e.getX()-cell)>42||Math.abs(e.getZ())>42){Vec3 pull=new Vec3(cell,100,0).subtract(e.position()).normalize().scale(.15);e.setDeltaMovement(e.getDeltaMovement().add(pull));e.hurtMarked=true;}
                 }
                 case END_OF_TIME -> {if(e instanceof LivingEntity living&&now%40==0){living.addEffect(new MobEffectInstance(MobEffects.WEAKNESS,65,2,false,false));living.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN,65,1,false,false));living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,65,0,false,false));if(age>200)living.hurt(l.damageSources().wither(),2);}}
@@ -89,7 +91,7 @@ public final class WarpRealms {
         if(d==Destination.FALLING_WORLD||d==Destination.FROZEN_MOMENT){
             Random r=new Random(819+d.ordinal());int count=d==Destination.FALLING_WORLD?48:32;
             for(int i=0;i<count;i++){WarpHazard h=HexGodOfStories.WARP_HAZARD.get().create(l);if(h==null)continue;
-                h.configure(d==Destination.FROZEN_MOMENT?1:i%3+2,cell,i);h.moveTo(cell+r.nextInt(100)-50,140+r.nextInt(90),r.nextInt(100)-50,0,0);l.addFreshEntity(h);}
+                h.configure(d==Destination.FROZEN_MOMENT?(i%4==0?5:1):i%3+2,cell,i);h.moveTo(cell+r.nextInt(100)-50,140+r.nextInt(90),r.nextInt(100)-50,0,0);l.addFreshEntity(h);}
         }
     }
     public static void releaseHazards(ServerPlayer p){if(!Warping.sovereign(p))return;for(WarpHazard h:p.serverLevel().getEntitiesOfClass(WarpHazard.class,p.getBoundingBox().inflate(96)))h.release(p.getLookAngle());HexNetwork.fx(p,"resume");}

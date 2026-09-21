@@ -19,22 +19,22 @@ public final class WarpHazard extends Entity {
     public int kind(){return entityData.get(KIND);}
     public boolean released(){return entityData.get(RELEASED);}
     public void configure(int kind,double cell,int index){entityData.set(KIND,kind);this.cell=cell;this.index=index;}
-    public void release(Vec3 direction){if(kind()!=1||released())return;entityData.set(RELEASED,true);setDeltaMovement(direction.scale(1.7).add(0,-.8,0));}
+    public void release(Vec3 direction){if((kind()!=1&&kind()!=5)||released())return;entityData.set(RELEASED,true);setDeltaMovement(direction.scale(1.7).add(0,-.8,0));}
     @Override public void tick(){
         super.tick();if(level().isClientSide)return;
-        if(kind()==1&&!released())return;
-        double speed=kind()==1?getDeltaMovement().y:-.15-index%5*.035;
-        Vec3 movement=kind()==1?getDeltaMovement():new Vec3(0,speed,0);
+        if((kind()==1||kind()==5)&&!released())return;
+        double speed=(kind()==1||kind()==5)?getDeltaMovement().y:-.15-index%5*.035;
+        Vec3 movement=(kind()==1||kind()==5)?getDeltaMovement():new Vec3(0,speed,0);
         AABB sweep=getBoundingBox().expandTowards(movement).inflate(kind()==1?.5:1);
         for(LivingEntity e:level().getEntitiesOfClass(LivingEntity.class,sweep,e->e.isAlive()&&!Warping.sovereign(e))){
-            if(kind()==1){e.hurt(damageSources().magic(),24);e.setDeltaMovement(movement.scale(.5));discard();return;}
+            if(kind()==1||kind()==5){e.hurt(damageSources().magic(),24);e.setDeltaMovement(movement.scale(.5));discard();return;}
             double top=getY()+height();
             if(e.getY()>=top-.5){e.teleportTo(e.getX(),top+movement.y,e.getZ());e.fallDistance=0;}
             else if(tickCount%20==0)e.hurt(damageSources().fallingBlock(this),10);
         }
         setPos(position().add(movement));
-        if(getY()<45){if(kind()==1){discard();return;}setPos(getX(),237,getZ());}
-        if(kind()==1&&tickCount>2400)discard();
+        if(getY()<45){if(kind()==1||kind()==5){discard();return;}setPos(getX(),237,getZ());}
+        if((kind()==1||kind()==5)&&released()&&tickCount>2400)discard();
     }
     public float height(){return kind()==3?10:kind()==1?3:2;}
     @Override public EntityDimensions getDimensions(Pose pose){return EntityDimensions.fixed(kind()==1?1:6,height());}
