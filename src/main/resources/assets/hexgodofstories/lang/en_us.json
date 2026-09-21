@@ -2,6 +2,8 @@
   "block.hexgodofstories.nothingness": "Nothingness",
   "death.attack.hexgodofstories.leviathan_bite": "%1$s was bitten in half by the abyssal leviathan",
   "death.attack.hexgodofstories.leviathan_bite.player": "%1$s was fed to the abyssal leviathan by %2$s",
+  "death.attack.hexgodofstories.realm_collapse": "%1$s was closed in on by a broken world",
+  "death.attack.hexgodofstories.realm_collapse.player": "%1$s was left in a broken world by %2$s",
   "death.attack.hexgodofstories.singularity": "%1$s was crushed into a singularity",
   "death.attack.hexgodofstories.singularity.player": "%1$s was thrown into a singularity by %2$s",
   "death.attack.hexgodofstories.solar_heat": "%1$s was consumed by the Sun",

@@ -97,8 +97,11 @@ Three rules now hold in every destination, because each of them was broken somew
   cap the result at 1.8 blocks per tick. The Falling World's extra gravity, which previously did nothing
   at all to players, now applies to them.
 - **Nothing holds a victim in a state it cannot leave or die from.** The well's horizon kills instead of
-  pinning, the crushing floor catches an entity at any height rather than only above y 90, and falling
-  debris is solid so victims are carried by ordinary collision instead of being repositioned every tick.
+  pinning, falling debris is solid so victims are carried by ordinary collision instead of being
+  repositioned every tick, and every destination now resolves. A trap with no exit and no lethality is a
+  softlock: the endless fall has a bottom that hurts exactly as much as the fall earned, the held moment
+  closes on whatever is standing in it after half a minute, and the Shattered World and Time Storm begin
+  to come apart around a victim after two minutes.
 
 Each destination is a distinct registered dimension. Casters receive separated 1024-block-spaced instances.
 Prepared instances are reused per caster/destination to prevent canceled charges generating unlimited terrain.

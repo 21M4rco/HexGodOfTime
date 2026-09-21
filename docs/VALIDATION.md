@@ -395,6 +395,14 @@ directional streaking. Cuboids spinning off in all directions read as rubble and
 - **A recall cannot put anything above the plane.** Entities returned to the press arrival point are
   placed under the current ceiling rather than on top of it.
 
+- **Nothing softlocks any more.** Three destinations could hold a victim indefinitely with no exit and
+  nothing to kill them: the Falling World (an endless fall that never landed), the Frozen Moment (slowed
+  and blinded, but unharmed) and, given time, the Shattered World and Time Storm. The fall now lands with
+  impact damage scaled to the speed it earned, the held moment closes after thirty seconds, and the other
+  two come apart around a victim after two minutes.
+- **The press restocks.** Opening the trap again rebuilds the columns it ground away, so a second use is
+  not an empty room.
+
 ### Not verified — needs a recorded in-game session
 
 - Whether being swept around the ring reads as an orbit from inside a player's own view, and whether the

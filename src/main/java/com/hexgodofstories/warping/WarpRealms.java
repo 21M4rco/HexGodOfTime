@@ -39,6 +39,10 @@ public final class WarpRealms {
     public static final int HUNTER_RESPAWN=1800;
     private static final ResourceKey<DamageType> SINGULARITY=
         ResourceKey.create(Registries.DAMAGE_TYPE,HexGodOfStories.id("singularity"));
+    private static final ResourceKey<DamageType> COLLAPSE=
+        ResourceKey.create(Registries.DAMAGE_TYPE,HexGodOfStories.id("realm_collapse"));
+    /** Realm age at which a destination with no inherent lethality starts closing on its victims. */
+    public static final int ATTRITION=2400;
 
     public static final class Ledger extends SavedData {
         int next;final Map<Long,Long> clocks=new HashMap<>();final Set<Long> ready=new HashSet<>();
@@ -56,7 +60,14 @@ public final class WarpRealms {
     public static double latest(ServerLevel l){return ledger(l).next*1024.0;}
     public static void prepare(ServerLevel l,Destination d,double x){if(!ready(l,x)&&JOBS.stream().noneMatch(j->j.level==l&&j.cell==x))JOBS.add(new Job(l,d,x,RealmLayout.blocks(d).iterator()));}
     public static boolean ready(ServerLevel l,double x){return l!=null&&ledger(l).ready.contains((long)x);}
-    public static void start(ServerLevel l,double x){Ledger a=ledger(l);a.clocks.put((long)x,l.getGameTime());a.setDirty();GROUND.remove((long)x);}
+    public static void start(ServerLevel l,double x) {
+        Ledger a=ledger(l);a.clocks.put((long)x,l.getGameTime());a.setDirty();GROUND.remove((long)x);
+        // The press grinds its own columns away. A trap opened a second time gets them back,
+        // otherwise the room has no clock in it and the realm reads as empty.
+        Destination d=Destination.from(l);
+        if(d==Destination.CRUSHING_REALM&&JOBS.stream().noneMatch(j->j.level==l&&j.cell==x))
+            JOBS.add(new Job(l,d,x,RealmLayout.blocks(d).iterator()));
+    }
     public static long age(ServerLevel l,double x){return Math.max(0,l.getGameTime()-ledger(l).clocks.getOrDefault((long)x,l.getGameTime()));}
 
     public static void transfer(Entity e,Destination d,double cell,boolean owner) {
@@ -104,10 +115,10 @@ public final class WarpRealms {
                 case SUN -> solarExposure(l,e,cell,now);
                 case VOID_SEA -> voidSea(l,e,now);
                 case GRAVITY_WELL -> singularity(l,e,cell,now);
-                case SHATTERED_WORLD -> shattered(e,age,now);
+                case SHATTERED_WORLD -> shattered(l,e,age,now);
                 case TIME_STORM -> timeStorm(l,e,age,now);
                 case FALLING_WORLD -> falling(e,now);
-                case FROZEN_MOMENT -> frozen(e,now);
+                case FROZEN_MOMENT -> frozen(l,e,age,now);
                 case CRUSHING_REALM -> crushing(l,e,cell,age,now);
                 case END_OF_TIME -> endOfTime(l,e,age,now);
             }
@@ -129,7 +140,16 @@ public final class WarpRealms {
         if(e.getY()<floor){
             switch(d){
                 // A star and an endless collapse both answer a fall with another fall.
-                case SUN,FALLING_WORLD -> {e.teleportTo(e.getX(),d==Destination.SUN?190:231,e.getZ());e.fallDistance=0;e.setDeltaMovement(e.getDeltaMovement().x,0,e.getDeltaMovement().z);e.hurtMarked=true;}
+                case SUN,FALLING_WORLD -> {
+                    // The collapse has a bottom. Hitting it hurts exactly as much as the fall earned,
+                    // and then the world puts the victim back at the top to do it again.
+                    if(d==Destination.FALLING_WORLD&&e instanceof LivingEntity faller){
+                        float impact=(float)Math.min(45,-e.getDeltaMovement().y*14-4);
+                        if(impact>0)faller.hurt(l.damageSources().fall(),impact);
+                    }
+                    e.teleportTo(e.getX(),d==Destination.SUN?190:231,e.getZ());
+                    e.fallDistance=0;e.setDeltaMovement(e.getDeltaMovement().x,0,e.getDeltaMovement().z);e.hurtMarked=true;
+                }
                 default -> recall(e,d,cell,age);
             }
         }
@@ -154,7 +174,7 @@ public final class WarpRealms {
         double y=d==Destination.CRUSHING_REALM?Math.min(at.y,WarpMath.ceiling(age)-2.5):at.y;
         e.teleportTo(at.x,y,at.z);
         e.setDeltaMovement(Vec3.ZERO);e.fallDistance=0;e.hurtMarked=true;
-        HexNetwork.fx(e,"arrive");
+        if(e instanceof LivingEntity)HexNetwork.fx(e,"arrive");
     }
 
     /**
@@ -260,12 +280,13 @@ public final class WarpRealms {
         e.setDeltaMovement(next);e.hurtMarked=true;
     }
 
-    /** Islands drift apart; every fortieth second the ground stops agreeing which way is down. */
-    private static void shattered(Entity e,long age,long now) {
+    /** Islands drift apart; every thirteenth second the ground stops agreeing which way is down. */
+    private static void shattered(ServerLevel l,Entity e,long age,long now) {
         long phase=age%260;
         if(phase<40)field(e,new Vec3(Math.sin(age*.05)*.012,.055,Math.cos(age*.05)*.012),now);
         else if(phase<48&&e instanceof LivingEntity living&&now%20==0)
             living.addEffect(new MobEffectInstance(MobEffects.LEVITATION,25,0,false,false));
+        attrition(l,e,age,now);
     }
 
     private static void timeStorm(ServerLevel l,Entity e,long age,long now) {
@@ -283,6 +304,7 @@ public final class WarpRealms {
             living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,8,3,false,false));
             if(now%20==0)living.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN,25,2,false,false));
         }
+        attrition(l,e,age,now);
     }
 
     /** The collapse never lands. Terminal velocity is enforced so the loop stays survivable to watch. */
@@ -292,13 +314,19 @@ public final class WarpRealms {
         e.fallDistance=0;
     }
 
-    /** A held catastrophe: everything in it is held too, until Loki lets the spears go. */
-    private static void frozen(Entity e,long now) {
+    /**
+     * A held catastrophe: everything in it is held too, until Loki lets the spears
+     * go. Being held inside a stopped instant is not something a body survives, so
+     * after half a minute the moment starts closing on whatever is standing in it.
+     */
+    private static void frozen(ServerLevel l,Entity e,long age,long now) {
         if(!(e instanceof LivingEntity living))return;
-        if(now%10!=0)return;
-        living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,20,5,false,false));
-        living.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN,20,4,false,false));
-        living.addEffect(new MobEffectInstance(MobEffects.BLINDNESS,20,0,false,false));
+        if(now%10==0){
+            living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,20,5,false,false));
+            living.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN,20,4,false,false));
+            living.addEffect(new MobEffectInstance(MobEffects.BLINDNESS,20,0,false,false));
+        }
+        if(age>600&&now%40==0)living.hurt(source(l,COLLAPSE),Math.min(10F,2F+(age-600)/240F));
     }
 
     /**
@@ -352,6 +380,16 @@ public final class WarpRealms {
         living.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN,65,1,false,false));
         living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,65,0,false,false));
         if(age>200)living.hurt(l.damageSources().wither(),Math.min(6F,2F+age/900F));
+    }
+
+    /**
+     * Every destination resolves. A trap that can hold a victim indefinitely without
+     * killing them is a softlock: no exit, no death, nothing to do. The realms with no
+     * lethality of their own close on whatever is still inside them.
+     */
+    private static void attrition(ServerLevel l,Entity e,long age,long now) {
+        if(age<ATTRITION||now%40!=0)return;
+        e.hurt(source(l,COLLAPSE),Math.min(12F,1F+(age-ATTRITION)/300F));
     }
 
     private static DamageSource source(ServerLevel l,ResourceKey<DamageType> type) {
