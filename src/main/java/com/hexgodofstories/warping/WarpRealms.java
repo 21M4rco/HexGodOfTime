@@ -25,8 +25,15 @@ public final class WarpRealms {
     private static final List<Job> JOBS=new ArrayList<>();
     private static final Map<UUID,ArrayDeque<Vec3>> HISTORY=new HashMap<>();
     private static Ledger ledger(ServerLevel l){return l.getDataStorage().computeIfAbsent(Ledger::load,Ledger::new,"warping_realms");}
-    public static double allocate(ServerLevel l){Ledger a=ledger(l);a.next++;a.setDirty();return a.next*1024.0;}
-    public static double latest(ServerLevel l){return ledger(l).next*1024.0;}
+    /**
+     * One realm per destination, shared by everyone, forever. Each portal used to be handed its own
+     * 1024 block slice, which made every trip a fresh private copy; a destination that is a place
+     * rather than an instance is the whole point, and the Void Sea in particular only means
+     * anything if it is the same ocean with the same god in it every time you open the way.
+     */
+    public static final double CELL = 0.0;
+    public static double allocate(ServerLevel l){return CELL;}
+    public static double latest(ServerLevel l){return CELL;}
     public static void prepare(ServerLevel l,Destination d,double x){if(!ready(l,x)&&JOBS.stream().noneMatch(j->j.level==l&&j.cell==x))JOBS.add(new Job(l,d,x,RealmLayout.blocks(d).iterator()));}
     public static boolean ready(ServerLevel l,double x){return l!=null&&ledger(l).ready.contains((long)x);}
     public static void start(ServerLevel l,double x){Ledger a=ledger(l);a.clocks.put((long)x,l.getGameTime());a.setDirty();}

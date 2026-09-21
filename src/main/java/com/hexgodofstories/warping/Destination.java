@@ -9,7 +9,7 @@ import net.minecraft.world.phys.Vec3;
 /** Stable IDs: append destinations, never reorder saved selections. */
 public enum Destination {
     SUN("Sun", "A stellar furnace. Captives fall fifty-six blocks into its corona.",0xffb34b, new Vec3(0,184,0)),
-    VOID_SEA("Void Sea", "An endless abyssal ocean nearly a thousand blocks deep. Something enormous already hunts it.",0x426887,new Vec3(0,VoidSea.ARRIVAL,0)),
+    VOID_SEA("Void Sea", "An endless abyssal ocean nearly a thousand blocks deep. A cosmic sea god already hunts it. It cannot be killed, it cannot be escaped by leaving the water, and it is always there.",0xd23b2f,new Vec3(0,VoidSea.ARRIVAL,0)),
     GRAVITY_WELL("Gravity Well", "An accretion disk surrounds a singularity. Pull intensifies inward.",0xb273ff,new Vec3(64,110,0)),
     SHATTERED_WORLD("Shattered World", "Broken forests and ruins. Unstable gravity between islands.",0x92b5b1,new Vec3(0,143,0)),
     TIME_STORM("Time Storm", "A storm of branching time. Your enemies' recent steps unravel.",0xca82ff,new Vec3(0,132,0)),
@@ -17,6 +17,8 @@ public enum Destination {
     FROZEN_MOMENT("Frozen Moment", "A catastrophe held still. Press X here to release nearby suspended hazards.",0xa3e5f1,new Vec3(0,132,0)),
     CRUSHING_REALM("Crushing Realm", "Two cosmic planes approach. Their remaining separation is your warning.",0xbe83ce,new Vec3(0,101,0)),
     END_OF_TIME("End of Time", "The exhausted remains of a universe. Living strength fades here.",0x998d9e,new Vec3(0,132,0));
+    /** The one destination whose danger is a creature rather than the environment. */
+    public boolean lethal(){return this==VOID_SEA;}
     public final String title,description; public final int color; public final Vec3 arrival;
     public final ResourceKey<Level> key;
     Destination(String title,String description,int color,Vec3 arrival) {

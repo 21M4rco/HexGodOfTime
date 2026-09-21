@@ -233,7 +233,7 @@ public final class AbyssalPilgrimAI {
         boolean holding = self.held() != null;
 
         if (holding) return random.nextFloat() < 0.5f ? LeviathanAttack.AIR_THROW : LeviathanAttack.DRAG_BELOW;
-        if (airborne && distance < 70) return LeviathanAttack.BREACH_BITE;
+        if (airborne && distance < LeviathanAttack.BREACH_BITE.range) return LeviathanAttack.BREACH_BITE;
         if (!lethalOnly && patience > 0.55f && random.nextFloat() < 0.22f) return LeviathanAttack.FAKE_ATTACK;
 
         float roll = random.nextFloat();

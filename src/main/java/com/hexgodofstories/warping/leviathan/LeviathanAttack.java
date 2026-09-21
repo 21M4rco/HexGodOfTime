@@ -25,7 +25,7 @@ public enum LeviathanAttack {
     /** Strike upward through the surface at boats and anything floating. */
     SURFACE_RAM(20, 14, 26, 26, false),
     /** Leave the water completely with the jaws open, hunting anything airborne. */
-    BREACH_BITE(34, 60, 44, 70, true),
+    BREACH_BITE(34, 60, 44, 95, true),
     /** Throw a held victim into the air and try to meet them on the way down. */
     AIR_THROW(14, 40, 30, 10, false),
     /** A full windup that is abandoned on purpose. Never deals damage. */

@@ -42,8 +42,10 @@ public final class Warping {
         Destination d=Destination.at(HexData.get(p).getInt("warpDestination"));
         ServerLevel target=p.server.getLevel(d.key);
         if(target==null){notice(p,"Warping dimensions are unavailable. Restart the server after installing the update.");return;}
-        double cell=HexData.get(p).getDouble("warpPrepared_"+d.name());
-        if(cell==0){cell=WarpRealms.allocate(target);HexData.get(p).putDouble("warpPrepared_"+d.name(),cell);}
+        // Fixed, shared and identical on every opening. Saves from before this change may carry a
+        // private slice; it is ignored rather than honoured, so everyone converges on the one realm.
+        double cell=WarpRealms.CELL;
+        HexData.get(p).putDouble("warpPrepared_"+d.name(),cell);
         WarpRealms.prepare(target,d,cell);
         Charge c=new Charge(p,new Vec3(hit.getBlockPos().getX()+.5,hit.getLocation().y+.025,hit.getBlockPos().getZ()+.5),d,cell);
         CHARGES.put(p.getUUID(),c);HexNetwork.animate(p,"threads");send(c,false);
@@ -105,7 +107,7 @@ public final class Warping {
         // Deliberate entry separate from the trap: crouch + X while Warping is selected.
         if(p.isShiftKeyDown()){
             Destination selected=Destination.at(HexData.get(p).getInt("warpDestination"));ServerLevel level=p.server.getLevel(selected.key);if(level==null)return;
-            double cell=HexData.get(p).getDouble("warpCell_"+selected.name());
+            double cell=WarpRealms.CELL;
             if(!WarpRealms.ready(level,cell)){notice(p,"Open a stabilized trap before entering its destination.");return;}
             WarpRealms.transfer(p,selected,cell,true);
         }

@@ -27,6 +27,18 @@ The Void Sea was 135 blocks of water, which is less than the creature is long. I
 the shipped dimension JSON ever disagree. Arrival height and the sovereign's out-of-world rescue
 were both keyed to the old floor of y=0 and have been corrected.
 
+## The realm is a place, not an instance
+
+Every Warping portal used to be handed its own 1024 block slice, so each trip was a fresh private
+copy of the destination. That is now one shared realm per destination, identical on every opening:
+`WarpRealms.CELL` is fixed at 0 and the per-player slices stored in old saves are ignored rather
+than honoured. The Void Sea in particular only means anything if it is the same ocean, with the
+same god in it, every single time the way is opened.
+
+The Void Sea is also marked as the dangerous one everywhere it is named: its destination colour is
+red, which tints the portal mirror itself, and in the selector (G) its button is red, bold and
+framed, under a standing warning line.
+
 ## One, always, forever
 
 There is a single Abyssal Pilgrim. Not one per player, not one per Warping cell — one, for the

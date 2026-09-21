@@ -147,7 +147,7 @@ public final class PilgrimWarden {
             if (last != null) hold(level, last);
         }
         if (now % 40 == 0) ensure(level);
-        if (now % 10 == 0) detectEntries(level, players);
+        if (now % 10 == 0) detectEntries(level, players, now % 200 == 0);
         if (now % 200 == 0) { purge(level, players); reposition(level, players); }
     }
 
@@ -158,29 +158,38 @@ public final class PilgrimWarden {
      * swimmer is what made the ocean feel empty: you could drop in, dive, and be treated as
      * scenery. A dry to wet transition now reaches the creature with an exact position attached.
      */
-    private static void detectEntries(ServerLevel level, List<ServerPlayer> players) {
+    private static void detectEntries(ServerLevel level, List<ServerPlayer> players, boolean sweep) {
         Set<UUID> seen = new HashSet<>();
         for (ServerPlayer player : players) {
             if (player.isSpectator() || player.isCreative()) continue;
             seen.add(player.getUUID());
-            check(level, player);
+            check(level, player, sweep);
             // Anything that came in with them counts too: mobs, summons, anything thrown in.
             for (LivingEntity other : level.getEntitiesOfClass(LivingEntity.class, player.getBoundingBox().inflate(96),
                     e -> e.isAlive() && !(e instanceof AbyssalPilgrimEntity) && !(e instanceof Player))) {
                 seen.add(other.getUUID());
-                check(level, other);
+                check(level, other, sweep);
             }
         }
         WET.retainAll(seen);
     }
 
-    private static void check(ServerLevel level, LivingEntity entity) {
+    /**
+     * Leaving the water is not an escape, so being above it counts as being in the realm. A flyer
+     * within reach of a breach is hunted exactly like a swimmer; the periodic sweep re-flags anyone
+     * hovering out there who is not currently being hunted.
+     */
+    private static void check(ServerLevel level, LivingEntity entity, boolean sweep) {
         boolean wet = entity.isInWater() || entity.getY() <= VoidSea.SURFACE;
+        boolean aloft = !wet && entity.getY() <= VoidSea.SURFACE + 160;
         UUID id = entity.getUUID();
-        if (!wet) { WET.remove(id); return; }
-        if (!WET.add(id)) return;                       // already wet, so not a new entry
+        if (!wet && !aloft) { WET.remove(id); return; }
+        boolean entered = WET.add(id);
+        if (!entered && !sweep) return;
         AbyssalPilgrimEntity pilgrim = ensure(level);
-        if (pilgrim != null && pilgrim.ai() != null) pilgrim.ai().alert(entity);
+        if (pilgrim == null || pilgrim.ai() == null) return;
+        if (!entered && pilgrim.ai().hunt().target() == entity) return;   // already on them
+        pilgrim.ai().alert(entity);
     }
 
     /**
