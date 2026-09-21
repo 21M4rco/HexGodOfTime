@@ -1,11 +1,16 @@
 package com.hexgodofstories.warping;
 
+import com.hexgodofstories.warping.leviathan.EnoughIsEnough;
 import com.hexgodofstories.warping.leviathan.HexorBlow;
+import com.hexgodofstories.warping.leviathan.LeviathanAttack;
 import com.hexgodofstories.warping.leviathan.TrillOfTheHunt;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -38,8 +43,12 @@ public final class HexorTest {
         aloneItHuntsAsItAlwaysDid();
         aFullSeaWindsItUp();
         theFrenzyThresholdIsActuallyCrossed(root);
+        thirtySecondsEach();
+        theClockCountsPresence();
+        aDecidedTargetIsOnlyEverKilled();
         everyBlowGoesThroughTheScale(root);
-        System.out.println("HexorTest: blows are weighed against what they land on, and the ocean's crowd is felt.");
+        theHuntDoesNotNeedAnAudience(root);
+        System.out.println("HexorTest: blows are weighed against what they land on, the crowd is felt, and the clock runs out.");
     }
 
     // ------------------------------------------------------------------ the blow
@@ -162,6 +171,111 @@ public final class HexorTest {
             "one extra swimmer is not enough to get there on its own");
     }
 
+    // ------------------------------------------------------------------ Enough is Enough
+
+    /**
+     * The clock is thirty seconds, and it belongs to one thing rather than to the sea.
+     */
+    private static void thirtySecondsEach() {
+        EnoughIsEnough.reset();
+        check(EnoughIsEnough.PATIENCE_TICKS == 600, "thirty seconds at twenty ticks a second");
+        UUID swimmer = UUID.randomUUID(), other = UUID.randomUUID();
+        check(!EnoughIsEnough.marked(swimmer), "something the sea has never met is not decided about");
+        check(EnoughIsEnough.remaining(swimmer) == EnoughIsEnough.PATIENCE_TICKS, "and has its whole thirty seconds");
+
+        long now = 0;
+        for (int tick = 10; tick < EnoughIsEnough.PATIENCE_TICKS; tick += 10) {
+            now = tick;
+            EnoughIsEnough.present(swimmer, now, 10);
+            check(!EnoughIsEnough.marked(swimmer), "at " + tick + " ticks it is still being played with");
+        }
+        EnoughIsEnough.present(swimmer, now += 10, 10);
+        check(EnoughIsEnough.marked(swimmer), "at six hundred ticks it is not");
+        check(!EnoughIsEnough.marked(other), "and the thing that arrived later still is");
+
+        // A second arrival, thirty seconds behind the first, is on its own clock the whole way.
+        for (int tick = 0; tick < EnoughIsEnough.PATIENCE_TICKS; tick += 10) EnoughIsEnough.present(other, now += 10, 10);
+        check(EnoughIsEnough.marked(other), "which runs out in its own time");
+
+        EnoughIsEnough.forget(swimmer);
+        check(!EnoughIsEnough.marked(swimmer), "being killed hands back a full thirty seconds");
+        EnoughIsEnough.reset();
+    }
+
+    /**
+     * Presence, not wall time.
+     *
+     * <p>Nothing can be hunted while its chunk is unloaded, so nothing should be spending its
+     * patience there either: an animal that sat in an unloaded chunk for an hour has used none of
+     * its thirty seconds, and something gone long enough is forgotten and starts again.
+     */
+    private static void theClockCountsPresence() {
+        EnoughIsEnough.reset();
+        UUID drifter = UUID.randomUUID();
+        long now = 0;
+        for (int tick = 0; tick < 300; tick += 10) EnoughIsEnough.present(drifter, now += 10, 10);
+        check(EnoughIsEnough.remaining(drifter) == 300, "half spent after fifteen seconds in the water");
+
+        // Gone, but not long enough to be forgotten: the clock is where it was left.
+        now += EnoughIsEnough.FORGET_TICKS - 40;
+        EnoughIsEnough.sweep(now);
+        check(EnoughIsEnough.remaining(drifter) == 300, "an hour in an unloaded chunk costs it nothing");
+        for (int tick = 0; tick < 300; tick += 10) EnoughIsEnough.present(drifter, now += 10, 10);
+        check(EnoughIsEnough.marked(drifter), "and the rest of the thirty seconds finishes it");
+
+        // Gone for good.
+        EnoughIsEnough.sweep(now + EnoughIsEnough.FORGET_TICKS);
+        check(!EnoughIsEnough.marked(drifter), "something the sea has not seen for a minute is forgotten");
+        check(EnoughIsEnough.tracked() == 0, "and its clock is not kept");
+
+        for (int i = 0; i < EnoughIsEnough.MAX_TRACKED + 50; i++) EnoughIsEnough.present(UUID.randomUUID(), 1, 10);
+        check(EnoughIsEnough.tracked() <= EnoughIsEnough.MAX_TRACKED, "the table is bounded (" + EnoughIsEnough.tracked() + ")");
+        EnoughIsEnough.reset();
+    }
+
+    /**
+     * Past zero there is nothing in the repertoire that is not a kill.
+     *
+     * <p>The scream and the vortex are area denial, the coil is a set piece with a way out of it
+     * and the feint is a lie: all four are things the creature does while it is still enjoying
+     * itself. What is left has to be the jaws, the two patterns that run the body through the prey,
+     * the grab that leads to being dragged under, and the leaps.
+     */
+    private static void aDecidedTargetIsOnlyEverKilled() {
+        Set<LeviathanAttack> playing = EnumSet.of(LeviathanAttack.FAKE_ATTACK, LeviathanAttack.VOID_SCREAM,
+            LeviathanAttack.WATER_VORTEX, LeviathanAttack.BODY_CRUSH, LeviathanAttack.TAIL_SWEEP,
+            LeviathanAttack.SURFACE_RAM);
+        Set<LeviathanAttack> seen = EnumSet.noneOf(LeviathanAttack.class);
+        for (int step = 0; step <= 100; step++) {
+            float roll = step / 100f;
+            for (double distance : new double[] { 4, 20, 43, 44, 45, 80, 140 }) {
+                for (boolean holding : new boolean[] { false, true }) {
+                    for (boolean airborne : new boolean[] { false, true }) {
+                        for (boolean canLeap : new boolean[] { false, true }) {
+                            LeviathanAttack pick = EnoughIsEnough.strike(roll, distance, holding, airborne, canLeap);
+                            if (pick.lethal() && !playing.contains(pick)) { seen.add(pick); continue; }
+                            throw new AssertionError("a decided target was offered " + pick
+                                + " at roll " + roll + ", " + distance + " blocks, holding=" + holding);
+                        }
+                    }
+                }
+            }
+        }
+        check(true, "no roll, range or posture answers a decided target with anything but a kill");
+        check(seen.contains(LeviathanAttack.PREDATORY_BITE) && seen.contains(LeviathanAttack.DRAG_BELOW),
+            "it bites and it drags");
+        check(seen.contains(LeviathanAttack.SKY_LEAP), "and it leaves the water after anything that does");
+
+        check(EnoughIsEnough.strike(0.9f, 5, true, false, false) == LeviathanAttack.AIR_THROW
+            && EnoughIsEnough.strike(0.1f, 5, true, false, false) == LeviathanAttack.DRAG_BELOW,
+            "something already in the jaws is taken down or thrown, never let go of");
+        check(EnoughIsEnough.strike(0.5f, 5, false, false, true) == LeviathanAttack.SKY_LEAP,
+            "an available leap is always taken");
+        for (float roll : new float[] { 0f, 0.5f, 0.99f })
+            check(EnoughIsEnough.strike(roll, 200, false, false, false).range >= 40,
+                "a distant target is answered by something whose run covers the distance");
+    }
+
     // ------------------------------------------------------------------ the source itself
 
     /**
@@ -188,6 +302,26 @@ public final class HexorTest {
             }
         }
         check(checked >= 2, "found the creature's blows to check (" + checked + ")");
+    }
+
+    /**
+     * The hunt is not gated on anybody being in the dimension to see it.
+     *
+     * <p>This is a property of one line: the upkeep that holds the hunted thing's chunk, and pulls
+     * a remembered one back in when there is nothing loaded, must not sit behind the player check
+     * that the repositioning does. There is no way to ask that of a running world from here, so it
+     * is asked of the source.
+     */
+    private static void theHuntDoesNotNeedAnAudience(Path root) throws Exception {
+        List<String> lines = Files.readAllLines(root.resolve(
+            "src/main/java/com/hexgodofstories/warping/leviathan/PilgrimWarden.java"));
+        String call = null;
+        for (String line : lines) if (line.contains("keepHunting(level")) { call = line; break; }
+        check(call != null, "the realm's upkeep still keeps the hunt going");
+        check(!call.contains("players"), "and does it whether or not anybody is in the dimension");
+        String source = String.join("\n", lines);
+        check(source.contains("rememberQuarry("), "the realm remembers what was left in it");
+        check(source.contains("EnoughIsEnough.present("), "and spends every occupant's clock as it sweeps");
     }
 
     // ------------------------------------------------------------------ plumbing

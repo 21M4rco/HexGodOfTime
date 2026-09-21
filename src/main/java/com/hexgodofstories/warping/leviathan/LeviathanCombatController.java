@@ -159,6 +159,9 @@ public final class LeviathanCombatController {
             // has earned nothing, and comes back round faster.
             if (connected) cooldown += 10;
             cooldown = (int) (cooldown * (1.0 - 0.5 * self.frenzy()));
+            // Enough is Enough: the beat between patterns is part of the performance, and the
+            // performance is over. What is left is the time it takes to come back round.
+            if (decided()) cooldown = Math.min(cooldown, 8);
         }
     }
 
@@ -197,7 +200,8 @@ public final class LeviathanCombatController {
             // has decided to finish them, it chews, on its own rhythm rather than on this clock.
             shakeVictim(0.9f);
             eat(30f, false);
-            if (tick % 9 == 0 && self.held() instanceof LivingEntity living) jaws(living, 2.5f, 0);
+            // Chewing, on the jaws' own rhythm — nearly twice as often once it has decided.
+            if (tick % (decided() ? 5 : 9) == 0 && self.held() instanceof LivingEntity living) jaws(living, 2.5f, 0);
         }
     }
 
@@ -302,8 +306,9 @@ public final class LeviathanCombatController {
         steer(ring, 1.5 + progress * 1.4, 1.0f);
 
         if (tick >= attack.windup) {
-            // One short, obvious chance to get out before it closes.
-            escapeWindow = progress > 0.62 && progress < 0.74;
+            // One short, obvious chance to get out before it closes — unless the clock on this one
+            // has run out, in which case there is no chance on offer.
+            escapeWindow = !decided() && progress > 0.62 && progress < 0.74;
             if (!escapeWindow) {
                 for (LivingEntity near : around(victim.position(), radius + 6)) {
                     Vec3 pull = victim.position().subtract(near.position());
@@ -502,7 +507,10 @@ public final class LeviathanCombatController {
             double rise = Math.max(6.0, aim.y - self.getY());
             double climb = Math.min(140, Math.sqrt(2 * rise / LeviathanMoveControl.GRAVITY));
             // Leads are damped: prey that jinks should be missed sometimes, not chased by magic.
-            aim = new Vec3(here.x + drift.x * climb * 0.7, here.y + drift.y * climb * 0.35, here.z + drift.z * climb * 0.7);
+            // That is a courtesy extended to things it is still playing with. Against a decided
+            // target the solution is taken whole, which is what perfect aim actually means here.
+            double damp = decided() ? 1.0 : 0.7;
+            aim = new Vec3(here.x + drift.x * climb * damp, here.y + drift.y * climb * damp * 0.5, here.z + drift.z * climb * damp);
         }
         return new Vec3(aim.x, Math.min(aim.y, self.surfaceY() + MAX_LEAP), aim.z);
     }
@@ -612,6 +620,8 @@ public final class LeviathanCombatController {
      */
     private Vec3 lead(Entity prey, double ticks) {
         Vec3 drift = prey.getDeltaMovement();
+        // The vertical damping is geometry rather than mercy — a swimmer's vertical velocity is
+        // mostly bobbing — so it stays. The horizontal lead is already taken at face value.
         return prey.position().add(drift.x * ticks, drift.y * ticks * 0.3, drift.z * ticks);
     }
 
@@ -681,6 +691,11 @@ public final class LeviathanCombatController {
 
     private List<LivingEntity> around(Vec3 centre, double radius) {
         return self.level().getEntitiesOfClass(LivingEntity.class, new AABB(centre, centre).inflate(radius), e -> prey(e) && e.position().distanceToSqr(centre) <= radius * radius);
+    }
+
+    /** Whether the thing this pattern is being run against has had its thirty seconds. */
+    private boolean decided() {
+        return victim != null && EnoughIsEnough.marked(victim.getUUID());
     }
 
     private boolean prey(LivingEntity entity) {

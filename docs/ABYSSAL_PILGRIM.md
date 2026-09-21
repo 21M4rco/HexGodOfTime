@@ -536,3 +536,73 @@ None of that is play. Whether four bites is the right number of bites for a ward
 with eight things in it reads as a creature that has stopped playing or merely as a faster one, and
 whether the title's colour is legible against the sky it is read against, are all judgements only a
 game session settles.
+
+## 0.5.13 — Enough is Enough, and a sea that does not need an audience
+
+Base: successful Actions run 35644572702 plus the scale and the crowd of 0.5.12.
+
+### Thirty seconds each
+
+The second passive, and the one that ends arguments about whether the creature will ever commit:
+every living thing in the realm carries its own clock, thirty seconds long, spent by the sweep that
+already walks the dimension six times a second. The clock belongs to the thing rather than to the
+sea, so two swimmers who arrived a minute apart run on two different clocks, and one can be watched
+from below while the other is being eaten.
+
+Past zero, for that target only:
+
+- The state roll stops being rolled. It is held on the committed approach, or on the frenzy that
+  replaces it, whatever it happened to be in the middle of when the clock ran out — a stalk in
+  progress ends on the tick the clock does.
+- The attack table is replaced by one with nothing in it that is not a kill. The scream and the
+  vortex are area denial, the coil is a set piece with an escape window in it, and the feint is a
+  lie; all four are things the creature does while it is still enjoying itself. What is left is the
+  jaws, the two patterns that run the body through the prey, the grab that ends with being dragged
+  down, and the leaps.
+- The pause between patterns collapses to under half a second, the leap stops being rationed —
+  two seconds rather than seven to seventeen — a held body is chewed nearly twice as often, and the
+  short chance to get out of the closing coil is not offered.
+- Its knowledge stops being an estimate. The long range fuzz is overwritten with the truth every
+  tick, and the ballistic leads its leaps are solved from stop being damped. Prey that jinks is
+  supposed to be missed sometimes; not this one.
+- The hunt stops reassigning itself. Unpredictable target switching is what keeps a group from
+  learning who is safe, which is a property of playing, and a decided target is also worth five
+  times what anything else in the water scores.
+
+The clock counts presence, not wall time: it only runs on the ticks the sweep can see the thing, so
+a minute spent in an unloaded chunk costs nothing. Being killed clears it, and so does being gone
+for a minute — whatever comes back is a new toy.
+
+### The sea does not stop because nobody is watching
+
+A player leaving the dimension used to end the hunt for everything else in it. Only the creature
+holds a chunk ticket, so the moment the last player left, every animal, summon and imported mob
+fell out of the entity manager: the target scan reads loaded entities, found an empty ocean, and
+whatever was left swimming survived by being unobserved.
+
+The realm now remembers where each non-player occupant was last seen — persisted with the singleton
+claim, bounded to sixteen, so a restart is not an amnesty and a sea somebody has filled with
+livestock cannot grow the save file — and the upkeep holds exactly one chunk ticket at a time on
+the strength of it. Whatever is being hunted keeps its own chunk ticking, so a chase does not end
+because the prey drifted outside the creature's own held radius. With nothing loaded to hunt, the
+nearest remembered occupant is pulled back in instead, which puts it in front of the ordinary
+target scan and the hunt resumes by itself; if it is most of a kilometre away the creature is moved
+to within a few hundred blocks of it first, the same move the realm already makes when it has lost
+every player. A memory whose chunk comes back without its occupant is dropped, which is what
+something having genuinely left the realm looks like from in here.
+
+### What is checked, and what is not
+
+`verifyHexor` covers the clock: that it is thirty seconds, that it is per entity rather than per
+realm, that it counts presence rather than wall time, that a forgotten thing starts again and that
+the table is bounded. The decided attack table is a pure function and is checked exhaustively —
+across every roll, range and posture it never answers with a feint, a scream, a vortex, a coil, a
+tail sweep or a ram, something already in the jaws is always taken down or thrown, an available
+leap is always taken, and a distant target is always answered by a pattern whose run covers the
+distance. The unattended hunt is checked where it can be, at the source: that the upkeep which
+holds the chunks is not behind the player test the repositioning uses.
+
+Not checked, and needing a session: whether thirty seconds is the right length of theatre before
+the creature stops performing; whether a decided hunt reads as a decision rather than as the AI
+breaking; and what one chunk ticket in an otherwise empty dimension costs a server over hours of
+nobody being in it.

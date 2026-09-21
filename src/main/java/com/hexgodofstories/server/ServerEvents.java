@@ -88,6 +88,8 @@ public final class ServerEvents {
     @SubscribeEvent public static void death(LivingDeathEvent e) {
         // A kill feeds the Pilgrim's patience back, which is what makes it willing to play again.
         if(e.getSource().getEntity() instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity pilgrim&&pilgrim.ai()!=null)pilgrim.ai().noteKill();
+        // Whatever it had decided about is dead. Anything that comes back gets its thirty seconds.
+        com.hexgodofstories.warping.leviathan.EnoughIsEnough.forget(e.getEntity().getUUID());
         Erasure.forget(e.getEntity());
         Bleed.clear(e.getEntity());
         Threat.forget(e.getEntity());

@@ -87,7 +87,11 @@ public final class LeviathanHuntController {
         if (switchCooldown > 0) switchCooldown--;
         if (target != null && (!target.isAlive() || target.level() != level || target.isSpectator() || (target instanceof Player p && (p.isCreative() || p.isSpectator())))) target = null;
 
-        if ((target == null || switchCooldown <= 0) && scanCooldown-- <= 0) {
+        // Enough is Enough holds the hunt on its subject. Unpredictable reassignment is what keeps
+        // a group from learning who is safe, which is a property of playing; once the clock on one
+        // of them has run out there is nothing left to be unpredictable about.
+        boolean locked = target != null && target.isAlive() && EnoughIsEnough.marked(target.getUUID());
+        if (!locked && (target == null || switchCooldown <= 0) && scanCooldown-- <= 0) {
             scanCooldown = 20;
             Entity candidate = choose(level);
             if (candidate != null && candidate != target) {
@@ -137,6 +141,7 @@ public final class LeviathanHuntController {
         for (Entity candidate : pool) {
             double distance = Math.sqrt(self.distanceToSqr(candidate));
             double score = 1200.0 / (60.0 + distance);
+            if (EnoughIsEnough.marked(candidate.getUUID())) score *= 5.0;  // it has already decided about this one
             if (candidate instanceof Player) score *= 3.4;                 // intelligent prey is the point
             if (candidate.isInWater()) score *= 1.55;                      // back in the water means back on the menu
             if (candidate.getDeltaMovement().lengthSqr() > 0.09) score *= 1.2;

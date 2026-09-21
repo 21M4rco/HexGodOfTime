@@ -58,9 +58,12 @@ public final class PilgrimWarden {
     /** Who was in the water last time we looked. A dry to wet transition is a detection event. */
     private static final Set<UUID> WET = new HashSet<>();
 
+    /** Ticks between sweeps of the realm. Also what each sweep spends off an occupant's clock. */
+    private static final int SURVEY = 10;
+
     private PilgrimWarden() { }
 
-    public static void reset() { WET.clear(); }
+    public static void reset() { WET.clear(); EnoughIsEnough.reset(); }
 
     /** Holds one chunk in an entity ticking state for the lifetime of the ticket. */
     public static void hold(ServerLevel level, ChunkPos pos) {
@@ -159,7 +162,9 @@ public final class PilgrimWarden {
                     if (entity instanceof AbyssalPilgrimEntity rival && rival != owner) rival.discard();
             }
         }
-        if (now % 10 == 0) surveyRealm(level, players, now % 200 == 0);
+        if (now % SURVEY == 0) surveyRealm(level, now);
+        // Deliberately not gated on anybody being here to see it.
+        if (now % 40 == 0) keepHunting(level);
         if (now % 200 == 0 && !players.isEmpty()) reposition(level, players);
     }
 
@@ -177,10 +182,11 @@ public final class PilgrimWarden {
      * about how many things are currently wet. Loaded entities only, which in practice is every
      * player and everything near one.
      */
-    private static void surveyRealm(ServerLevel level, List<ServerPlayer> players, boolean sweep) {
+    private static void surveyRealm(ServerLevel level, long now) {
         Set<UUID> wetNow = new HashSet<>();
         AbyssalPilgrimEntity pilgrim = ensure(level);
         if (pilgrim == null || pilgrim.ai() == null || pilgrim.isDying()) return;
+        PilgrimRegistry registry = PilgrimRegistry.of(level);
         net.minecraft.world.entity.Entity entrant = null;
         int occupants = 0;
         for (net.minecraft.world.entity.Entity entity : level.getAllEntities()) {
@@ -188,6 +194,9 @@ public final class PilgrimWarden {
                     || !entity.isAlive() || entity.isSpectator()
                     || entity instanceof Player p && p.isCreative()) continue;
             occupants++;
+            // Both passives are fed from here: how many there are, and how long each one has left.
+            EnoughIsEnough.present(entity.getUUID(), now, SURVEY);
+            if (!(entity instanceof Player)) registry.rememberQuarry(entity.getUUID(), new ChunkPos(entity.blockPosition()));
             // Airborne presence is handled by global hunting. WET must only track actual water.
             if (!entity.isInWater()) continue;
             wetNow.add(entity.getUUID());
@@ -195,7 +204,52 @@ public final class PilgrimWarden {
         }
         pilgrim.ai().occupants(occupants);
         if (entrant != null) pilgrim.ai().alert(entrant);
+        EnoughIsEnough.sweep(now);
         WET.clear(); WET.addAll(wetNow);
+    }
+
+    /**
+     * The sea does not stop because nobody is watching it.
+     *
+     * <p>A player leaving the dimension used to end the hunt for everything else in it. Only the
+     * creature holds a chunk ticket, so the moment the last player leaves, every animal, summon and
+     * imported mob falls out of the entity manager: the hunt scans loaded entities and finds an
+     * empty ocean, and whatever was left swimming survives by being unobserved.
+     *
+     * <p>Two tickets fix that, and never more than one at a time. Whatever is being hunted keeps
+     * its own chunk ticking, so a chase does not end because the prey drifted out of the creature's
+     * own held radius. With nothing loaded to hunt, the nearest thing the realm remembers is pulled
+     * back in instead, which puts it in front of the ordinary target scan and the hunt resumes on
+     * its own. A memory whose chunk comes back without it is dropped: that is what a thing having
+     * genuinely left looks like from here.
+     */
+    private static void keepHunting(ServerLevel level) {
+        AbyssalPilgrimEntity pilgrim = ensure(level);
+        if (pilgrim == null || pilgrim.ai() == null || pilgrim.isDying()) return;
+        net.minecraft.world.entity.Entity target = pilgrim.ai().hunt().target();
+        if (target != null && target.isAlive() && target.level() == level) {
+            hold(level, new ChunkPos(target.blockPosition()));
+            return;
+        }
+        PilgrimRegistry registry = PilgrimRegistry.of(level);
+        UUID nearest = null; ChunkPos where = null; double best = Double.MAX_VALUE;
+        // Copied, because a memory that turns out to be stale is dropped while we are walking it.
+        for (var entry : new java.util.LinkedHashMap<>(registry.quarry()).entrySet()) {
+            ChunkPos at = entry.getValue();
+            if (level.hasChunk(at.x, at.z) && level.getEntity(entry.getKey()) == null) {
+                // Its chunk is here and it is not. It died, despawned or was taken out of the realm.
+                registry.forgetQuarry(entry.getKey());
+                EnoughIsEnough.forget(entry.getKey());
+                continue;
+            }
+            double distance = pilgrim.distanceToSqr(at.getMiddleBlockX(), pilgrim.getY(), at.getMiddleBlockZ());
+            if (distance < best) { best = distance; nearest = entry.getKey(); where = at; }
+        }
+        if (nearest == null || where == null) return;
+        hold(level, where);
+        // Remembered, loadable, and most of a kilometre away: swim to it rather than wait for it.
+        if (best > LOST * LOST) relocateNear(level, pilgrim,
+            new Vec3(where.getMiddleBlockX(), Mth.clamp(pilgrim.getY(), VoidSea.FLOOR + 40, VoidSea.SURFACE - 50), where.getMiddleBlockZ()));
     }
 
     /**
@@ -213,12 +267,17 @@ public final class PilgrimWarden {
             if (d < best) { best = d; nearest = player; }
         }
         if (nearest == null || best <= LOST * LOST) return;
+        relocateNear(level, pilgrim, nearest.position().add(0, -200, 0));
+    }
+
+    /** Puts the creature a few hundred blocks from a point, deep, and facing nowhere in particular. */
+    private static void relocateNear(ServerLevel level, AbyssalPilgrimEntity pilgrim, Vec3 anchor) {
         RandomSource random = level.random;
         double angle = random.nextDouble() * Mth.TWO_PI;
         double radius = 180 + random.nextDouble() * 160;
-        pilgrim.moveTo(nearest.getX() + Math.cos(angle) * radius,
-            Mth.clamp(nearest.getY() - 200, VoidSea.FLOOR + 40, VoidSea.SURFACE - 50),
-            nearest.getZ() + Math.sin(angle) * radius, random.nextFloat() * 360f, 0f);
+        pilgrim.moveTo(anchor.x + Math.cos(angle) * radius,
+            Mth.clamp(anchor.y, VoidSea.FLOOR + 40, VoidSea.SURFACE - 50),
+            anchor.z + Math.sin(angle) * radius, random.nextFloat() * 360f, 0f);
         PilgrimRegistry.of(level).remember(new ChunkPos(pilgrim.blockPosition()));
     }
 

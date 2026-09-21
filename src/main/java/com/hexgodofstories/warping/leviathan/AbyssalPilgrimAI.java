@@ -27,6 +27,11 @@ import javax.annotation.Nullable;
  * in the realm: alone with one swimmer the creature behaves exactly as it always has, and every
  * further occupant caps its patience, floors its frenzy, winds the commit clock faster and, out in
  * {@link LeviathanMoveControl} and {@link HexorBlow}, makes it faster and heavier handed.
+ *
+ * <p>Both are also overridden outright, for one target at a time, by {@link EnoughIsEnough}. Thirty
+ * seconds after the realm first sees something, the creature is done playing with that thing in
+ * particular: the states below that do not commit are not chosen, the attack roll can only come up
+ * lethal, the leap stops being rare and its knowledge of where that thing is stops being a guess.
  */
 public final class AbyssalPilgrimAI {
     /** Deliberately non lethal harassment. */
@@ -70,6 +75,8 @@ public final class AbyssalPilgrimAI {
     private int leapCooldown;
     /** Living things in the realm that are not Hexor, as the realm's own sweep last counted them. */
     private int occupants = TrillOfTheHunt.ALONE;
+    /** True while the thing currently being hunted has run its {@link EnoughIsEnough} clock out. */
+    private boolean decided;
 
     public AbyssalPilgrimAI(AbyssalPilgrimEntity self) {
         this.self = self;
@@ -134,6 +141,13 @@ public final class AbyssalPilgrimAI {
 
         if (alertCooldown > 0) alertCooldown--;
         hunt.tick(level);
+        // Enough is Enough. The clock belongs to the target rather than to the creature, so this is
+        // read fresh every tick: a hunt that switches to something newer goes back to being a game.
+        // A decided target is also known exactly, every tick, instead of through the fuzzed
+        // estimate the long range search runs on.
+        Entity quarry = hunt.target();
+        decided = quarry != null && EnoughIsEnough.marked(quarry.getUUID());
+        if (decided) hunt.sharpen(quarry);
         combat.tick();
         // Landing something is the only thing that buys patience back. Nothing else resets this:
         // not a new state, not a new target, not another lap. Read on the tick the blow lands
@@ -169,6 +183,9 @@ public final class AbyssalPilgrimAI {
             hunt.sharpen(hunt.target());
             if (state != LeviathanState.HUNT) setState(LeviathanState.HUNT);
         } else if (stateTicks >= stateLimit) chooseState(random);
+
+        // Whatever it was in the middle of when the clock ran out, it is not doing it any more.
+        if (decided && !state.committed()) setState(LeviathanState.HUNT);
 
         switch (state) {
             case SEARCH -> search(level);
@@ -247,6 +264,9 @@ public final class AbyssalPilgrimAI {
 
     private void chooseState(RandomSource random) {
         if (!hunt.hasTarget()) { setState(LeviathanState.SEARCH); return; }
+        // Nothing is rolled for a target it has finished playing with: it closes, or it is already
+        // past closing. The approach in HUNT works at any range, so no tracking state is needed.
+        if (decided) { setState(frenzy > 0.75f ? LeviathanState.FRENZY : LeviathanState.HUNT); return; }
         double distance = hunt.targetDistance();
 
         if (frenzy > 0.75f) { setState(LeviathanState.FRENZY); return; }
@@ -371,7 +391,9 @@ public final class AbyssalPilgrimAI {
     private boolean takeLeap() {
         if (leapCooldown > 0 || self.isDying() || self.depth() >= 220) return false;
         if (!hunt.leapable(58, LeviathanAttack.SKY_LEAP.range)) return false;
-        leapCooldown = 140 + self.getRandom().nextInt(200);
+        // A leviathan permanently in the air is a fountain, so the gap stays — but for a target it
+        // has decided about, leaving the water is the answer rather than an event worth rationing.
+        leapCooldown = decided ? 40 + self.getRandom().nextInt(60) : 140 + self.getRandom().nextInt(200);
         return true;
     }
 
@@ -380,6 +402,10 @@ public final class AbyssalPilgrimAI {
         boolean surface = target.getY() > self.surfaceY() - 6;
         boolean holding = self.held() != null;
 
+        // Decided: one table, nothing in it that is not a kill. Claiming the leap is skipped while
+        // something is already in the jaws, because that pattern never comes up holding.
+        if (decided) return EnoughIsEnough.strike(random.nextFloat(), distance, holding,
+            hunt.airborneTarget(), !holding && takeLeap());
         if (holding) return random.nextFloat() < 0.5f ? LeviathanAttack.AIR_THROW : LeviathanAttack.DRAG_BELOW;
         // Anything off the water is answered by leaving the water. The short leap is the ordinary
         // reply; the long breach is saved for prey far enough up to be worth the whole run up.

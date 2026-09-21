@@ -40,6 +40,14 @@ Everything below needs a recorded in-game session and **has not had one**. Nothi
   cross the threshold the AI branches on. Whether a sea with eight things in it reads as a creature
   that has stopped playing, rather than merely as a faster one, needs several players in the water
   at once, which has not happened.
+- **Thirty seconds of theatre.** The clock, its per-entity ownership and the decided attack table
+  are checked by `verifyHexor`. Whether thirty seconds is the right amount of stalking before the
+  creature stops performing, and whether the switch reads as a decision rather than as the AI
+  breaking, are play judgements.
+- **The hunt with nobody in the dimension.** The chunk the hunt holds, the remembered occupants and
+  the relocation are source-level and bounded by construction. That something left in the water is
+  actually dead when a player returns has not been observed, and what one held chunk ticket costs
+  an idle server over hours has not been measured.
 - **The Void Sea's arrival title.** That it is sent on every entry is source-level; that the colour
   is legible against the realm's sky during the fifty block fall has not been seen.
 - **Flight removal in play.** That no dimension but the fracture world grants flight is enforced in one place and exercised by the server regression for the Void Sea. Whether the Sun, the Crushing Realm and the Falling World are now fair without it has not been played.

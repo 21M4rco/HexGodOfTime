@@ -1,11 +1,16 @@
 package com.hexgodofstories.warping.leviathan;
 
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import javax.annotation.Nullable;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -29,6 +34,20 @@ public final class PilgrimRegistry extends SavedData {
     private int lastChunkX, lastChunkZ;
     private boolean located;
 
+    /**
+     * Where each thing left in the realm was last seen.
+     *
+     * <p>The hunt can only find loaded entities, and with nobody in the dimension the only loaded
+     * chunks are the ones the creature is holding around itself. Without this, anything left in
+     * the water would simply stop existing the moment the last player left and start existing
+     * again when one came back, which is a sea that only happens while it is being watched.
+     *
+     * <p>Persisted, so a restart does not amount to an amnesty, and bounded, so a realm somebody
+     * has filled with livestock cannot grow the save file without limit.
+     */
+    private final Map<UUID, ChunkPos> quarry = new LinkedHashMap<>();
+    public static final int MAX_QUARRY = 16;
+
     public static PilgrimRegistry of(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(PilgrimRegistry::load, PilgrimRegistry::new, FILE);
     }
@@ -43,6 +62,11 @@ public final class PilgrimRegistry extends SavedData {
             registry.lastChunkZ = tag.getInt("LastChunkZ");
             registry.located = true;
         }
+        ListTag remembered = tag.getList("Quarry", Tag.TAG_COMPOUND);
+        for (int i = 0; i < remembered.size() && registry.quarry.size() < MAX_QUARRY; i++) {
+            CompoundTag entry = remembered.getCompound(i);
+            if (entry.hasUUID("Id")) registry.quarry.put(entry.getUUID("Id"), new ChunkPos(entry.getInt("X"), entry.getInt("Z")));
+        }
         return registry;
     }
 
@@ -50,6 +74,13 @@ public final class PilgrimRegistry extends SavedData {
     public CompoundTag save(CompoundTag tag) {
         if (pilgrim != null) tag.putUUID("Pilgrim", pilgrim);
         if (located) { tag.putInt("LastChunkX", lastChunkX); tag.putInt("LastChunkZ", lastChunkZ); }
+        ListTag remembered = new ListTag();
+        quarry.forEach((id, at) -> {
+            CompoundTag entry = new CompoundTag();
+            entry.putUUID("Id", id); entry.putInt("X", at.x); entry.putInt("Z", at.z);
+            remembered.add(entry);
+        });
+        tag.put("Quarry", remembered);
         return tag;
     }
 
@@ -84,6 +115,28 @@ public final class PilgrimRegistry extends SavedData {
         if (missingSince < 0) missingSince = now;
         return now - missingSince >= 200;
     }
+
+    /**
+     * Notes where something in the realm was, so the hunt can go back to it once the chunk it was
+     * standing in has been let go of. The oldest memory is dropped when the table is full, since
+     * the creature's attention is finite and the newest arrival is the one it saw last.
+     */
+    public void rememberQuarry(UUID id, ChunkPos at) {
+        ChunkPos known = quarry.get(id);
+        if (known != null && known.x == at.x && known.z == at.z) return;
+        if (known == null && quarry.size() >= MAX_QUARRY) {
+            UUID oldest = quarry.keySet().iterator().next();
+            quarry.remove(oldest);
+        }
+        quarry.put(id, at);
+        setDirty();
+    }
+
+    /** Eaten, gone, or looked for in a loaded chunk and not there. */
+    public void forgetQuarry(UUID id) { if (quarry.remove(id) != null) setDirty(); }
+
+    /** Everything the realm remembers having in it, oldest memory first. */
+    public Map<UUID, ChunkPos> quarry() { return Collections.unmodifiableMap(quarry); }
 
     /** Only ever called when the claimed creature is gone for good. */
     public void release() {
