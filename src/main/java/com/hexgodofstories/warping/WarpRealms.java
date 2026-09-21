@@ -131,6 +131,9 @@ public final class WarpRealms {
     // ------------------------------------------------------------------ bounds --
     /** Nothing falls out of a realm, rises out of one, or wanders into the next instance. */
     private static void contain(ServerLevel l,Destination d,Entity e,double cell,long age,boolean sovereign) {
+        // Creative is outside the world's rules everywhere else; a realm is no different. An admin
+        // flying a trap apart should not be recalled to its arrival point mid-inspection.
+        if(e instanceof Player p&&p.isCreative())return;
         double floor=switch(d){
             case VOID_SEA -> 1;
             case CRUSHING_REALM -> 88;
@@ -143,8 +146,10 @@ public final class WarpRealms {
                 case SUN,FALLING_WORLD -> {
                     // The collapse has a bottom. Hitting it hurts exactly as much as the fall earned,
                     // and then the world puts the victim back at the top to do it again.
-                    if(d==Destination.FALLING_WORLD&&e instanceof LivingEntity faller){
-                        float impact=(float)Math.min(45,-e.getDeltaMovement().y*14-4);
+                    // Containment runs ahead of the sovereign exemption, so the impact has to
+                    // respect it here: the collapse does not get to hurt the one who built it.
+                    if(d==Destination.FALLING_WORLD&&!sovereign&&e instanceof LivingEntity faller){
+                        float impact=(float)Math.min(30,-e.getDeltaMovement().y*11-4);
                         if(impact>0)faller.hurt(l.damageSources().fall(),impact);
                     }
                     e.teleportTo(e.getX(),d==Destination.SUN?190:231,e.getZ());
