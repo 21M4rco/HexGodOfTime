@@ -59,6 +59,39 @@ public final class HexCommands {
             c.getSource().sendSuccess(()->Component.literal(p.getGameProfile().getName()+" — "+HexData.selected(p).title
                 +" | energy "+Math.round(HexData.energy(p))+"/"+Math.round(HexData.maxEnergy(p))
                 +" | ascended "+HexData.get(p).getBoolean("ascended")),false);return 1;}));
+        // The Void Sea's hunter spends most of its life out of sight on purpose, which makes
+        // "is it even there" a fair question. These answer it without breaking the illusion in play.
+        var pilgrim=Commands.literal("pilgrim");
+        pilgrim.then(Commands.literal("where").executes(c->{
+            ServerLevel level=c.getSource().getLevel();
+            var list=level.getEntitiesOfClass(com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity.class,
+                new net.minecraft.world.phys.AABB(-3.0E7,-3.0E7,-3.0E7,3.0E7,3.0E7,3.0E7));
+            var from=c.getSource().getPosition();
+            if(list.isEmpty()){c.getSource().sendSuccess(()->Component.literal("Nothing is hunting this ocean."),false);return 0;}
+            for(var q:list)c.getSource().sendSuccess(()->Component.literal(String.format(
+                "%s \u00b7 %.0f %.0f %.0f \u00b7 %.0f blocks away \u00b7 lumen %d%%",
+                q.state().name(),q.getX(),q.getY(),q.getZ(),Math.sqrt(q.distanceToSqr(from)),Math.round(q.glow()*100))),false);
+            return list.size();}));
+        pilgrim.then(Commands.literal("summon").executes(c->{
+            ServerPlayer p=c.getSource().getPlayerOrException();ServerLevel level=p.serverLevel();
+            var q=com.hexgodofstories.warping.leviathan.PilgrimWarden.ensure(level,com.hexgodofstories.warping.WarpMath.cellX(p.getX()));
+            if(q==null){c.getSource().sendFailure(Component.literal("No hunter in this cell yet; try /hgos pilgrim spawn."));return 0;}
+            double a=p.getRandom().nextDouble()*Math.PI*2;
+            q.moveTo(p.getX()+Math.cos(a)*46,Math.max(com.hexgodofstories.warping.VoidSea.FLOOR+30,p.getY()-34),p.getZ()+Math.sin(a)*46,(float)(Math.toDegrees(a)),0f);
+            if(q.ai()!=null)q.ai().alert(p);
+            c.getSource().sendSuccess(()->Component.literal("It knows where you are."),true);return 1;}));
+        pilgrim.then(Commands.literal("spawn").executes(c->{
+            ServerPlayer p=c.getSource().getPlayerOrException();
+            var q=com.hexgodofstories.warping.leviathan.PilgrimWarden.spawn(p.serverLevel(),com.hexgodofstories.warping.WarpMath.cellX(p.getX()),p.position());
+            c.getSource().sendSuccess(()->Component.literal(q==null?"The abyss refused.":"The Abyssal Pilgrim has been given this ocean."),true);
+            return q==null?0:1;}));
+        pilgrim.then(Commands.literal("purge").executes(c->{
+            var list=c.getSource().getLevel().getEntitiesOfClass(com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity.class,
+                new net.minecraft.world.phys.AABB(-3.0E7,-3.0E7,-3.0E7,3.0E7,3.0E7,3.0E7));
+            for(var q:list)q.beginDeath();
+            int n=list.size();
+            c.getSource().sendSuccess(()->Component.literal("Death sequence started for "+n+" leviathan(s)."),true);return n;}));
+        root.then(pilgrim);
         root.then(player);e.getDispatcher().register(root);
     }
 }

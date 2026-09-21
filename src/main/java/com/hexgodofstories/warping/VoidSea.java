@@ -17,13 +17,19 @@ public final class VoidSea {
     public static final int MIN_Y = -768, HEIGHT = 1280;
     public static final int MAX_Y = MIN_Y + HEIGHT - 1;
 
-    /** Layer stack in data/hexgodofstories/dimension/warping_void_sea.json. */
-    public static final int BEDROCK = 1, DEEPSLATE = 64, TUFF = 16, GRAVEL = 2, WATER = 935;
+    /**
+     * Layer stack in data/hexgodofstories/dimension/warping_void_sea.json.
+     *
+     * <p>The floor is Nothingness, not stone. It has bedrock's hardness, no loot table and no item
+     * form, so the bottom of this realm cannot be mined, blown open or dug through — there is no
+     * back door out of the Pilgrim's ocean, and no way to stand in a pocket underneath it.
+     */
+    public static final int BASE = 83, WATER = 935;
 
     /** Topmost water block. Everything above this is air. */
-    public static final int SURFACE = MIN_Y + BEDROCK + DEEPSLATE + TUFF + GRAVEL + WATER - 1;
+    public static final int SURFACE = MIN_Y + BASE + WATER - 1;
     /** Topmost solid block of the sea floor. */
-    public static final int FLOOR = MIN_Y + BEDROCK + DEEPSLATE + TUFF + GRAVEL - 1;
+    public static final int FLOOR = MIN_Y + BASE - 1;
     /** Usable water column in blocks. */
     public static final int DEPTH = SURFACE - FLOOR;
     /** Clear air above the waterline, which is what a full breach needs. */

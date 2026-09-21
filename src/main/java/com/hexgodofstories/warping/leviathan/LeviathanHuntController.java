@@ -49,6 +49,14 @@ public final class LeviathanHuntController {
 
     public void forget() { target = null; contactTicks = 0; estimateAge = 400; }
 
+    /** Replaces the fuzzed estimate with the real position. Used only by hard detection events. */
+    public void sharpen(Entity entity) {
+        if (entity == null) return;
+        estimate = entity.position();
+        estimateAge = 0;
+        contactTicks = Math.max(contactTicks, 40);
+    }
+
     public void focus(@Nullable Entity entity) {
         if (entity == null || entity == target) return;
         target = entity;

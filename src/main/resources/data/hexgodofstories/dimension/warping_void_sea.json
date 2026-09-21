@@ -9,20 +9,8 @@
       "structure_overrides": [],
       "layers": [
         {
-          "height": 1,
-          "block": "minecraft:bedrock"
-        },
-        {
-          "height": 64,
-          "block": "minecraft:deepslate"
-        },
-        {
-          "height": 16,
-          "block": "minecraft:tuff"
-        },
-        {
-          "height": 2,
-          "block": "minecraft:gravel"
+          "height": 83,
+          "block": "hexgodofstories:nothingness"
         },
         {
           "height": 935,

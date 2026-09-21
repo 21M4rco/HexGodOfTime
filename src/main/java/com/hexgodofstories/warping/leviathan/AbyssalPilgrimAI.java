@@ -41,6 +41,7 @@ public final class AbyssalPilgrimAI {
     private int callTimer = 200;
     private long lastKill;
     private int followUp = -1;
+    private int alertCooldown;
 
     public AbyssalPilgrimAI(AbyssalPilgrimEntity self) {
         this.self = self;
@@ -50,6 +51,21 @@ public final class AbyssalPilgrimAI {
 
     public LeviathanHuntController hunt() { return hunt; }
     public LeviathanCombatController combat() { return combat; }
+
+    /**
+     * Something just entered the water. This is the one signal that bypasses the creature's
+     * deliberately imperfect long range knowledge: it gets an exact position and commits.
+     */
+    public void alert(Entity prey) {
+        if (alertCooldown > 0 || prey == null || !prey.isAlive()) return;
+        alertCooldown = 80;
+        hunt.focus(prey);
+        hunt.sharpen(prey);
+        frenzy = Math.min(1f, frenzy + 0.10f);
+        double distance = hunt.targetDistance();
+        setState(distance < 140 ? LeviathanState.HUNT : LeviathanState.TRACK);
+        self.voice(HexGodOfStories.PILGRIM_TARGET_DETECTED.get(), 140f, 0.92f + self.getRandom().nextFloat() * 0.12f);
+    }
 
     /** Being struck cannot hurt it, but it does register who tried. */
     public void provoke(Entity source) {
@@ -62,6 +78,7 @@ public final class AbyssalPilgrimAI {
         if (!(self.level() instanceof ServerLevel level)) return;
         RandomSource random = self.getRandom();
 
+        if (alertCooldown > 0) alertCooldown--;
         hunt.tick(level);
         combat.tick();
         updateMood(level);

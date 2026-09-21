@@ -48,9 +48,10 @@ public final class VoidSeaShapeTest {
         Matcher m = Pattern.compile("\\{\"height\":(-?\\d+),\"block\":\"([^\"]+)\"\\}").matcher(dim);
         List<String> blocks = new ArrayList<>();
         while (m.find()) { layers.add(Integer.parseInt(m.group(1))); blocks.add(m.group(2)); }
-        check(layers.size() == 5, "the sea is bedrock, deepslate, tuff, gravel and water");
-        check(blocks.get(4).equals("minecraft:water"), "the top layer is water");
-        int[] expected = { VoidSea.BEDROCK, VoidSea.DEEPSLATE, VoidSea.TUFF, VoidSea.GRAVEL, VoidSea.WATER };
+        check(layers.size() == 2, "the sea is an indestructible floor and a water column");
+        check(blocks.get(0).equals("hexgodofstories:nothingness"), "the floor is Nothingness, so it cannot be dug through");
+        check(blocks.get(1).equals("minecraft:water"), "the column above it is water");
+        int[] expected = { VoidSea.BASE, VoidSea.WATER };
         for (int i = 0; i < expected.length; i++) check(layers.get(i) == expected[i], "layer " + i + " height matches VoidSea");
 
         int sum = 0;

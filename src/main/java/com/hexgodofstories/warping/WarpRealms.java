@@ -119,5 +119,5 @@ public final class WarpRealms {
         }
     }
     public static void releaseHazards(ServerPlayer p){if(!Warping.sovereign(p))return;for(WarpHazard h:p.serverLevel().getEntitiesOfClass(WarpHazard.class,p.getBoundingBox().inflate(96)))h.release(p.getLookAngle());HexNetwork.fx(p,"resume");}
-    public static void reset(){JOBS.clear();HISTORY.clear();}
+    public static void reset(){JOBS.clear();HISTORY.clear();com.hexgodofstories.warping.leviathan.PilgrimWarden.reset();}
 }

@@ -31,6 +31,7 @@ import software.bernie.geckolib.core.object.PlayState;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
 import javax.annotation.Nullable;
+import java.util.List;
 
 /**
  * The Abyssal Pilgrim. Sole apex creature of the abyss dimension and, by design, the only thing
@@ -66,7 +67,7 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
 
     private float bankIntent, bank, prevBank;
     private float renderGlow, prevRenderGlow;
-    private double cachedSurface = 247, cachedFloor = 2;
+    private double cachedSurface = VoidSea.SURFACE, cachedFloor = VoidSea.FLOOR;
     private int terrainClock;
     /** Client side, used to fade ambience and decide appendage detail. */
     private double viewerDistance = 1024;
@@ -228,6 +229,9 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
         super.tick();
 
         if (!level().isClientSide) {
+            // Without this the creature freezes the moment it leaves simulation distance, which is
+            // most of its life: it hunts from beyond sight on purpose.
+            if (tickCount % 20 == 0 && level() instanceof ServerLevel server) PilgrimWarden.renew(server, this);
             if (isDying()) tickDeathSequence();
             Vec3 motion = getDeltaMovement();
             if (motion.lengthSqr() > 1.0E-8) {
@@ -238,6 +242,7 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
                 setPos(nx, ny, nz);
             }
             setYHeadRot(getYRot());
+            if (tickCount % 2 == 0) bodyContact();
         }
 
         bank += Mth.wrapDegrees(bankIntent - bank) * 0.12f;
@@ -250,6 +255,34 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
         // Client only presentation lives in a class the dedicated server never resolves.
         if (level().isClientSide) net.minecraftforge.fml.DistExecutor.unsafeRunWhenOn(net.minecraftforge.api.distmarker.Dist.CLIENT,
             () -> () -> com.hexgodofstories.client.leviathan.LeviathanClientHooks.clientTick(this));
+    }
+
+    /**
+     * Full body contact. Anything overlapping a segment is shoved clear of it, and a body moving at
+     * speed hurts on the way past. Without this a hundred and sixty blocks of creature read as
+     * scenery: it would slide through a swimmer and neither would notice.
+     */
+    private void bodyContact() {
+        if (isDying() || !segments.primed()) return;
+        List<LivingEntity> near = level().getEntitiesOfClass(LivingEntity.class, segments.bounds(),
+            e -> e != this && e.isAlive() && !(e instanceof AbyssalPilgrimEntity)
+                 && !(e instanceof net.minecraft.world.entity.player.Player p && (p.isCreative() || p.isSpectator())));
+        if (near.isEmpty()) return;
+        double speed = getDeltaMovement().length();
+        for (LivingEntity victim : near) {
+            int index = segments.nearest(victim.position());
+            Vec3 centre = segments.segment(index);
+            double reach = LeviathanSegmentController.radius(index) + victim.getBbWidth() * 0.5;
+            Vec3 away = victim.position().subtract(centre);
+            double distance = away.length();
+            if (distance > reach) continue;
+            away = distance < 1.0E-4 ? new Vec3(0, 1, 0) : away.scale(1.0 / distance);
+            double shove = 0.30 + speed * 0.85;
+            victim.setDeltaMovement(victim.getDeltaMovement().scale(0.55).add(away.scale(shove)));
+            victim.hurtMarked = true;
+            victim.fallDistance = 0;
+            if (speed > 0.5 && tickCount % 10 == 0) victim.hurt(damageSources().mobAttack(this), (float) (2.0 + speed * 4.0));
+        }
     }
 
     private void positionParts() {
