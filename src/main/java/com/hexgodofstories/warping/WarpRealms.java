@@ -259,6 +259,12 @@ public final class WarpRealms {
             if(e.isAlive()&&!(e instanceof Player))e.discard();
             return;
         }
+        // Beyond the capture radius there is no ring to be on yet, only a fall toward one.
+        double distance=offset.length();
+        if(distance>WarpMath.CAPTURE){
+            field(e,offset.scale(-WarpMath.pull(distance)/distance),now);
+            return;
+        }
         double height=offset.dot(DISK_NORMAL);
         Vec3 plane=offset.subtract(DISK_NORMAL.scale(height));
         double radius=plane.length();
@@ -371,7 +377,8 @@ public final class WarpRealms {
             for(int[] pillar:RealmLayout.pressPillars())
                 for(int dx=0;dx<RealmLayout.PILLAR;dx++)for(int dz=0;dz<RealmLayout.PILLAR;dz++){
                     BlockPos pos=new BlockPos((int)cell+pillar[0]+dx,y,pillar[1]+dz);
-                    if(l.getBlockState(pos).isAir())continue;
+                    // Never force a chunk load to grind a column nobody is standing near.
+                    if(!l.isLoaded(pos)||l.getBlockState(pos).isAir())continue;
                     l.setBlock(pos,net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(),2|16);
                     broke=true;
                 }

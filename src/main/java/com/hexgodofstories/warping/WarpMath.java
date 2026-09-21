@@ -34,7 +34,7 @@ public final class WarpMath {
      * core of radius 10, a ring of debris from 12 to 35 tilted 0.28 radians about
      * the X axis, and anything further out than CAPTURE still falling toward it.
      */
-    public static final double WELL_Y=96,EVENT_HORIZON=10,DISK_INNER=12,DISK_OUTER=35,DISK_TILT=.28,CAPTURE=95,TIDAL=35;
+    public static final double WELL_Y=96,EVENT_HORIZON=10,DISK_INNER=12,DISK_OUTER=35,DISK_TILT=.28,CAPTURE=95;
     /**
      * Inward acceleration per tick for the far capture, before anything is on the
      * ring. Inverse-square close in, linear far out, capped. Strictly decreasing.
