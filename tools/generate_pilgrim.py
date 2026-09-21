@@ -60,112 +60,114 @@ def build_geometry():
     BONES.clear()
     bone('root', None, [0, 0, 0])
 
-    # --- skull: elongated, extraterrestrial, no normal eye sockets
-    r0 = radius(0)
-    head_cubes = [
-        cube([-r0 * 0.96, -r0 * 0.66, -150], [r0 * 1.92, r0 * 1.32, 206], 'armor', down='under'),
-        cube([-r0 * 0.74, r0 * 0.52, -128], [r0 * 1.48, 24, 168], 'spine'),
-        cube([-r0 * 0.58, -r0 * 0.46, -238], [r0 * 1.16, r0 * 0.94, 92], 'armor', down='under'),
-        cube([-r0 * 0.30, r0 * 0.60, -196], [r0 * 0.60, 18, 74], 'spine'),
-    ]
-    bone('head', 'root', [0, 0, 0], head_cubes)
+    def ribbon(points, width, tile):
+        # Overlapping stepped plates follow a sculpted curve, rather than rigid straight bars.
+        out = []
+        for k, (a, b) in enumerate(zip(points, points[1:])):
+            dist = math.dist(a, b)
+            steps = max(1, math.ceil(dist / (width * 0.75)))
+            for n in range(steps):
+                t = n / steps
+                v = [a[j] + (b[j] - a[j]) * t for j in range(3)]
+                w = width * (1 - 0.55 * (k + t) / (len(points) - 1))
+                out.append(cube([v[0]-w/2, v[1]-w/2, v[2]-w/2], [w,w,w*1.35], tile))
+        return out
 
-    # --- multi part jaw. Upper hinges, lower drops, and the front splits outward.
-    upper = [cube([-r0 * 0.62, -30, -344], [r0 * 1.24, 34, 200], 'armor')]
-    for t in range(7):
-        x = -r0 * 0.52 + t * (r0 * 1.04 / 6)
-        upper.append(cube([x - 5, -46, -330 + RNG.randint(-8, 8)], [10, 20 + RNG.randint(0, 16), 14], 'bone'))
-    bone('upper_jaw', 'head', [0, -12, -150], upper)
+    # Flattened, layered cranial shield; the silhouette is a long wedge, not a rectangular snout.
+    skull = []
+    for j in range(9):
+        z = 40 - j * 26
+        w = 73 - j * 4.2
+        h = 44 - j * 2.2
+        skull.append(cube([-w, -h*.55, z-28], [2*w,h,32], 'armor', down='under'))
+        skull.append(cube([-w*.70,h*.45,z-30], [w*1.4,12,36], 'spine'))
+        for sign in (-1,1):
+            skull.append(cube([sign*w-8,-h*.4,z-25], [14,h*.85,27], 'armor'))
+    bone('head', 'root', [0,0,0], skull)
 
-    lower = [cube([-r0 * 0.56, -34, -334], [r0 * 1.12, 32, 192], 'armor', down='under'),
-             cube([-r0 * 0.44, -18, -318], [r0 * 0.88, 14, 160], 'maw')]
-    for t in range(7):
-        x = -r0 * 0.46 + t * (r0 * 0.92 / 6)
-        lower.append(cube([x - 5, -6, -322 + RNG.randint(-8, 8)], [10, 18 + RNG.randint(0, 18), 14], 'bone'))
-    bone('lower_jaw', 'head', [0, -44, -150], lower)
+    # Open channel between jaws. Teeth alternate along their LENGTH, never a comb on the nose.
+    for name, y, upper in [('upper_jaw',-9,True),('lower_jaw',-44,False)]:
+        jaw_cubes=[]
+        for j in range(7):
+            z=-130-j*19; w=43-j*2.1
+            jaw_cubes.append(cube([-w,y,z-22],[w*2,13,25],'armor'))
+            jaw_cubes.append(cube([-w*.74,y+(-2 if upper else 11),z-20],[w*1.48,4,21],'maw'))
+            for sign in (-1,1):
+                height=11+(j*7%17)
+                jaw_cubes.append(cube([sign*(w-6)-4,y-height+2 if upper else y+12,z-14],[8,height,7],'bone'))
+        bone(name,'head',[0,y,-110],jaw_cubes)
+    for side, sign in [('left',-1),('right',1)]:
+        points=[(sign*42,-38,-118),(sign*53,-48,-168),(sign*48,-54,-218),(sign*32,-59,-275)]
+        mand=ribbon(points,16,'rib')
+        for k in range(6):
+            mand.append(cube([sign*(49-k*2)-3,-43-k*2,-155-k*19],[6,12+k%3*5,6],'bone'))
+        bone('jaw_split_'+side,'head',[sign*42,-38,-118],mand)
 
-    for side, sign in (('left', -1), ('right', 1)):
-        mand = [cube([sign * r0 * 0.48 - (24 if sign < 0 else 0), -34, -412], [24, 30, 140], 'armor')]
-        for t in range(4):
-            mand.append(cube([sign * r0 * 0.48 - (14 if sign < 0 else -4), -14, -400 + t * 32], [12, 22, 12], 'bone'))
-        bone('jaw_split_%s' % side, 'upper_jaw', [sign * r0 * 0.48, -20, -318], mand)
+    sensory=[]
+    for sign in (-1,1):
+        for k in range(5):
+            # Nodes sit OUTSIDE the skull's armor. Old nodes were buried inside solid cubes.
+            z=-65-k*24; w=61-k*4
+            sensory.append(cube([sign*w-5,9+(k%2)*8,z],[10,10+(k%3)*2,12],'glow'))
+    bone('sensory_organs','head',[0,0,-100])
+    bone('glow_organs_head','sensory_organs',[0,0,-100],sensory)
+    bone('glow_organs_0','head',[0,0,0],[cube([-5,39,-75],[10,5,18],'glow')])
 
-    # --- sensory organs replace eyes: clustered emissive nodes down both temples
-    sensory = []
-    for s in (-1, 1):
-        for k in range(3):
-            sensory.append(cube([s * (r0 * 0.60) - (10 if s < 0 else 0), 6 + k * 13, -176 + k * 26], [10, 11, 13], 'glow'))
-    bone('sensory_organs', 'head', [0, 24, -150], sensory)
-    bone('glow_organs_head', 'head', [0, 18, -90],
-         [cube([-r0 * 0.30, r0 * 0.34, -110], [r0 * 0.60, 10, 120], 'glow'),
-          cube([-r0 * 0.86, -8, -70], [12, 12, 90], 'glow'),
-          cube([r0 * 0.74, -8, -70], [12, 12, 90], 'glow')])
-
-    # --- head tendrils
-    bone('head_tendrils', 'head', [0, -24, -300])
+    # Six trailing cheek feelers: long, tapered and swept BACK along the neck.
+    bone('head_tendrils','head',[0,-15,-60])
     for t in range(6):
-        ang = (t / 5.0 - 0.5) * 2.1
-        px, py = math.sin(ang) * r0 * 0.7, -20 - math.cos(ang) * 22
-        bone('head_tendril_%d' % t, 'head_tendrils', [px, py, -300],
-             [cube([px - 6, py - 6, -300], [12, 12, 104], 'tendril'),
-              cube([px - 4, py - 4, -344], [8, 8, 54], 'tendril')])
+        sign=-1 if t%2==0 else 1; k=t//2
+        points=[(sign*62,-12-k*12,-60),(sign*(96+k*16),-30-k*22,20),
+                (sign*(124+k*12),-42-k*32,130),(sign*(140+k*15),-60-k*24,270+k*45)]
+        bone('head_tendril_'+str(t),'head_tendrils',points[0],ribbon(points,10-k,'tendril'))
+        bone('head_tendril_tip_'+str(t),'head_tendril_'+str(t),points[-1],
+             [cube([points[-1][0]-3,points[-1][1]-3,points[-1][2]],[6,6,10],'glow')])
 
-    # --- spine chain. Each joint parents the next, so only relative angles are ever written.
+    # Independent world-path joints: head tracking cannot rotate the entire spine.
     for i in range(1, SEGMENTS):
-        r = radius(i)
-        z = zpos(i)
-        parent = spine_name(i - 1)
-        cubes = [cube([-r, -r * 0.85, z - 56], [r * 2, r * 1.7, 112], 'armor', down='under')]
-        if i < TAIL_START:
-            cubes.append(cube([-r * 0.24, r * 0.80, z - 44], [r * 0.48, 16, 88], 'spine'))
-        bone(spine_name(i), parent, [0, 0, z], cubes)
+        r=radius(i); z=zpos(i)
+        plates=[cube([-r*.80,-r*.57,z-49],[r*1.6,r*1.14,102],'under')]
+        for j in range(3):
+            q=z-52+j*34; w=r*(1.0-.055*j)
+            plates.append(cube([-w,-r*.32,q],[w*2,r*.80,39],'armor'))
+            plates.append(cube([-w*.64,r*.44,q-2],[w*1.28,r*.22,40],'spine'))
+            for sign in (-1,1):
+                plates.append(cube([sign*w-w*.10,-r*.44,q],[w*.20,r*.60,31],'armor'))
+        bone(spine_name(i),'root',[0,0,z],plates)
+        organs=[]
+        for sign in (-1,1):
+            organs.append(cube([sign*r*.75-4,r*.62,z-20],[8,6,12],'glow'))
+        bone('glow_organs_'+str(i),spine_name(i),[0,0,z],organs)
 
-    # --- emissive strips, one group per joint, hidden individually by the renderer
-    for i in range(SEGMENTS):
-        r = radius(i)
-        z = zpos(i)
-        if i == 0:
-            continue
-        bone('glow_organs_%d' % i, spine_name(i), [0, 0, z],
-             [cube([-r - 3, -r * 0.16, z - 40], [7, 9, 80], 'glow'),
-              cube([r - 4, -r * 0.16, z - 40], [7, 9, 80], 'glow'),
-              cube([-r * 0.20, r * 0.66, z - 30], [r * 0.40, 8, 60], 'glow')])
-    bone('glow_organs_0', 'head', [0, 0, 0],
-         [cube([-radius(0) - 3, -10, -60], [7, 9, 110], 'glow'),
-          cube([radius(0) - 4, -10, -60], [7, 9, 110], 'glow')])
-
-    # --- skeletal dorsal structures and rib like appendages along the body
-    body_count = TAIL_START - BODY_START
-    for b in range(body_count):
-        i = BODY_START + b
-        r = radius(i)
-        z = zpos(i)
-        taper = 1.0 - b / (body_count + 2.0)
-        bone('dorsal_fin_%d' % b, spine_name(i), [0, r * 0.82, z],
-             [cube([-7, r * 0.82, z - 34], [14, 92 * taper, 66], 'spine'),
-              cube([-5, r * 0.82 + 72 * taper, z - 10], [10, 54 * taper, 20], 'bone')])
-        for side, sign in (('l', -1), ('r', 1)):
-            base = sign * r * 0.88
-            bone('rib_appendage_%s_%d' % (side, b), spine_name(i), [base, -r * 0.18, z],
-                 [cube([base - (108 * taper if sign < 0 else 0), -r * 0.18 - 8, z - 9], [108 * taper, 16, 18], 'rib'),
-                  cube([base - (188 * taper if sign < 0 else -108 * taper), -r * 0.18 - 6, z - 7], [80 * taper, 12, 14], 'rib')])
-
-    # --- thin whip tail ending in tendrils
-    tail_end = zpos(SEGMENTS - 1)
-    bone('tail_tendrils', spine_name(SEGMENTS - 1), [0, 0, tail_end + 50])
+    # Sparse, swept-back dorsal sails and paired hanging rib feelers define the reference.
+    for b in range(TAIL_START-BODY_START):
+        i=BODY_START+b; r=radius(i); z=zpos(i); taper=1-b/15
+        fin=[]
+        height=(135 if b in (0,3,6) else 45)*taper
+        for k in range(6):
+            y=r*.60+k*height/6
+            fin.append(cube([-7+k*.6,y,z-27+k*13],[14-k*1.2,height/6+5,70-k*7],'spine'))
+        bone('dorsal_fin_'+str(b),spine_name(i),[0,r*.60,z],fin)
+        for side,sign in [('l',-1),('r',1)]:
+            points=[(sign*r*.82,-r*.1,z),(sign*(r+20*taper),-r*.7-36*taper,z+15),
+                    (sign*(r+35*taper),-r*.7-95*taper,z+40),
+                    (sign*(r+58*taper),-r*.7-147*taper,z+75),
+                    (sign*(r+89*taper),-r*.7-157*taper,z+100)]
+            bone('rib_appendage_'+side+'_'+str(b),spine_name(i),points[0],ribbon(points,14*taper+4,'rib'))
+    end=zpos(SEGMENTS-1)
+    bone('tail_tendrils',spine_name(SEGMENTS-1),[0,0,end+35])
     for t in range(4):
-        px = (t - 1.5) * 9
-        bone('tail_tendril_%d' % t, 'tail_tendrils', [px, 0, tail_end + 50],
-             [cube([px - 3, -3, tail_end + 44], [6, 6, 60], 'tendril'),
-              cube([px - 2, -2, tail_end + 92], [4, 4, 34], 'tendril')])
+        sign=-1 if t%2==0 else 1; k=t//2
+        pts=[(sign*5,0,end+30),(sign*(23+k*10),k*12,end+68),
+             (sign*(39+k*15),k*19,end+106),(sign*(43+k*17),k*10,end+137)]
+        bone('tail_tendril_'+str(t),'tail_tendrils',pts[0],ribbon(pts,9-k*2,'tendril'))
 
-    geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
-        'description': {'identifier': 'geometry.abyssal_pilgrim', 'texture_width': 256, 'texture_height': 256,
-                        'visible_bounds_width': 260, 'visible_bounds_height': 120, 'visible_bounds_offset': [0, 0, 74]},
-        'bones': list(BONES)}]}
-    (ROOT / 'geo/abyssal_pilgrim.geo.json').write_text(json.dumps(geo, indent=1) + '\n')
-    cubes = sum(len(b.get('cubes', [])) for b in BONES)
-    return len(BONES), cubes
+    geo={'format_version':'1.12.0','minecraft:geometry':[{
+        'description':{'identifier':'geometry.abyssal_pilgrim','texture_width':256,'texture_height':256,
+            'visible_bounds_width':340,'visible_bounds_height':340,'visible_bounds_offset':[0,0,0]},
+        'bones':list(BONES)}]}
+    (ROOT/'geo/abyssal_pilgrim.geo.json').write_text(json.dumps(geo,indent=1)+'\n')
+    return len(BONES),sum(len(b.get('cubes',[])) for b in BONES)
 
 # ----------------------------------------------------------------------- animations
 def keys(pairs):

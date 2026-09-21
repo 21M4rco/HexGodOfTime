@@ -41,6 +41,7 @@ public final class LeviathanSegmentController {
     private int count, head;
 
     private final Vec3[] seg = new Vec3[SEGMENTS];
+    private final Vec3[] previous = new Vec3[SEGMENTS];
     private final float[] yaw = new float[SEGMENTS], pitch = new float[SEGMENTS], roll = new float[SEGMENTS];
     private final float[] prevYaw = new float[SEGMENTS], prevPitch = new float[SEGMENTS], prevRoll = new float[SEGMENTS];
     private final float[] rollVel = new float[SEGMENTS];
@@ -49,7 +50,7 @@ public final class LeviathanSegmentController {
     private Vec3 leading = Vec3.ZERO;
 
     public LeviathanSegmentController() {
-        for (int i = 0; i < SEGMENTS; i++) seg[i] = Vec3.ZERO;
+        for (int i = 0; i < SEGMENTS; i++) seg[i] = previous[i] = Vec3.ZERO;
     }
 
     public static double radius(int index) { return PROFILE[Mth.clamp(index, 0, SEGMENTS - 1)]; }
@@ -59,6 +60,7 @@ public final class LeviathanSegmentController {
 
     public boolean primed() { return primed; }
     public Vec3 segment(int i) { return seg[Mth.clamp(i, 0, SEGMENTS - 1)]; }
+    public Vec3 segment(int i, float partial) { return previous[clamp(i)].lerp(seg[clamp(i)], partial); }
     public float yaw(int i) { return yaw[Mth.clamp(i, 0, SEGMENTS - 1)]; }
     public float pitch(int i) { return pitch[Mth.clamp(i, 0, SEGMENTS - 1)]; }
     public float roll(int i) { return roll[Mth.clamp(i, 0, SEGMENTS - 1)]; }
@@ -86,7 +88,7 @@ public final class LeviathanSegmentController {
         }
         count = MAX_NODES;
         for (int i = 0; i < SEGMENTS; i++) {
-            seg[i] = position.add(backward.scale(i * SPACING));
+            seg[i] = previous[i] = position.add(backward.scale(i * SPACING));
             yaw[i] = prevYaw[i] = yawDegrees; pitch[i] = prevPitch[i] = pitchDegrees;
             roll[i] = prevRoll[i] = 0; rollVel[i] = 0;
         }
@@ -128,7 +130,7 @@ public final class LeviathanSegmentController {
      * One sweep of the path serves all joints because their distances increase monotonically.
      */
     public void rebuild() {
-        for (int i = 0; i < SEGMENTS; i++) { prevYaw[i] = yaw[i]; prevPitch[i] = pitch[i]; prevRoll[i] = roll[i]; }
+        for (int i = 0; i < SEGMENTS; i++) { previous[i] = seg[i]; prevYaw[i] = yaw[i]; prevPitch[i] = pitch[i]; prevRoll[i] = roll[i]; }
         // Keep the unsampled leading point separate. Overwriting node(0) during slow
         // movement loses every turn until a single tick exceeds NODE_STEP.
         Vec3 cursor = leading;

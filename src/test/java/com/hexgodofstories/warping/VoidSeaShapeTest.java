@@ -91,7 +91,7 @@ public final class VoidSeaShapeTest {
         for (int i = 1; i < spine.size(); i++) {
             String bone = spine.get(i), parent = spine.get(i - 1);
             check(pivots.containsKey(bone), "geometry defines " + bone);
-            check(parent.equals(parents.get(bone)), bone + " is parented to " + parent);
+            check("root".equals(parents.get(bone)), bone + " follows the world path independently of head tracking");
             double step = pivots.get(bone)[2] - pivots.get(parent)[2];
             check(Math.abs(step - EXPECTED_PIVOT_STEP) < 1.0E-6, bone + " sits one joint behind " + parent);
         }

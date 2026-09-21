@@ -70,33 +70,41 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
     }
 
     private void poseSpine(AbyssalPilgrimEntity entity, LeviathanSegmentController segments, LeviathanSegmentRenderController render, float partial) {
-        for (int i = 1; i < LeviathanSegmentController.SEGMENTS; i++) {
+        net.minecraft.world.phys.Vec3 origin = new net.minecraft.world.phys.Vec3(
+            Mth.lerp(partial, entity.xOld, entity.getX()),
+            Mth.lerp(partial, entity.yOld, entity.getY()),
+            Mth.lerp(partial, entity.zOld, entity.getZ()));
+        for (int i = 0; i < LeviathanSegmentController.SEGMENTS; i++) {
             GeoBone bone = bone(SPINE[i]);
             if (bone == null) continue;
-            float deltaYaw = Mth.wrapDegrees(segments.yaw(i, partial) - segments.yaw(i - 1, partial));
-            float deltaPitch = Mth.wrapDegrees(segments.pitch(i, partial) - segments.pitch(i - 1, partial));
-            float deltaRoll = Mth.wrapDegrees(segments.roll(i, partial) - segments.roll(i - 1, partial));
-            // Additive: the keyframed clip supplies undulation and character, this supplies the path.
-            bone.setRotY(bone.getRotY() + deltaYaw * Mth.DEG_TO_RAD * YAW_SIGN);
-            bone.setRotX(bone.getRotX() + deltaPitch * Mth.DEG_TO_RAD * PITCH_SIGN);
-            bone.setRotZ(bone.getRotZ() + deltaRoll * Mth.DEG_TO_RAD * ROLL_SIGN);
+            net.minecraft.world.phys.Vec3 offset = segments.segment(i, partial).subtract(origin);
+            // GeckoLib negates position X, but not Y/Z. Independent root children follow the
+            // recorded collision path directly; Euler differences are not valid 3D joint rotations.
+            bone.setPosX((float) -offset.x * 16f);
+            bone.setPosY((float) offset.y * 16f);
+            bone.setPosZ((float) offset.z * 16f - bone.getPivotZ());
+            float yaw = i == 0 ? Mth.rotLerp(partial, entity.yRotO, entity.getYRot()) : segments.yaw(i, partial);
+            float pitch = i == 0 ? Mth.lerp(partial, entity.xRotO, entity.getXRot()) : segments.pitch(i, partial);
+            bone.setRotY((180f - yaw) * Mth.DEG_TO_RAD);
+            bone.setRotX(-pitch * Mth.DEG_TO_RAD);
+            bone.setRotZ(0);
         }
     }
 
     private void poseHead(AbyssalPilgrimEntity entity, LeviathanSegmentRenderController render, float partial) {
         GeoBone head = bone("head");
-        if (head != null) {
+        if (head != null && entity.attack() == null) {
             head.setRotY(head.getRotY() + render.headYaw() * Mth.DEG_TO_RAD * YAW_SIGN);
-            head.setRotX(head.getRotX() + render.headPitch() * Mth.DEG_TO_RAD * PITCH_SIGN);
+            head.setRotX(head.getRotX() - render.headPitch() * Mth.DEG_TO_RAD);
         }
         float open = jawOpen(entity, partial);
         GeoBone upper = bone("upper_jaw"), lower = bone("lower_jaw");
-        if (upper != null) upper.setRotX(upper.getRotX() - open * 0.46f);
-        if (lower != null) lower.setRotX(lower.getRotX() + open * 1.05f);
+        if (upper != null) upper.setRotX(-open * 0.30f);
+        if (lower != null) lower.setRotX(open * 0.98f);
         // The jaw does not just hinge, it splits.
         GeoBone left = bone("jaw_split_left"), right = bone("jaw_split_right");
-        if (left != null) { left.setRotY(left.getRotY() + open * 0.58f); left.setRotZ(left.getRotZ() + open * 0.26f); }
-        if (right != null) { right.setRotY(right.getRotY() - open * 0.58f); right.setRotZ(right.getRotZ() - open * 0.26f); }
+        if (left != null) { left.setRotY(open * 0.58f); left.setRotZ(open * 0.26f); }
+        if (right != null) { right.setRotY(-open * 0.58f); right.setRotZ(-open * 0.26f); }
 
         GeoBone sensory = bone("sensory_organs");
         if (sensory != null) {
@@ -110,10 +118,15 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
     private float jawOpen(AbyssalPilgrimEntity entity, float partial) {
         LeviathanAttack attack = entity.attack();
         float idle = 0.06f + 0.04f * Mth.sin((entity.tickCount + partial) * 0.05f);
+        if (entity.heldId() >= 0) return 0.42f;
         if (attack == null) return idle;
         float t = entity.attackTick() + partial;
         return switch (attack) {
-            case PREDATORY_BITE, BREACH_BITE, DEEP_CHARGE ->
+            case BREACH_BITE, DEEP_CHARGE ->
+                t < attack.windup ? Mth.clamp(t / attack.windup, 0, 1)
+                : t < attack.windup + attack.active ? 0.95f
+                : Mth.clamp(1f - (t - attack.windup - attack.active) / 12f, idle, 1f);
+            case PREDATORY_BITE ->
                 t < attack.windup ? Mth.clamp(t / attack.windup, 0, 1) : Mth.clamp(1f - (t - attack.windup) / 5f, 0.02f, 1f);
             case VOID_SCREAM -> Mth.clamp(t / attack.windup, 0, 1);
             case FAKE_ATTACK -> t < attack.windup ? Mth.clamp(t / attack.windup, 0, 1) * 0.9f : Mth.clamp(1f - (t - attack.windup) / 10f, 0f, 1f) * 0.9f;

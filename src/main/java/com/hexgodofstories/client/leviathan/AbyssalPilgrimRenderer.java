@@ -20,8 +20,14 @@ public class AbyssalPilgrimRenderer extends GeoEntityRenderer<AbyssalPilgrimEnti
     }
 
     @Override
+    protected void applyRotations(AbyssalPilgrimEntity entity, com.mojang.blaze3d.vertex.PoseStack pose,
+                                  float age, float yaw, float partial) {
+        // Each logical body joint is posed in world space by the model.
+    }
+
+    @Override
     public boolean shouldRender(AbyssalPilgrimEntity entity, Frustum frustum, double camX, double camY, double camZ) {
-        return true;
+        return frustum.isVisible(entity.getBoundingBoxForCulling().inflate(28));
     }
 
     @Override
