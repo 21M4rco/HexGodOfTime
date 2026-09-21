@@ -19,25 +19,31 @@ public final class WarpHazard extends Entity {
     public int kind(){return entityData.get(KIND);}
     public boolean released(){return entityData.get(RELEASED);}
     public void configure(int kind,double cell,int index){entityData.set(KIND,kind);this.cell=cell;this.index=index;}
-    public void release(Vec3 direction){if((kind()!=1&&kind()!=5)||released())return;entityData.set(RELEASED,true);setDeltaMovement(direction.scale(1.7).add(0,-.8,0));}
+    public void release(Vec3 direction){if(!spear()||released())return;entityData.set(RELEASED,true);setDeltaMovement(direction.scale(1.7).add(0,-.8,0));}
     @Override public void tick(){
         super.tick();if(level().isClientSide)return;
-        if((kind()==1||kind()==5)&&!released())return;
-        double speed=(kind()==1||kind()==5)?getDeltaMovement().y:-.15-index%5*.035;
-        Vec3 movement=(kind()==1||kind()==5)?getDeltaMovement():new Vec3(0,speed,0);
-        AABB sweep=getBoundingBox().expandTowards(movement).inflate(kind()==1?.5:1);
+        if(spear()&&!released())return;
+        double speed=spear()?getDeltaMovement().y:-.15-index%5*.035;
+        Vec3 movement=spear()?getDeltaMovement():new Vec3(0,speed,0);
+        AABB sweep=getBoundingBox().expandTowards(movement).inflate(spear()?.5:1);
         for(LivingEntity e:level().getEntitiesOfClass(LivingEntity.class,sweep,e->e.isAlive()&&!Warping.sovereign(e))){
-            if(kind()==1||kind()==5){e.hurt(damageSources().magic(),24);e.setDeltaMovement(movement.scale(.5));discard();return;}
-            double top=getY()+height();
-            if(e.getY()>=top-.5){e.teleportTo(e.getX(),top+movement.y,e.getZ());e.fallDistance=0;}
-            else if(tickCount%20==0)e.hurt(damageSources().fallingBlock(this),10);
+            if(spear()){e.hurt(damageSources().magic(),24);e.setDeltaMovement(movement.scale(.5));e.hurtMarked=true;discard();return;}
+            // Riders are carried by ordinary collision now - see canBeCollidedWith - so nothing is
+            // teleported onto the platform every tick. Only what the mass runs through is hurt.
+            if(e.getY()+e.getBbHeight()>getY()&&e.getY()<getY()+height()-.35&&tickCount%20==0)
+                e.hurt(damageSources().fallingBlock(this),10);
         }
         setPos(position().add(movement));
-        if(getY()<45){if(kind()==1||kind()==5){discard();return;}setPos(getX(),237,getZ());}
-        if((kind()==1||kind()==5)&&released()&&tickCount>2400)discard();
+        if(getY()<45){if(spear()){discard();return;}setPos(getX(),237,getZ());}
+        if(spear()&&released()&&tickCount>2400)discard();
     }
-    public float height(){return kind()==3?10:kind()==1?3:2;}
-    @Override public EntityDimensions getDimensions(Pose pose){return EntityDimensions.fixed(kind()==1?1:6,height());}
+    /** Kinds 1 and 5 are the suspended execution spears; everything else is architecture. */
+    public boolean spear(){return kind()==1||kind()==5;}
+    public float height(){return kind()==3?10:spear()?3:2;}
+    @Override public EntityDimensions getDimensions(Pose pose){return EntityDimensions.fixed(spear()?1:6,height());}
+    /** Cohesive debris is solid: victims stand on it and are carried, instead of being repositioned. */
+    @Override public boolean canBeCollidedWith(){return !spear();}
+    @Override public boolean isPickable(){return true;}
     @Override public void onSyncedDataUpdated(EntityDataAccessor<?> key){super.onSyncedDataUpdated(key);if(KIND.equals(key))refreshDimensions();}
     protected void readAdditionalSaveData(CompoundTag n){entityData.set(KIND,n.getInt("kind"));entityData.set(RELEASED,n.getBoolean("released"));cell=n.getDouble("cell");index=n.getInt("index");}
     protected void addAdditionalSaveData(CompoundTag n){n.putInt("kind",kind());n.putBoolean("released",released());n.putDouble("cell",cell);n.putInt("index",index);}

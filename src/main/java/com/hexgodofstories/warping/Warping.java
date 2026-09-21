@@ -5,6 +5,7 @@ import com.hexgodofstories.data.*;
 import com.hexgodofstories.network.HexNetwork;
 import com.hexgodofstories.server.*;
 import net.minecraft.core.*;
+import net.minecraft.util.Mth;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.*;
 import net.minecraft.world.entity.*;
@@ -88,10 +89,21 @@ public final class Warping {
                 level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.RIFT_CLOSE.get(),SoundSource.PLAYERS,.8f,.7f);continue;
             }
             double r=WarpMath.width(c.held)*.5;
-            AABB area=new AABB(c.at.x-r,c.at.y-.4,c.at.z-r,c.at.x+r,c.at.y+1.3,c.at.z+r);
+            // Searched well above and below the window: something falling at terminal velocity
+            // crosses the whole opening inside one tick and used to pass straight through it.
+            AABB area=new AABB(c.at.x-r,c.at.y-8,c.at.z-r,c.at.x+r,c.at.y+4,c.at.z+r);
             for(Entity e:level.getEntities((Entity)null,area,e->e.isAlive()&&!e.isSpectator()&&
                 (e.getUUID().equals(entry.getKey())||!sovereign(e)&&!(e instanceof net.minecraft.world.entity.player.Player q&&q.isCreative())))){
-                if(e.getY()<c.at.y-.4||e.getY()>c.at.y+.3||!WarpMath.inside(e.getX()-c.at.x,e.getZ()-c.at.z,c.held)||!c.moved.add(e.getUUID()))continue;
+                double plane=c.at.y,x=e.getX()-c.at.x,z=e.getZ()-c.at.z;
+                boolean standing=e.getY()>=plane-.45&&e.getY()<=plane+.35;
+                boolean fell=e.yo>plane+.05&&e.getY()<plane-.05;
+                if(!standing&&!fell)continue;
+                if(fell){
+                    // Cross where it actually crossed, not where it ended the tick.
+                    double t=Mth.clamp((e.yo-plane)/Math.max(1e-6,e.yo-e.getY()),0,1);
+                    x=Mth.lerp(t,e.xo,e.getX())-c.at.x;z=Mth.lerp(t,e.zo,e.getZ())-c.at.z;
+                }
+                if(!WarpMath.inside(x,z,c.held)||!c.moved.add(e.getUUID()))continue;
                 WarpRealms.transfer(e,c.destination,c.cell,e.getUUID().equals(entry.getKey())&&sovereign(e));
             }
             if(now%4==0)send(c,false);

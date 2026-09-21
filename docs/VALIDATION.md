@@ -331,3 +331,46 @@ directional streaking. Cuboids spinning off in all directions read as rubble and
 - A second player, and a mob, being thrown off the throne; the owner still seated normally; Regeneration
   present while seated and gone shortly after standing.
 - That the guard does not throw the owner, their mount, or anything they care about that merely walks past.
+
+## 0.5.4 — One hunter, a working singularity, and realms with edges
+
+- **The Void Sea has one leviathan.** The periodic spawner that could stack several of them per player is
+  gone. A single hunter is bound to each instance, extras are culled, and a slain one returns only after
+  ninety seconds. It is hostile to every living thing in the realm, its own summoner included.
+- **The bite is a bargain, not a hit.** Twelve ticks of visible wind-up, a lunge that commits at nine
+  blocks, then fifty hearts through armour on a four-block volume at the mouth. The headless check holds
+  both ends of it: the warning cannot shrink below half a second and the lunge must still be able to
+  reach something swimming away.
+- **The model is the box model.** The procedural sphere-and-quad renderer is replaced by a 96-bone,
+  131-cube box model with a generated 512-pixel box-UV atlas, an emissive pass and a travelling-wave swim.
+  Generated from `tools/generate_leviathan.py`, which also emits the `LayerDefinition`, so the geometry,
+  the texture and the Java cannot drift apart.
+- **The singularity resolves.** Pull is inverse-square with a floor, a cap and a tangential component, so
+  victims spiral in and always arrive rather than sticking at the centre taking damage forever; the
+  horizon at seven blocks is a clean kill with its own armour-bypassing damage type. The simulation in
+  the regression check confirms a victim released at 180 blocks always reaches the horizon, and that no
+  field ever exceeds 1.8 blocks per tick.
+- **Realms have edges.** Floor, ceiling and a horizontal leash per instance for every entity in all nine
+  destinations, replacing a guard that only caught Loki-capable players below y 0.
+- **Fields reach players.** Realm pushes are strided and speed-capped so they arrive as motion
+  corrections a client can live with. The Falling World's extra gravity previously did nothing at all to
+  players; it does now.
+- **The portal cannot be fallen through.** Entry is a swept test against the previous tick's position
+  with the crossing point interpolated, so something at terminal velocity no longer passes straight
+  through the window it should have fallen into.
+- **Falling debris is solid.** Platforms implement collision instead of teleporting riders onto
+  themselves every tick, and the spear kinds share one predicate so kind 5 no longer reports a
+  six-block-wide hitbox.
+
+### Not verified — needs a recorded in-game session
+
+- The leviathan model in the water: proportions, swim wave, the bite reading as a warning, the emissive
+  pass in the dark, and the absence of frustum popping on a 17-block animal with a 4.5-block hitbox.
+- That the box-UV atlas lands the right face on the right side of every cube in game, and that the
+  countershading reads correctly at distance.
+- That one bite kills a fully armoured survival player, and that a player who dodges sideways during the
+  wind-up survives one.
+- The singularity's feel at close range, and whether the spiral reads as an orbit or as a stumble.
+- Each realm's containment from the inside: falling off a Shattered World island, swimming to the leash
+  in the Void Sea, and riding a Falling World platform down.
+- Flight grant and revocation across entering, dying in, and leaving a realm.

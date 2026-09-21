@@ -45,6 +45,9 @@ public final class HexClient {
             for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT})e.register(k);
             for(KeyMapping k:TIME_KEYS)e.register(k);
         }
+        @SubscribeEvent public static void modelLayers(EntityRenderersEvent.RegisterLayerDefinitions e) {
+            e.registerLayerDefinition(LeviathanRenderer.LAYER,LeviathanParts::createBodyLayer);
+        }
         @SubscribeEvent public static void entities(EntityRenderersEvent.RegisterRenderers e) {
             e.registerEntityRenderer(HexGodOfStories.ILLUSION.get(),IllusionRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.LEVIATHAN.get(),LeviathanRenderer::new);

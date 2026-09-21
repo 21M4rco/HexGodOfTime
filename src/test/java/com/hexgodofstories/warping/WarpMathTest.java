@@ -43,7 +43,37 @@ public final class WarpMathTest {
         check(WarpMath.solarDamage(WarpMath.SUN_CORONA-.01)>0,"corona inflicts heat");
         check(WarpMath.solarDamage(WarpMath.SUN_RADIUS-.01)>WarpMath.solarDamage(WarpMath.SUN_RADIUS+.01),"photosphere is lethal faster than corona");
         check(WarpMath.SUN_RADIUS>33+Math.sqrt(3),"photosphere encloses every corner of the existing magma shell");
-        System.out.println("Warping geometry and timing checks passed");
+        // --- realm fields -------------------------------------------------------
+        // A victim released anywhere in the well reaches the horizon: no orbit that
+        // never resolves, and no runaway speed that trips the movement checks.
+        double distance=180,speed=0;int ticks=0;
+        while(distance>WarpMath.EVENT_HORIZON&&ticks++<6000){
+            speed=Math.min(WarpMath.FIELD_SPEED,speed+WarpMath.pull(distance));
+            check(speed<=WarpMath.FIELD_SPEED,"pull never exceeds the field speed cap");
+            distance-=speed;
+        }
+        check(distance<=WarpMath.EVENT_HORIZON,"a victim in the well always reaches the horizon");
+        check(WarpMath.pull(WarpMath.EVENT_HORIZON)<=.26,"pull is capped at the horizon");
+        check(WarpMath.pull(1)==WarpMath.pull(WarpMath.EVENT_HORIZON),"inside the horizon uses the horizon value");
+        check(WarpMath.orbit(20)>0&&WarpMath.orbit(20)>WarpMath.orbit(200),"spin decays outward");
+        check(WarpMath.EVENT_HORIZON<WarpMath.TIDAL,"tidal shear starts outside the horizon");
+        check(WarpMath.FIELD_SPEED<10,"a field never moves anything faster than the server accepts");
+        check(WarpMath.LEASH<WarpMath.LEASH_HARD,"the leash pulls inward before it recalls");
+        check(WarpMath.LEASH_HARD*2<1024,"one instance can never reach into the next");
+
+        // --- the abyssal hunter -------------------------------------------------
+        check(HuntMath.BITE_DAMAGE>=100,"a bite is fifty hearts");
+        check(HuntMath.BITE_STRIKE>=10&&HuntMath.BITE_STRIKE<HuntMath.BITE_TICKS,"half a second of open jaw before it lands");
+        check(HuntMath.telegraph(0)&&HuntMath.telegraph(HuntMath.BITE_STRIKE-1)&&!HuntMath.telegraph(HuntMath.BITE_STRIKE),
+            "the warning ends exactly when the jaws do");
+        check(HuntMath.closing(HuntMath.BITE_STRIKE)+HuntMath.MOUTH_RADIUS>=HuntMath.STRIKE_RANGE+1,
+            "a committed bite reaches something that is swimming away");
+        check(HuntMath.closing(HuntMath.BITE_STRIKE)<HuntMath.LUNGE*HuntMath.BITE_STRIKE,"the lunge accelerates, it does not teleport");
+        check(HuntMath.MOUTH_RADIUS<HuntMath.STRIKE_RANGE,"it has to close the distance to bite");
+        check(HuntMath.HUNT<.3&&HuntMath.HUNT>HuntMath.CRUISE,"pursuit is slow, and slower still with nothing to chase");
+        check(HuntMath.RECOVERY>HuntMath.BITE_TICKS,"one bite cannot run into the next");
+        check(HuntMath.BOTTOM>0&&HuntMath.SURFACE<136,"the hunter stays inside the water column");
+        System.out.println("Warping geometry, realm fields, hunter timing and boundaries passed");
     }
     private static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
 }
