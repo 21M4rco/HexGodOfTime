@@ -42,7 +42,7 @@ public final class PrisonMoonRenderer {
                 double r=MoonGravity.radius(n),noise=RealmSky.fbm(n.x*38,n.y*38,n.z*38);
                 double light=.42+.58*Math.max(0,n.dot(new Vec3(-.4,.7,.6).normalize()));
                 int stone=r<CosmicPhysics.MOON_RADIUS-.6?0x5b5b69:noise>.52?0xb0adb6:noise>.39?0x85828e:0x6b6874;
-                WarpMesh.vertex(b,m,MoonGravity.CENTER.add(n.scale(r)),WarpMesh.shade(stone,light),1);
+                WarpMesh.vertex(b,matrix,MoonGravity.CENTER.add(n.scale(r)),WarpMesh.shade(stone,light),1);
             }
         }
         VertexBuffer buffer=new VertexBuffer(VertexBuffer.Usage.STATIC);buffer.bind();buffer.upload(b.end());VertexBuffer.unbind();return buffer;

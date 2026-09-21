@@ -11,7 +11,7 @@ import java.util.WeakHashMap;
 /** The prison moon is an indestructible analytic surface, shared by the renderer and collision. */
 public final class MoonGravity {
     public static final Vec3 CENTER=new Vec3(0,CosmicPhysics.MOON_Y,0);
-    private static final Map<Entity,Frame> FRAMES=new WeakHashMap<>();
+    private static final Map<Entity,Frame> FRAMES=java.util.Collections.synchronizedMap(new WeakHashMap<>());
     private record Frame(Vec3 up,Vec3 forward) {}
     public static boolean active(Entity e) {
         return e!=null&&Destination.from(e.level())==Destination.CRUSHING_REALM&&!e.isSpectator()
