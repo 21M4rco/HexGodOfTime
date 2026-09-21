@@ -57,7 +57,15 @@ public final class HexGodOfStories {
         BLADE_SWING = sound("blade_swing"), BLADE_HIT = sound("blade_hit"), BLADE_THROW = sound("blade_throw"), BLADE_EMBED = sound("blade_embed"),
         RIFT_OPEN = sound("rift_open"), RIFT_CLOSE = sound("rift_close");
     /**
-     * The Pilgrim's voice. Volumes above one do not play louder, they carry further, which is how a
+     * Hexor's ambient vocalisation. One long, loud, atmospheric clip that stands in for every
+     * background noise the creature makes; {@code AbyssalPilgrimAI} owns the spacing between plays
+     * and refuses to start a second one over the top of the first.
+     */
+    public static final RegistryObject<SoundEvent> HEXOR_AMBIENT = sound("hexor_ambient");
+    /** How long {@link #HEXOR_AMBIENT} runs for, in ticks. Kept here so the AI can space around it. */
+    public static final int HEXOR_AMBIENT_TICKS = 136;
+    /**
+     * Hexor's voice. Volumes above one do not play louder, they carry further, which is how a
      * creature the size of a district is heard long before anything is visible.
      */
     public static final RegistryObject<SoundEvent>

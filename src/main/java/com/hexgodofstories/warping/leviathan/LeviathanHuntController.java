@@ -37,6 +37,11 @@ public final class LeviathanHuntController {
     private double orbitRadius = 46, orbitDepth = 52;
     @Nullable private Vec3 roam;
     private int roamTicks;
+    /** Held still once chosen; see {@link #ambushPoint()}. */
+    @Nullable private Vec3 ambush, observe;
+    private Vec3 ambushAnchor = Vec3.ZERO, observeAnchor = Vec3.ZERO;
+    /** Fixed per hunt, so the approach does not jitter from tick to tick. */
+    private double approachLead = 12;
     /** Set by the AI each tick so a return to the water can be detected as an event. */
     public boolean airborneTargetRecently;
 
@@ -47,7 +52,7 @@ public final class LeviathanHuntController {
     public int contactTicks() { return contactTicks; }
     public boolean hasTarget() { return target != null && target.isAlive(); }
 
-    public void forget() { target = null; contactTicks = 0; estimateAge = 400; }
+    public void forget() { target = null; contactTicks = 0; estimateAge = 400; ambush = observe = null; }
 
     /** Replaces the fuzzed estimate with the real position. Used only by hard detection events. */
     public void sharpen(Entity entity) {
@@ -68,6 +73,8 @@ public final class LeviathanHuntController {
 
     private void pickOrbit() {
         RandomSource random = self.getRandom();
+        ambush = observe = null;
+        approachLead = 8 + random.nextDouble() * 10;
         orbitDirection = random.nextBoolean() ? 1 : -1;
         // Never inside the creature's own turning circle. A twenty six block orbit was a request
         // for a body twenty times that long to tie itself in a knot, and it obliged.
@@ -158,10 +165,24 @@ public final class LeviathanHuntController {
     }
 
     /** Held below and behind, on a slow orbit, at a depth that keeps the body invisible. */
-    public Vec3 stalkPoint() {
+    public Vec3 stalkPoint() { return stalkPoint(0); }
+
+    /**
+     * The same orbit, closing.
+     *
+     * <p>{@code tighten} runs from nought at the start of a hunt to one once the creature has been
+     * circling for a while without landing anything, and draws the ring in and up as it goes. A
+     * circle held at a constant radius forever is a creature that has decided not to attack; a
+     * spiral is one that has decided when. It never closes past the widest radius the spine can
+     * actually hold — inside that the body folds through itself — because the commit is supposed
+     * to be a straight run at the prey, not a tighter lap around it.
+     */
+    public Vec3 stalkPoint(double tighten) {
         Vec3 anchor = estimate;
-        double radius = orbitRadius;
-        Vec3 point = anchor.add(Math.cos(orbitPhase) * radius, -orbitDepth, Math.sin(orbitPhase) * radius);
+        double t = Mth.clamp(tighten, 0, 1);
+        double radius = Mth.lerp(t, orbitRadius, 46.0);
+        double depth = Mth.lerp(t, orbitDepth, 16.0);
+        Vec3 point = anchor.add(Math.cos(orbitPhase) * radius, -depth, Math.sin(orbitPhase) * radius);
         return clampToWater(point);
     }
 
@@ -170,33 +191,68 @@ public final class LeviathanHuntController {
         return clampToWater(estimate.add(0, -below, 0));
     }
 
-    /** Far out, deep, and outside the victim's forward arc, ready to accelerate. */
+    /**
+     * Far out, deep, and outside the victim's forward arc, ready to accelerate.
+     *
+     * <p>Chosen once and then held until the prey has moved a long way. It used to be rolled fresh
+     * on every tick, so the creature was steering at a station that jumped tens of blocks twenty
+     * times a second: it never arrived anywhere, the "am I in position" test that gates the strike
+     * was a coin flip, and the whole ambush degenerated into wandering with a name.
+     */
     public Vec3 ambushPoint() {
         Vec3 anchor = estimate;
-        float facing = target instanceof LivingEntity living ? living.getYRot() : 0;
-        // Sit behind the victim's heading, with a random side bias.
-        double angle = (facing + 180 + (self.getRandom().nextDouble() - 0.5) * 110) * Mth.DEG_TO_RAD;
-        double radius = 55 + self.getRandom().nextDouble() * 60;
-        Vec3 point = anchor.add(-Math.sin(angle) * radius, -(60 + self.getRandom().nextDouble() * 60), Math.cos(angle) * radius);
-        return clampToWater(point);
+        if (ambush == null || anchor.distanceToSqr(ambushAnchor) > 45 * 45) {
+            float facing = target instanceof LivingEntity living ? living.getYRot() : 0;
+            // Sit behind the victim's heading, with a random side bias.
+            double angle = (facing + 180 + (self.getRandom().nextDouble() - 0.5) * 110) * Mth.DEG_TO_RAD;
+            double radius = 55 + self.getRandom().nextDouble() * 60;
+            ambushAnchor = anchor;
+            ambush = clampToWater(anchor.add(-Math.sin(angle) * radius,
+                -(60 + self.getRandom().nextDouble() * 60), Math.cos(angle) * radius));
+        }
+        return ambush;
     }
 
     /** Approach vector that arrives from behind and below rather than head on. */
-    public Vec3 approachPoint() {
+    public Vec3 approachPoint() { return approachPoint(0); }
+
+    /**
+     * The approach, becoming less polite as the hunt wears on.
+     *
+     * <p>At rest it is the old one: eight to eighteen blocks behind the victim's heading and well
+     * under them, so the creature arrives out of the blind arc. That is a lovely approach and a
+     * hopeless attack, because a point the body arrives at is a point inside its own turning
+     * circle, where the steering stops converging and carves past instead — which is precisely
+     * what the endless orbiting looked like. As {@code commitment} rises the offsets collapse and
+     * the aim point is pushed out past the prey, so the same approach turns into a run through.
+     */
+    public Vec3 approachPoint(double commitment) {
         if (target == null) return estimate;
+        double c = Mth.clamp(commitment, 0, 1);
         Vec3 anchor = target.position();
         Vec3 back = target instanceof LivingEntity living ? living.getLookAngle().reverse() : Vec3.ZERO;
-        double lead = 8 + self.getRandom().nextDouble() * 10;
-        Vec3 point = anchor.add(back.x * lead, -Math.max(6, orbitDepth * 0.3), back.z * lead);
+        double lead = approachLead * (1 - c);
+        double below = Math.max(6, orbitDepth * 0.3) * (1 - 0.8 * c);
+        Vec3 point = anchor.add(back.x * lead, -below, back.z * lead);
+        if (c > 0.12) {
+            Vec3 run = point.subtract(self.position());
+            if (run.lengthSqr() > 1.0E-6) point = point.add(run.normalize().scale(26 + 44 * c));
+        }
         return clampToWater(point);
     }
 
     /** Surfaces at long range so the player sees something and cannot tell what. */
     public Vec3 observePoint() {
         Vec3 anchor = estimate;
-        double radius = 90 + self.getRandom().nextDouble() * 70;
-        double angle = self.getRandom().nextDouble() * Mth.TWO_PI;
-        return new Vec3(anchor.x + Math.cos(angle) * radius, waterline() - 2.5, anchor.z + Math.sin(angle) * radius);
+        // Held, for the same reason the ambush station is: a watcher that re-picks where it is
+        // watching from every tick does not read as watching.
+        if (observe == null || anchor.distanceToSqr(observeAnchor) > 60 * 60) {
+            double radius = 90 + self.getRandom().nextDouble() * 70;
+            double angle = self.getRandom().nextDouble() * Mth.TWO_PI;
+            observeAnchor = anchor;
+            observe = new Vec3(anchor.x + Math.cos(angle) * radius, waterline() - 2.5, anchor.z + Math.sin(angle) * radius);
+        }
+        return new Vec3(observe.x, waterline() - 2.5, observe.z);
     }
 
     /** Wide, aimless sweeps when nothing is being hunted. */

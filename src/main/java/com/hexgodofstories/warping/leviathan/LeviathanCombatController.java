@@ -42,6 +42,13 @@ public final class LeviathanCombatController {
     private int orbitSign = 1;
     private boolean crossedSurface, splashed, escapeWindow;
     private final Set<UUID> struck = new HashSet<>();
+    /** Where the jaws were on the previous tick, so a pass at speed can be swept rather than sampled. */
+    @Nullable private Vec3 lastMouth;
+    private Vec3 sweepFrom = Vec3.ZERO;
+    /** Whether the pattern now running has actually put damage on something. */
+    private boolean connected;
+    /** The same, narrowed to the tick it happened on. Cleared at the top of every tick. */
+    private boolean landedThisTick;
     /** How far below the waterline a dragged victim is ever taken. */
     private static final double DRAG_LIMIT = 150.0;
     /** How far above the waterline a leap will ever aim. Higher than this, flight has won. */
@@ -56,6 +63,12 @@ public final class LeviathanCombatController {
     @Nullable public Entity victim() { return victim; }
     public boolean ready() { return cooldown <= 0; }
     public void cool(int ticks) { cooldown = Math.max(cooldown, ticks); }
+    /** True once the pattern currently running, or the last one that ran, drew blood. */
+    public boolean connected() { return connected; }
+    /** True only on the tick a blow actually landed, so a caller can edge trigger on it. */
+    public boolean landed() { return landedThisTick; }
+    /** Ticks left before another pattern may start. */
+    public int cooldown() { return cooldown; }
 
     public void begin(LeviathanAttack pattern, @Nullable Entity target) {
         attack = pattern;
@@ -63,7 +76,7 @@ public final class LeviathanCombatController {
         tick = 0;
         breachPreparation = 0;
         struck.clear();
-        crossedSurface = splashed = escapeWindow = false;
+        crossedSurface = splashed = escapeWindow = connected = false;
         anchor = target != null ? target.position() : self.position();
         orbit = self.getRandom().nextDouble() * Mth.TWO_PI;
         orbitSign = self.getRandom().nextBoolean() ? 1 : -1;
@@ -74,7 +87,10 @@ public final class LeviathanCombatController {
     }
 
     public void abort() {
-        if (attack != null) cooldown = 20 + self.getRandom().nextInt(40);
+        // Short: an abandoned pattern is a miss, and a predator that misses comes straight back
+        // round. The old three second penalty was most of why a broken off approach turned into
+        // another full lap of circling.
+        if (attack != null) cooldown = 10 + self.getRandom().nextInt(16);
         attack = null; victim = null; tick = 0;
         self.setAttack(null);
         self.setAttackTick(0);
@@ -83,6 +99,13 @@ public final class LeviathanCombatController {
     }
 
     public void tick() {
+        landedThisTick = false;
+        // Recorded every tick, attack or not, so the first tick of a pattern already has a real
+        // previous position to sweep from instead of a zero.
+        Vec3 mouthNow = mouth();
+        sweepFrom = lastMouth == null ? mouthNow : lastMouth;
+        lastMouth = mouthNow;
+
         if (crossedSurface && !splashed && self.getY() < self.surfaceY() - 1) {
             splashed = true;
             impact(new Vec3(self.getX(), self.surfaceY(), self.getZ()));
@@ -123,22 +146,45 @@ public final class LeviathanCombatController {
             attack = null;
             self.setAttack(null);
             self.control().setAllowAir(false);
-            cooldown = (finished.lethal() ? 30 : 12) + self.getRandom().nextInt(finished == LeviathanAttack.VOID_SCREAM ? 200 : 70);
-            cooldown = (int) (cooldown * (1.0 - 0.45 * self.frenzy()));
+            // Attacks are meant to be frequent without being a stream. The pattern clocks already
+            // cost forty to a hundred ticks each, so this is the pause *between* them: about a
+            // second and a half at rest, under a second at full frenzy, and a long one only after
+            // the scream, which is an area denial pattern rather than a strike.
+            cooldown = (finished.lethal() ? 16 : 8) + self.getRandom().nextInt(finished == LeviathanAttack.VOID_SCREAM ? 160 : 26);
+            // A pattern that connected has earned a beat to let the victim react; one that missed
+            // has earned nothing, and comes back round faster.
+            if (connected) cooldown += 10;
+            cooldown = (int) (cooldown * (1.0 - 0.5 * self.frenzy()));
         }
     }
 
     // ---------------------------------------------------------------- patterns
 
+    /**
+     * The commit. Line the jaws up over the windup, then run them through the prey.
+     *
+     * <p>Both halves used to steer at the victim's own position, which is why the pattern so often
+     * ended with the mouth open a few blocks to one side of somebody who took no damage: the aim
+     * point sat inside the move control's turning circle, so the body carved past it rather than
+     * turning onto it, and the jaws — thirteen blocks ahead of the position being steered — were
+     * never where the aim point was anyway. The windup now closes on the prey with the mouth
+     * itself, and the active phase drives at a point well beyond them so the run is a straight
+     * line the body can actually hold and the jaws cross the prey on the way past.
+     */
     private void bite() {
         if (victim == null) { abort(); return; }
         if (tick < attack.windup) {
-            steer(victim.position(), 0.9, 0.55f);
+            // Closing, and already aimed past them: this is the moment the creature stops circling
+            // and points itself, so the aim point has to stay outside the radius inside which the
+            // steering gives up on turning. Shorter than the run itself, so it still reads as a
+            // gather rather than as the strike starting early.
+            steer(aimThrough(victim, 34), 1.5, 0.95f);
+            self.control().addBurst(0.35);
         } else if (tick < attack.windup + attack.active) {
-            steer(victim.position(), 1.9, 0.95f);
-            self.control().addBurst(0.8);
+            steer(aimThrough(victim, 46), 2.4, 1.0f);
+            self.control().addBurst(1.0);
             if (tick == attack.windup + 1) self.voice(HexGodOfStories.PILGRIM_BITE.get(), 22f, 0.85f);
-            for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.HEAD, 2.2)) {
+            for (LivingEntity hit : headSweep(2.6)) {
                 damage(hit, 14f, 0.55);
                 if (hit == victim && attack.canHold && self.getRandom().nextFloat() < 0.55f) takeHold(hit);
             }
@@ -158,10 +204,13 @@ public final class LeviathanCombatController {
             steer(self.position().add(line.normalize().scale(20)), 0.6, 0.8f);
             if (tick == 4) self.voice(HexGodOfStories.PILGRIM_LUNGE.get(), 28f, 1.0f);
         } else if (tick < attack.windup + attack.active) {
-            Vec3 through = anchor.add(anchor.subtract(self.position()).normalize().scale(70));
-            steer(through, 3.1, 0.30f);
+            // Aimed at where the prey is now rather than where it was when the run started: a
+            // charge that commits to a stale anchor is a charge that misses anything that moved
+            // during the windup, and the pass is long enough for that to be most things.
+            steer(victim.isAlive() ? aimThrough(victim, 70)
+                : anchor.add(anchor.subtract(self.position()).normalize().scale(70)), 3.1, 0.55f);
             self.control().addBurst(1.6);
-            for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.HEAD, 2.6)) damage(hit, 16f, 1.6);
+            for (LivingEntity hit : headSweep(2.8)) damage(hit, 16f, 1.6);
             for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.NECK, 1.6)) damage(hit, 9f, 1.2);
         } else {
             steer(self.position().add(self.getLookAngle().scale(30)), 0.8, 0.18f);
@@ -191,10 +240,11 @@ public final class LeviathanCombatController {
         if (victim == null) { abort(); return; }
         Vec3 mouth = mouth();
         if (tick < attack.windup) {
-            steer(victim.position(), 1.2, 0.7f);
+            steer(mouthOnto(lead(victim, 12)), 1.4, 0.85f);
         } else if (tick < attack.windup + attack.active) {
             if (tick == attack.windup) self.voice(HexGodOfStories.PILGRIM_GRAB.get(), 24f, 1.0f);
-            steer(victim.position(), 1.1, 0.8f);
+            // The tendrils reach from the mouth, so the mouth is what has to be brought to bear.
+            steer(mouthOnto(lead(victim, 6)), 1.4, 0.9f);
             double reach = attack.range;
             for (LivingEntity near : around(mouth, reach)) {
                 Vec3 pull = mouth.subtract(near.position());
@@ -210,8 +260,10 @@ public final class LeviathanCombatController {
     private void dragBelow() {
         if (tick < attack.windup) {
             if (victim == null) { abort(); return; }
-            steer(victim.position(), 1.6, 0.9f);
-            for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.HEAD, 2.5)) { takeHold(hit); break; }
+            // This windup has to end with the jaws actually on someone or the pattern aborts, so
+            // it drives through them rather than holding station short of them.
+            steer(aimThrough(victim, 34), 1.9, 0.95f);
+            for (LivingEntity hit : headSweep(2.5)) { takeHold(hit); break; }
             if (self.held() == null && tick == attack.windup - 1) { abort(); return; }
         } else if (tick < attack.windup + attack.active) {
             if (self.held() == null) { abort(); return; }
@@ -296,10 +348,12 @@ public final class LeviathanCombatController {
             steer(new Vec3(victim.getX(), Math.max(self.floorY() + 14, victim.getY() - 95), victim.getZ()), 1.6, 0.6f);
             if (tick == 0) self.voice(HexGodOfStories.PILGRIM_BREACH_CHARGE.get(), 64f, 0.8f);
         } else if (tick < attack.windup + attack.active) {
-            steer(new Vec3(victim.getX(), victim.getY() + 6, victim.getZ()), 3.0, 0.5f);
+            // Straight up and through, not up to. Stopping level with the prey is a charge that
+            // arrives underneath them with the jaws already past.
+            steer(aimThrough(victim, 50).add(0, 6, 0), 3.0, 0.7f);
             self.control().addBurst(1.4);
             self.setGlow(1f);
-            for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.HEAD, 2.6)) {
+            for (LivingEntity hit : headSweep(2.8)) {
                 damage(hit, 15f, 1.4);
                 if (self.getRandom().nextFloat() < 0.4f) takeHold(hit);
             }
@@ -317,6 +371,7 @@ public final class LeviathanCombatController {
             steer(new Vec3(victim.getX(), line + 3, victim.getZ()), 2.6, 0.7f);
             self.control().addBurst(1.2);
             if (!splashed && self.getY() > line - 4) { splashed = true; splash(new Vec3(self.getX(), line, self.getZ()), 1.3f); }
+            for (LivingEntity hit : headSweep(2.0)) { damage(hit, 11f, 1.0); hit.setDeltaMovement(hit.getDeltaMovement().add(0, 1.35, 0)); hit.hurtMarked = true; }
             for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.NECK, 2.5)) { damage(hit, 9f, 1.0); hit.setDeltaMovement(hit.getDeltaMovement().add(0, 1.35, 0)); hit.hurtMarked = true; }
             for (Boat boat : self.level().getEntitiesOfClass(Boat.class, self.segments().box(0).inflate(9))) {
                 boat.setDeltaMovement(boat.getDeltaMovement().add((self.getRandom().nextDouble() - 0.5) * 0.7, 1.5, (self.getRandom().nextDouble() - 0.5) * 0.7));
@@ -360,7 +415,7 @@ public final class LeviathanCombatController {
                 crossedSurface = true;
                 splash(new Vec3(self.getX(), line, self.getZ()), 2.0f);
             }
-            for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.HEAD, 3.0)) {
+            for (LivingEntity hit : headSweep(3.0)) {
                 damage(hit, 20f, 1.0);
                 if (self.held() == null) takeHold(hit);
             }
@@ -414,7 +469,7 @@ public final class LeviathanCombatController {
                 crossedSurface = true;
                 splash(new Vec3(self.getX(), line, self.getZ()), 2.2f);
             }
-            for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.HEAD, 3.2)) {
+            for (LivingEntity hit : headSweep(3.2)) {
                 damage(hit, 22f, 1.0);
                 if (self.held() == null && attack.canHold) takeHold(hit);
             }
@@ -492,7 +547,7 @@ public final class LeviathanCombatController {
             }
             // Otherwise, try to be underneath them when they come down.
             steer(new Vec3(victim.getX(), Math.min(victim.getY(), self.surfaceY()) - 6, victim.getZ()), 2.4, 0.8f);
-            for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.HEAD, 2.6)) damage(hit, 12f, 0.8);
+            for (LivingEntity hit : headSweep(2.6)) damage(hit, 12f, 0.8);
         }
     }
 
@@ -539,6 +594,47 @@ public final class LeviathanCombatController {
         self.control().moveTo(point, speed, authority);
     }
 
+    // ---------------------------------------------------------------- aiming
+
+    /**
+     * Where the prey will be in {@code ticks}.
+     *
+     * <p>Horizontal drift is taken at face value and vertical drift is damped, because a swimmer's
+     * vertical velocity is mostly buoyancy bobbing and leading it puts the jaws under their feet.
+     * Something standing perfectly still has no drift at all and therefore no lead, which is the
+     * point: a stationary target is the easiest thing in the ocean to hit, not the hardest.
+     */
+    private Vec3 lead(Entity prey, double ticks) {
+        Vec3 drift = prey.getDeltaMovement();
+        return prey.position().add(drift.x * ticks, drift.y * ticks * 0.3, drift.z * ticks);
+    }
+
+    /**
+     * The point to drive the body at so the jaws pass clean through the prey.
+     *
+     * <p>Steering at the prey's own position is what made a strike a near miss. Two things go
+     * wrong with it. The move control refuses to turn toward anything inside its own turning
+     * circle — it carves past and comes back round, which is exactly the endless orbiting the
+     * creature was doing — and a point the body arrives at is a point the body stops at, with
+     * {@link AbyssalPilgrimEntity#MOUTH_REACH} blocks of skull already past the victim.
+     *
+     * <p>Aiming well beyond them fixes both at once. The aim point is never inside the turning
+     * circle, so the heading converges the whole way in; and because the mouth rides ahead of the
+     * body on the same straight line, whatever the body is driven through the jaws reach first.
+     */
+    private Vec3 aimThrough(Entity prey, double beyond) {
+        Vec3 mark = lead(prey, 8);
+        Vec3 run = mark.subtract(self.position());
+        Vec3 line = run.lengthSqr() < 1.0E-6 ? self.getLookAngle() : run.normalize();
+        return mark.add(line.scale(beyond));
+    }
+
+    /** Where the body must sit for the jaws to rest on {@code point} rather than past it. */
+    private Vec3 mouthOnto(Vec3 point) {
+        return point.subtract(self.getLookAngle().scale(AbyssalPilgrimEntity.MOUTH_REACH));
+    }
+
+
     public Vec3 mouth() {
         return self.mouthPosition();
     }
@@ -555,6 +651,28 @@ public final class LeviathanCombatController {
         return found;
     }
 
+    /**
+     * Everything the jaws crossed between the previous tick and this one.
+     *
+     * <p>A single frame overlap test is the wrong test for a head that covers several blocks a
+     * tick. The box is somewhere else the tick before and somewhere else again the tick after, so
+     * a pass at strike speed can go straight through a player without ever sampling them — the
+     * player sees the mouth close on them and takes nothing. Sweeping the head's own travel makes
+     * the damage code agree with what was on screen.
+     */
+    private List<LivingEntity> headSweep(double inflate) {
+        Vec3 now = mouth();
+        Vec3 was = sweepFrom;
+        double reach = LeviathanSegmentController.radius(0) + inflate;
+        List<LivingEntity> found = new ArrayList<>();
+        for (LivingEntity candidate : self.level().getEntitiesOfClass(
+                LivingEntity.class, new AABB(was, now).inflate(reach), this::prey)) {
+            AABB grown = candidate.getBoundingBox().inflate(reach);
+            if (grown.contains(now) || grown.contains(was) || grown.clip(was, now).isPresent()) found.add(candidate);
+        }
+        return found;
+    }
+
     private List<LivingEntity> around(Vec3 centre, double radius) {
         return self.level().getEntitiesOfClass(LivingEntity.class, new AABB(centre, centre).inflate(radius), e -> prey(e) && e.position().distanceToSqr(centre) <= radius * radius);
     }
@@ -567,7 +685,8 @@ public final class LeviathanCombatController {
 
     private void damage(LivingEntity entity, float amount, double knockback) {
         if (!struck.add(entity.getUUID())) return;
-        entity.hurt(self.damageSources().mobAttack(self), amount);
+        connected = landedThisTick = true;
+        entity.hurt(self.attackDamage(entity), amount);
         if (knockback > 0) {
             Vec3 away = entity.position().subtract(self.segments().segment(0));
             if (away.lengthSqr() < 1.0E-4) away = new Vec3(0, 1, 0);

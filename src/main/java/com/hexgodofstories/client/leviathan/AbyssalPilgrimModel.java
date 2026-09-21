@@ -46,10 +46,30 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
     }
 
     private final Map<AbyssalPilgrimEntity, LeviathanSegmentRenderController> controllers = new WeakHashMap<>();
+    /** Set by the renderer each frame; see {@link #getRenderType}. */
+    private boolean blended;
 
     @Override public ResourceLocation getModelResource(AbyssalPilgrimEntity animatable) { return MODEL; }
     @Override public ResourceLocation getTextureResource(AbyssalPilgrimEntity animatable) { return TEXTURE; }
     @Override public ResourceLocation getAnimationResource(AbyssalPilgrimEntity animatable) { return ANIMATION; }
+
+    /** Told once a frame whether any part of the body is currently being dimmed by the water. */
+    public void setBlended(boolean blended) { this.blended = blended; }
+
+    /**
+     * Cutout while the creature is in plain sight, blended while the water is hiding it.
+     *
+     * <p>The cutout pass has no blending at all: a vertex alpha below one is simply written opaque,
+     * so the per joint fade the renderer computes would be discarded and the body would stay as
+     * sharp under two hundred blocks of ocean as it is at the surface. Switching rather than
+     * always blending keeps the fully exposed creature on exactly the pass it has always used, so
+     * a breach looks identical to how it looked before any of this existed.
+     */
+    @Override
+    public net.minecraft.client.renderer.RenderType getRenderType(AbyssalPilgrimEntity animatable, ResourceLocation texture) {
+        return blended ? net.minecraft.client.renderer.RenderType.entityTranslucent(texture)
+                       : net.minecraft.client.renderer.RenderType.entityCutoutNoCull(texture);
+    }
 
     public LeviathanSegmentRenderController controllerFor(AbyssalPilgrimEntity entity) {
         return controllers.computeIfAbsent(entity, e -> new LeviathanSegmentRenderController());
@@ -124,8 +144,19 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
                 t < attack.windup ? Mth.clamp(t / attack.windup, 0, 1)
                 : t < attack.windup + attack.active ? 0.95f
                 : Mth.clamp(1f - (t - attack.windup - attack.active) / 12f, idle, 1f);
-            case PREDATORY_BITE ->
-                t < attack.windup ? Mth.clamp(t / attack.windup, 0, 1) : Mth.clamp(1f - (t - attack.windup) / 5f, 0.02f, 1f);
+            // The jaws used to slam shut five ticks into the active phase and then stay shut while
+            // the pattern went on dealing damage for the rest of it, so the mouth the player saw
+            // and the mouth the damage came out of were two different things. They now hold open
+            // across the whole pass, close as the head comes off the prey, and relax to idle over
+            // the recovery instead of popping back.
+            case PREDATORY_BITE -> {
+                float snap = attack.windup + attack.active - 6f;
+                float shut = attack.windup + attack.active;
+                yield t < attack.windup ? Mth.clamp(t / attack.windup, 0f, 1f)
+                    : t < snap ? 0.98f
+                    : t < shut ? Mth.clamp(1f - (t - snap) / 6f, 0.02f, 1f)
+                    : Mth.lerp(Mth.clamp((t - shut) / Math.max(1f, attack.recover), 0f, 1f), 0.02f, idle);
+            }
             case VOID_SCREAM -> Mth.clamp(t / attack.windup, 0, 1);
             case FAKE_ATTACK -> t < attack.windup ? Mth.clamp(t / attack.windup, 0, 1) * 0.9f : Mth.clamp(1f - (t - attack.windup) / 10f, 0f, 1f) * 0.9f;
             case TENDRIL_GRAB, DRAG_BELOW, AIR_THROW -> 0.55f;

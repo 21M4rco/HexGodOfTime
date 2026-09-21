@@ -49,9 +49,11 @@
   "subtitles.hexgodofstories.time_resume": "Time resumes",
   "subtitles.hexgodofstories.time_slip": "Time slips",
   "subtitles.hexgodofstories.time_stop": "Time stops",
+  "death.attack.hexgodofstories.hexor": "%1$s has been devoured by Hexor",
+  "death.attack.hexgodofstories.hexor.player": "%1$s has been devoured by Hexor",
   "death.attack.hexgodofstories.solar_heat": "%1$s was consumed by the Sun",
   "death.attack.hexgodofstories.solar_heat.player": "%1$s was cast into the Sun by %2$s",
-  "entity.hexgodofstories.abyssal_pilgrim": "The Abyssal Pilgrim",
+  "entity.hexgodofstories.abyssal_pilgrim": "Hexor",
   "subtitles.hexgodofstories.pilgrim_distant_call": "A call from far below",
   "subtitles.hexgodofstories.pilgrim_deep_idle": "Something breathes in the dark",
   "subtitles.hexgodofstories.pilgrim_clicking": "Clicking",
@@ -60,7 +62,7 @@
   "subtitles.hexgodofstories.pilgrim_breach_charge": "The water begins to move",
   "subtitles.hexgodofstories.pilgrim_breach": "The ocean opens",
   "subtitles.hexgodofstories.pilgrim_water_impact": "Impact",
-  "subtitles.hexgodofstories.pilgrim_roar": "The Pilgrim roars",
+  "subtitles.hexgodofstories.pilgrim_roar": "Hexor roars",
   "subtitles.hexgodofstories.pilgrim_bite": "Jaws close",
   "subtitles.hexgodofstories.pilgrim_grab": "Tendrils take hold",
   "subtitles.hexgodofstories.pilgrim_throw": "Thrown",
@@ -68,5 +70,6 @@
   "subtitles.hexgodofstories.pilgrim_tail_sweep": "The tail whips through",
   "subtitles.hexgodofstories.pilgrim_void_scream": "Void scream",
   "subtitles.hexgodofstories.pilgrim_hurt": "The blow does not land",
-  "subtitles.hexgodofstories.pilgrim_death": "A final enormous call"
+  "subtitles.hexgodofstories.pilgrim_death": "A final enormous call",
+  "subtitles.hexgodofstories.hexor_ambient": "Hexor calls through the deep"
 }

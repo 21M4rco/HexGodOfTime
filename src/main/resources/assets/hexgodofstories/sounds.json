@@ -197,6 +197,15 @@
       }
     ]
   },
+  "hexor_ambient": {
+    "subtitle": "subtitles.hexgodofstories.hexor_ambient",
+    "sounds": [
+      {
+        "name": "hexgodofstories:hexor_ambient",
+        "stream": true
+      }
+    ]
+  },
   "illusion": {
     "subtitle": "subtitles.hexgodofstories.illusion",
     "sounds": [

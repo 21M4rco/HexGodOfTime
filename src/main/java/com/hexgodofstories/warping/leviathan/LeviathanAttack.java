@@ -6,10 +6,17 @@ package com.hexgodofstories.warping.leviathan;
  * play the matching animation without receiving per-bone data.
  */
 public enum LeviathanAttack {
-    /** Jaw windup then a violent snap. Can capture the victim inside the mouth. */
-    PREDATORY_BITE(18, 10, 22, 14, true),
+    /**
+      * Jaw windup, then the jaws are run through the target.
+      *
+      * <p>Ten ticks of active phase was not a bite, it was a sample: the head covers barely nine
+      * blocks in that time, so whether the jaws were anywhere near the prey during it came down to
+      * how far away the pattern happened to start. Twenty two ticks is a pass, and the range the
+      * behaviour may start it from is no longer shorter than the creature's own jaw reach.
+      */
+    PREDATORY_BITE(16, 22, 14, 34, true),
     /** Straighten, fold the fins, and pass clean through the target instead of stopping. */
-    ABYSSAL_LUNGE(22, 18, 26, 34, true),
+    ABYSSAL_LUNGE(22, 18, 26, 55, true),
     /** Force travels down the spine and the tail whips through the target volume. */
     TAIL_SWEEP(20, 12, 24, 30, false),
     /** Tendrils catch and reel the target in. Outcome is chosen afterwards. */
@@ -17,7 +24,7 @@ public enum LeviathanAttack {
     /** Take hold and dive hard. Usually ends in a release far from the surface. */
     DRAG_BELOW(14, 70, 30, 12, true),
     /** Coil, tighten slowly, allow a short escape window, then crush. */
-    BODY_CRUSH(26, 80, 34, 16, false),
+    BODY_CRUSH(26, 80, 34, 50, false),
     /** Jaw opens fully and a pressure pulse leaves the body in every direction. */
     VOID_SCREAM(34, 16, 40, 40, false),
     /** Descend well below the target then accelerate straight up. */
@@ -31,7 +38,7 @@ public enum LeviathanAttack {
     /** A full windup that is abandoned on purpose. Never deals damage. */
     FAKE_ATTACK(20, 14, 26, 24, false),
     /** Orbit at speed and drag everything nearby toward the centre. */
-    WATER_VORTEX(24, 90, 30, 28, false),
+    WATER_VORTEX(24, 90, 30, 40, false),
     /**
      * Line up beneath something that is flying, then leave the water on a computed ballistic arc to
      * meet it in the air. Short, committed and unrecoverable once launched: the jaws either arrive

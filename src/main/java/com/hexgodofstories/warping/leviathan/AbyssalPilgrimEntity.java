@@ -309,8 +309,42 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
             () -> () -> com.hexgodofstories.client.leviathan.LeviathanClientHooks.clientTick(this));
     }
 
-    /** The jaw chamber is thirteen blocks ahead of the cranial pivot in the authored model. */
-    public Vec3 mouthPosition() { return position().add(getLookAngle().scale(13.0)); }
+    /**
+     * Blocks between the entity's own position and the jaw chamber in the authored model.
+     *
+     * <p>This is the single most important number in the creature's combat geometry and it used to
+     * live only inside {@link #mouthPosition()}. Every attack that steered the body at its victim
+     * was therefore aiming thirteen blocks of skull straight past them: by the time the position
+     * the move control was driving arrived, the jaws had already gone through and beyond. Anything
+     * that wants to put the mouth somewhere has to subtract this first, so it is stated once.
+     */
+    public static final double MOUTH_REACH = 13.0;
+
+    /** The jaw chamber, thirteen blocks ahead of the cranial pivot in the authored model. */
+    public Vec3 mouthPosition() { return position().add(getLookAngle().scale(MOUTH_REACH)); }
+
+    /** Where the body has to be for the mouth to arrive at {@code point} on the present heading. */
+    public Vec3 bodyPointForMouthAt(Vec3 point) { return point.subtract(getLookAngle().scale(MOUTH_REACH)); }
+
+    /**
+     * The damage source every one of Hexor's blows is dealt with.
+     *
+     * <p>Players get a damage type of the creature's own, whose message id resolves to Hexor's line
+     * in the language file. That routes the announcement through the same vanilla death message
+     * machinery every other kill uses — once, to vanilla's audience, on the death screen too — with
+     * nothing sending a second copy to chat. Everything else keeps the generic mob attack on
+     * purpose: an ocean of drowned dying to a named damage type would put that line in the chat
+     * over and over for kills nobody was watching.
+     */
+    public DamageSource attackDamage(Entity victim) {
+        if (!(victim instanceof net.minecraft.world.entity.player.Player)) return damageSources().mobAttack(this);
+        return new DamageSource(level().registryAccess()
+            .registryOrThrow(net.minecraft.core.registries.Registries.DAMAGE_TYPE).getHolderOrThrow(HEXOR_KILL), this);
+    }
+
+    /** Matches data/hexgodofstories/damage_type/hexor.json. */
+    private static final net.minecraft.resources.ResourceKey<net.minecraft.world.damagesource.DamageType> HEXOR_KILL =
+        net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DAMAGE_TYPE, HexGodOfStories.id("hexor"));
 
     /** Apply contact to the actual section volumes, including boats and moving modded objects. */
     private void bodyContact() {
@@ -333,7 +367,7 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
                 victim.setDeltaMovement(victim.getDeltaMovement().scale(0.55).add(away.scale(0.35 + speed * 1.6)));
                 victim.hurtMarked = true; victim.fallDistance = 0;
                 if (speed > 0.3 && tickCount % 10 == 0 && attack() != LeviathanAttack.FAKE_ATTACK)
-                    victim.hurt(damageSources().mobAttack(this), (float) (2.0 + speed * 9.0));
+                    victim.hurt(attackDamage(victim), (float) (2.0 + speed * 9.0));
                 break;
             }
         }

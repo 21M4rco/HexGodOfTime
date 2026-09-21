@@ -180,3 +180,112 @@ A successful build does not establish visual quality, breach timing, multiplayer
 or performance in a populated modpack. These still require Minecraft client/server playtesting.
 Existing stalk/toy/ambush/frenzy behavior, attack repertoire, sound bank and administrative sinking
 sequence were retained. Normal gameplay cannot trigger the death sequence.
+
+## 0.5.8 — Hexor: commitment, voice, the kill line and the water
+
+Base: successful Actions run 35624047134, commit 32549e05c741cc3630c6ebbec1f15806dec94056.
+The model, texture, animation clips, keyframes, joint count, spacing and silhouette are untouched.
+One animation *state* change is described under "Jaws" and is a timing fix, not a re-pose.
+
+### Name
+
+Display name only. `entity.hexgodofstories.abyssal_pilgrim` now reads **Hexor**, and the two player
+facing strings that named the creature — the roar subtitle and the `/hgos pilgrim spawn` reply —
+say Hexor. The registry id stays `hexgodofstories:abyssal_pilgrim`: it is what saved worlds, the
+sounds, geometry, animation and texture paths, and `VoidSeaShapeTest` are all keyed on, and
+renaming it would orphan every existing Void Sea rather than rename anything a player can see.
+
+### Why it circled and never bit
+
+Five separate faults, all of which had to be fixed for the creature to land anything.
+
+**The jaws are thirteen blocks ahead of the body.** `mouthPosition()` is
+`position + look * 13`, and the head hitbox is placed there, but every close pattern steered the
+*body* at the victim. Driving the body onto someone puts thirteen blocks of skull past them. The
+mouth only ever crossed the prey by accident, on the way in, if the pattern happened to start at
+the right distance. Strikes now aim through the prey; station keeping patterns aim
+`mouthOnto(...)`, which subtracts the jaw reach so the mouth is what arrives.
+
+**A point at the prey is a point the steering refuses to turn toward.** `LeviathanMoveControl`
+blends the desired heading back toward the current one inside `TURN_RADIUS * 0.6` — thirty blocks —
+because a body this long cannot turn onto something it is nearly on top of. Every approach point
+sat inside that radius, so the creature carved past and came round. That *is* the circling. Aiming
+forty to seventy blocks beyond the prey keeps the aim point outside the radius, so the heading
+converges the whole way in and the body passes through instead of around. Nothing about the turn
+rate, radius or speed scale was changed; the mass and the wide arcs read exactly as before.
+
+**One frame of overlap is the wrong hit test for a head moving several blocks a tick.** The head
+box is elsewhere the tick before and elsewhere again the tick after. `headSweep` tests the jaws'
+actual travel between ticks, so a pass at strike speed registers.
+
+**Play had no clock.** Every non-committing state could be chosen again the moment the last ended,
+and could run up to thirty seconds. `pressure` counts ticks with prey inside 150 blocks and nothing
+landed on it; `commitment()` is that over 360 ticks. It bleeds the toy, stalk and ambush shares
+into hunting, tightens the ceiling on how long any of them may run, closes the stalk orbit, drops
+the approach's blind angle offsets, and collapses the moment a blow lands. A fresh hunt is still
+about half circling. A hunt that has gone twenty seconds without a hit is not.
+
+**Standing still was a perfect defence.** `AMBUSH` would only strike while unseen, and the one
+posture that never breaks line of sight is a player standing still watching the water. It still
+prefers to be unseen and still waits for it, but the wait is bounded and a patient starer is taken
+anyway. Its station also stopped being re-rolled from scratch every tick, which had it steering at
+a point that jumped tens of blocks twenty times a second and made the in-position test a coin flip.
+
+Alongside: the feint dropped from 22% of picks to 8%, never twice running and never past a third of
+the commit clock; `PREDATORY_BITE` went from ten active ticks to twenty two, with a range no longer
+shorter than the creature's own jaw reach; the range gate now accounts for the jaw reach and the
+ground the windup covers, and falls back to a closing pattern instead of silently picking nothing;
+post-attack cooldowns roughly halved; and every path that starts a pattern goes through one
+`commit()` that also moves the state machine, so the creature can no longer play an attack while
+its navigation is still running a circling state.
+
+### Jaws
+
+`PREDATORY_BITE` closed its mouth five ticks into the active phase and then went on dealing damage
+for the rest of it with the jaws shut. They now hold open across the whole pass, close as the head
+comes off the prey, and ease back to idle over the recovery. No keyframe, bone or pose was changed;
+this is the envelope `AbyssalPilgrimModel.jawOpen` drives them with.
+
+### Voice
+
+The supplied clip ships as `hexor_ambient.ogg`, downmixed to mono because Minecraft's sound engine
+can only position a mono buffer — a stereo clip plays flat inside the player's head at the same
+volume from any distance. It replaces all three ambient branches; attack, grab, breach, impact and
+roar cues are untouched. Two rules keep six and a half seconds of loud from becoming wallpaper:
+nothing starts while the last call is still sounding, and the gap after it finishes is 55 to 180
+seconds, randomised. `VoidSeaShapeTest` fails the build if the file is not mono or if
+`HEXOR_AMBIENT_TICKS` no longer covers its length.
+
+### The kill line
+
+`data/hexgodofstories/damage_type/hexor.json` carries the message id `hexgodofstories.hexor`, whose
+translation is `%1$s has been devoured by Hexor`. Players killed by Hexor take that damage type;
+everything else keeps the generic mob attack, so an ocean of drowned cannot put the line in chat.
+The announcement is vanilla's, produced once, obeying `showDeathMessages` and appearing on the
+death screen — nothing sends a second copy. `HexorDeathMessageMixin` styles that one component red
+at its single exit point, which is the only part a language file cannot express.
+
+### Seeing it through the surface
+
+The creature was legible in full detail through the waterline at any depth. That is not a model or
+texture fault. Water is a surface, not a volume: only the faces bordering air are drawn, so nine
+hundred blocks of ocean cost one translucent quad and dim nothing behind them. What normally does
+the dimming is skylight, which loses a level per block of water — and this realm has
+`has_skylight: false` with a flat `ambient_light` of 0.18 under it, so every block of the column is
+lit identically and depth costs the creature nothing.
+
+Lowering the realm's ambient light would blind the realm rather than hide the creature, and fog
+belongs to the camera rather than to what it is looking at. `LeviathanWaterVeil` puts back the
+attenuation the water should have been applying: depth divided by how steeply the ray to the camera
+climbs, which is the distance the light actually spends in water, turned into a survival fraction.
+The renderer applies it per spine joint — a body this long can have its head under a boat and its
+tail a hundred blocks below — as both alpha and a blend toward the biome's water fog colour, since
+alpha alone leaves a crisp ghost and tint alone leaves a flat cut-out. GeckoLib passes a bone's
+colour to its children, and the emissive layer re-renders through the same path, so the
+bioluminescence fades with the body instead of punching through the surface at full brightness.
+
+Deliberate limits. The first seven blocks under the surface hide nothing, so a breach, a back
+crossing the waterline or a head coming up under a boat all read at full strength. A camera that is
+itself in the water returns full visibility and gets ordinary fog, light and line of sight. The
+cutout pass is kept while nothing is being dimmed, so a fully exposed creature draws exactly as it
+did before any of this existed; only a faded one switches to a blended pass.

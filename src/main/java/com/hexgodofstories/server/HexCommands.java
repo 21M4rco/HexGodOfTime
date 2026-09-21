@@ -93,7 +93,7 @@ public final class HexCommands {
         pilgrim.then(Commands.literal("spawn").executes(c->{
             ServerPlayer p=c.getSource().getPlayerOrException();
             var q=com.hexgodofstories.warping.leviathan.PilgrimWarden.spawn(p.serverLevel(),p.position());
-            c.getSource().sendSuccess(()->Component.literal(q==null?"The abyss refused.":"The Abyssal Pilgrim has been given this ocean."),true);
+            c.getSource().sendSuccess(()->Component.literal(q==null?"The abyss refused.":"Hexor has been given this ocean."),true);
             return q==null?0:1;}));
         pilgrim.then(Commands.literal("purge").executes(c->{
             var list=c.getSource().getLevel().getEntitiesOfClass(com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity.class,

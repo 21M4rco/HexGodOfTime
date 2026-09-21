@@ -157,6 +157,66 @@ public final class VoidSeaShapeTest {
         }
         for (String texture : new String[] { "abyssal_pilgrim.png", "abyssal_pilgrim_glowmask.png" })
             check(Files.isRegularFile(root.resolve("src/main/resources/assets/hexgodofstories/textures/entity/" + texture)), texture + " is present");
+
+        hexorAmbientIsPositional(root, sounds);
+    }
+
+    /**
+     * Hexor's ambient call has to be mono, and the AI has to be spacing itself around its real
+     * length.
+     *
+     * <p>Neither failure shows up as an error. Minecraft's sound engine can only place a mono
+     * buffer in the world; hand it a stereo clip and it plays the thing flat inside the player's
+     * head, at the same volume from any distance and from no direction at all, which for a
+     * creature you are meant to locate by ear is worse than silence. And the declared clip length
+     * is what stops a second call starting over the top of the first, so a file that grows past it
+     * would quietly bring the stacking back.
+     */
+    private static void hexorAmbientIsPositional(Path root, String sounds) throws Exception {
+        check(sounds.contains("\"hexor_ambient\":{"), "sounds.json registers hexor_ambient");
+        Path ogg = root.resolve("src/main/resources/assets/hexgodofstories/sounds/hexor_ambient.ogg");
+        check(Files.isRegularFile(ogg) && Files.size(ogg) > 512, "hexor_ambient.ogg is present and not empty");
+
+        byte[] bytes = Files.readAllBytes(ogg);
+        int header = indexOf(bytes, new byte[] { 1, 'v', 'o', 'r', 'b', 'i', 's' });
+        check(header >= 0, "hexor_ambient.ogg carries a Vorbis identification header");
+        // Identification header: type(1) "vorbis"(6) version(4) channels(1) rate(4), little endian.
+        int channels = bytes[header + 11] & 0xFF;
+        check(channels == 1, "hexor_ambient.ogg is mono, so the sound engine can place it (" + channels + " channels)");
+        long rate = (bytes[header + 12] & 0xFFL) | (bytes[header + 13] & 0xFFL) << 8
+                  | (bytes[header + 14] & 0xFFL) << 16 | (bytes[header + 15] & 0xFFL) << 24;
+        check(rate > 0, "hexor_ambient.ogg declares a sample rate");
+
+        String java = Files.readString(root.resolve("src/main/java/com/hexgodofstories/HexGodOfStories.java"));
+        Matcher declared = Pattern.compile("HEXOR_AMBIENT_TICKS\\s*=\\s*(\\d+)").matcher(java);
+        check(declared.find(), "HexGodOfStories declares HEXOR_AMBIENT_TICKS");
+        int ticks = Integer.parseInt(declared.group(1));
+        // Granule position of the last Ogg page is the total sample count.
+        long samples = lastGranule(bytes);
+        int actual = (int) Math.ceil(samples * 20.0 / rate);
+        check(ticks >= actual, "HEXOR_AMBIENT_TICKS (" + ticks + ") covers the clip's " + actual + " ticks");
+        check(ticks <= actual + 40, "HEXOR_AMBIENT_TICKS (" + ticks + ") is not wildly longer than the clip");
+    }
+
+    private static int indexOf(byte[] haystack, byte[] needle) {
+        outer:
+        for (int i = 0; i + needle.length <= haystack.length; i++) {
+            for (int j = 0; j < needle.length; j++) if (haystack[i + j] != needle[j]) continue outer;
+            return i;
+        }
+        return -1;
+    }
+
+    /** Sample count of the stream, read from the granule position of its final Ogg page. */
+    private static long lastGranule(byte[] bytes) {
+        long granule = 0;
+        for (int i = 0; i + 14 <= bytes.length; i++) {
+            if (bytes[i] != 'O' || bytes[i + 1] != 'g' || bytes[i + 2] != 'g' || bytes[i + 3] != 'S') continue;
+            long value = 0;
+            for (int b = 7; b >= 0; b--) value = value << 8 | (bytes[i + 6 + b] & 0xFFL);
+            if (value > granule) granule = value;
+        }
+        return granule;
     }
 
     // ------------------------------------------------------------------ helpers
