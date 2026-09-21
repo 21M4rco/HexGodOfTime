@@ -129,7 +129,9 @@ public final class VoidSeaWaveTest {
         double x = 612.0, z = -1180.0;
         double previous = 0, beforeThat = 0;
         double smallest = Double.MAX_VALUE, largest = 0;
-        int crests = 0, lastCrest = Integer.MIN_VALUE, shortestGap = Integer.MAX_VALUE, longestGap = 0;
+        // Far enough back that the first crest is never suppressed, and nowhere near the range
+        // where subtracting it from a tick index can wrap.
+        int crests = 0, lastCrest = -10000, shortestGap = Integer.MAX_VALUE, longestGap = 0;
         for (int tick = 0; tick < 9000; tick++) {
             double time = 250000 + tick;
             double h = VoidSeaWaves.height(x, z, 0, time, VoidSeaWaves.collect(x, z, 16.0, time));
@@ -137,7 +139,7 @@ public final class VoidSeaWaveTest {
                 crests++;
                 smallest = Math.min(smallest, previous);
                 largest = Math.max(largest, previous);
-                if (lastCrest != Integer.MIN_VALUE) {
+                if (crests > 1) {
                     shortestGap = Math.min(shortestGap, tick - lastCrest);
                     longestGap = Math.max(longestGap, tick - lastCrest);
                 }
