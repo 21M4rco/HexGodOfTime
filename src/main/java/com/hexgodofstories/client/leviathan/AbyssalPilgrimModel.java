@@ -85,6 +85,9 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
             bone.setPosZ((float) offset.z * 16f - bone.getPivotZ());
             float yaw = i == 0 ? Mth.rotLerp(partial, entity.yRotO, entity.getYRot()) : segments.yaw(i, partial);
             float pitch = i == 0 ? Mth.lerp(partial, entity.xRotO, entity.getXRot()) : segments.pitch(i, partial);
+            if (i == 0 && entity.attack() == null) {
+                yaw += render.headYaw(); pitch += render.headPitch();
+            }
             // Compose local banking after heading/pitch, then express it in GeckoLib's Z-Y-X order.
             org.joml.Vector3f angles = new org.joml.Quaternionf()
                 .rotateY((180f - yaw) * Mth.DEG_TO_RAD)
@@ -96,11 +99,6 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
     }
 
     private void poseHead(AbyssalPilgrimEntity entity, LeviathanSegmentRenderController render, float partial) {
-        GeoBone head = bone("head");
-        if (head != null && entity.attack() == null) {
-            head.setRotY(head.getRotY() + render.headYaw() * Mth.DEG_TO_RAD * YAW_SIGN);
-            head.setRotX(head.getRotX() - render.headPitch() * Mth.DEG_TO_RAD);
-        }
         float open = jawOpen(entity, partial);
         GeoBone upper = bone("upper_jaw"), lower = bone("lower_jaw");
         if (upper != null) upper.setRotX(open * 0.30f);
@@ -149,8 +147,8 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
             GeoBone fin = bone("dorsal_fin_" + b);
             if (fin != null) { fin.setRotZ(fin.getRotZ() + s * 0.35f); fin.setRotX(fin.getRotX() + l * 0.5f); }
             GeoBone ribLeft = bone("rib_appendage_l_" + b), ribRight = bone("rib_appendage_r_" + b);
-            if (ribLeft != null) { ribLeft.setRotZ(ribLeft.getRotZ() + 0.22f + s * 0.55f); ribLeft.setRotX(ribLeft.getRotX() + l * 0.7f); }
-            if (ribRight != null) { ribRight.setRotZ(ribRight.getRotZ() - 0.22f + s * 0.55f); ribRight.setRotX(ribRight.getRotX() + l * 0.7f); }
+            if (ribLeft != null) { ribLeft.setRotZ(0.22f + s * 0.55f); ribLeft.setRotX(l * 0.7f); }
+            if (ribRight != null) { ribRight.setRotZ(-0.22f + s * 0.55f); ribRight.setRotX(l * 0.7f); }
         }
         if (render.detail() < 2) return;
         for (int t = 0; t < 6; t++) {
@@ -158,16 +156,16 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
             if (tendril == null) continue;
             float phase = (entity.tickCount + partial) * 0.09f + t * 0.9f;
             float amount = render.sway(0) * Mth.DEG_TO_RAD * 0.75f + Mth.sin(phase) * (entity.isSubmerged() ? 0.13f : 0.34f);
-            tendril.setRotZ(tendril.getRotZ() + amount);
-            tendril.setRotX(tendril.getRotX() + Mth.cos(phase * 0.7f) * (entity.isSubmerged() ? 0.1f : 0.3f) + render.lift(0) * Mth.DEG_TO_RAD * 0.4f);
+            tendril.setRotZ(amount);
+            tendril.setRotX(Mth.cos(phase * 0.7f) * (entity.isSubmerged() ? 0.1f : 0.3f) + render.lift(0) * Mth.DEG_TO_RAD * 0.4f);
         }
         for (int t = 0; t < 4; t++) {
             GeoBone tendril = bone("tail_tendril_" + t);
             if (tendril == null) continue;
             int segment = LeviathanSegmentController.SEGMENTS - 1;
             float phase = (entity.tickCount + partial) * 0.11f + t * 1.3f;
-            tendril.setRotZ(tendril.getRotZ() + render.sway(segment) * Mth.DEG_TO_RAD * 0.9f + Mth.sin(phase) * 0.22f);
-            tendril.setRotX(tendril.getRotX() + render.lift(segment) * Mth.DEG_TO_RAD * 0.6f);
+            tendril.setRotZ(render.sway(segment) * Mth.DEG_TO_RAD * 0.9f + Mth.sin(phase) * 0.22f);
+            tendril.setRotX(render.lift(segment) * Mth.DEG_TO_RAD * 0.6f);
         }
     }
 

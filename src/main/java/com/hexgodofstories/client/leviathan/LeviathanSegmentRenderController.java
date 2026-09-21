@@ -28,6 +28,7 @@ public final class LeviathanSegmentRenderController {
     private float impact;
     private boolean wasSubmerged = true;
     private int detail = 2;
+    private int simulatedTick = Integer.MIN_VALUE;
 
     /** 2 full appendage solve, 1 spine plus coarse sway, 0 spine only. */
     public int detail() { return detail; }
@@ -41,6 +42,9 @@ public final class LeviathanSegmentRenderController {
         double distance = entity.viewerDistance();
         detail = distance < DETAIL_RANGE ? 2 : distance < COARSE_RANGE ? 1 : 0;
 
+        // One spring step per game tick, independent of FPS and the emissive render pass.
+        if (simulatedTick == entity.tickCount) return;
+        simulatedTick = entity.tickCount;
         boolean submerged = entity.isSubmerged();
         if (wasSubmerged && !submerged) impact = 0.4f;          // leaving the water
         if (!wasSubmerged && submerged) impact = 1.0f;          // and the far more violent return
@@ -84,8 +88,8 @@ public final class LeviathanSegmentRenderController {
             if (toward.lengthSqr() > 1.0E-4) {
                 float absoluteYaw = (float) (Mth.atan2(-toward.x, toward.z) * Mth.RAD_TO_DEG);
                 float absolutePitch = (float) (-Mth.atan2(toward.y, flat) * Mth.RAD_TO_DEG);
-                wantYaw = Mth.clamp(Mth.wrapDegrees(absoluteYaw - entity.segments().yaw(0, partialTick)), -58f, 58f);
-                wantPitch = Mth.clamp(Mth.wrapDegrees(absolutePitch - entity.segments().pitch(0, partialTick)), -42f, 42f);
+                wantYaw = Mth.clamp(Mth.wrapDegrees(absoluteYaw - entity.getYRot()), -58f, 58f);
+                wantPitch = Mth.clamp(Mth.wrapDegrees(absolutePitch - entity.getXRot()), -42f, 42f);
             }
         }
         headYaw += (wantYaw - headYaw) * 0.11f;
