@@ -55,6 +55,11 @@ public final class WarpRealms {
             if(!e.isAlive()||e.isSpectator()||e instanceof WarpHazard||e instanceof AbyssalLeviathan)continue;
             double cell=WarpMath.cellX(e.getX());long age=age(l,cell);
             if(e instanceof ServerPlayer p&&now%10==0){CompoundTag n=new CompoundTag();n.putLong("age",age);n.putLong("time",now);n.putDouble("cell",cell);HexNetwork.to(p,new HexNetwork.Message(HexNetwork.WARP_REALM,0,n));}
+            if(d==Destination.VOID_SEA&&e instanceof ServerPlayer swimmer&&!swimmer.isCreative()&&now%200==0
+                &&l.getEntitiesOfClass(AbyssalLeviathan.class,swimmer.getBoundingBox().inflate(180),Entity::isAlive).isEmpty()){
+                AbyssalLeviathan hunter=HexGodOfStories.LEVIATHAN.get().create(l);
+                if(hunter!=null){hunter.moveTo(e.getX()+45,Math.min(120,e.getY()-16),e.getZ()+24,0,0);l.addFreshEntity(hunter);}
+            }
             if(Warping.sovereign(e)){e.fallDistance=0;if(e.getY()<0)e.teleportTo(e.getX(),180,e.getZ());continue;}
             if(e instanceof net.minecraft.world.entity.player.Player p&&p.isCreative())continue;
             switch(d){

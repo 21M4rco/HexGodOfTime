@@ -33,6 +33,7 @@ public final class AbyssalLeviathan extends PathfinderMob {
             entityData.set(STRIKING,strike);
             // Circle underneath before climbing sharply into a bite; deep silhouette precedes the attack.
             desired=prey.position().add(strike?0:Math.cos(tickCount*.035)*12,strike?.3:-12,strike?0:Math.sin(tickCount*.035)*12).subtract(position()).normalize().scale(strike?1.15:.65);
+            if(distance<45&&tickCount%100==0)level().playSound(null,blockPosition(),net.minecraft.sounds.SoundEvents.ELDER_GUARDIAN_AMBIENT,net.minecraft.sounds.SoundSource.HOSTILE,1.2f,.45f);
             if(distance<6.8&&attackCooldown==0){
                 prey.hurt(damageSources().mobAttack(this),60);Vec3 knock=prey.position().subtract(position()).normalize().scale(1.3).add(0,.65,0);prey.setDeltaMovement(knock);prey.hurtMarked=true;attackCooldown=65;
                 level().playSound(null,blockPosition(),net.minecraft.sounds.SoundEvents.RAVAGER_ROAR,net.minecraft.sounds.SoundSource.HOSTILE,2,.55f);

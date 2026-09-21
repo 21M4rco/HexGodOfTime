@@ -65,7 +65,7 @@ public final class Warping {
         send(p,c,false);
     }
     private static boolean valid(ServerPlayer p,Charge c){
-        if(!p.isAlive()||!HexData.access(p)||p.isSpectator()||p.level()!=c.level||HexData.selected(p)!=Ability.WARPING||TemporalEngine.frozen(p)||Erasure.erasing(p))return false;
+        if(!p.isAlive()||!HexData.access(p)||!HexData.unlocked(p,Ability.WARPING)||p.isSpectator()||p.level()!=c.level||HexData.selected(p)!=Ability.WARPING||TemporalEngine.frozen(p)||Erasure.erasing(p))return false;
         if(HexData.energy(p)<Ability.WARPING.cost)return false;
         BlockHitResult h=aim(p);return h!=null&&h.getLocation().distanceToSqr(c.at)<2.25;
     }

@@ -39,9 +39,10 @@ public final class HexHud {
             g.drawString(mc.font,tag,WIDTH-7-mc.font.width(tag),6,0x84a892,false);
         }
         long cd=Math.max(0,d.getLong("cd_"+a.name())-ClientState.now());
-        boolean home=a==Ability.RIFT&&com.hexgodofstories.server.PocketRealm.inside(mc.player.level());
+        boolean home=a==Ability.RIFT&&com.hexgodofstories.server.PocketRealm.inside(mc.player.level())||a==Ability.WARPING&&com.hexgodofstories.warping.Destination.from(mc.player.level())!=null;
         String status=home?"Return: free":cd>0?String.format(Locale.ROOT,"Recovery %.1fs",cd/20f):d.getFloat("energy")<a.cost?"Low energy":"Ready";
         g.drawString(mc.font,status+"  |  Cost "+(home?0:a.cost),7,18,cd>0&&!home?0xd2b27f:0x93caaa,false);
+        if(a==Ability.WARPING){String charge=WarpRenderer.chargeLabel(mc.player.getId());if(!charge.isEmpty())g.drawString(mc.font,charge,3,-12,0xd7b9f0,false);}
         String primary=HexClient.PRIMARY.getTranslatedKeyMessage().getString();
         String secondary=HexClient.SECONDARY.getTranslatedKeyMessage().getString();
         // Outside the sanctum the Fracture only does one thing — it takes you and whatever is
@@ -51,9 +52,11 @@ public final class HexHud {
         String head=!fracture?primary(a)
             :home?FractureModes.byId(d.getString("fractureMode")).label(d.getString("fractureTargetName"))
             :"Tap: doorway in. Hold: pull 5 blocks in.";
+        if(a==Ability.WARPING&&home)head="Leave this dimension freely.";
         var lines=mc.font.split(net.minecraft.network.chat.Component.literal(primary+"  "+head),WIDTH-14);
         for(int i=0;i<Math.min(2,lines.size());i++)g.drawString(mc.font,lines.get(i),7,32+i*10,fracture?0xd8ecdd:0xc9d8ce,false);
         String hint=!fracture?alternate(a):home?"Choose where the break leads":"";
+        if(a==Ability.WARPING)hint=com.hexgodofstories.warping.Destination.at(d.getInt("warpDestination")).title;
         if(a==Ability.TIME_BRANCH) {
             long remaining=Math.max(0,d.getLong(BranchFistState.UNTIL)-ClientState.now());
             long fistCd=Math.max(0,d.getLong(BranchFistState.COOLDOWN)-ClientState.now());

@@ -17,6 +17,12 @@ public final class WarpRenderer {
     private static final Map<Integer,CompoundTag> WINDOWS=new HashMap<>();
     private static CompoundTag realm=new CompoundTag();
     public static void receive(int id,CompoundTag n){if(n.getBoolean("clear"))WINDOWS.remove(id);else WINDOWS.put(id,n);}
+    public static String chargeLabel(int id){
+        CompoundTag n=WINDOWS.get(id);if(n==null)return "";
+        if(n.getLong("opened")>=0)return "REALITY OPEN";
+        int ticks=(int)(ClientState.now()-n.getLong("start"));
+        return String.format(java.util.Locale.ROOT,"%s  %d%%  /  %.1f blocks",ticks<WarpMath.MIN_CHARGE?"Forming":"Release to trap",Math.min(100,ticks),WarpMath.width(ticks));
+    }
     public static void realm(CompoundTag n){realm=n;}
     public static void clear(){WINDOWS.clear();realm=new CompoundTag();WarpScene.clear();}
     public static void render(RenderLevelStageEvent e){
@@ -26,7 +32,7 @@ public final class WarpRenderer {
         if(d!=null){
             pose.pushPose();pose.translate(WarpMath.cellX(camera.x)-camera.x,-camera.y,-camera.z);
             RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();RenderSystem.disableCull();RenderSystem.setShaderColor(1,1,1,1);
-            try{WarpScene.draw(pose,d,time,realm.getLong("age")+(long)time-realm.getLong("time"),false);}finally{pose.popPose();RenderSystem.enableCull();RenderSystem.disableBlend();}
+            try{WarpScene.draw(pose,d,time,realm.contains("time")?realm.getLong("age")+(long)time-realm.getLong("time"):0,false);}finally{pose.popPose();RenderSystem.enableCull();RenderSystem.disableBlend();}
         }
         WINDOWS.values().removeIf(n->n.getLong("until")<mc.level.getGameTime());
         if(WINDOWS.isEmpty())return;
