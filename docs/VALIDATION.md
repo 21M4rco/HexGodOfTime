@@ -6,13 +6,14 @@
 - Runtime source and registration scan for obsolete gameplay identity.
 - Procedural asset generation executed successfully: 5 authored meshes, 6 particle sprites, 25 animations, 14 original sounds.
 - Java/Forge compilation through the **Build HexGodOfStories** GitHub Action, which is the only compiler available to this project's working environment.
-- Abyssal Pilgrim: compiles against Forge 47.4.10 and GeckoLib 4.4.9, and `verifyVoidSea` passes in the same Action, so the shipped geometry, animation, audio and the Void Sea's Java constants are proven to agree with the dimension JSON. Its body reconstruction was additionally exercised offline against straight, drifting, stationary, tight S-curve, spiral, vertical and post-teleport paths: joint spacing held to within 0.08 blocks of 6.0 in every case, and did not bunch when the creature stopped.
+- Abyssal Pilgrim: compiles against Forge 47.4.10 and GeckoLib 4.4.9, and `verifyVoidSea` passes in the same Action, so the shipped geometry, animation, audio and the Void Sea's Java constants are proven to agree with the dimension JSON. Its body reconstruction was additionally exercised offline against straight, drifting, stationary, tight S-curve, spiral, vertical and post-teleport paths: joint spacing is now exactly 6.0 in every case, no two non-neighbouring joints come within 17.4 blocks of each other on any of them, and the worst joint angle is 19 degrees. The same offline harness reproduced the reported knot on the previous code first (126 blocks of body inside a 0.5 block span, joints 0.1 blocks apart), which is what the joint limits were written against.
+- **Dedicated server startup, datapack load and the Warping/Pilgrim regressions**, through the **Warping dedicated server smoke** Action on this branch. A real Forge dedicated server boots, all nine realm dimensions load, and the in-process regression listener passes: the Pilgrim is present in the sea's entity manager the instant it is added, repeated lookups return the same UUID, it ticks and swims with no players connected, it retains vertical pitch under the new steering, it detects prey imported into the water, exactly one remains after a deliberate duplicate is introduced, and a Warping arrival no longer leaves automatic flight switched on.
+- Pilgrim skin and emissive mask regenerate reproducibly from `tools/generate_pilgrim_textures.py`, and every tile was measured for wrap continuity at its own borders.
 
 ## Not verified
 
 Everything below needs a recorded in-game session and **has not had one**. Nothing here should be described as working.
 
-- Dedicated server startup and mixin application.
 - Client shader loading and visual review.
 - Cape behaviour during sprinting, jumping, falling, landing, crouching, rapid rotation and teleportation, viewed from front, rear and sides.
 - First- and third-person weapon alignment, including the reverse off-hand grip and the GUI silhouette.
@@ -22,7 +23,10 @@ Everything below needs a recorded in-game session and **has not had one**. Nothi
 - Illusory architecture geometry and its per-frame cost at the block cap.
 - Two-player transformation, illusion combat, overlapping time fields and projectiles entering a stop.
 - Logout/reconnect, death/respawn and dimension changes while transformed or holding state.
-- **The Abyssal Pilgrim in the water.** Nothing about how it looks or feels is established. Specifically: whether a 160-block body reads at that scale; the bone rotation sign conventions, which `AbyssalPilgrimModel.YAW_SIGN`, `PITCH_SIGN` and `ROLL_SIGN` exist to make a one-character fix if the spine is inverted; breach arc timing and the feel of crossing the waterline; camera shake magnitude; whether 935 blocks of water costs measurable frame time at high render distance; multiplayer target switching with several players in one Warping cell; and whether the emissive mask suffix GeckoLib expects matches the generated `_glowmask.png`.
+- **The Abyssal Pilgrim in the water.** Nothing about how it looks or feels is established. Specifically: whether a 160-block body reads at that scale; the bone rotation sign conventions, which `AbyssalPilgrimModel.YAW_SIGN`, `PITCH_SIGN` and `ROLL_SIGN` exist to make a one-character fix if the spine is inverted; breach and leap arc timing and the feel of crossing the waterline; camera shake magnitude; whether 935 blocks of water costs measurable frame time at high render distance; multiplayer target switching with several players in one Warping cell; and whether the emissive mask suffix GeckoLib expects matches the generated `_glowmask.png`.
+- **How the new skin reads in game.** The tiles were measured for seamlessness and designed for low contrast at cube scale, which is an argument, not an observation. Whether the hull now reads as one surface rather than as stacked boxes needs eyes on it.
+- **Whether the joint limits are the right ones.** They are provably sufficient to prevent self-intersection and they hold the model's exact pivot spacing, but 9 to 19 degrees per joint is a judgement about how a leviathan should bend, and only play establishes that.
+- **Flight removal in play.** That no dimension but the fracture world grants flight is enforced in one place and exercised by the server regression for the Void Sea. Whether the Sun, the Crushing Realm and the Falling World are now fair without it has not been played.
 
 ## Known limitations
 

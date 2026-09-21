@@ -1,3 +1,34 @@
+## 0.5.6 — The Pilgrim stops knotting itself, and starts leaving the water
+
+- **A spine, not a rope.** The body was reconstructed by replaying the head's own recorded path, so
+  any curve the head could describe the body would reproduce — including curves far tighter than
+  its own joint spacing. A hover, a tight orbit or a hard turn at low speed therefore folded a
+  hundred and twenty six blocks of creature into a knot a metre across. Joints are now rigid six
+  block links with a bend limit that widens toward the tail, so the path is followed as closely as
+  a spine allows and no closer.
+- **Turning is bounded by a radius.** Degrees per tick is the wrong limit for something this long:
+  the same allowance is a graceful arc at attack speed and a pirouette while drifting. A target
+  inside the turning circle is now carved past rather than spun at, and a reversal keeps more than
+  half its speed, so it reads as a wide banked arc.
+- **The attack geometry stopped asking for the impossible.** Stalk orbits start at forty six blocks,
+  the crushing ring closes to thirty rather than four and a half, and the vortex holds thirty four,
+  each turning at a rate its radius can actually be swum at.
+- **It jumps.** Prey that leaves the water is answered by leaving the water: the creature reads
+  where the target will be, solves the launch that meets it there, lines up underneath and throws
+  itself, with one tail flick of drift permitted mid-air and nothing else. The existing deep breach
+  uses the same solved impulse rather than trying to steer at a point in the sky.
+- **New skin.** Every cube face stretches one tile of a fixed atlas, so a tile with edges draws
+  those edges around all 1,550 cubes. The tiles are now seamless, low contrast and finely detailed
+  — cold hide, lamellar bone, ribbed membrane, a luminous organ — and the rib blades stay swept
+  along the hull instead of splaying out. Same geometry, same UV layout, reproducible through
+  `python tools/generate_pilgrim_textures.py`.
+- **Flight is confined to the fracture world.** It used to follow the mantle into every dimension,
+  and sovereignty granted it again in eight of the nine Warping realms, which meant a corona you
+  can climb out of, planes that cannot close on you, a collapse you do not fall with and an ocean
+  whose hunter cannot reach you. Every realm is now survived from inside it. Your own pocket realm
+  keeps flight, because falling off the edge is the only hazard there. Creative and spectator mode
+  are untouched.
+
 ## 0.5.0 — HexGodOfStories
 
 - **The mod is now HexGodOfStories.** Mod id, package, assets, keybinding category, creative tab and the command root all move: every command is `/hgos ...`. Existing saves are carried across — progression, unlocks, quick bars, sanctum plots and pending world restores are read from their old names once and rewritten under the new one, so nothing is lost and nothing is regenerated.
@@ -145,7 +176,7 @@ Client appearance and movement still require in-game verification; compilation a
 
 Fracture: tap the primary key for a doorway, or hold for 0.6 seconds to gather all eligible entities within five blocks of the portal. After a brief inward pull, the group crosses and the portal closes. The same hold works inside the pocket realm; returning costs no energy and ignores entry cooldown. Visitors arrive in the caster's realm and keep their own way home.
 
-While transformed, press **J** to toggle Cosmic Flight. **Space** rises and **crouch** descends; vanilla double-jump flight controls also work. Change the binding in Minecraft's Controls menu. A green spatial nebula and star filaments surround flying players.
+While transformed **and inside your own fracture world**, press **J** to toggle Cosmic Flight. **Space** rises and **crouch** descends; vanilla double-jump flight controls also work. Change the binding in Minecraft's Controls menu. A green spatial nebula and star filaments surround flying players. Since 0.5.6 no other dimension grants flight, the Warping realms included.
 
 The HUD shows eight named ability cards with recovery/ready status, selection and energy. Hold the select key and scroll to switch. Existing realms receive the larger island, organic tree/roots and rebuilt throne through a resumable upgrade; no world reset is needed.
 

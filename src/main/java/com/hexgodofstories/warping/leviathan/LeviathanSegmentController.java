@@ -170,11 +170,11 @@ public final class LeviathanSegmentController {
 
         seg[0] = raw[0];
         Vec3 heading = raw[1].subtract(raw[0]);
-        Vec3 previousLink = heading.lengthSqr() < 1.0E-10 ? backward : heading.normalize();
+        Vec3 previousLink = heading.lengthSqr() < 1.0E-8 ? backward : heading.normalize();
         seg[1] = seg[0].add(previousLink.scale(SPACING));
         for (int i = 2; i < SEGMENTS; i++) {
             Vec3 toward = raw[i].subtract(seg[i - 1]);
-            Vec3 link = toward.lengthSqr() < 1.0E-10 ? previousLink : toward.normalize();
+            Vec3 link = toward.lengthSqr() < 1.0E-8 ? previousLink : toward.normalize();
             link = bend(previousLink, link, bendLimit(i));
             seg[i] = seg[i - 1].add(link.scale(SPACING));
             previousLink = link;
@@ -213,11 +213,13 @@ public final class LeviathanSegmentController {
         double limit = limitDegrees * Mth.DEG_TO_RAD;
         if (dot >= Math.cos(limit)) return want;
         Vec3 sideways = want.subtract(from.scale(dot));
-        if (sideways.lengthSqr() < 1.0E-12) {
+        // Vec3#normalize answers zero below a ten thousandth of a block, and a zero link
+        // would be a joint shorter than its own bone, so every branch tests above that.
+        if (sideways.lengthSqr() < 1.0E-8) {
             // Exactly reversed: any perpendicular will do, and the next joints refine it.
             Vec3 axis = Math.abs(from.y) < 0.9 ? new Vec3(0, 1, 0) : new Vec3(1, 0, 0);
             sideways = axis.subtract(from.scale(from.dot(axis)));
-            if (sideways.lengthSqr() < 1.0E-12) return from;
+            if (sideways.lengthSqr() < 1.0E-8) return from;
         }
         return from.scale(Math.cos(limit)).add(sideways.normalize().scale(Math.sin(limit)));
     }

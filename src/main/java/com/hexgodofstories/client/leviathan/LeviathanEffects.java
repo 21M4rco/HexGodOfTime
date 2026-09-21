@@ -57,8 +57,10 @@ public final class LeviathanEffects {
                 ring(at, ParticleTypes.BUBBLE, (int) (90 * falloff), 16.0, 0.9, 0.2);
                 ring(at, ParticleTypes.SOUL_FIRE_FLAME, (int) (18 * falloff), 10.0, 0.35, 0.1);
             }
-            case "crush" -> { addShake(1.1f * falloff, 0.9f); ring(at, ParticleTypes.BUBBLE, (int) (40 * falloff), 6.0, 0.5, 0.2); }
-            case "vortex" -> ring(at, ParticleTypes.BUBBLE, (int) (34 * falloff), 20.0, 0.6, 0.35);
+            // Both rings follow the radius their pattern actually holds; a six block ring
+            // around a thirty block cage is a puff of bubbles in the middle of nothing.
+            case "crush" -> { addShake(1.1f * falloff, 0.9f); ring(at, ParticleTypes.BUBBLE, (int) (54 * falloff), 13.0, 0.5, 0.2); }
+            case "vortex" -> ring(at, ParticleTypes.BUBBLE, (int) (48 * falloff), 32.0, 0.6, 0.35);
             case "shake" -> addShake(0.9f * power, 0.8f);
             case "bump" -> { addShake(0.45f * falloff, 0.82f); ring(at, ParticleTypes.SPLASH, (int) (16 * falloff), 2.0, 0.3, 0.5); }
             case "charge" -> addShake(0.35f * falloff, 0.985f);

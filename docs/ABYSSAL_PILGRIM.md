@@ -1,4 +1,4 @@
-# The Abyssal Pilgrim — 0.5.4
+# The Abyssal Pilgrim — 0.5.6
 
 Base: successful Actions run 35602014851, commit 3d415465288b5231db5b369cc43d6b196b3ad050.
 Forge 1.20.1, GeckoLib 4.4.9. Changes are scoped to the existing Void Sea Pilgrim and its integration.
@@ -50,6 +50,65 @@ compact path checkpoints: 260 relative float triplets (3,120 bytes plus NBT head
 ticks, plus a snapshot on tracking start. These restore the real curved body for new viewers and
 limit accumulated client drift. Decorative bones are never networked. Existing state, glow, target
 and attack metadata and presentation event packets remain.
+
+## 0.5.6 — body limits, steering radius and the leap
+
+### The knot
+
+The body was resolved by sampling the head's recorded path at six block intervals of arc length.
+That is faithful and wrong: arc length is not joint spacing, so a path that curls tighter than the
+joint spacing produced joints two or three blocks apart in space while the model drew them six
+apart, and every cube in the chain overlapped every other. Measured on the pathological inputs, a
+0.25 block/tick drift with the old nine degree per tick yaw allowance collapsed the whole 126 block
+body into a span of 0.5 blocks, with non-neighbouring joints 0.1 blocks apart and a worst joint
+angle of 138 degrees. The 4.5 block crushing ring produced a span of 10 blocks and 1.7 block
+separation.
+
+Joints are now placed as rigid `SPACING` links along the path direction, and each link's angle
+against the link in front of it is clamped — 9 degrees at the shoulder rising to 19 at the tail,
+which is a turning circle of roughly 29 blocks at the thick end. The same inputs now give spans of
+27 to 38 blocks, worst joint angles of 16 to 19 degrees, non-neighbouring separation of at least
+17.4 blocks, and joint spacing of exactly 6.000 everywhere. `verifyPilgrimMotion` still passes; the
+snapshot path a late-joining client reconstructs agrees with the server's to within 2 micro-blocks,
+because both derive from the same node array and the limiter is deterministic.
+
+### Steering
+
+`LeviathanMoveControl` bounded turns by degrees per tick scaled by attack commitment. A radius is
+what a spine can follow, so a radius is now what is enforced: the per-tick heading change is capped
+at what a 30 block circle allows at the current speed, a target closer than 18 blocks is blended
+into the current heading rather than turned toward, and the speed penalty for being misaligned
+bottoms out at 55 percent rather than 12, so a reversal is a wide arc instead of a stall and spin.
+The attack and hunt geometry was widened to match: stalk orbits 46 to 90 blocks with an angular
+rate derived from the radius, the crushing ring closing 56 to 30, the vortex at 34.
+
+### SKY_LEAP
+
+A new pattern, and the only one whose purpose is to stop being in the water. The creature reads the
+target's drift, iterates an interception point three times (flight time depends on height, height
+depends on the lead), dives to about 52 blocks, lines up underneath it, and is then thrown along a
+solved ballistic velocity by `LeviathanMoveControl.launch`. Ordinary swimming terms cannot produce
+a launch — they bleed speed into a heading over many ticks and cap the result — so the launch
+bypasses them and the climb through the remaining water is uncontrolled. In the air the only
+correction permitted is 0.05 blocks per tick of horizontal drift; height is decided at the launch.
+
+It is triggered directly rather than through the attack roll, on a 140 to 340 tick cooldown,
+whenever a target is off the water, within 90 blocks horizontally and under 58 blocks up. The
+existing `BREACH_BITE` keeps its long dive and its role as the ambush set piece, and now uses the
+same solved impulse instead of steering at a point in the sky, which is what left it wallowing at
+the surface with its nose in the air. Both aim at most 110 blocks above the waterline; higher than
+that, flight has won.
+
+### Skin
+
+`tools/generate_pilgrim_textures.py` replaces the skin and emissive mask. The geometry, the 4x2
+atlas layout and every UV are unchanged, because the model is the contract. Two properties matter
+and neither held before: the tiles wrap seamlessly, since a tile with an edge has that edge drawn
+around the outline of all 1,550 cubes; and contrast stays low with detail fine, since high contrast
+marks the boundary of every cube it lands on. The appendage bone that covers more than half the
+drawn faces was also cooled and darkened, and the rib blades' procedural splay was cut from roughly
+60 degrees of swing to 23, because a fan of bright blades standing off the hull is the shape that
+reads as scattered debris rather than as an animal.
 
 ## Verification and limits
 

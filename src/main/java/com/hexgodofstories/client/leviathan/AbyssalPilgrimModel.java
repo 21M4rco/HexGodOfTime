@@ -142,27 +142,29 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
             float s = render.sway(segment) * Mth.DEG_TO_RAD;
             float l = render.lift(segment) * Mth.DEG_TO_RAD;
             GeoBone fin = bone("dorsal_fin_" + b);
-            if (fin != null) { fin.setRotZ(fin.getRotZ() + s * 0.35f); fin.setRotX(fin.getRotX() + l * 0.5f); }
+            if (fin != null) { fin.setRotZ(fin.getRotZ() + s * 0.22f); fin.setRotX(fin.getRotX() + l * 0.35f); }
+            // Rib blades are swept back along the hull and stay swept. They ripple; they do not
+            // splay. A fan of blades standing off the body is the shape that reads as debris.
             GeoBone ribLeft = bone("rib_appendage_l_" + b), ribRight = bone("rib_appendage_r_" + b);
-            if (ribLeft != null) { ribLeft.setRotZ(0.22f + s * 0.55f); ribLeft.setRotX(l * 0.7f); }
-            if (ribRight != null) { ribRight.setRotZ(-0.22f + s * 0.55f); ribRight.setRotX(l * 0.7f); }
+            if (ribLeft != null) { ribLeft.setRotZ(0.20f + s * 0.30f); ribLeft.setRotX(l * 0.45f); }
+            if (ribRight != null) { ribRight.setRotZ(-0.20f + s * 0.30f); ribRight.setRotX(l * 0.45f); }
         }
         if (render.detail() < 2) return;
         for (int t = 0; t < 6; t++) {
             GeoBone tendril = bone("head_tendril_" + t);
             if (tendril == null) continue;
             float phase = (entity.tickCount + partial) * 0.09f + t * 0.9f;
-            float amount = render.sway(0) * Mth.DEG_TO_RAD * 0.75f + Mth.sin(phase) * (entity.isSubmerged() ? 0.13f : 0.34f);
+            float amount = render.sway(0) * Mth.DEG_TO_RAD * 0.55f + Mth.sin(phase) * (entity.isSubmerged() ? 0.11f : 0.22f);
             tendril.setRotZ(amount);
-            tendril.setRotX(Mth.cos(phase * 0.7f) * (entity.isSubmerged() ? 0.1f : 0.3f) + render.lift(0) * Mth.DEG_TO_RAD * 0.4f);
+            tendril.setRotX(Mth.cos(phase * 0.7f) * (entity.isSubmerged() ? 0.09f : 0.20f) + render.lift(0) * Mth.DEG_TO_RAD * 0.3f);
         }
         for (int t = 0; t < 4; t++) {
             GeoBone tendril = bone("tail_tendril_" + t);
             if (tendril == null) continue;
             int segment = LeviathanSegmentController.SEGMENTS - 1;
             float phase = (entity.tickCount + partial) * 0.11f + t * 1.3f;
-            tendril.setRotZ(render.sway(segment) * Mth.DEG_TO_RAD * 0.9f + Mth.sin(phase) * 0.22f);
-            tendril.setRotX(render.lift(segment) * Mth.DEG_TO_RAD * 0.6f);
+            tendril.setRotZ(render.sway(segment) * Mth.DEG_TO_RAD * 0.65f + Mth.sin(phase) * 0.16f);
+            tendril.setRotX(render.lift(segment) * Mth.DEG_TO_RAD * 0.45f);
         }
     }
 
@@ -184,7 +186,9 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
         };
         if (entity.isDying()) intensity = base;
         boolean dark = intensity < 0.07f;
-        float scale = Mth.clamp(0.45f + intensity * 0.95f, 0.2f, 1.6f);
+        // Capped near life size: an organ scaled half again as large pushes out through the hull
+        // it is supposed to be embedded in, which at a hundred and fifty blocks long is very visible.
+        float scale = Mth.clamp(0.45f + intensity * 0.8f, 0.2f, 1.22f);
         for (int i = 0; i < LeviathanSegmentController.SEGMENTS; i++) {
             GeoBone organ = bone("glow_organs_" + i);
             if (organ == null) continue;

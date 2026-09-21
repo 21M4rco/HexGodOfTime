@@ -62,15 +62,19 @@ public final class LeviathanSegmentRenderController {
         for (int i = 0; i < LeviathanSegmentController.SEGMENTS; i += step) {
             float lead = segments.yaw(Math.max(0, i - 1));
             float turn = Mth.wrapDegrees(lead - segments.yaw(i));
-            float drive = turn * (submerged ? 1.4f : 3.1f) + (float) Math.sin((entity.tickCount + partialTick) * 0.17 + i * 0.6) * speed * (submerged ? 9f : 2f);
-            drive += impact * (float) Math.sin(i * 1.7 + entity.tickCount * 0.9) * 46f;
+            // Ranges are deliberately narrow. Fins and rib blades that swing far enough to stand
+            // out from the hull stop reading as part of the animal and start reading as loose
+            // pieces beside it, which is most of what made the body look like scattered boxes.
+            float drive = turn * (submerged ? 1.1f : 2.2f)
+                + (float) Math.sin((entity.tickCount + partialTick) * 0.17 + i * 0.6) * speed * (submerged ? 4.5f : 1.2f);
+            drive += impact * (float) Math.sin(i * 1.7 + entity.tickCount * 0.9) * 20f;
             swayVel[i] = swayVel[i] * damping + (drive - sway[i]) * stiffness;
-            sway[i] = Mth.clamp(sway[i] + swayVel[i], -85f, 85f);
+            sway[i] = Mth.clamp(sway[i] + swayVel[i], -38f, 38f);
 
             float pitchLead = segments.pitch(Math.max(0, i - 1));
-            float rise = Mth.wrapDegrees(pitchLead - segments.pitch(i)) * 1.2f + (submerged ? 0f : 26f);
+            float rise = Mth.wrapDegrees(pitchLead - segments.pitch(i)) * 1.0f + (submerged ? 0f : 16f);
             liftVel[i] = liftVel[i] * damping + (rise - lift[i]) * stiffness;
-            lift[i] = Mth.clamp(lift[i] + liftVel[i], -70f, 70f);
+            lift[i] = Mth.clamp(lift[i] + liftVel[i], -32f, 32f);
         }
         if (step > 1) for (int i = 0; i < LeviathanSegmentController.SEGMENTS; i++) if (i % step != 0) { sway[i] = sway[i - i % step]; lift[i] = lift[i - i % step]; }
 
@@ -88,8 +92,10 @@ public final class LeviathanSegmentRenderController {
             if (toward.lengthSqr() > 1.0E-4) {
                 float absoluteYaw = (float) (Mth.atan2(-toward.x, toward.z) * Mth.RAD_TO_DEG);
                 float absolutePitch = (float) (-Mth.atan2(toward.y, flat) * Mth.RAD_TO_DEG);
-                wantYaw = Mth.clamp(Mth.wrapDegrees(absoluteYaw - entity.getYRot()), -58f, 58f);
-                wantPitch = Mth.clamp(Mth.wrapDegrees(absolutePitch - entity.getXRot()), -42f, 42f);
+                // A neck, not a turret: past about a third of a turn the head stops looking
+                // attached to the body it is on, and the body has to come round instead.
+                wantYaw = Mth.clamp(Mth.wrapDegrees(absoluteYaw - entity.getYRot()), -34f, 34f);
+                wantPitch = Mth.clamp(Mth.wrapDegrees(absolutePitch - entity.getXRot()), -26f, 26f);
             }
         }
         headYaw += (wantYaw - headYaw) * 0.11f;

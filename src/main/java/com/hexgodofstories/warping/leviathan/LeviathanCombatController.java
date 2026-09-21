@@ -94,6 +94,10 @@ public final class LeviathanCombatController {
         self.setAttackTick(tick);
         carryHeld();
 
+        // A leap at something that has already come back down is a leap at nothing. Anything that
+        // only exists to reach the air gives up the moment the air stops being where the prey is.
+        if (attack.huntsAir() && tick < attack.windup && victim != null && victim.isInWater()) { abort(); return; }
+
         switch (attack) {
             case PREDATORY_BITE -> bite();
             case ABYSSAL_LUNGE -> lunge();

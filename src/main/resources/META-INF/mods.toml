@@ -3,7 +3,7 @@ loaderVersion="[47,)"
 license="All Rights Reserved"
 [[mods]]
 modId="hexgodofstories"
-version="0.5.3-warping"
+version="0.5.6-abyssal-hunt"
 displayName="HexGodOfStories"
 authors="21M4rco"
 description='''Illusion, sorcery, conjuration and command of time. Powers are granted by an operator with /hgos, never by default.'''
