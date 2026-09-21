@@ -76,10 +76,20 @@ public final class HexCommands {
             ServerPlayer p=c.getSource().getPlayerOrException();ServerLevel level=p.serverLevel();
             var q=com.hexgodofstories.warping.leviathan.PilgrimWarden.ensure(level,com.hexgodofstories.warping.WarpMath.cellX(p.getX()));
             if(q==null){c.getSource().sendFailure(Component.literal("No hunter in this cell yet; try /hgos pilgrim spawn."));return 0;}
-            double a=p.getRandom().nextDouble()*Math.PI*2;
-            q.moveTo(p.getX()+Math.cos(a)*46,Math.max(com.hexgodofstories.warping.VoidSea.FLOOR+30,p.getY()-34),p.getZ()+Math.sin(a)*46,(float)(Math.toDegrees(a)),0f);
+            // Deliberately the most visible placement possible: dead ahead, level with the eye,
+            // facing the caster. If nothing appears after this, the creature is present and the
+            // fault is in rendering, not in presence.
+            net.minecraft.world.phys.Vec3 look=p.getLookAngle();
+            double fx=look.x,fz=look.z,fl=Math.sqrt(fx*fx+fz*fz);
+            if(fl<1.0E-4){fx=0;fz=1;fl=1;}
+            fx/=fl;fz/=fl;
+            double hx=p.getX()+fx*60,hz=p.getZ()+fz*60;
+            double hy=Math.min(com.hexgodofstories.warping.VoidSea.SURFACE-8,Math.max(com.hexgodofstories.warping.VoidSea.FLOOR+30,p.getY()));
+            q.moveTo(hx,hy,hz,(float)Math.toDegrees(Math.atan2(fx,-fz)),0f);
             if(q.ai()!=null)q.ai().alert(p);
-            c.getSource().sendSuccess(()->Component.literal("It knows where you are."),true);return 1;}));
+            c.getSource().sendSuccess(()->Component.literal(
+                "Placed 60 blocks ahead at your eye level, facing you. If you see nothing there, it is a render fault, not a missing creature."),true);
+            return 1;}));
         pilgrim.then(Commands.literal("spawn").executes(c->{
             ServerPlayer p=c.getSource().getPlayerOrException();
             var q=com.hexgodofstories.warping.leviathan.PilgrimWarden.spawn(p.serverLevel(),com.hexgodofstories.warping.WarpMath.cellX(p.getX()),p.position());
