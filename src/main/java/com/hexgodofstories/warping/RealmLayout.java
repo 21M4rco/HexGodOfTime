@@ -8,6 +8,18 @@ import java.util.*;
 /** The same deterministic architecture is built by the server and drawn inside the aperture. */
 public final class RealmLayout {
     public record Voxel(BlockPos pos,BlockState state){}
+    /** Footprint of one press column, and where the twelve of them stand. */
+    public static final int PILLAR=3;
+    private static final int[][] PRESS_PILLARS=columns();
+    public static int[][] pressPillars(){return PRESS_PILLARS;}
+    private static int[][] columns(){
+        int[][] out=new int[12][];
+        for(int i=0;i<12;i++){
+            double a=i*Math.PI/6;int radius=i%2==0?19:34;
+            out[i]=new int[]{(int)Math.round(Math.cos(a)*radius),(int)Math.round(Math.sin(a)*radius)};
+        }
+        return out;
+    }
     private static final Map<Destination,List<Voxel>> CACHE=new EnumMap<>(Destination.class);
     public static List<Voxel> blocks(Destination d){return CACHE.computeIfAbsent(d,RealmLayout::create);}
     private static List<Voxel> create(Destination d){
@@ -45,8 +57,18 @@ public final class RealmLayout {
                 for(int i=0;i<12;i++){double a=i*Math.PI/6;ruin(b,(int)(Math.cos(a)*20),126,(int)(Math.sin(a)*20),9+i%7);}
             }
             case CRUSHING_REALM -> {
-                // Upper plane is an authoritative moving boundary, never thousands of block edits per tick.
-                for(int x=-42;x<=42;x++)for(int z=-42;z<=42;z++)put(b,x,98,z,(Math.abs(x)%13==0||Math.abs(z)%13==0?Blocks.CRYING_OBSIDIAN:Blocks.POLISHED_BLACKSTONE).defaultBlockState());
+                // A real floor, so standing in the press is ordinary standing. Only the plane above
+                // moves, and it stays an authoritative boundary rather than thousands of edits a tick.
+                int deck=(int)WarpMath.PRESS_FLOOR-1;
+                for(int x=-42;x<=42;x++)for(int z=-42;z<=42;z++)
+                    put(b,x,deck,z,(Math.abs(x)%13==0||Math.abs(z)%13==0?Blocks.CRYING_OBSIDIAN:Blocks.POLISHED_BLACKSTONE).defaultBlockState());
+                // Columns between the two planes. The descending one grinds them away as it arrives,
+                // which is the only thing in the realm that measures how much room is left.
+                for(int[] pillar:pressPillars())
+                    for(int dx=0;dx<PILLAR;dx++)for(int dz=0;dz<PILLAR;dz++)
+                        for(int y=deck+1;y<150;y++)
+                            put(b,pillar[0]+dx,y,pillar[1]+dz,
+                                (y%9==0?Blocks.CHISELED_POLISHED_BLACKSTONE:Blocks.POLISHED_DEEPSLATE).defaultBlockState());
             }
             case END_OF_TIME -> {
                 island(b,0,126,0,12,false,r);

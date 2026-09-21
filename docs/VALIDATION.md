@@ -376,3 +376,29 @@ directional streaking. Cuboids spinning off in all directions read as rubble and
 - Each realm's containment from the inside: falling off a Shattered World island, swimming to the leash
   in the Void Sea, and riding a Falling World platform down.
 - Flight grant and revocation across entering, dying in, and leaving a realm.
+
+## 0.5.5 — The ring is flown the way it is drawn, and the press makes sense
+
+- **The well orbits.** Victims are flattened into the drawn accretion disk, carried around the ring at a
+  speed that rises as they are dragged in, and decay to the core over about half a minute; the middle
+  kills on contact. Velocity is set toward a target instead of accumulated as force, so a player is
+  carried rather than fighting a tug of war with their own movement. The headless check proves every
+  orbit reaches the middle inside three minutes and never exceeds the field speed cap.
+- **The press has a real floor.** The rising invisible floor above a static visible slab is gone. The
+  floor is blocks, it never moves, and nothing is teleported onto it; only the plane above descends.
+- **The press has columns.** Twelve stone columns stand between the planes and are ground away level by
+  level as the plane reaches them, with a sound each time, so the room itself shows how much of it is
+  left. Grinding is bounded to the column footprints, not the whole 85-block deck.
+- **The crush escalates honestly.** Damage starts when the remaining gap is smaller than the victim is
+  tall and becomes unsurvivable at the final 1.5 blocks, instead of a flat 6 or 20 either side of an
+  arbitrary threshold.
+- **A recall cannot put anything above the plane.** Entities returned to the press arrival point are
+  placed under the current ceiling rather than on top of it.
+
+### Not verified — needs a recorded in-game session
+
+- Whether being swept around the ring reads as an orbit from inside a player's own view, and whether the
+  motion corrections are smooth enough at two-tick stride.
+- That the disk plane the server flies matches the disk the client draws, including its tilt.
+- The columns grinding away under the descending plane, and whether the sound and the dust read.
+- That a player standing on the press floor is never teleported, jittered or pushed through it.

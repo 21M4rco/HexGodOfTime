@@ -10,6 +10,7 @@ import net.minecraft.nbt.*;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.*;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.*;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.player.Player;
@@ -48,13 +49,14 @@ public final class WarpRealms {
     private static final List<Job> JOBS=new ArrayList<>();
     private static final Map<UUID,ArrayDeque<Vec3>> HISTORY=new HashMap<>();
     private static final Map<Long,Long> HUNTER_DUE=new HashMap<>();
+    private static final Map<Long,Integer> GROUND=new HashMap<>();
 
     private static Ledger ledger(ServerLevel l){return l.getDataStorage().computeIfAbsent(Ledger::load,Ledger::new,"warping_realms");}
     public static double allocate(ServerLevel l){Ledger a=ledger(l);a.next++;a.setDirty();return a.next*1024.0;}
     public static double latest(ServerLevel l){return ledger(l).next*1024.0;}
     public static void prepare(ServerLevel l,Destination d,double x){if(!ready(l,x)&&JOBS.stream().noneMatch(j->j.level==l&&j.cell==x))JOBS.add(new Job(l,d,x,RealmLayout.blocks(d).iterator()));}
     public static boolean ready(ServerLevel l,double x){return l!=null&&ledger(l).ready.contains((long)x);}
-    public static void start(ServerLevel l,double x){Ledger a=ledger(l);a.clocks.put((long)x,l.getGameTime());a.setDirty();}
+    public static void start(ServerLevel l,double x){Ledger a=ledger(l);a.clocks.put((long)x,l.getGameTime());a.setDirty();GROUND.remove((long)x);}
     public static long age(ServerLevel l,double x){return Math.max(0,l.getGameTime()-ledger(l).clocks.getOrDefault((long)x,l.getGameTime()));}
 
     public static void transfer(Entity e,Destination d,double cell,boolean owner) {
@@ -95,7 +97,7 @@ public final class WarpRealms {
             if(e instanceof ServerPlayer listener&&now%140==0)ambience(d,listener);
             boolean sovereign=Warping.sovereign(e);
             // The floor, the ceiling and the leash are not hazards; they hold for everything, always.
-            contain(l,d,e,cell,sovereign);
+            contain(l,d,e,cell,age,sovereign);
             if(sovereign&&d!=Destination.SUN){e.fallDistance=0;continue;}
             if(e instanceof Player p&&p.isCreative())continue;
             switch(d){
@@ -111,12 +113,13 @@ public final class WarpRealms {
             }
         }
         if(hunters!=null&&now%20==0)hunter(l,hunters,now);
+        if(d==Destination.CRUSHING_REALM)for(ServerPlayer p:l.players())press(l,WarpMath.cellX(p.getX()),age(l,WarpMath.cellX(p.getX())),now);
         if(d==Destination.TIME_STORM&&now%200==0)HISTORY.keySet().removeIf(id->l.getEntity(id)==null);
     }
 
     // ------------------------------------------------------------------ bounds --
     /** Nothing falls out of a realm, rises out of one, or wanders into the next instance. */
-    private static void contain(ServerLevel l,Destination d,Entity e,double cell,boolean sovereign) {
+    private static void contain(ServerLevel l,Destination d,Entity e,double cell,long age,boolean sovereign) {
         double floor=switch(d){
             case VOID_SEA -> 1;
             case CRUSHING_REALM -> 88;
@@ -127,7 +130,7 @@ public final class WarpRealms {
             switch(d){
                 // A star and an endless collapse both answer a fall with another fall.
                 case SUN,FALLING_WORLD -> {e.teleportTo(e.getX(),d==Destination.SUN?190:231,e.getZ());e.fallDistance=0;e.setDeltaMovement(e.getDeltaMovement().x,0,e.getDeltaMovement().z);e.hurtMarked=true;}
-                default -> recall(e,d,cell);
+                default -> recall(e,d,cell,age);
             }
         }
         double ceiling=l.getMaxBuildHeight()-6;
@@ -137,7 +140,7 @@ public final class WarpRealms {
         }
         double dx=e.getX()-cell,dz=e.getZ();
         double spread=Math.sqrt(dx*dx+dz*dz);
-        if(spread>WarpMath.LEASH_HARD){recall(e,d,cell);return;}
+        if(spread>WarpMath.LEASH_HARD){recall(e,d,cell,age);return;}
         if(spread>WarpMath.LEASH&&!sovereign){
             Vec3 inward=new Vec3(-dx,0,-dz).normalize().scale(.08+(spread-WarpMath.LEASH)/(WarpMath.LEASH_HARD-WarpMath.LEASH)*.22);
             e.setDeltaMovement(e.getDeltaMovement().add(inward));e.hurtMarked=true;
@@ -145,9 +148,11 @@ public final class WarpRealms {
     }
 
     /** Puts an entity back on its arrival point rather than letting it leave the world. */
-    private static void recall(Entity e,Destination d,double cell) {
+    private static void recall(Entity e,Destination d,double cell,long age) {
         Vec3 at=d.arrival.add(cell,0,0);
-        e.teleportTo(at.x,at.y,at.z);
+        // The press has a shrinking ceiling: never put anything back above it.
+        double y=d==Destination.CRUSHING_REALM?Math.min(at.y,WarpMath.ceiling(age)-2.5):at.y;
+        e.teleportTo(at.x,y,at.z);
         e.setDeltaMovement(Vec3.ZERO);e.fallDistance=0;e.hurtMarked=true;
         HexNetwork.fx(e,"arrive");
     }
@@ -207,28 +212,52 @@ public final class WarpRealms {
     }
 
     /**
-     * A singularity, not a magnet. Pull follows an inverse square with a floor and
-     * a cap, a tangent keeps victims spiralling instead of pinning them to the
-     * centre taking damage forever, and the horizon is a clean kill rather than a
-     * place to be stuck.
+     * The ring, not a magnet.
+     *
+     * The disk that is drawn is the disk that is flown: victims are flattened into
+     * its plane, carried around it at a Keplerian speed that rises as they are
+     * dragged inward, and decay through the ring over about twenty seconds. Only
+     * the middle kills, and it kills on contact.
+     *
+     * Velocity is set toward a target rather than accumulated as force. A force
+     * that a player's own movement fights reads as a stutter; a swept orbit reads
+     * as being carried, which is the thing this realm is supposed to be.
      */
+    private static final Vec3 DISK_NORMAL=
+        new Vec3(0,-Math.cos(WarpMath.DISK_TILT),Math.sin(WarpMath.DISK_TILT));
+
     private static void singularity(ServerLevel l,Entity e,double cell,long now) {
         Vec3 core=new Vec3(cell,WarpMath.WELL_Y,0);
-        Vec3 toward=core.subtract(e.position());
-        double distance=toward.length();
-        if(distance<=WarpMath.EVENT_HORIZON){
+        Vec3 offset=e.position().subtract(core);
+        if(offset.length()<=WarpMath.EVENT_HORIZON){
             e.hurt(source(l,SINGULARITY),1000F);
             if(e.isAlive()&&!(e instanceof Player))e.discard();
             return;
         }
-        Vec3 inward=toward.scale(1/Math.max(.001,distance));
-        Vec3 spin=new Vec3(-inward.z,0,inward.x).scale(WarpMath.orbit(distance));
-        double gravity=e.isNoGravity()?0:.08;
-        field(e,inward.scale(WarpMath.pull(distance)).add(spin).add(0,gravity,0),now);
-        if(distance<WarpMath.TIDAL&&now%10==0&&e instanceof LivingEntity living){
-            living.hurt(source(l,SINGULARITY),(float)(2+(WarpMath.TIDAL-distance)*.35));
-            living.addEffect(new MobEffectInstance(MobEffects.CONFUSION,80,0,false,false));
+        double height=offset.dot(DISK_NORMAL);
+        Vec3 plane=offset.subtract(DISK_NORMAL.scale(height));
+        double radius=plane.length();
+        Vec3 out=radius<.75?new Vec3(1,0,0):plane.scale(1/radius);
+        Vec3 around=DISK_NORMAL.cross(out);
+        Vec3 target=around.scale(WarpMath.orbitSpeed(radius))
+            .subtract(out.scale(WarpMath.inwardDrift(radius)))
+            .subtract(DISK_NORMAL.scale(Mth.clamp(height*.12,-.55,.55)));
+        sweep(e,target,now);
+        if(radius<WarpMath.DISK_INNER&&now%20==0&&e instanceof LivingEntity living){
+            living.hurt(source(l,SINGULARITY),(float)(2+(WarpMath.DISK_INNER-radius)*.4));
+            living.addEffect(new MobEffectInstance(MobEffects.CONFUSION,90,0,false,false));
         }
+    }
+
+    /** Carries an entity along a target velocity instead of fighting it with force. */
+    private static void sweep(Entity e,Vec3 target,long now) {
+        boolean player=e instanceof ServerPlayer;
+        int stride=player?2:1;
+        if(now%stride!=0)return;
+        Vec3 v=e.getDeltaMovement();
+        Vec3 next=v.add(target.subtract(v).scale(player?.85:.35));
+        if(next.lengthSqr()>WarpMath.FIELD_SPEED*WarpMath.FIELD_SPEED)next=next.normalize().scale(WarpMath.FIELD_SPEED);
+        e.setDeltaMovement(next);e.hurtMarked=true;
     }
 
     /** Islands drift apart; every fortieth second the ground stops agreeing which way is down. */
@@ -272,19 +301,49 @@ public final class WarpRealms {
         living.addEffect(new MobEffectInstance(MobEffects.BLINDNESS,20,0,false,false));
     }
 
+    /**
+     * The press. The floor is real blocks and never moves - an invisible floor
+     * rising away from a visible slab was the part that made no sense - and one
+     * plane comes down onto it, grinding the columns between them away as it goes.
+     * Nothing is teleported onto the floor any more; standing on it is ordinary.
+     */
     private static void crushing(ServerLevel l,Entity e,double cell,long age,long now) {
-        double floor=WarpMath.floor(age)+1,ceiling=WarpMath.ceiling(age);
-        if(e.getY()<floor){
-            e.teleportTo(e.getX(),floor,e.getZ());e.fallDistance=0;
-            e.setDeltaMovement(e.getDeltaMovement().x,Math.max(0,e.getDeltaMovement().y),e.getDeltaMovement().z);e.hurtMarked=true;
+        double ceiling=WarpMath.ceiling(age),floor=WarpMath.floor(age);
+        double head=e.getY()+e.getBbHeight();
+        if(head>ceiling){
+            // Pushed down by the plane in steps it could plausibly push, not snapped through it.
+            double push=Math.min(head-ceiling,.6);
+            e.teleportTo(e.getX(),Math.max(floor,e.getY()-push),e.getZ());
+            e.setDeltaMovement(e.getDeltaMovement().x,Math.min(0,e.getDeltaMovement().y),e.getDeltaMovement().z);
+            e.hurtMarked=true;e.fallDistance=0;
         }
-        if(e.getY()+e.getBbHeight()>ceiling){
-            e.teleportTo(e.getX(),Math.max(floor,ceiling-e.getBbHeight()),e.getZ());
-            e.setDeltaMovement(e.getDeltaMovement().x,Math.min(0,e.getDeltaMovement().y),e.getDeltaMovement().z);e.hurtMarked=true;
-            if(now%10==0)e.hurt(l.damageSources().inWall(),ceiling-floor<2?20:6);
+        double room=ceiling-floor-e.getBbHeight();
+        if(room<.35&&now%10==0){
+            float crush=room<=.05?1000F:(float)Math.max(5,(.35-room)*70);
+            e.hurt(l.damageSources().inWall(),crush);
         }
-        if(Math.abs(e.getX()-cell)>42||Math.abs(e.getZ())>42)
-            field(e,new Vec3(cell,100,0).subtract(e.position()).normalize().scale(.05),now);
+        if(Math.abs(e.getX()-cell)>44||Math.abs(e.getZ())>44)
+            field(e,new Vec3(cell,floor+2,0).subtract(e.position()).normalize().scale(.06),now);
+    }
+
+    /** Grinds away whatever the descending plane has reached since the last check. */
+    private static void press(ServerLevel l,double cell,long age,long now) {
+        if(now%4!=0)return;
+        long key=(long)cell;
+        int reached=WarpMath.pressGround(age);
+        Integer last=GROUND.put(key,reached);
+        if(last==null||reached>=last)return;
+        boolean broke=false;
+        for(int y=Math.max(reached,last-8);y<last;y++)
+            for(int[] pillar:RealmLayout.pressPillars())
+                for(int dx=0;dx<RealmLayout.PILLAR;dx++)for(int dz=0;dz<RealmLayout.PILLAR;dz++){
+                    BlockPos pos=new BlockPos((int)cell+pillar[0]+dx,y,pillar[1]+dz);
+                    if(l.getBlockState(pos).isAir())continue;
+                    l.setBlock(pos,net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(),2|16);
+                    broke=true;
+                }
+        if(broke)l.playSound(null,BlockPos.containing(cell,reached,0),
+            net.minecraft.sounds.SoundEvents.DEEPSLATE_BREAK,SoundSource.BLOCKS,4F,.45F);
     }
 
     private static void endOfTime(ServerLevel l,Entity e,long age,long now) {
@@ -347,5 +406,5 @@ public final class WarpRealms {
         HexNetwork.fx(p,"resume");
     }
 
-    public static void reset(){JOBS.clear();HISTORY.clear();HUNTER_DUE.clear();}
+    public static void reset(){JOBS.clear();HISTORY.clear();HUNTER_DUE.clear();GROUND.clear();}
 }

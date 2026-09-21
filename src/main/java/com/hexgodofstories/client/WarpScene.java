@@ -84,7 +84,8 @@ public final class WarpScene {
                 if(d==Destination.FROZEN_MOMENT)for(int i=0;i<130;i++){double a=i*2.399;Vec3 p=new Vec3(Math.cos(a)*(8+i%30),130+i%45,Math.sin(a)*(8+i%30));WarpMesh.box(b,m,p.x,p.y,p.z,.13,.13,.13,0xc6ecff,.7f);}
             }
             case CRUSHING_REALM -> {
-                double bottom=WarpMath.floor(age);WarpMesh.box(b,m,-46,bottom-3,-46,92,4,92,0x241b2e,1);
+                // The floor is real blocks in the realm; only the preview needs one drawn.
+                if(preview){double bottom=WarpMath.floor(age);WarpMesh.box(b,m,-46,bottom-4,-46,92,4,92,0x241b2e,1);}
                 double top=WarpMath.ceiling(age);WarpMesh.box(b,m,-46,top,-46,92,4,92,0x211527,1);
                 for(int i=-40;i<=40;i+=10){WarpMesh.box(b,m,i,top-.035,-42,.15,.03,84,0xc879eb,.8f);WarpMesh.box(b,m,-42,top-.035,i,84,.03,.15,0xc879eb,.8f);}
                 for(int i=0;i<30;i++){double a=i*2.399;WarpMesh.sphere(b,m,new Vec3(Math.cos(a)*44,100+(top-100)*(i%7)/7,Math.sin(a)*44),.3,.3,.3,0xc998df,.65f,8,0,false);}

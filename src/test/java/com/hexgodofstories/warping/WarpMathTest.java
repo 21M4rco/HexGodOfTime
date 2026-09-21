@@ -55,8 +55,29 @@ public final class WarpMathTest {
         check(distance<=WarpMath.EVENT_HORIZON,"a victim in the well always reaches the horizon");
         check(WarpMath.pull(WarpMath.EVENT_HORIZON)<=.26,"pull is capped at the horizon");
         check(WarpMath.pull(1)==WarpMath.pull(WarpMath.EVENT_HORIZON),"inside the horizon uses the horizon value");
-        check(WarpMath.orbit(20)>0&&WarpMath.orbit(20)>WarpMath.orbit(200),"spin decays outward");
-        check(WarpMath.EVENT_HORIZON<WarpMath.TIDAL,"tidal shear starts outside the horizon");
+        // The ring: everything caught by it is carried around and decays into the middle.
+        check(WarpMath.EVENT_HORIZON<WarpMath.DISK_INNER&&WarpMath.DISK_INNER<WarpMath.DISK_OUTER,
+            "the drawn ring sits outside the drawn core");
+        check(WarpMath.orbitSpeed(WarpMath.DISK_INNER)>WarpMath.orbitSpeed(WarpMath.DISK_OUTER),
+            "the ring carries faster the closer it drags you");
+        check(WarpMath.inwardDrift(WarpMath.DISK_OUTER+5)>WarpMath.inwardDrift(WarpMath.DISK_OUTER-5),
+            "outside the ring falls onto it faster than the ring itself decays");
+        double orbitR=WarpMath.CAPTURE;int swept=0;
+        while(orbitR>WarpMath.EVENT_HORIZON&&swept++<20000){
+            double carried=Math.hypot(WarpMath.orbitSpeed(orbitR),WarpMath.inwardDrift(orbitR));
+            check(carried<=WarpMath.FIELD_SPEED,"a swept orbit stays inside the field cap");
+            orbitR-=WarpMath.inwardDrift(orbitR);
+        }
+        check(orbitR<=WarpMath.EVENT_HORIZON,"every orbit decays into the middle");
+        check(swept<20*180,"and reaches it inside three minutes");
+
+        // The press: one plane, onto a floor that is real and never moves.
+        check(WarpMath.floor(0)==WarpMath.floor(5000),"the press floor never moves");
+        check(WarpMath.ceiling(100)==WarpMath.PRESS_TOP,"the full gap is the warning");
+        check(WarpMath.ceiling(600)>WarpMath.ceiling(1200),"the plane keeps coming down");
+        check(WarpMath.ceiling(9000000)-WarpMath.floor(0)==WarpMath.PRESS_GAP,"it stops at a gap nothing survives");
+        check(WarpMath.PRESS_GAP<1.8,"a standing victim cannot fit in the final gap");
+        check(WarpMath.pressGround(2000)<WarpMath.pressGround(500),"the grind follows the plane down");
         check(WarpMath.FIELD_SPEED<10,"a field never moves anything faster than the server accepts");
         check(WarpMath.LEASH<WarpMath.LEASH_HARD,"the leash pulls inward before it recalls");
         check(WarpMath.LEASH_HARD*2<1024,"one instance can never reach into the next");

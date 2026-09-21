@@ -29,23 +29,42 @@ public final class WarpMath {
     public static final double LEASH=240,LEASH_HARD=380;
     /** Speed ceiling for anything a realm field accelerates, well under the movement checks. */
     public static final double FIELD_SPEED=1.8;
-    /** Singularity centre, horizon and the radius where tidal shear starts tearing. */
-    public static final double WELL_Y=96,EVENT_HORIZON=7,TIDAL=34;
     /**
-     * Inward acceleration per tick. Inverse-square close in, linear far out, and
-     * capped, so a victim accelerates hard near the core without the runaway that
-     * an uncapped field produced. Strictly decreasing with distance.
+     * The well, in the same numbers the accretion disk is drawn with: a black
+     * core of radius 10, a ring of debris from 12 to 35 tilted 0.28 radians about
+     * the X axis, and anything further out than CAPTURE still falling toward it.
+     */
+    public static final double WELL_Y=96,EVENT_HORIZON=10,DISK_INNER=12,DISK_OUTER=35,DISK_TILT=.28,CAPTURE=95,TIDAL=35;
+    /**
+     * Inward acceleration per tick for the far capture, before anything is on the
+     * ring. Inverse-square close in, linear far out, capped. Strictly decreasing.
      */
     public static double pull(double distance){
         double r=Math.max(EVENT_HORIZON,distance);
         return Math.min(.26,3.4/(r*r*.06+r));
     }
-    /** Tangential component: victims spiral in rather than pinning to the centre. */
-    public static double orbit(double distance){
-        return Math.min(.09,1.6/Math.max(EVENT_HORIZON,distance));
+    /**
+     * Orbital speed on the ring, in blocks per tick: a Keplerian shape, so the
+     * closer a victim is dragged the faster they are carried around. Capped under
+     * the field speed so the whole motion stays inside the movement checks.
+     */
+    public static double orbitSpeed(double radius){
+        return Math.min(1.45,.8*Math.sqrt(DISK_OUTER/Math.max(EVENT_HORIZON,radius)));
     }
-    public static double ceiling(long age){return Math.max(131,164-Math.max(0,age-100)*.03);}
-    public static double floor(long age){return Math.min(131,98+Math.max(0,age-100)*.03);}
+    /** Inward decay per tick: a fall onto the ring from outside, a slow spiral once on it. */
+    public static double inwardDrift(double radius){
+        return radius>DISK_OUTER?.35:.04+.10*(1-radius/DISK_OUTER);
+    }
+    /**
+     * The press. One plane descends onto a real block floor that never moves:
+     * a rising invisible floor above a visible slab was the part that made no
+     * sense. Five seconds of warning, then sixty-odd to close.
+     */
+    public static final double PRESS_FLOOR=99,PRESS_TOP=164,PRESS_RATE=.045,PRESS_GAP=1.5;
+    public static double ceiling(long age){return Math.max(PRESS_FLOOR+PRESS_GAP,PRESS_TOP-Math.max(0,age-100)*PRESS_RATE);}
+    public static double floor(long age){return PRESS_FLOOR;}
+    /** Lowest block level the descending plane has already ground away. */
+    public static int pressGround(long age){return (int)Math.floor(ceiling(age));}
     public static double fallingY(double initial,double time){return 48+Math.floorMod((long)((initial-48-time*.19)*1000),192000)/1000.0;}
     public static double cellX(double x){return Math.floor((x+512)/1024)*1024;}
     private WarpMath(){}
