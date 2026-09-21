@@ -361,6 +361,8 @@ directional streaking. Cuboids spinning off in all directions read as rubble and
 - **Falling debris is solid.** Platforms implement collision instead of teleporting riders onto
   themselves every tick, and the spear kinds share one predicate so kind 5 no longer reports a
   six-block-wide hitbox.
+- **Flight survives the crossing.** Leaving a realm tears down player-owned state, flight included, so
+  an ascended caster who flew in was dropped out of the air on arrival home. They keep flying now.
 
 ### Not verified — needs a recorded in-game session
 

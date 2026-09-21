@@ -127,7 +127,11 @@ public final class Warping {
         FractureAnchor a=FractureAnchor.load(HexData.get(p).getCompound("warpReturn"));
         ServerLevel to=a==null?null:a.level(p.server);
         if(to==null){to=p.server.overworld();a=new FractureAnchor(to.dimension(),Vec3.atBottomCenterOf(to.getSharedSpawnPos()),p.getYRot(),p.getXRot());}
+        // Crossing tears down player-owned state, flight included. Someone who was flying
+        // under their own mantle keeps flying, instead of being dropped for a tick on arrival.
+        boolean flying=p.getAbilities().flying&&HexData.get(p).getBoolean("ascended");
         cancel(p);HexNetwork.fx(p,"depart");p.teleportTo(to,a.at().x,a.at().y,a.at().z,a.yaw(),a.pitch());p.setDeltaMovement(Vec3.ZERO);p.fallDistance=0;
+        if(flying){CosmicFlight.tick(p);p.getAbilities().flying=true;p.onUpdateAbilities();}
         HexNetwork.arrival(p);return true;
     }
     private static void send(Charge c,boolean clear){
