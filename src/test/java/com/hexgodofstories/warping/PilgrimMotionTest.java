@@ -30,8 +30,8 @@ public final class PilgrimMotionTest {
         for (float yaw : new float[]{-179, -90, 0, 73, 179}) for (float pitch : new float[]{-88,-40,0,40,88}) {
             float y = (float)Math.toRadians(180-yaw), p = (float)Math.toRadians(-pitch);
             Quaternionf expected = new Quaternionf().rotateY(y).rotateX(p).rotateZ(0.6f);
-            Vector3f euler = expected.getEulerAnglesZYX(new Vector3f());
-            Quaternionf rendered = new Quaternionf().rotateZ(euler.z).rotateY(euler.y).rotateX(euler.x);
+            float[] euler = com.hexgodofstories.warping.leviathan.LeviathanPoseMath.angles(yaw, pitch, (float)Math.toDegrees(0.6));
+            Quaternionf rendered = new Quaternionf().rotateZ(euler[2]).rotateY(euler[1]).rotateX(euler[0]);
             Vector3f a = expected.transform(new Vector3f(0,0,-1));
             Vector3f b = rendered.transform(new Vector3f(0,0,-1));
             check(a.distance(b) < 0.0001, "render heading survives bank at " + yaw + ", " + pitch);

@@ -89,12 +89,9 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
                 yaw += render.headYaw(); pitch += render.headPitch();
             }
             // Compose local banking after heading/pitch, then express it in GeckoLib's Z-Y-X order.
-            org.joml.Vector3f angles = new org.joml.Quaternionf()
-                .rotateY((180f - yaw) * Mth.DEG_TO_RAD)
-                .rotateX(-pitch * Mth.DEG_TO_RAD)
-                .rotateZ((i == 0 ? entity.bank(partial) : segments.roll(i, partial)) * Mth.DEG_TO_RAD)
-                .getEulerAnglesZYX(new org.joml.Vector3f());
-            bone.setRotX(angles.x); bone.setRotY(angles.y); bone.setRotZ(angles.z);
+            float[] angles = com.hexgodofstories.warping.leviathan.LeviathanPoseMath.angles(
+                yaw, pitch, i == 0 ? entity.bank(partial) : segments.roll(i, partial));
+            bone.setRotX(angles[0]); bone.setRotY(angles[1]); bone.setRotZ(angles[2]);
         }
     }
 
