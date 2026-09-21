@@ -98,9 +98,7 @@ public final class AbyssalPilgrimAI {
         // waiting for an attack roll to come up. A hunter that only looks at the sky when its own
         // dice say so is a hunter that lets everything airborne live, which is how the surface
         // became a safe place to stand.
-        if (leapCooldown <= 0 && !self.isDying() && self.depth() < 220
-                && hunt.leapable(58, LeviathanAttack.SKY_LEAP.range)) {
-            leapCooldown = 140 + random.nextInt(200);
+        if (takeLeap()) {
             combat.begin(LeviathanAttack.SKY_LEAP, hunt.target());
             setState(LeviathanState.ATTACK);
             return;
@@ -246,6 +244,20 @@ public final class AbyssalPilgrimAI {
         if (pick != null) { combat.begin(pick, target); setState(LeviathanState.ATTACK); }
     }
 
+    /**
+     * Whether a leap is both possible and off cooldown, claiming the cooldown when it answers yes.
+     *
+     * <p>Both routes into the pattern ask here — the direct answer to something leaving the water,
+     * and the ordinary attack roll — so the creature cannot chain leaps by coming at it from the
+     * other side. A leviathan that is permanently in the air is a fountain, not a hunter.
+     */
+    private boolean takeLeap() {
+        if (leapCooldown > 0 || self.isDying() || self.depth() >= 220) return false;
+        if (!hunt.leapable(58, LeviathanAttack.SKY_LEAP.range)) return false;
+        leapCooldown = 140 + self.getRandom().nextInt(200);
+        return true;
+    }
+
     @Nullable
     private LeviathanAttack pickAttack(RandomSource random, Entity target, double distance, boolean lethalOnly) {
         boolean surface = target.getY() > self.surfaceY() - 6;
@@ -254,7 +266,7 @@ public final class AbyssalPilgrimAI {
         if (holding) return random.nextFloat() < 0.5f ? LeviathanAttack.AIR_THROW : LeviathanAttack.DRAG_BELOW;
         // Anything off the water is answered by leaving the water. The short leap is the ordinary
         // reply; the long breach is saved for prey far enough up to be worth the whole run up.
-        if (hunt.leapable(58, LeviathanAttack.SKY_LEAP.range)) return LeviathanAttack.SKY_LEAP;
+        if (takeLeap()) return LeviathanAttack.SKY_LEAP;
         if (hunt.airborneTarget() && distance < LeviathanAttack.BREACH_BITE.range) return LeviathanAttack.BREACH_BITE;
         if (!lethalOnly && patience > 0.55f && random.nextFloat() < 0.22f) return LeviathanAttack.FAKE_ATTACK;
 

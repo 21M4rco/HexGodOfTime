@@ -625,7 +625,10 @@ public final class LeviathanCombatController {
     // ---------------------------------------------------------------- presentation
 
     private void announce(LeviathanAttack pattern) {
-        if (pattern == LeviathanAttack.VOID_SCREAM || pattern == LeviathanAttack.BREACH_BITE) HexNetwork.pilgrimEffect(self, "charge", self.segments().segment(0), 1f);
+        // The leap is telegraphed for the same reason the breach is: something this size lining up
+        // underneath you should be felt before it arrives, or the kill is not a fair one.
+        if (pattern == LeviathanAttack.VOID_SCREAM || pattern == LeviathanAttack.BREACH_BITE
+            || pattern == LeviathanAttack.SKY_LEAP) HexNetwork.pilgrimEffect(self, "charge", self.segments().segment(0), 1f);
     }
 
     private void splash(Vec3 at, float magnitude) {
