@@ -3,26 +3,33 @@ package com.hexgodofstories.warping;
 /** Pure geometry/time rules shared by authority, rendering and regression tests. */
 public final class WarpMath {
     public static final int MIN_CHARGE=24,FULL_CHARGE=100,MAX_HOLD=160,OPEN_TICKS=200;
-    public static final int EDGE_COUNT=32;
     public static final double SUN_Y=94,SUN_RADIUS=35,SUN_CORONA=42;
     public static float solarDamage(double distance){return distance<SUN_RADIUS?36:distance<SUN_CORONA?8:0;}
-    public static double width(int ticks){return 2+8*Math.min(1,Math.max(0,ticks)/(double)FULL_CHARGE);}
-    /** Fixed, angular mirror outline. The renderer and server use the same polygon at every size. */
-    public static double edgeX(int i,double half){return edge(i,half,true);}
-    public static double edgeZ(int i,double half){return edge(i,half,false);}
-    private static double edge(int i,double half,boolean x){
-        i=Math.floorMod(i,EDGE_COUNT);double a=i*Math.PI*2/EDGE_COUNT,c=Math.cos(a),s=Math.sin(a);
-        double jag= .72+Math.floorMod(i*17+i*i*7,29)/100.0;
-        return (x?c:s)*half*jag/Math.max(Math.abs(c),Math.abs(s));
-    }
-    public static boolean inside(double x,double z,int ticks){
-        double half=width(ticks)*.5;if(Math.abs(x)>=half||Math.abs(z)>=half)return false;
-        boolean in=false;
-        for(int i=0,j=EDGE_COUNT-1;i<EDGE_COUNT;j=i++){
-            double ax=edgeX(i,half),az=edgeZ(i,half),bx=edgeX(j,half),bz=edgeZ(j,half);
-            if((az>z)!=(bz>z)&&x<(bx-ax)*(z-az)/(bz-az)+ax)in=!in;
-        }
-        return in;
+    /**
+     * How far the break reaches across the floor, corner to corner, at this charge.
+     *
+     * <p>A held charge now buys a genuinely large tear rather than a ten block one: a full charge
+     * is twenty eight blocks across, and what that width means is the span of the whole fracture,
+     * not a radius — {@link WarpFracture} spends it on an impact hole and the cracks leaving it.
+     */
+    public static double width(int ticks){return 2+26*charge(ticks);}
+    /** Nought at the first tick of a hold, one once the charge is full. */
+    public static double charge(int ticks){return Math.min(1,Math.max(0,ticks)/(double)FULL_CHARGE);}
+    /** Blocks from the centre that the fracture is allowed to run to at this charge. */
+    public static double reach(int ticks){return width(ticks)*.5;}
+    /**
+     * What a break of this charge costs, as a multiple of the ability's own cost.
+     *
+     * <p>Size is the thing being paid for: the smallest usable tear is half price and the full
+     * twenty eight block one is twice it, so opening reality wide is a deliberate expense rather
+     * than the same flat fee as cracking it.
+     */
+    public static double costScale(int held){return .5+1.5*charge(held);}
+    /** The largest charge this much energy can actually pay for, in ticks. */
+    public static int affordable(double energy,double cost){
+        if(cost<=0)return FULL_CHARGE;
+        double f=(energy/cost-.5)/1.5;
+        return (int)Math.floor(Math.max(0,Math.min(1,f))*FULL_CHARGE);
     }
     public static boolean openAt(long opened,long now){return opened>=0&&now>=opened&&now-opened<OPEN_TICKS;}
     public static double pull(double distance){return Math.min(.32,.025+2.8/Math.max(10,distance));}

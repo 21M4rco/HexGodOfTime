@@ -200,7 +200,7 @@ Client appearance and movement still require in-game verification; compilation a
 
 Fracture: tap the primary key for a doorway, or hold for 0.6 seconds to gather all eligible entities within five blocks of the portal. After a brief inward pull, the group crosses and the portal closes. The same hold works inside the pocket realm; returning costs no energy and ignores entry cooldown. Visitors arrive in the caster's realm and keep their own way home.
 
-While transformed **and inside your own fracture world**, press **J** to toggle Cosmic Flight. **Space** rises and **crouch** descends; vanilla double-jump flight controls also work. Change the binding in Minecraft's Controls menu. A green spatial nebula and star filaments surround flying players. Since 0.5.6 no other dimension grants flight, the Warping realms included.
+While transformed, press **J** to toggle Cosmic Flight, in any dimension. **Space** rises and **crouch** descends; vanilla double-jump flight controls also work. Change the binding in Minecraft's Controls menu. A green spatial nebula and star filaments surround flying players. The mantle is the whole of the permission: nothing else grants flight, so an untransformed player is on foot everywhere, the Warping realms included.
 
 The HUD shows eight named ability cards with recovery/ready status, selection and energy. Hold the select key and scroll to switch. Existing realms receive the larger island, organic tree/roots and rebuilt throne through a resumable upgrade; no world reset is needed.
 

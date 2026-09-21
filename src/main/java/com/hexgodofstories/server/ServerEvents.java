@@ -146,6 +146,9 @@ public final class ServerEvents {
         // A suspended body cannot be wounded in a moment that is not passing; the harm waits for time to resume.
         if(TemporalEngine.bank(e.getEntity(),e.getAmount(),e.getSource().getEntity())){e.setCanceled(true);return;}
         if(e.getEntity() instanceof ServerPlayer p&&HexData.get(p).getLong("wardUntil")>HexData.now(p))e.setAmount(e.getAmount()*.25f);
+        // Being hit is the only thing that takes a fracture away from the caster holding it open.
+        // Turning the camera away deliberately does not; concentration is not aim.
+        if(e.getEntity() instanceof ServerPlayer struck&&e.getAmount()>0)com.hexgodofstories.warping.Warping.interrupt(struck);
         // One ledger serves both deceptions: it tells a projection who has earned a fight, and it tells
         // a creature choosing between identical figures which of them has actually been cutting it.
         Threat.record(e.getEntity(),e.getSource().getEntity(),e.getAmount());

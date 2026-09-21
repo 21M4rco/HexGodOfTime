@@ -40,6 +40,18 @@ Everything below needs a recorded in-game session and **has not had one**. Nothi
   cross the threshold the AI branches on. Whether a sea with eight things in it reads as a creature
   that has stopped playing, rather than merely as a faster one, needs several players in the water
   at once, which has not happened.
+- **The broken portal in play.** The fracture's shape, growth, variation, pointed ends and the
+  match between the way through and the visible openings are all checked by `verifyWarping`, which
+  is geometry rather than appearance. Whether it reads as shattered glass on real ground, whether a
+  twenty-eight block tear is the right maximum, and how the fracture looks crossing stairs, slabs
+  and a one block step have not been seen.
+- **A locked target through a fight.** That the charge survives turning the camera and dies to a hit
+  is source-level. The feel of it, and that nothing is left drawn on a client when a caster is
+  killed mid-charge, needs two players.
+- **Flight in every dimension.** The mantle granting flight everywhere is one condition and is
+  exercised by the same tick that always granted it. What it does to the Sun, the Falling World and
+  the gravity well — all of which were rebalanced in 0.5.6 around not being able to rise out of
+  them — has not been played.
 - **Thirty seconds of theatre.** The clock, its per-entity ownership and the decided attack table
   are checked by `verifyHexor`. Whether thirty seconds is the right amount of stalking before the
   creature stops performing, and whether the switch reads as a decision rather than as the AI

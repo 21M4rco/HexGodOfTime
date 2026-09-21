@@ -63,10 +63,13 @@ public final class WarpRealms {
         if(e instanceof ServerPlayer p){
             if(Destination.from(old)==null)HexData.get(p).put("warpReturn",new FractureAnchor(old.dimension(),p.position(),p.getYRot(),p.getXRot()).save());
             p.stopRiding();p.teleportTo(to,pos.x,pos.y,pos.z,p.getYRot(),p.getXRot());
-            // No destination hands out flight any more, not even to the caster who opened it. A
-            // realm you can rise out of is scenery; these are meant to be survived from inside.
-            com.hexgodofstories.server.CosmicFlight.revoke(p);
-            if(!p.isCreative()&&!p.isSpectator()){p.getAbilities().flying=false;p.onUpdateAbilities();}
+            // A destination still hands out nothing: arriving does not grant flight, and a caster
+            // without the mantle crosses on foot. What the mantle carries, it carries everywhere,
+            // so a transformed keeper is left alone here rather than being stripped on arrival.
+            if(!com.hexgodofstories.server.CosmicFlight.mantled(p)){
+                com.hexgodofstories.server.CosmicFlight.revoke(p);
+                if(!p.isCreative()&&!p.isSpectator()){p.getAbilities().flying=false;p.onUpdateAbilities();}
+            }
         }else{
             e.stopRiding();e.changeDimension(to,new ITeleporter(){public Entity placeEntity(Entity entity,ServerLevel current,ServerLevel dest,float yaw,java.util.function.Function<Boolean,Entity> reposition){Entity moved=reposition.apply(false);if(moved!=null){moved.moveTo(pos.x,pos.y,pos.z,yaw,0);moved.setDeltaMovement(0,-.3,0);moved.fallDistance=0;}return moved;}});
         }
@@ -233,7 +236,9 @@ public final class WarpRealms {
             return;
         }
         e.stopRiding();
-        if(e instanceof ServerPlayer p){
+        // The well takes flight from anyone it is dragging in — except a keeper wearing the mantle,
+        // whose flight is theirs in every dimension. They are still pulled; they can still fly.
+        if(e instanceof ServerPlayer p&&!com.hexgodofstories.server.CosmicFlight.mantled(p)){
             com.hexgodofstories.server.CosmicFlight.revoke(p);
             if(p.getAbilities().flying){p.getAbilities().flying=false;p.onUpdateAbilities();}
         }
