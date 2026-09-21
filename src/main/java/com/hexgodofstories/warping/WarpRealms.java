@@ -17,9 +17,20 @@ import java.util.*;
 /** Bounded preparation work, persistent instance clocks and environmental rules scoped to nine new levels. */
 public final class WarpRealms {
     public static final class Ledger extends SavedData {
+        /**
+         * Bumped whenever {@link RealmLayout} changes what a realm is made of.
+         *
+         * <p>A realm is built once and then remembered as ready forever, which is right until the
+         * blueprint changes underneath an existing save: the new architecture would then never be
+         * placed in any world that had already opened the way once. A mismatch here simply forgets
+         * that the realms were built, and the next portal rebuilds them over the top.
+         */
+        static final int LAYOUT=2;
         int next;final Map<Long,Long> clocks=new HashMap<>();final Set<Long> ready=new HashSet<>();
-        static Ledger load(CompoundTag n){Ledger l=new Ledger();l.next=n.getInt("next");for(long x:n.getLongArray("ready"))l.ready.add(x);ListTag a=n.getList("clocks",10);for(int i=0;i<a.size();i++){var c=a.getCompound(i);l.clocks.put(c.getLong("cell"),c.getLong("time"));}return l;}
-        public CompoundTag save(CompoundTag n){n.putInt("next",next);n.putLongArray("ready",ready.stream().mapToLong(Long::longValue).toArray());ListTag a=new ListTag();clocks.forEach((x,t)->{CompoundTag c=new CompoundTag();c.putLong("cell",x);c.putLong("time",t);a.add(c);});n.put("clocks",a);return n;}
+        static Ledger load(CompoundTag n){Ledger l=new Ledger();l.next=n.getInt("next");
+            if(n.getInt("layout")==LAYOUT)for(long x:n.getLongArray("ready"))l.ready.add(x);
+            ListTag a=n.getList("clocks",10);for(int i=0;i<a.size();i++){var c=a.getCompound(i);l.clocks.put(c.getLong("cell"),c.getLong("time"));}return l;}
+        public CompoundTag save(CompoundTag n){n.putInt("next",next);n.putInt("layout",LAYOUT);n.putLongArray("ready",ready.stream().mapToLong(Long::longValue).toArray());ListTag a=new ListTag();clocks.forEach((x,t)->{CompoundTag c=new CompoundTag();c.putLong("cell",x);c.putLong("time",t);a.add(c);});n.put("clocks",a);return n;}
     }
     private record Job(ServerLevel level,Destination d,double cell,Iterator<RealmLayout.Voxel> blocks){}
     private static final List<Job> JOBS=new ArrayList<>();
@@ -78,37 +89,157 @@ public final class WarpRealms {
                 };
                 if(ambience!=null)listener.playNotifySound(ambience,net.minecraft.sounds.SoundSource.AMBIENT,.14f,.65f);
             }
-            if(Warping.sovereign(e)&&d!=Destination.SUN){e.fallDistance=0;double bottom=d==Destination.VOID_SEA?VoidSea.FLOOR:0,rescue=d==Destination.VOID_SEA?VoidSea.SURFACE-24:180;if(e.getY()<bottom)e.teleportTo(e.getX(),rescue,e.getZ());continue;}
-            if(e instanceof net.minecraft.world.entity.player.Player p&&p.isCreative())continue;
+            // The realm acts on everyone in it, the caster included. It used to exempt any player
+            // with Warping unlocked from every hazard but the Sun, which meant the one person most
+            // likely to be standing in a realm was the one person nothing in it could touch: no
+            // pull, no planes, no storm, no cold. Creative and spectator remain the way to look
+            // around without being killed for it.
+            if(e instanceof net.minecraft.world.entity.player.Player p&&(p.isCreative()||p.isSpectator()))continue;
+            descend(d,e);
+            rescue(l,d,e,cell);
             switch(d){
                 case SUN -> solarExposure(l,e,cell,now);
                 case VOID_SEA -> {}  // the realm's only hazard is alive and has its own AI
-                case GRAVITY_WELL -> {
-                    Vec3 toward=new Vec3(cell,96,0).subtract(e.position());double dist=toward.length();
-                    e.setDeltaMovement(e.getDeltaMovement().scale(.96).add(toward.normalize().scale(WarpMath.pull(dist))).add(0,e.isNoGravity()?0:.08,0));e.hurtMarked=true;
-                    if(dist<23&&now%10==0)e.hurt(l.damageSources().magic(),(float)(4+(23-dist)*2));
-                }
+                case GRAVITY_WELL -> singularity(l,e,cell,now);
                 case SHATTERED_WORLD -> {
-                    long phase=age%240;if(phase<35){e.setDeltaMovement(e.getDeltaMovement().add(Math.sin(age*.05)*.015,.075,Math.cos(age*.05)*.015));e.hurtMarked=true;}
+                    // Gravity lets go for thirty five ticks in every twelve seconds, and what is
+                    // between the islands is a long way down.
+                    long phase=age%240;if(phase<35){e.setDeltaMovement(e.getDeltaMovement().add(Math.sin(age*.05)*.015,.115,Math.cos(age*.05)*.015));e.hurtMarked=true;}
                 }
                 case TIME_STORM -> {
                     if(now%5==0){var h=HISTORY.computeIfAbsent(e.getUUID(),k->new ArrayDeque<>());h.addLast(e.position());while(h.size()>13)h.removeFirst();
-                        if(age>60&&age%100<5&&h.size()>10){Vec3 back=h.getFirst();e.teleportTo(back.x,back.y,back.z);e.setDeltaMovement(Vec3.ZERO);e.hurtMarked=true;HexNetwork.fx(e,"slip");h.clear();}}
+                        if(age>60&&age%100<5&&h.size()>10){Vec3 back=h.getFirst();place(e,back.x,back.y,back.z);e.setDeltaMovement(Vec3.ZERO);e.hurtMarked=true;HexNetwork.fx(e,"slip");h.clear();}}
                     if(age%100>85&&e instanceof LivingEntity living)living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,8,3,false,false));
                 }
-                case FALLING_WORLD -> {if(e.getY()<48){e.teleportTo(e.getX(),231,e.getZ());e.fallDistance=0;}if(e.getDeltaMovement().y>-.15)e.setDeltaMovement(e.getDeltaMovement().add(0,-.035,0));}
-                case FROZEN_MOMENT -> {}
-                case CRUSHING_REALM -> {
-                    double floor=WarpMath.floor(age)+1,ceiling=WarpMath.ceiling(age);
-                    if(e.getY()<floor&&e.getY()>90){e.teleportTo(e.getX(),floor,e.getZ());e.fallDistance=0;}
-                    if(e.getY()+e.getBbHeight()>ceiling){e.teleportTo(e.getX(),Math.max(floor,ceiling-e.getBbHeight()),e.getZ());e.setDeltaMovement(e.getDeltaMovement().x,Math.min(0,e.getDeltaMovement().y),e.getDeltaMovement().z);if(now%10==0)e.hurt(l.damageSources().inWall(),ceiling-floor<2?20:6);}
-                    if(Math.abs(e.getX()-cell)>42||Math.abs(e.getZ())>42){Vec3 pull=new Vec3(cell,100,0).subtract(e.position()).normalize().scale(.15);e.setDeltaMovement(e.getDeltaMovement().add(pull));e.hurtMarked=true;}
-                }
+                case FALLING_WORLD -> {if(e.getY()<48)place(e,e.getX(),231,e.getZ());if(e.getDeltaMovement().y>-.15)e.setDeltaMovement(e.getDeltaMovement().add(0,-.035,0));}
+                case FROZEN_MOMENT -> freeze(l,e,now);
+                case CRUSHING_REALM -> press(l,e,cell,age,now);
                 case END_OF_TIME -> {if(e instanceof LivingEntity living&&now%40==0){living.addEffect(new MobEffectInstance(MobEffects.WEAKNESS,65,2,false,false));living.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN,65,1,false,false));living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,65,0,false,false));if(age>200)living.hurt(l.damageSources().wither(),2);}}
             }
         }
         if(d==Destination.TIME_STORM&&now%200==0)HISTORY.keySet().removeIf(id->l.getEntity(id)==null);
     }
+    // ------------------------------------------------------------------ shared realm physics
+
+    /** Centre of the singularity, and the radius inside which nothing comes back out. */
+    public static final double WELL_Y=96,HORIZON=11,TIDAL=34;
+
+    /**
+     * Terminal descent in blocks per tick, before Minecraft's own gravity is added on top.
+     *
+     * <p>These are places, and a place you hang motionless in is not one. Vanilla's terminal
+     * velocity of nearly four blocks a tick is a plummet that ends a hundred blocks later, which
+     * suits none of them either; every realm is a long, slow fall through open space instead. The
+     * Falling World is the exception in the fast direction, because falling is the entire realm,
+     * and the Gravity Well in the other, because down there is decided by the singularity.
+     */
+    private static double sink(Destination d){
+        return switch(d){
+            case FALLING_WORLD -> 1.25;
+            case GRAVITY_WELL, VOID_SEA -> 0;
+            default -> .35;
+        };
+    }
+
+    /** A gentle, inevitable descent, and never any fall damage for it. */
+    private static void descend(Destination d,Entity e){
+        e.fallDistance=0;
+        double limit=sink(d);if(limit<=0)return;
+        Vec3 v=e.getDeltaMovement();
+        if(v.y<-limit){e.setDeltaMovement(v.x,-limit,v.z);e.hurtMarked=true;}
+    }
+
+    /** Nothing is ever lost out of the bottom of a realm; it is put back at the top of one. */
+    private static void rescue(ServerLevel l,Destination d,Entity e,double cell){
+        double bottom=d==Destination.VOID_SEA?VoidSea.FLOOR-8:0;
+        if(e.getY()>=bottom)return;
+        double back=switch(d){
+            case VOID_SEA -> VoidSea.SURFACE-24;
+            case CRUSHING_REALM -> 120;
+            default -> 200;
+        };
+        place(e,e.getX(),back,e.getZ());
+        e.setDeltaMovement(Vec3.ZERO);
+    }
+
+    /**
+     * Repositions something and makes it stick.
+     *
+     * <p>{@code Entity#teleportTo(x, y, z)} moves the server's copy and tells nobody, so a player
+     * moved that way keeps walking from where their own client still thinks they are and the
+     * server accepts it on the next movement packet. Every realm that relocates you — the endless
+     * fall looping back to the top, the crushing planes holding you between them, the storm
+     * rewinding you — was quietly doing nothing at all to players.
+     */
+    private static void place(Entity e,double x,double y,double z){
+        if(e instanceof ServerPlayer p)p.connection.teleport(x,y,z,p.getYRot(),p.getXRot());
+        else e.teleportTo(x,y,z);
+        e.fallDistance=0;
+    }
+
+    // ------------------------------------------------------------------ per realm hazards
+
+    /**
+     * The black hole. Pull that steepens inward, tidal shear that starts hurting well outside the
+     * horizon, and an event horizon that is simply the end of the entity that reaches it.
+     */
+    private static void singularity(ServerLevel l,Entity e,double cell,long now){
+        Vec3 centre=new Vec3(cell,WELL_Y,0);
+        Vec3 toward=centre.subtract(e.position());
+        double dist=toward.length();
+        if(dist<HORIZON){
+            // Past the horizon there is no mechanic left to apply. Nothing escapes, including the
+            // caster who opened the way in, and no protection short of creative mode reaches here.
+            HexNetwork.fx(e,"slip");
+            e.hurt(l.damageSources().genericKill(),Float.MAX_VALUE);
+            if(e.isAlive()&&!(e instanceof ServerPlayer))e.discard();
+            return;
+        }
+        // Momentum is kept, so a fast pass can still carry you out the far side; standing still
+        // cannot. The pull itself steepens from a drift at the rim to inescapable near the horizon.
+        e.setDeltaMovement(e.getDeltaMovement().scale(.985).add(toward.scale(WarpMath.pull(dist)/dist)));
+        e.hurtMarked=true;
+        if(dist<TIDAL&&now%10==0&&e instanceof LivingEntity living){
+            float shear=(float)(1.5+Math.pow((TIDAL-dist)/(TIDAL-HORIZON),2)*13);
+            living.hurt(l.damageSources().magic(),shear);
+            living.addEffect(new MobEffectInstance(MobEffects.CONFUSION,80,0,false,false));
+        }
+    }
+
+    /**
+     * The frozen moment. A catastrophe held still is held still because nothing here is warm
+     * enough to move, and that includes the visitor.
+     *
+     * <p>Driven through the vanilla freeze counter rather than a private one, so the player gets
+     * the frost closing in around the screen that they already know how to read. Minecraft thaws
+     * anything not standing in powder snow by two ticks each tick, so this adds three to make one.
+     */
+    private static void freeze(ServerLevel l,Entity e,long now){
+        if(!(e instanceof LivingEntity living)||!living.canFreeze())return;
+        int required=living.getTicksRequiredToFreeze();
+        living.setTicksFrozen(Math.min(required*3,living.getTicksFrozen()+3));
+        double chill=Math.min(1.0,living.getTicksFrozen()/(double)required);
+        if(chill>.35&&now%20==0)living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,30,chill>.8?2:chill>.6?1:0,false,false));
+        if(chill>=1&&now%30==0)living.hurt(l.damageSources().freeze(),3);
+    }
+
+    /**
+     * The crushing realm. Two planes close on a fixed line and the gap between them is the whole
+     * warning; when it runs out there is nowhere left to be.
+     */
+    private static void press(ServerLevel l,Entity e,double cell,long age,long now){
+        double floor=WarpMath.floor(age)+1,ceiling=WarpMath.ceiling(age),gap=ceiling-floor;
+        if(e.getY()<floor&&e.getY()>90){place(e,e.getX(),floor,e.getZ());e.setDeltaMovement(e.getDeltaMovement().x,Math.max(0,e.getDeltaMovement().y),e.getDeltaMovement().z);}
+        if(e.getY()+e.getBbHeight()>ceiling){
+            place(e,e.getX(),Math.max(floor,ceiling-e.getBbHeight()),e.getZ());
+            e.setDeltaMovement(e.getDeltaMovement().x,Math.min(0,e.getDeltaMovement().y),e.getDeltaMovement().z);
+        }
+        // Taller than the gap means being crushed, at a rate that climbs as it keeps closing.
+        if(gap<e.getBbHeight()+.2&&now%10==0)e.hurt(l.damageSources().inWall(),gap<1?1000f:(float)(6+(2-gap)*9));
+        else if(gap<5&&now%20==0)e.hurt(l.damageSources().inWall(),2);
+        if(Math.abs(e.getX()-cell)>42||Math.abs(e.getZ())>42){Vec3 pull=new Vec3(cell,100,0).subtract(e.position()).normalize().scale(.15);e.setDeltaMovement(e.getDeltaMovement().add(pull));e.hurtMarked=true;}
+    }
+
     private static final net.minecraft.resources.ResourceKey<net.minecraft.world.damagesource.DamageType> SOLAR_HEAT=
         net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DAMAGE_TYPE,HexGodOfStories.id("solar_heat"));
     /** Stellar heat is not ordinary fire: the mantle's fire resistance cannot make the Sun harmless. */
@@ -122,6 +253,9 @@ public final class WarpRealms {
     }
     private static void populate(ServerLevel l,Destination d,double cell){
         if(d==Destination.VOID_SEA)com.hexgodofstories.warping.leviathan.PilgrimWarden.ensure(l);
+        // A rebuild re-runs this, and the hazards are entities rather than blocks: without this a
+        // layout bump would leave the Falling World with two sets of debris in it, then three.
+        if(!l.getEntitiesOfClass(WarpHazard.class,new AABB(cell-200,0,-200,cell+200,320,200)).isEmpty())return;
         if(d==Destination.FALLING_WORLD||d==Destination.FROZEN_MOMENT){
             Random r=new Random(819+d.ordinal());int count=d==Destination.FALLING_WORLD?48:32;
             for(int i=0;i<count;i++){WarpHazard h=HexGodOfStories.WARP_HAZARD.get().create(l);if(h==null)continue;

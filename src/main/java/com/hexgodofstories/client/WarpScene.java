@@ -25,21 +25,36 @@ public final class WarpScene {
         }
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
         BufferBuilder b=Tesselator.getInstance().getBuilder();b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);Matrix4f m=pose.last().pose();
-        WarpMesh.sphere(b,m,new Vec3(0,110,0),310,310,310,0x020106,1,32,0,false);
+        if(d==Destination.FROZEN_MOMENT){
+            // A catastrophe held still is a whiteout, not a starfield: a blank bright shell with
+            // suspended ice hanging in it, and nothing beyond it to give the eye any distance.
+            WarpMesh.sphere(b,m,new Vec3(0,110,0),310,310,310,0xeef7ff,1,32,0,false);
+            Random ice=new Random(4471);
+            for(int i=0;i<520;i++){
+                Vec3 n=new Vec3(ice.nextGaussian(),ice.nextGaussian(),ice.nextGaussian()).normalize();
+                Vec3 p=new Vec3(0,110,0).add(n.scale(120+ice.nextDouble()*160));
+                double size=.5+ice.nextDouble()*2.4;
+                WarpMesh.box(b,m,p.x,p.y,p.z,size,size*.35,size,i%5==0?0xffffff:0xbcd9ef,.85f);
+            }
+            BufferUploader.drawWithShader(b.end());
+            return;
+        }
+        int[] pal=space(d);
+        WarpMesh.sphere(b,m,new Vec3(0,110,0),310,310,310,pal[0],1,32,0,false);
         Random r=new Random(81031);int stars=d==Destination.END_OF_TIME?100:850;
         for(int i=0;i<stars;i++){
             Vec3 n=new Vec3(r.nextGaussian(),r.nextGaussian(),r.nextGaussian()).normalize(),p=new Vec3(0,110,0).add(n.scale(295));
             Vec3 side=n.cross(new Vec3(0,1,0)).normalize().scale(.09+r.nextDouble()*.22),up=n.cross(side);
-            WarpMesh.quad(b,m,p.subtract(side).subtract(up),p.add(side).subtract(up),p.add(side).add(up),p.subtract(side).add(up),i%4==0?0xd8c7ff:0xe6e9ef,.8f);
+            WarpMesh.quad(b,m,p.subtract(side).subtract(up),p.add(side).subtract(up),p.add(side).add(up),p.subtract(side).add(up),i%4==0?pal[4]:0xe6e9ef,.8f);
         }
         if(d!=Destination.END_OF_TIME)for(int i=0;i<220;i++){
             double a=r.nextDouble()*Math.PI*2,rad=240+r.nextDouble()*35;Vec3 p=new Vec3(Math.cos(a)*rad,100+Math.sin(a*2)*70+r.nextGaussian()*18,Math.sin(a)*rad);
-            double size=2+r.nextDouble()*12;WarpMesh.sphere(b,m,p,size,size*.45,size,0x6e398d,.035f,8,0,false);
+            double size=2+r.nextDouble()*12;WarpMesh.sphere(b,m,p,size,size*.45,size,pal[1],.045f,8,0,false);
         }
         // Galaxies have spiral arms, distant cores and a tilted dust band, not a flat portal texture.
         for(int g=0;g<(d==Destination.END_OF_TIME?0:3);g++)for(int i=0;i<230;i++){
             double a=i*.16+g*2,rad=i*.085;Vec3 center=new Vec3(Math.cos(g*2.1)*235,190+g*20,Math.sin(g*2.1)*235);
-            Vec3 p=center.add(Math.cos(a)*rad,Math.sin(a)*rad*.4,Math.sin(a)*rad*.7);WarpMesh.box(b,m,p.x,p.y,p.z,.35,.35,.35,i<30?0xf1dfff:0x784c9e,.55f);
+            Vec3 p=center.add(Math.cos(a)*rad,Math.sin(a)*rad*.4,Math.sin(a)*rad*.7);WarpMesh.box(b,m,p.x,p.y,p.z,.35,.35,.35,i<30?pal[3]:pal[2],.55f);
         }
         if(d==Destination.SUN)for(int i=0;i<5;i++){
             double phase=(time+i*117)%520;if(phase>55)continue;
@@ -48,6 +63,26 @@ public final class WarpScene {
         }
         BufferUploader.drawWithShader(b.end());
     }
+    /**
+     * Deep space colours, per realm: backdrop, nebula, galaxy arm, galaxy core, star tint.
+     *
+     * <p>Every realm drew the same violet nebulae and the same white-on-lilac galaxies over the
+     * same near black shell, which is most of why eight very different places looked like one
+     * place seen eight times. The geometry was already per realm; only the colour was not.
+     */
+    private static int[] space(Destination d){
+        return switch(d){
+            case GRAVITY_WELL    -> new int[]{0x01000a,0x3a1060,0x5a2a86,0xe0c2ff,0xcfd6ff};
+            case SHATTERED_WORLD -> new int[]{0x04090c,0x2c6b6e,0x49a0a0,0xdffbff,0xe8f6f4};
+            case TIME_STORM      -> new int[]{0x0a0316,0x7b2ecc,0xa964ff,0xffe6ff,0xe6ccff};
+            case FALLING_WORLD   -> new int[]{0x0c0703,0x8a4a1e,0xc98a3c,0xffe9c2,0xffdcb0};
+            case CRUSHING_REALM  -> new int[]{0x0a0207,0x5a1030,0x8c2050,0xffc4dd,0xffd0d8};
+            case END_OF_TIME     -> new int[]{0x070609,0x3a3640,0x55505e,0x9a94a4,0x8e8896};
+            case SUN             -> new int[]{0x100401,0xa33a10,0xe0731c,0xfff0c0,0xffe9bf};
+            default              -> new int[]{0x020106,0x6e398d,0x784c9e,0xf1dfff,0xe6e9ef};
+        };
+    }
+
     public static void draw(PoseStack pose,Destination d,double time,long age,boolean preview){
         if(d==Destination.SUN){SunRenderer.draw(pose,time);return;}
         RenderSystem.setShader(GameRenderer::getPositionColorShader);

@@ -25,7 +25,30 @@ public final class RealmLayout {
                 for(int x=-9;x<=9;x++)for(int z=-9;z<=9;z++)if(x*x+z*z<81)
                     put(b,x,116,z,Blocks.LAVA.defaultBlockState());
             }
-            case VOID_SEA,GRAVITY_WELL,FALLING_WORLD -> {}
+            case VOID_SEA,FALLING_WORLD -> {}
+            case GRAVITY_WELL -> {
+                // The realm built nothing at all, so the black hole was a client side hologram over
+                // an empty void: nothing to stand on, nothing to fall off, nothing to reach. The
+                // horizon is now a real solid body and the disk is real matter orbiting it, sized
+                // to sit under the rings WarpScene draws so the two read as one object.
+                int horizon=(int)WarpRealms.HORIZON;
+                for(int x=-horizon;x<=horizon;x++)for(int y=-horizon;y<=horizon;y++)for(int z=-horizon;z<=horizon;z++)
+                    if(x*x+y*y+z*z<=horizon*horizon)put(b,x,(int)WarpRealms.WELL_Y+y,z,Blocks.BLACK_CONCRETE.defaultBlockState());
+                // Two spiral arms of infalling matter, hot at the inside edge and cooling outward,
+                // with gaps you can fall through and a warp so it is not a flat plate.
+                for(int x=-40;x<=40;x++)for(int z=-40;z<=40;z++){
+                    double radius=Math.sqrt(x*x+z*z);
+                    if(radius<horizon+3||radius>40)continue;
+                    double arm=Math.sin(Math.atan2(z,x)*2-radius*.34);
+                    if(arm<-.15+r.nextDouble()*.3)continue;
+                    BlockState state=radius<20?Blocks.MAGMA_BLOCK.defaultBlockState()
+                        :radius<29?Blocks.BLACKSTONE.defaultBlockState()
+                        :Blocks.CRYING_OBSIDIAN.defaultBlockState();
+                    int warp=(int)Math.round(Math.sin(Math.atan2(z,x)*3+radius*.12)*2.5);
+                    put(b,x,(int)WarpRealms.WELL_Y+warp,z,state);
+                    if(radius<24&&arm>.55)put(b,x,(int)WarpRealms.WELL_Y+warp-1,z,Blocks.MAGMA_BLOCK.defaultBlockState());
+                }
+            }
             case SHATTERED_WORLD -> {
                 island(b,0,136,0,10,false,r);
                 for(int i=0;i<18;i++){

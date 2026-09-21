@@ -26,10 +26,19 @@ public final class WarpHazard extends Entity {
         double speed=(kind()==1||kind()==5)?getDeltaMovement().y:-.15-index%5*.035;
         Vec3 movement=(kind()==1||kind()==5)?getDeltaMovement():new Vec3(0,speed,0);
         AABB sweep=getBoundingBox().expandTowards(movement).inflate(kind()==1?.5:1);
-        for(LivingEntity e:level().getEntitiesOfClass(LivingEntity.class,sweep,e->e.isAlive()&&!Warping.sovereign(e))){
+        // Falling architecture does not check who opened the way in. Exempting the caster meant the
+        // Falling World's debris and the Frozen Moment's spears passed straight through the one
+        // person most likely to be standing in front of them.
+        for(LivingEntity e:level().getEntitiesOfClass(LivingEntity.class,sweep,e->e.isAlive()&&!e.isSpectator()
+                &&!(e instanceof net.minecraft.world.entity.player.Player p&&p.isCreative()))){
             if(kind()==1||kind()==5){e.hurt(damageSources().magic(),24);e.setDeltaMovement(movement.scale(.5));discard();return;}
             double top=getY()+height();
-            if(e.getY()>=top-.5){e.teleportTo(e.getX(),top+movement.y,e.getZ());e.fallDistance=0;}
+            // Riding the slab down: a server side move alone never reaches a player's client.
+            if(e.getY()>=top-.5){
+                if(e instanceof net.minecraft.server.level.ServerPlayer p)p.connection.teleport(e.getX(),top+movement.y,e.getZ(),p.getYRot(),p.getXRot());
+                else e.teleportTo(e.getX(),top+movement.y,e.getZ());
+                e.fallDistance=0;
+            }
             else if(tickCount%20==0)e.hurt(damageSources().fallingBlock(this),10);
         }
         setPos(position().add(movement));

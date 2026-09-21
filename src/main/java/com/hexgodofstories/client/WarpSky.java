@@ -11,7 +11,18 @@ import org.joml.Matrix4f;
 
 public final class WarpSky extends DimensionSpecialEffects {
     public WarpSky(){super(Float.NaN,false,SkyType.NONE,true,false);}
-    public Vec3 getBrightnessDependentFogColor(Vec3 color,float sun){return net.minecraft.client.Minecraft.getInstance().level!=null&&Destination.from(net.minecraft.client.Minecraft.getInstance().level)==Destination.VOID_SEA?new Vec3(.025,.10,.24):new Vec3(.012,.008,.022);}
+    /**
+     * Fog comes from the biome now, for every realm but the sea.
+     *
+     * <p>This returned one hardcoded near black for all eight of the others, which is why they all
+     * looked like the same purple void whatever their biome said: the incoming colour is the one
+     * Minecraft has already derived from the biome's fog_color, and it was being thrown away. The
+     * Void Sea keeps its hand set water colour because that realm is finished.
+     */
+    public Vec3 getBrightnessDependentFogColor(Vec3 color,float sun){
+        var level=net.minecraft.client.Minecraft.getInstance().level;
+        return level!=null&&Destination.from(level)==Destination.VOID_SEA?new Vec3(.025,.10,.24):color;
+    }
     public boolean isFoggyAt(int x,int z){return false;}
     @Override public float[] getSunriseColor(float time,float partial){return null;}
     @Override public boolean renderClouds(ClientLevel l,int ticks,float p,PoseStack pose,double x,double y,double z,Matrix4f projection){return true;}
