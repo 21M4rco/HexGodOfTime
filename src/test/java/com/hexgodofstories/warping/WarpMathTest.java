@@ -34,9 +34,6 @@ public final class WarpMathTest {
         }
         check(!WarpMath.inside(4,0,24),"short hold does not get full footprint");
         check(WarpMath.pull(10)>WarpMath.pull(40)&&WarpMath.pull(40)>WarpMath.pull(100),"inward pull intensifies");
-        check(WarpMath.ceiling(80)>160,"visible warning before closing");
-        check(WarpMath.ceiling(500)>WarpMath.ceiling(1000),"ceiling descends gradually");
-        check(WarpMath.ceiling(2000)-WarpMath.floor(2000)<1.8,"final gap really crushes a standing victim");
         check(WarpMath.cellX(1024+200)==1024&&WarpMath.cellX(2048-100)==2048,"separate instances remain separate");
         for(int t=0;t<100000;t+=13)check(WarpMath.fallingY(175,t)>=48&&WarpMath.fallingY(175,t)<240,"endless fall has bounded coordinates");
         check(WarpMath.solarDamage(WarpMath.SUN_CORONA)==0,"outside corona is safe");

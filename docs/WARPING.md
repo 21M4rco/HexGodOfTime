@@ -33,7 +33,7 @@ The 8-second maximum hold releases a stable charge. Access to the return action 
 | Time Storm | Broken platforms and branching temporal structures | Recent-position rewinds and intermittent movement disruption |
 | Falling World | Moving cohesive terrain fragments, trees and tower sections | Endless falling loop, moving platforms and debris impact |
 | Frozen Moment | Ruined catastrophe, stationary dust, suspended spears and fragments | Loki can release the suspended hazards |
-| Crushing Realm | Upper and lower cosmic planes | Five-second warning, then both planes close gradually until the gap is fatal |
+| Cosmic Prison (saved ID: Crushing Realm) | Cratered moon inside luminous restraint bands | Heavy radial gravity; walk around the entire sphere, including the underside; short jumps and slow movement |
 | End of Time | Dead fragments, stripped trunks, sparse stars and exhausted timeline remnants | Weakness, fatigue, slow movement and gradual decay |
 
 Each destination is a distinct registered dimension. Casters receive separated 1024-block-spaced instances.
@@ -61,3 +61,14 @@ Compatibility with third-party shader pipelines and alternate framebuffer implem
 The normal GitHub build compiles and reobfuscates the JAR, includes a source JAR, and runs existing regression checks plus Warping's geometry/timing checks.
 The dedicated-server smoke workflow boots a disposable server world to catch datapack and server-side class-loading failures, then checks the Sun caster damage gate, actual generic-kill damage in all nine destinations, fire-resistant/fire-immune solar victims and creative-mode exposure. Its test listener is loaded only with `-PwarpingSmoke` and is excluded from release JARs.
 These checks do not replace an in-game visual and multiplayer playtest. In particular, aperture depth composition, moving-platform behavior, shader compatibility and leviathan animation require client testing.
+
+
+### Radial realms — 0.5.7
+
+Gravity Well contains no blocks. Legacy terrain is removed as its chunks load, and new block/fluid placement is refused in this dimension. Entities follow a fast, inescapable orbit that steadily shrinks. Contact with the visible ten-block black center kills; the old damage outside the center has been removed. Spectator mode remains available for inspection.
+
+Cosmic Prison keeps the existing `warping_crushing_realm` dimension ID and replaces both crushing planes with a 96-block-diameter moon. The rendered crater surface and ground collision sample the same deterministic radial height field. Gravity is three times vanilla acceleration; movement is deliberately heavy and jumps are low. Movement, eye position, view direction, camera roll, living-entity rotation and bounding boxes follow local radial up. Camera/heading frames are transported continuously across the poles and synchronized to other viewers. The surface cannot be mined; creatures and dropped objects also return to it. The old floor is removed from existing chunks. Creative flight and spectator mode are inspection modes.
+
+The Leviathan change is restricted to its face: hollow forward skull, recessed throat, layered irregular tapered teeth on both jaws and split mandibles, wider resting gape, and asymmetric eye clusters embedded in the cheeks. Body, fins, tail, tendrils, textures and combat behavior are preserved.
+
+Manual client acceptance: in survival, enter the moon, walk a complete circuit through the underside, jump at the top/equator/bottom, check first-person aiming and both third-person cameras, then leave and check normal gravity returns. Repeat with a second player. In the Gravity Well, import a player, creature and dropped item; confirm inward circulation, death only at the center, and that an existing save has no remaining terrain. Inspect the Leviathan from the front and sides during idle, bite and split-jaw attacks.

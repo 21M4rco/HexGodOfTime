@@ -66,6 +66,7 @@ public final class WarpRealms {
     }
     public static void tick(ServerLevel l){
         Destination d=Destination.from(l);if(d==null)return;
+        RadialRealmRules.clean(l);
         int budget=4096;
         for(var it=JOBS.iterator();it.hasNext()&&budget>0;){Job j=it.next();if(j.level!=l)continue;
             while(j.blocks.hasNext()&&budget-->0){var v=j.blocks.next();l.setBlock(v.pos().offset((int)j.cell,0,0),v.state(),2|16);}
@@ -75,7 +76,7 @@ public final class WarpRealms {
         if(d==Destination.VOID_SEA)com.hexgodofstories.warping.leviathan.PilgrimWarden.tick(l,now);
         List<Entity> active=new ArrayList<>();l.getAllEntities().forEach(active::add);
         for(Entity e:active){
-            if(!e.isAlive()||e.isSpectator()||e instanceof WarpHazard||e instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity)continue;
+            if(!e.isAlive()||e.isSpectator()||(d!=Destination.GRAVITY_WELL&&(e instanceof WarpHazard||e instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity)))continue;
             double cell=WarpMath.cellX(e.getX());long age=age(l,cell);
             if(e instanceof ServerPlayer p&&now%10==0){CompoundTag n=new CompoundTag();n.putLong("age",age);n.putLong("time",now);n.putDouble("cell",cell);HexNetwork.to(p,new HexNetwork.Message(HexNetwork.WARP_REALM,0,n));}
             if(e instanceof ServerPlayer listener&&now%140==0){
@@ -94,7 +95,7 @@ public final class WarpRealms {
             // likely to be standing in a realm was the one person nothing in it could touch: no
             // pull, no planes, no storm, no cold. Creative and spectator remain the way to look
             // around without being killed for it.
-            if(e instanceof net.minecraft.world.entity.player.Player p&&(p.isCreative()||p.isSpectator()))continue;
+            if(e instanceof net.minecraft.world.entity.player.Player p&&p.isCreative()&&d!=Destination.GRAVITY_WELL&&!(d==Destination.CRUSHING_REALM&&MoonGravity.active(e)))continue;
             descend(d,e);
             rescue(l,d,e,cell);
             switch(d){
@@ -113,7 +114,14 @@ public final class WarpRealms {
                 }
                 case FALLING_WORLD -> {if(e.getY()<48)place(e,e.getX(),231,e.getZ());if(e.getDeltaMovement().y>-.15)e.setDeltaMovement(e.getDeltaMovement().add(0,-.035,0));}
                 case FROZEN_MOMENT -> freeze(l,e,now);
-                case CRUSHING_REALM -> press(l,e,cell,age,now);
+                case CRUSHING_REALM -> {
+                    MoonGravity.enforce(e);
+                    if(now%10==0){
+                        Vec3 forward=MoonGravity.forward(e);CompoundTag frame=new CompoundTag();
+                        frame.putDouble("x",forward.x);frame.putDouble("y",forward.y);frame.putDouble("z",forward.z);
+                        HexNetwork.tracking(e,new HexNetwork.Message(HexNetwork.MOON_FRAME,e.getId(),frame));
+                    }
+                }
                 case END_OF_TIME -> {if(e instanceof LivingEntity living&&now%40==0){living.addEffect(new MobEffectInstance(MobEffects.WEAKNESS,65,2,false,false));living.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN,65,1,false,false));living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,65,0,false,false));if(age>200)living.hurt(l.damageSources().wither(),2);}}
             }
         }
@@ -122,7 +130,7 @@ public final class WarpRealms {
     // ------------------------------------------------------------------ shared realm physics
 
     /** Centre of the singularity, and the radius inside which nothing comes back out. */
-    public static final double WELL_Y=96,HORIZON=11,TIDAL=34;
+    public static final double WELL_Y=CosmicPhysics.WELL_Y,HORIZON=CosmicPhysics.HORIZON;
 
     /**
      * Terminal descent in blocks per tick, before Minecraft's own gravity is added on top.
@@ -136,7 +144,7 @@ public final class WarpRealms {
     private static double sink(Destination d){
         return switch(d){
             case FALLING_WORLD -> 1.25;
-            case GRAVITY_WELL, VOID_SEA -> 0;
+            case GRAVITY_WELL, CRUSHING_REALM, VOID_SEA -> 0;
             default -> .35;
         };
     }
@@ -151,6 +159,7 @@ public final class WarpRealms {
 
     /** Nothing is ever lost out of the bottom of a realm; it is put back at the top of one. */
     private static void rescue(ServerLevel l,Destination d,Entity e,double cell){
+        if(d==Destination.GRAVITY_WELL||d==Destination.CRUSHING_REALM)return;
         double bottom=d==Destination.VOID_SEA?VoidSea.FLOOR-8:0;
         if(e.getY()>=bottom)return;
         double back=switch(d){
@@ -179,31 +188,33 @@ public final class WarpRealms {
 
     // ------------------------------------------------------------------ per realm hazards
 
-    /**
-     * The black hole. Pull that steepens inward, tidal shear that starts hurting well outside the
-     * horizon, and an event horizon that is simply the end of the entity that reaches it.
-     */
+    /** Strong circulation with guaranteed slow infall. Contact, rather than distant shear, is lethal. */
     private static void singularity(ServerLevel l,Entity e,double cell,long now){
-        Vec3 centre=new Vec3(cell,WELL_Y,0);
-        Vec3 toward=centre.subtract(e.position());
-        double dist=toward.length();
-        if(dist<HORIZON){
-            // Past the horizon there is no mechanic left to apply. Nothing escapes, including the
-            // caster who opened the way in, and no protection short of creative mode reaches here.
+        Vec3 center=new Vec3(CELL,WELL_Y,0),relative=e.position().subtract(center);
+        AABB box=e.getBoundingBox();
+        double x=net.minecraft.util.Mth.clamp(center.x,box.minX,box.maxX)-center.x;
+        double y=net.minecraft.util.Mth.clamp(center.y,box.minY,box.maxY)-center.y;
+        double z=net.minecraft.util.Mth.clamp(center.z,box.minZ,box.maxZ)-center.z;
+        if(x*x+y*y+z*z<=HORIZON*HORIZON||relative.lengthSqr()<=HORIZON*HORIZON){
             HexNetwork.fx(e,"slip");
             e.hurt(l.damageSources().genericKill(),Float.MAX_VALUE);
-            if(e.isAlive()&&!(e instanceof ServerPlayer))e.discard();
+            if(e.isAlive()&&e instanceof LivingEntity living){
+                living.setHealth(0);living.die(l.damageSources().genericKill());
+            }
+            if(!(e instanceof ServerPlayer)&&e.isAlive())e.discard();
             return;
         }
-        // Momentum is kept, so a fast pass can still carry you out the far side; standing still
-        // cannot. The pull itself steepens from a drift at the rim to inescapable near the horizon.
-        e.setDeltaMovement(e.getDeltaMovement().scale(.985).add(toward.scale(WarpMath.pull(dist)/dist)));
-        e.hurtMarked=true;
-        if(dist<TIDAL&&now%10==0&&e instanceof LivingEntity living){
-            float shear=(float)(1.5+Math.pow((TIDAL-dist)/(TIDAL-HORIZON),2)*13);
-            living.hurt(l.damageSources().magic(),shear);
-            living.addEffect(new MobEffectInstance(MobEffects.CONFUSION,80,0,false,false));
+        e.stopRiding();
+        if(e instanceof ServerPlayer p){
+            com.hexgodofstories.server.CosmicFlight.revoke(p);
+            if(p.getAbilities().flying){p.getAbilities().flying=false;p.onUpdateAbilities();}
         }
+        CosmicPhysics.V next=CosmicPhysics.orbit(new CosmicPhysics.V(relative.x,relative.y,relative.z));
+        Vec3 target=center.add(next.x(),next.y(),next.z());
+        // Authoritative positioning also catches immobile entities and mobs that ignore knockback.
+        // Ordinary movement is suppressed here; no input or knockback can cancel the pull.
+        place(e,target.x,target.y,target.z);
+        e.setDeltaMovement(Vec3.ZERO);e.fallDistance=0;
     }
 
     /**
@@ -221,23 +232,6 @@ public final class WarpRealms {
         double chill=Math.min(1.0,living.getTicksFrozen()/(double)required);
         if(chill>.35&&now%20==0)living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,30,chill>.8?2:chill>.6?1:0,false,false));
         if(chill>=1&&now%30==0)living.hurt(l.damageSources().freeze(),3);
-    }
-
-    /**
-     * The crushing realm. Two planes close on a fixed line and the gap between them is the whole
-     * warning; when it runs out there is nowhere left to be.
-     */
-    private static void press(ServerLevel l,Entity e,double cell,long age,long now){
-        double floor=WarpMath.floor(age)+1,ceiling=WarpMath.ceiling(age),gap=ceiling-floor;
-        if(e.getY()<floor&&e.getY()>90){place(e,e.getX(),floor,e.getZ());e.setDeltaMovement(e.getDeltaMovement().x,Math.max(0,e.getDeltaMovement().y),e.getDeltaMovement().z);}
-        if(e.getY()+e.getBbHeight()>ceiling){
-            place(e,e.getX(),Math.max(floor,ceiling-e.getBbHeight()),e.getZ());
-            e.setDeltaMovement(e.getDeltaMovement().x,Math.min(0,e.getDeltaMovement().y),e.getDeltaMovement().z);
-        }
-        // Taller than the gap means being crushed, at a rate that climbs as it keeps closing.
-        if(gap<e.getBbHeight()+.2&&now%10==0)e.hurt(l.damageSources().inWall(),gap<1?1000f:(float)(6+(2-gap)*9));
-        else if(gap<5&&now%20==0)e.hurt(l.damageSources().inWall(),2);
-        if(Math.abs(e.getX()-cell)>42||Math.abs(e.getZ())>42){Vec3 pull=new Vec3(cell,100,0).subtract(e.position()).normalize().scale(.15);e.setDeltaMovement(e.getDeltaMovement().add(pull));e.hurtMarked=true;}
     }
 
     private static final net.minecraft.resources.ResourceKey<net.minecraft.world.damagesource.DamageType> SOLAR_HEAT=
@@ -263,5 +257,5 @@ public final class WarpRealms {
         }
     }
     public static void releaseHazards(ServerPlayer p){if(!Warping.sovereign(p))return;for(WarpHazard h:p.serverLevel().getEntitiesOfClass(WarpHazard.class,p.getBoundingBox().inflate(96)))h.release(p.getLookAngle());HexNetwork.fx(p,"resume");}
-    public static void reset(){JOBS.clear();HISTORY.clear();com.hexgodofstories.warping.leviathan.PilgrimWarden.reset();}
+    public static void reset(){RadialRealmRules.clear();MoonGravity.clear();JOBS.clear();HISTORY.clear();com.hexgodofstories.warping.leviathan.PilgrimWarden.reset();}
 }

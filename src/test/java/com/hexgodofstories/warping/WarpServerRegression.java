@@ -57,6 +57,7 @@ public final class WarpServerRegression {
         FakePlayer creative=caster(sun);creative.setGameMode(GameType.CREATIVE);creative.moveTo(0,WarpMath.SUN_Y,0);
         float health=creative.getHealth();WarpRealms.solarExposure(sun,creative,0,10);
         check(creative.getHealth()==health,"creative mode still ignores ordinary solar exposure");
+        radialRealms(event);
         ServerLevel sea=event.getServer().getLevel(Destination.VOID_SEA.key);
         FakePlayer visitor=caster(sea);
         visitor.getAbilities().mayfly=true;visitor.getAbilities().flying=true;
@@ -94,6 +95,43 @@ public final class WarpServerRegression {
             check(count==1,"one loaded Pilgrim after duplicate recovery, found "+count);
             System.out.println("PILGRIM_SERVER_REGRESSIONS_PASSED ticks="+pilgrim.tickCount+" pitch="+greatestPitch);
         }
+    }
+    private static void radialRealms(ServerStartedEvent event) {
+        ServerLevel moon=event.getServer().getLevel(Destination.CRUSHING_REALM.key);
+        var subject=EntityType.PIG.create(moon);check(subject!=null,"moon subject exists");
+        subject.setNoAi(true);
+        // Exercise the injected travel method and actual Entity.move bounding boxes at both poles
+        // and the equator. A cosmetic-only rotation cannot pass this check.
+        for(var normal:new net.minecraft.world.phys.Vec3[]{new net.minecraft.world.phys.Vec3(0,1,0),
+                new net.minecraft.world.phys.Vec3(1,0,0),new net.minecraft.world.phys.Vec3(0,-1,0)}) {
+            var at=MoonGravity.CENTER.add(normal.scale(MoonGravity.radius(normal)+.025));
+            subject.setPos(at.x,at.y,at.z);subject.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+            for(int i=0;i<12;i++)subject.travel(net.minecraft.world.phys.Vec3.ZERO);
+            check(subject.position().distanceTo(at)<.1,"resting surface stable at "+normal);
+            check(subject.getEyePosition().subtract(subject.position()).dot(normal)>0,"eye stays outside the moon at "+normal);
+            MoonGravity.jump(subject);
+            check(subject.getDeltaMovement().dot(normal)>.3,"jump points away from the core at "+normal);
+            for(int i=0;i<8;i++)subject.travel(net.minecraft.world.phys.Vec3.ZERO);
+            check(MoonGravity.grounded(subject),"heavy gravity returns jump to surface at "+normal);
+        }
+        // Follow a complete great-circle circuit through the south pole and back to the north.
+        subject.setPos(0,CosmicPhysics.MOON_Y+CosmicPhysics.MOON_RADIUS+.025,0);
+        subject.setYRot(0);subject.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+        boolean underside=false;
+        for(int i=0;i<3000;i++){
+            subject.travel(new net.minecraft.world.phys.Vec3(0,0,1));
+            underside|=subject.getY()<CosmicPhysics.MOON_Y-40;
+            var n=MoonGravity.up(subject.position());
+            check(Math.abs(subject.position().distanceTo(MoonGravity.CENTER)-MoonGravity.radius(n))<.15,"walking follows crater height");
+        }
+        check(underside,"walking can cross the underside");subject.discard();
+        ServerLevel well=event.getServer().getLevel(Destination.GRAVITY_WELL.key);
+        var pos=new net.minecraft.core.BlockPos(32,96,0);
+        check(!well.setBlock(pos,net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(),3),"well refuses new terrain");
+        check(well.getBlockState(pos).isAir(),"well remains block-free");
+        check(RealmLayout.blocks(Destination.GRAVITY_WELL).isEmpty(),"well layout has no blocks");
+        check(RealmLayout.blocks(Destination.CRUSHING_REALM).isEmpty(),"old crushing floor removed from layout");
+        System.out.println("RADIAL_REALMS_SERVER_REGRESSIONS_PASSED");
     }
     private static FakePlayer caster(ServerLevel level){
         // Forge's normal fake player is always invulnerable; exercise ServerPlayer damage instead.

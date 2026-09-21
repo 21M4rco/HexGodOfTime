@@ -26,29 +26,8 @@ public final class RealmLayout {
                     put(b,x,116,z,Blocks.LAVA.defaultBlockState());
             }
             case VOID_SEA,FALLING_WORLD -> {}
-            case GRAVITY_WELL -> {
-                // The realm built nothing at all, so the black hole was a client side hologram over
-                // an empty void: nothing to stand on, nothing to fall off, nothing to reach. The
-                // horizon is now a real solid body and the disk is real matter orbiting it, sized
-                // to sit under the rings WarpScene draws so the two read as one object.
-                int horizon=(int)WarpRealms.HORIZON;
-                for(int x=-horizon;x<=horizon;x++)for(int y=-horizon;y<=horizon;y++)for(int z=-horizon;z<=horizon;z++)
-                    if(x*x+y*y+z*z<=horizon*horizon)put(b,x,(int)WarpRealms.WELL_Y+y,z,Blocks.BLACK_CONCRETE.defaultBlockState());
-                // Two spiral arms of infalling matter, hot at the inside edge and cooling outward,
-                // with gaps you can fall through and a warp so it is not a flat plate.
-                for(int x=-40;x<=40;x++)for(int z=-40;z<=40;z++){
-                    double radius=Math.sqrt(x*x+z*z);
-                    if(radius<horizon+3||radius>40)continue;
-                    double arm=Math.sin(Math.atan2(z,x)*2-radius*.34);
-                    if(arm<-.15+r.nextDouble()*.3)continue;
-                    BlockState state=radius<20?Blocks.MAGMA_BLOCK.defaultBlockState()
-                        :radius<29?Blocks.BLACKSTONE.defaultBlockState()
-                        :Blocks.CRYING_OBSIDIAN.defaultBlockState();
-                    int warp=(int)Math.round(Math.sin(Math.atan2(z,x)*3+radius*.12)*2.5);
-                    put(b,x,(int)WarpRealms.WELL_Y+warp,z,state);
-                    if(radius<24&&arm>.55)put(b,x,(int)WarpRealms.WELL_Y+warp-1,z,Blocks.MAGMA_BLOCK.defaultBlockState());
-                }
-            }
+            // The singularity and moon use spatial meshes and radial physics, never block platforms.
+            case GRAVITY_WELL,CRUSHING_REALM -> {}
             case SHATTERED_WORLD -> {
                 island(b,0,136,0,10,false,r);
                 for(int i=0;i<18;i++){
@@ -66,10 +45,6 @@ public final class RealmLayout {
             case FROZEN_MOMENT -> {
                 island(b,0,126,0,19,false,r);
                 for(int i=0;i<12;i++){double a=i*Math.PI/6;ruin(b,(int)(Math.cos(a)*20),126,(int)(Math.sin(a)*20),9+i%7);}
-            }
-            case CRUSHING_REALM -> {
-                // Upper plane is an authoritative moving boundary, never thousands of block edits per tick.
-                for(int x=-42;x<=42;x++)for(int z=-42;z<=42;z++)put(b,x,98,z,(Math.abs(x)%13==0||Math.abs(z)%13==0?Blocks.CRYING_OBSIDIAN:Blocks.POLISHED_BLACKSTONE).defaultBlockState());
             }
             case END_OF_TIME -> {
                 island(b,0,126,0,12,false,r);

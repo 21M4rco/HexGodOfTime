@@ -107,16 +107,15 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
 
         GeoBone sensory = bone("sensory_organs");
         if (sensory != null) {
-            float focus = entity.lookTarget() != null ? 1f : 0.55f;
-            sensory.setScaleX(focus); sensory.setScaleY(focus); sensory.setScaleZ(focus);
-            sensory.setRotY(render.headYaw() * 0.35f * Mth.DEG_TO_RAD * YAW_SIGN);
+            sensory.setScaleX(1); sensory.setScaleY(1); sensory.setScaleZ(1);
+            sensory.setRotY(0); // Eye clusters stay embedded in the cheek armour.
         }
     }
 
     /** How wide the mouth is right now, 0 closed and 1 fully split open. */
     private float jawOpen(AbyssalPilgrimEntity entity, float partial) {
         LeviathanAttack attack = entity.attack();
-        float idle = 0.06f + 0.04f * Mth.sin((entity.tickCount + partial) * 0.05f);
+        float idle = 0.29f + 0.035f * Mth.sin((entity.tickCount + partial) * 0.05f);
         if (entity.heldId() >= 0) return 0.42f;
         if (attack == null) return idle;
         float t = entity.attackTick() + partial;
@@ -200,7 +199,7 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
         GeoBone headOrgans = bone("glow_organs_head");
         if (headOrgans != null) {
             headOrgans.setHidden(dark);
-            if (!dark) { headOrgans.setScaleX(scale); headOrgans.setScaleY(scale); headOrgans.setScaleZ(scale); }
+            if (!dark) { headOrgans.setScaleX(1); headOrgans.setScaleY(1); headOrgans.setScaleZ(1); }
         }
     }
 

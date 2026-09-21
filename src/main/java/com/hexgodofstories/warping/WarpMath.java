@@ -26,8 +26,6 @@ public final class WarpMath {
     }
     public static boolean openAt(long opened,long now){return opened>=0&&now>=opened&&now-opened<OPEN_TICKS;}
     public static double pull(double distance){return Math.min(.32,.025+2.8/Math.max(10,distance));}
-    public static double ceiling(long age){return Math.max(131,164-Math.max(0,age-100)*.03);}
-    public static double floor(long age){return Math.min(131,98+Math.max(0,age-100)*.03);}
     public static double fallingY(double initial,double time){return 48+Math.floorMod((long)((initial-48-time*.19)*1000),192000)/1000.0;}
     public static double cellX(double x){return Math.floor((x+512)/1024)*1024;}
     private WarpMath(){}

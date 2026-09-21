@@ -44,6 +44,11 @@ public final class ClientState {
         if(mc.level==null)return;
         if(world!=mc.level)tick();
         switch(m.kind()) {
+            case HexNetwork.MOON_FRAME -> {
+                Entity entity=mc.level.getEntity(m.entity());
+                if(entity!=null&&entity!=mc.player)com.hexgodofstories.warping.MoonGravity.frame(entity,
+                    new Vec3(m.data().getDouble("x"),m.data().getDouble("y"),m.data().getDouble("z")));
+            }
             case HexNetwork.WARP -> WarpRenderer.receive(m.entity(),m.data());
             case HexNetwork.WARP_REALM -> WarpRenderer.realm(m.data());
             case HexNetwork.PILGRIM_PATH -> {

@@ -4,7 +4,7 @@ plugins {
     id 'org.spongepowered.mixin' version '0.7.+'
 }
 group = 'com.hexgodofstories'
-version = '0.5.6-abyssal-hunt'
+version = '0.5.7-cosmic-prison'
 base { archivesName = 'hexgodofstories' }
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 java.withSourcesJar()
@@ -99,3 +99,11 @@ tasks.register('verifyPilgrimMotion', JavaExec) {
     enableAssertions = true
 }
 tasks.named('check') { dependsOn 'verifyPilgrimMotion' }
+
+// Converging singularity orbits and a continuous moon surface, without launching Minecraft.
+tasks.register('verifyCosmicPhysics', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.hexgodofstories.warping.CosmicPhysicsTest'
+}
+tasks.named('check') { dependsOn 'verifyCosmicPhysics' }

@@ -12,7 +12,7 @@ import java.util.*;
 /** Destination and aperture share this scene. Architecture comes from the server's generation blueprint. */
 public final class WarpScene {
     private static final Map<Destination,VertexBuffer> TERRAIN=new EnumMap<>(Destination.class);
-    public static void clear(){TERRAIN.values().forEach(VertexBuffer::close);TERRAIN.clear();SunRenderer.clear();}
+    public static void clear(){TERRAIN.values().forEach(VertexBuffer::close);TERRAIN.clear();SunRenderer.clear();PrisonMoonRenderer.clear();}
     public static void sky(PoseStack pose,Destination d,double time){
         if(d==Destination.SUN||d==Destination.VOID_SEA){
             // Same detailed sky in the portal and in the destination, at the preview's spatial scale.
@@ -85,6 +85,7 @@ public final class WarpScene {
 
     public static void draw(PoseStack pose,Destination d,double time,long age,boolean preview){
         if(d==Destination.SUN){SunRenderer.draw(pose,time);return;}
+        if(d==Destination.CRUSHING_REALM){PrisonMoonRenderer.draw(pose,time);return;}
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
         if(preview&&d!=Destination.SUN&&d!=Destination.VOID_SEA){
             VertexBuffer mesh=TERRAIN.computeIfAbsent(d,WarpScene::bakeTerrain);mesh.bind();mesh.drawWithShader(pose.last().pose(),RenderSystem.getProjectionMatrix(),GameRenderer.getPositionColorShader());VertexBuffer.unbind();
@@ -97,7 +98,7 @@ public final class WarpScene {
             case GRAVITY_WELL -> {
                 Vec3 c=new Vec3(0,96,0);
                 for(int i=0;i<18;i++)WarpMesh.ring(b,m,c,10+i*1.4,1.9,i<4?0xf4d4ff:i<10?0xae67ff:0x452464,.6f,.28,time*.008+i*.08);
-                WarpMesh.sphere(b,m,c,10,10,10,0x000000,1,48,0,false);
+                WarpMesh.sphere(b,m,c,CosmicPhysics.HORIZON,CosmicPhysics.HORIZON,CosmicPhysics.HORIZON,0x000000,1,64,0,false);
                 for(int i=0;i<160;i++){
                     double a=i*2.399+time*.01,r=12+(i*7-time*.25)%65;if(r<12)r+=65;
                     Vec3 p=c.add(Math.cos(a)*r,Math.sin(i*1.7)*r*.35,Math.sin(a)*r);WarpMesh.ribbon(b,m,p,p.add(c.subtract(p).normalize().scale(1+r*.035)),.09,0xd6aaff,.75f);
@@ -117,12 +118,6 @@ public final class WarpScene {
             case FALLING_WORLD,FROZEN_MOMENT -> {
                 if(preview){Random r=new Random(819+d.ordinal());int count=d==Destination.FALLING_WORLD?48:32;for(int i=0;i<count;i++){int x=r.nextInt(100)-50,y=140+r.nextInt(90),z=r.nextInt(100)-50;hazard(b,m,d==Destination.FROZEN_MOMENT?(i%4==0?5:1):i%3+2,x,d==Destination.FALLING_WORLD?WarpMath.fallingY(y,age):y,z);}}
                 if(d==Destination.FROZEN_MOMENT)for(int i=0;i<130;i++){double a=i*2.399;Vec3 p=new Vec3(Math.cos(a)*(8+i%30),130+i%45,Math.sin(a)*(8+i%30));WarpMesh.box(b,m,p.x,p.y,p.z,.13,.13,.13,0xc6ecff,.7f);}
-            }
-            case CRUSHING_REALM -> {
-                double bottom=WarpMath.floor(age);WarpMesh.box(b,m,-46,bottom-3,-46,92,4,92,0x241b2e,1);
-                double top=WarpMath.ceiling(age);WarpMesh.box(b,m,-46,top,-46,92,4,92,0x211527,1);
-                for(int i=-40;i<=40;i+=10){WarpMesh.box(b,m,i,top-.035,-42,.15,.03,84,0xc879eb,.8f);WarpMesh.box(b,m,-42,top-.035,i,84,.03,.15,0xc879eb,.8f);}
-                for(int i=0;i<30;i++){double a=i*2.399;WarpMesh.sphere(b,m,new Vec3(Math.cos(a)*44,100+(top-100)*(i%7)/7,Math.sin(a)*44),.3,.3,.3,0xc998df,.65f,8,0,false);}
             }
             case END_OF_TIME -> {
                 for(int i=0;i<35;i++){double a=i*2.399;Vec3 p=new Vec3(Math.cos(a)*(32+i),125+Math.sin(i*1.7)*40,Math.sin(a)*(32+i));WarpMesh.ribbon(b,m,p,p.add(2+i%5,3,1),.18,0x605267,.55f);}

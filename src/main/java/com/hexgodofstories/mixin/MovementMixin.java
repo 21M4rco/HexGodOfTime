@@ -22,9 +22,23 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ServerGamePacketListenerImpl.class)
 public abstract class MovementMixin {
     @Shadow public ServerPlayer player;
+    @Shadow private boolean clientIsFloating;
+    @Inject(method="handleMovePlayer",at=@At("RETURN"))
+    private void hgos$radialGround(ServerboundMovePlayerPacket packet,CallbackInfo ci) {
+        if(com.hexgodofstories.warping.MoonGravity.active(player)||com.hexgodofstories.warping.Destination.from(player.level())==com.hexgodofstories.warping.Destination.GRAVITY_WELL) {
+            clientIsFloating=false;
+            player.setOnGround(com.hexgodofstories.warping.MoonGravity.grounded(player));
+            player.fallDistance=0;
+        }
+    }
     @Inject(method="handleMovePlayer",at=@At("HEAD"),cancellable=true)
     private void hgos$hold(ServerboundMovePlayerPacket packet,CallbackInfo ci) {
         if(!player.serverLevel().getServer().isSameThread())return;
-        if(TemporalEngine.frozen(player)||Erasure.erasing(player))ci.cancel();
+        if(TemporalEngine.frozen(player)||Erasure.erasing(player)){ci.cancel();return;}
+        if(com.hexgodofstories.warping.Destination.from(player.level())==com.hexgodofstories.warping.Destination.GRAVITY_WELL&&!player.isSpectator()) {
+            float yaw=packet.getYRot(player.getYRot()),pitch=packet.getXRot(player.getXRot());
+            if(Float.isFinite(yaw)&&Float.isFinite(pitch)){player.setYRot(yaw);player.setXRot(net.minecraft.util.Mth.clamp(pitch,-90,90));}
+            clientIsFloating=false;ci.cancel();
+        }
     }
 }
