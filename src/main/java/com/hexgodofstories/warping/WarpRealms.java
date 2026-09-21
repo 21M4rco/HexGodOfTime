@@ -51,10 +51,22 @@ public final class WarpRealms {
             if(!j.blocks.hasNext()){ledger(l).ready.add((long)j.cell);ledger(l).setDirty();populate(l,d,j.cell);it.remove();}
         }
         long now=l.getGameTime();
-        for(Entity e:l.getAllEntities()){
+        List<Entity> active=new ArrayList<>();l.getAllEntities().forEach(active::add);
+        for(Entity e:active){
             if(!e.isAlive()||e.isSpectator()||e instanceof WarpHazard||e instanceof AbyssalLeviathan)continue;
             double cell=WarpMath.cellX(e.getX());long age=age(l,cell);
             if(e instanceof ServerPlayer p&&now%10==0){CompoundTag n=new CompoundTag();n.putLong("age",age);n.putLong("time",now);n.putDouble("cell",cell);HexNetwork.to(p,new HexNetwork.Message(HexNetwork.WARP_REALM,0,n));}
+            if(e instanceof ServerPlayer listener&&now%140==0){
+                net.minecraft.sounds.SoundEvent ambience=switch(d){
+                    case SUN -> HexGodOfStories.BRANCH_ROAR.get();
+                    case GRAVITY_WELL -> HexGodOfStories.BRANCH_HUM.get();
+                    case TIME_STORM -> HexGodOfStories.BRANCH_SHIMMER.get();
+                    case FALLING_WORLD -> HexGodOfStories.METEOR_ROAR.get();
+                    case CRUSHING_REALM -> HexGodOfStories.BRANCH_PRESSURE.get();
+                    default -> null;
+                };
+                if(ambience!=null)listener.playNotifySound(ambience,net.minecraft.sounds.SoundSource.AMBIENT,.14f,.65f);
+            }
             if(d==Destination.VOID_SEA&&e instanceof ServerPlayer swimmer&&!swimmer.isCreative()&&now%200==0
                 &&l.getEntitiesOfClass(AbyssalLeviathan.class,swimmer.getBoundingBox().inflate(180),Entity::isAlive).isEmpty()){
                 AbyssalLeviathan hunter=HexGodOfStories.LEVIATHAN.get().create(l);

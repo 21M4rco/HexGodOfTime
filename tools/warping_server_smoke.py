@@ -5,7 +5,8 @@ An isolated disposable world is used. Nothing connects to a public server.
 import os
 from pathlib import Path
 import re
-import selectors
+import queue
+import threading
 import signal
 import subprocess
 import sys
@@ -17,22 +18,25 @@ run.mkdir(exist_ok=True)
 (run / 'server.properties').write_text('level-name=warping-smoke\nonline-mode=false\nserver-port=0\nview-distance=2\nsimulation-distance=2\n')
 proc = subprocess.Popen(['gradle', '--no-daemon', 'runServer'], stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT, text=True, start_new_session=True)
-selector = selectors.DefaultSelector()
-selector.register(proc.stdout, selectors.EVENT_READ)
+lines = queue.Queue()
+def read_output():
+    for line in proc.stdout:
+        lines.put(line)
+threading.Thread(target=read_output, daemon=True).start()
 end = time.monotonic() + 240
 ready = False
 with open('warping-server-smoke.log', 'w') as log:
     try:
         while time.monotonic() < end and proc.poll() is None:
-            for key, _ in selector.select(timeout=1):
-                line = key.fileobj.readline()
-                log.write(line)
-                log.flush()
-                print(line, end='', flush=True)
-                if re.search(r'Done \([\d.]+s\)!', line):
-                    ready = True
-                    break
-            if ready:
+            try:
+                line = lines.get(timeout=1)
+            except queue.Empty:
+                continue
+            log.write(line)
+            log.flush()
+            print(line, end='', flush=True)
+            if re.search(r'Done \([\d.]+s\)!', line):
+                ready = True
                 break
     finally:
         if proc.poll() is None:

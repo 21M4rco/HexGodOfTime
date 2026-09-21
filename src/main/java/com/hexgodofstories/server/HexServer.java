@@ -552,6 +552,7 @@ public final class HexServer {
 
     /** Persisted administrative switch. Turning it off immediately tears down player-owned power state. */
     public static void access(ServerPlayer p,boolean enabled) {
+        if(!enabled&&Warping.sovereign(p))Warping.leave(p);
         HexData.access(p,enabled);
         if(!enabled) {
             HexData.get(p).putBoolean("ascended",false);
