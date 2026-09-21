@@ -483,7 +483,14 @@ public final class LeviathanCombatController {
             self.voice(HexGodOfStories.PILGRIM_THROW.get(), 34f, 0.95f);
             anchor = self.position();
         } else if (victim != null) {
-            // Try to be underneath them when they come down.
+            // Something it threw into the air is something in the air, so the jump answers this
+            // too: thrown, then met on the way down. If they land first the leap gives itself up.
+            if (tick == attack.windup + 2 && victim.getY() > self.surfaceY() + 6) {
+                begin(LeviathanAttack.SKY_LEAP, victim);
+                tick = -1;   // begin zeroed the clock, and the caller is about to increment it
+                return;
+            }
+            // Otherwise, try to be underneath them when they come down.
             steer(new Vec3(victim.getX(), Math.min(victim.getY(), self.surfaceY()) - 6, victim.getZ()), 2.4, 0.8f);
             for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.HEAD, 2.6)) damage(hit, 12f, 0.8);
         }
