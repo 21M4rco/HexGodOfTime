@@ -9,8 +9,13 @@ import net.minecraft.world.phys.Vec3;
  *
  * <p>Nodes are appended by distance rather than by tick, so the body keeps constant spacing whether
  * the creature is drifting at a tenth of a block per tick or breaching at two. Segment positions are
- * resolved by one linear sweep back along the recorded path, which means S-curves, spirals, coils
- * and vertical loops all fall out of the head's own motion without any extra state.
+ * resolved by one linear sweep back along the recorded path, which means S-curves, long banked
+ * turns and vertical climbs all fall out of the head's own motion without any extra state.
+ *
+ * <p>The path is a suggestion, not an instruction. Joints are rigid six block links and each one
+ * may only turn so far against the link in front of it, so a curve the body could not physically
+ * take is followed as closely as a spine allows and no closer. That distinction is the whole
+ * difference between a creature that banks through a turn and one that folds into a knot.
  *
  * <p>The class is deliberately free of world and entity references: the server runs one instance to
  * drive hitboxes and damage, and every client runs its own against the interpolated render position.
@@ -41,6 +46,8 @@ public final class LeviathanSegmentController {
     private int count, head;
 
     private final Vec3[] seg = new Vec3[SEGMENTS];
+    /** Arc length samples of the recorded path, before the joint limits are applied. */
+    private final Vec3[] raw = new Vec3[SEGMENTS];
     private final Vec3[] previous = new Vec3[SEGMENTS];
     private final float[] yaw = new float[SEGMENTS], pitch = new float[SEGMENTS], roll = new float[SEGMENTS];
     private final float[] prevYaw = new float[SEGMENTS], prevPitch = new float[SEGMENTS], prevRoll = new float[SEGMENTS];
@@ -50,7 +57,7 @@ public final class LeviathanSegmentController {
     private Vec3 leading = Vec3.ZERO;
 
     public LeviathanSegmentController() {
-        for (int i = 0; i < SEGMENTS; i++) seg[i] = previous[i] = Vec3.ZERO;
+        for (int i = 0; i < SEGMENTS; i++) seg[i] = previous[i] = raw[i] = Vec3.ZERO;
     }
 
     public static double radius(int index) { return PROFILE[Mth.clamp(index, 0, SEGMENTS - 1)]; }
@@ -88,7 +95,7 @@ public final class LeviathanSegmentController {
         }
         count = MAX_NODES;
         for (int i = 0; i < SEGMENTS; i++) {
-            seg[i] = previous[i] = position.add(backward.scale(i * SPACING));
+            seg[i] = previous[i] = raw[i] = position.add(backward.scale(i * SPACING));
             yaw[i] = prevYaw[i] = yawDegrees; pitch[i] = prevPitch[i] = pitchDegrees;
             roll[i] = prevRoll[i] = 0; rollVel[i] = 0;
         }
@@ -127,14 +134,23 @@ public final class LeviathanSegmentController {
 
     /**
      * Resolves every joint position, then derives yaw, pitch and a spring damped bank angle.
-     * One sweep of the path serves all joints because their distances increase monotonically.
+     *
+     * <p>Joints are placed as rigid six block links rather than as raw samples of the recorded
+     * path, and the angle each link may turn against the one in front of it is bounded. The path
+     * still decides where the body goes; it no longer decides whether the body is physically
+     * possible. Without that bound a tight orbit, a hover or a hard turn at low speed folds a
+     * hundred and twenty six blocks of creature into a knot a metre across, because every joint
+     * faithfully reproduces a curve far tighter than its own spacing.
+     *
+     * <p>The bound widens toward the tail, which is thinner and genuinely more flexible than the
+     * shoulder, so the silhouette reads as one tapering animal instead of a uniform hose.
      */
     public void rebuild() {
         for (int i = 0; i < SEGMENTS; i++) { previous[i] = seg[i]; prevYaw[i] = yaw[i]; prevPitch[i] = pitch[i]; prevRoll[i] = roll[i]; }
         // Keep the unsampled leading point separate. Overwriting node(0) during slow
         // movement loses every turn until a single tick exceeds NODE_STEP.
         Vec3 cursor = leading;
-        seg[0] = cursor;
+        raw[0] = cursor;
         int placed = 1;
         double travelled = 0, wanted = SPACING;
         for (int k = 0; k < count && placed < SEGMENTS; k++) {
@@ -143,14 +159,26 @@ public final class LeviathanSegmentController {
             if (step > 1.0E-7) {
                 while (placed < SEGMENTS && travelled + step >= wanted) {
                     double f = (wanted - travelled) / step;
-                    seg[placed++] = cursor.add(next.subtract(cursor).scale(f));
+                    raw[placed++] = cursor.add(next.subtract(cursor).scale(f));
                     wanted += SPACING;
                 }
                 travelled += step;
             }
             cursor = next;
         }
-        while (placed < SEGMENTS) { seg[placed] = seg[placed - 1].add(backward.scale(SPACING)); placed++; }
+        while (placed < SEGMENTS) { raw[placed] = raw[placed - 1].add(backward.scale(SPACING)); placed++; }
+
+        seg[0] = raw[0];
+        Vec3 heading = raw[1].subtract(raw[0]);
+        Vec3 previousLink = heading.lengthSqr() < 1.0E-10 ? backward : heading.normalize();
+        seg[1] = seg[0].add(previousLink.scale(SPACING));
+        for (int i = 2; i < SEGMENTS; i++) {
+            Vec3 toward = raw[i].subtract(seg[i - 1]);
+            Vec3 link = toward.lengthSqr() < 1.0E-10 ? previousLink : toward.normalize();
+            link = bend(previousLink, link, bendLimit(i));
+            seg[i] = seg[i - 1].add(link.scale(SPACING));
+            previousLink = link;
+        }
 
         for (int i = 0; i < SEGMENTS; i++) {
             Vec3 forward = i == 0 ? seg[0].subtract(seg[1]) : seg[i - 1].subtract(seg[i]);
@@ -163,10 +191,35 @@ public final class LeviathanSegmentController {
             // Bank into turns: the difference against the joint in front drives a damped spring.
             float lead = i == 0 ? yaw[0] : yaw[i - 1];
             float turn = Mth.wrapDegrees(lead - yaw[i]);
-            float goal = Mth.clamp(turn * 1.35f, -55f, 55f);
+            float goal = Mth.clamp(turn * 2.0f, -34f, 34f);
             rollVel[i] = rollVel[i] * 0.78f + (goal - roll[i]) * 0.09f;
-            roll[i] = Mth.clamp(roll[i] + rollVel[i], -70f, 70f);
+            roll[i] = Mth.clamp(roll[i] + rollVel[i], -40f, 40f);
         }
+    }
+
+    /**
+     * Degrees one joint may turn against the joint in front of it. Six blocks of spacing at twelve
+     * degrees is a turning circle of about twenty nine blocks, which is roughly what the move
+     * control is allowed to fly; the tail is given more because it is a fraction of the girth.
+     */
+    private static float bendLimit(int index) {
+        float along = (index - 1) / (float) (SEGMENTS - 2);
+        return 9.0f + 10.0f * along;
+    }
+
+    /** Rotates {@code want} back toward {@code from} until the angle between them fits the limit. */
+    private static Vec3 bend(Vec3 from, Vec3 want, float limitDegrees) {
+        double dot = Mth.clamp(from.dot(want), -1.0, 1.0);
+        double limit = limitDegrees * Mth.DEG_TO_RAD;
+        if (dot >= Math.cos(limit)) return want;
+        Vec3 sideways = want.subtract(from.scale(dot));
+        if (sideways.lengthSqr() < 1.0E-12) {
+            // Exactly reversed: any perpendicular will do, and the next joints refine it.
+            Vec3 axis = Math.abs(from.y) < 0.9 ? new Vec3(0, 1, 0) : new Vec3(1, 0, 0);
+            sideways = axis.subtract(from.scale(from.dot(axis)));
+            if (sideways.lengthSqr() < 1.0E-12) return from;
+        }
+        return from.scale(Math.cos(limit)).add(sideways.normalize().scale(Math.sin(limit)));
     }
 
     /** Compact server path checkpoint; decorative bones are never sent. */

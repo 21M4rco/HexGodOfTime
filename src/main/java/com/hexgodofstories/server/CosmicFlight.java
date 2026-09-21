@@ -4,12 +4,30 @@ import com.hexgodofstories.data.HexData;
 import com.hexgodofstories.network.HexNetwork;
 import net.minecraft.server.level.ServerPlayer;
 
-/** Grants vanilla server-authorized flight only while the final mantle is active. */
+/**
+ * Grants vanilla server-authorized flight, and now only inside the fracture world.
+ *
+ * <p>Flight used to follow the mantle into every dimension, and sovereignty granted it again in
+ * eight of the nine Warping realms on top of that. Between them there was almost nowhere the mod
+ * could put a player that could not be answered by rising above it: a corona you can climb out of,
+ * planes that cannot close on you, a collapse you do not fall with, and an ocean whose hunter
+ * cannot reach you are all the same non-event. Every one of those places is now survived from
+ * inside it.
+ *
+ * <p>The exception is the fracture world — the keeper's own pocket realm. It is an open island
+ * over a void with no hazard in it but the drop, so flight there takes nothing away and walking
+ * off the edge is the only thing it prevents.
+ *
+ * <p>Creative and spectator mode are untouched. Those are the operator's own flight, not the
+ * mod's, and taking them away would break a great deal more than it fixed.
+ */
 public final class CosmicFlight {
     private CosmicFlight() {}
+    /** The one dimension in which this mod will hand out flight. */
+    public static boolean fractureWorld(ServerPlayer p){return p.level().dimension().equals(com.hexgodofstories.server.PocketRealm.KEY);}
     public static void tick(ServerPlayer p) {
         var d=HexData.get(p);var a=p.getAbilities();
-        boolean allowed=HexData.access(p)&&p.isAlive()&&(d.getBoolean("ascended")||com.hexgodofstories.warping.Destination.from(p.level())!=null&&com.hexgodofstories.warping.Destination.from(p.level())!=com.hexgodofstories.warping.Destination.VOID_SEA&&com.hexgodofstories.warping.Warping.sovereign(p))&&!p.isSpectator();
+        boolean allowed=HexData.access(p)&&p.isAlive()&&d.getBoolean("ascended")&&fractureWorld(p)&&!p.isSpectator();
         if(!allowed){revoke(p);return;}
         if(!d.getBoolean("flightGranted")) {
             d.putBoolean("flightHadMayfly",a.mayfly&&!p.isCreative());
@@ -24,7 +42,7 @@ public final class CosmicFlight {
         }
     }
     public static void toggle(ServerPlayer p) {
-        if(!HexData.access(p)||!(HexData.get(p).getBoolean("ascended")||com.hexgodofstories.warping.Destination.from(p.level())!=null&&com.hexgodofstories.warping.Destination.from(p.level())!=com.hexgodofstories.warping.Destination.VOID_SEA&&com.hexgodofstories.warping.Warping.sovereign(p))||p.isSpectator()||p.isPassenger()||TemporalEngine.frozen(p))return;
+        if(!HexData.access(p)||!HexData.get(p).getBoolean("ascended")||!fractureWorld(p)||p.isSpectator()||p.isPassenger()||TemporalEngine.frozen(p))return;
         tick(p);
         p.getAbilities().flying=!p.getAbilities().flying;
         p.resetFallDistance();p.onUpdateAbilities();

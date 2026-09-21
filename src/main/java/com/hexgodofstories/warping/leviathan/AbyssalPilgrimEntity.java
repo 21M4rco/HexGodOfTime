@@ -211,6 +211,18 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
     @Override public boolean canBeLeashed(net.minecraft.world.entity.player.Player player) { return false; }
     @Override public boolean removeWhenFarAway(double distance) { return false; }
     @Override public void checkDespawn() { }
+    /**
+     * The realm has exactly one occupant and it is always there, which has to be true of the
+     * server's entity manager and not only of the fiction.
+     *
+     * <p>An ordinary entity is only tracked and ticked once the chunk holding it has been promoted
+     * to an entity ticking state, and that promotion is queued rather than immediate. A creature
+     * that spends its life beyond simulation distance therefore spends its life frozen, invisible
+     * to a UUID lookup, and indistinguishable from one that was never added — which is how a realm
+     * ends up with two of something that there is only ever one of. Declaring it always ticking
+     * makes presence unconditional: it is live the instant it is added and it never stops.
+     */
+    @Override public boolean isAlwaysTicking() { return true; }
     @Override public boolean displayFireAnimation() { return false; }
     @Override public boolean addEffect(net.minecraft.world.effect.MobEffectInstance effect, @Nullable Entity source) { return false; }
     /** Vanilla travel is bypassed entirely; motion belongs to the move control. */

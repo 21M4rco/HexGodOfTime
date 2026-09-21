@@ -43,6 +43,8 @@ public final class AbyssalPilgrimAI {
     private int followUp = -1;
     private int alertCooldown;
     private int waterPursuit;
+    /** Keeps the leap a decisive event rather than a constant fountain. */
+    private int leapCooldown;
 
     public AbyssalPilgrimAI(AbyssalPilgrimEntity self) {
         this.self = self;
@@ -89,6 +91,17 @@ public final class AbyssalPilgrimAI {
 
         if (combat.active()) {
             if (state != LeviathanState.ATTACK) setState(LeviathanState.ATTACK);
+            return;
+        }
+        if (leapCooldown > 0) leapCooldown--;
+        // Prey that leaves the water is answered by leaving the water, immediately and without
+        // waiting for an attack roll to come up. A hunter that only looks at the sky when its own
+        // dice say so is a hunter that lets everything airborne live, which is how the surface
+        // became a safe place to stand.
+        if (leapCooldown <= 0 && !self.isDying() && hunt.leapable(58, LeviathanAttack.SKY_LEAP.range)) {
+            leapCooldown = 140 + random.nextInt(200);
+            combat.begin(LeviathanAttack.SKY_LEAP, hunt.target());
+            setState(LeviathanState.ATTACK);
             return;
         }
         if (followUp >= 0) { LeviathanAttack next = LeviathanAttack.byId(followUp); followUp = -1; if (combat.ready()) { combat.begin(next, hunt.target()); return; } }
@@ -234,12 +247,14 @@ public final class AbyssalPilgrimAI {
 
     @Nullable
     private LeviathanAttack pickAttack(RandomSource random, Entity target, double distance, boolean lethalOnly) {
-        boolean airborne = hunt.airborneTarget();
         boolean surface = target.getY() > self.surfaceY() - 6;
         boolean holding = self.held() != null;
 
         if (holding) return random.nextFloat() < 0.5f ? LeviathanAttack.AIR_THROW : LeviathanAttack.DRAG_BELOW;
-        if (airborne && distance < LeviathanAttack.BREACH_BITE.range) return LeviathanAttack.BREACH_BITE;
+        // Anything off the water is answered by leaving the water. The short leap is the ordinary
+        // reply; the long breach is saved for prey far enough up to be worth the whole run up.
+        if (hunt.leapable(58, LeviathanAttack.SKY_LEAP.range)) return LeviathanAttack.SKY_LEAP;
+        if (hunt.airborneTarget() && distance < LeviathanAttack.BREACH_BITE.range) return LeviathanAttack.BREACH_BITE;
         if (!lethalOnly && patience > 0.55f && random.nextFloat() < 0.22f) return LeviathanAttack.FAKE_ATTACK;
 
         float roll = random.nextFloat();

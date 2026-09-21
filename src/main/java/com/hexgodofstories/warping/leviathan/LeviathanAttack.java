@@ -31,7 +31,13 @@ public enum LeviathanAttack {
     /** A full windup that is abandoned on purpose. Never deals damage. */
     FAKE_ATTACK(20, 14, 26, 24, false),
     /** Orbit at speed and drag everything nearby toward the centre. */
-    WATER_VORTEX(24, 90, 30, 28, false);
+    WATER_VORTEX(24, 90, 30, 28, false),
+    /**
+     * Line up beneath something that is flying, then leave the water on a computed ballistic arc to
+     * meet it in the air. Short, committed and unrecoverable once launched: the jaws either arrive
+     * where the prey will be or the creature falls back through the surface with nothing.
+     */
+    SKY_LEAP(34, 92, 26, 90, true);
 
     public final int windup, active, recover;
     /** Distance in blocks at which the pattern may be started. */
@@ -46,6 +52,8 @@ public enum LeviathanAttack {
     public int total() { return windup + active + recover; }
     public boolean lethal() { return this != FAKE_ATTACK; }
     /** Patterns that need the creature to leave the water. */
-    public boolean aerial() { return this == BREACH_BITE || this == AIR_THROW || this == DEEP_CHARGE || this == SURFACE_RAM; }
+    public boolean aerial() { return this == BREACH_BITE || this == SKY_LEAP || this == AIR_THROW || this == DEEP_CHARGE || this == SURFACE_RAM; }
+    /** Patterns that only make sense against something that is currently off the water. */
+    public boolean huntsAir() { return this == BREACH_BITE || this == SKY_LEAP; }
     public static LeviathanAttack byId(int id) { return values()[Math.floorMod(id, values().length)]; }
 }

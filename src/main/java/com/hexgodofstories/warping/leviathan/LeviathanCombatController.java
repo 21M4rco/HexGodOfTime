@@ -44,6 +44,8 @@ public final class LeviathanCombatController {
     private final Set<UUID> struck = new HashSet<>();
     /** How far below the waterline a dragged victim is ever taken. */
     private static final double DRAG_LIMIT = 150.0;
+    /** How far above the waterline a leap will ever aim. Higher than this, flight has won. */
+    private static final double MAX_LEAP = 110.0;
     /** Ticks of borrowed breath given to anything the creature intends to keep playing with. */
     private static final int LUNG = 700;
 
@@ -103,6 +105,7 @@ public final class LeviathanCombatController {
             case DEEP_CHARGE -> deepCharge();
             case SURFACE_RAM -> surfaceRam();
             case BREACH_BITE -> breachBite();
+            case SKY_LEAP -> skyLeap();
             case AIR_THROW -> airThrow();
             case FAKE_ATTACK -> fakeAttack();
             case WATER_VORTEX -> vortex();
@@ -227,9 +230,13 @@ public final class LeviathanCombatController {
     private void bodyCrush() {
         if (victim == null) { abort(); return; }
         double progress = Mth.clamp(tick / (double) (attack.windup + attack.active), 0, 1);
-        double radius = Mth.lerp(progress, 20.0, 4.5);
-        orbit += orbitSign * (0.10 + 0.07 * progress);
-        Vec3 ring = victim.position().add(Math.cos(orbit) * radius, Math.sin(orbit * 0.7) * radius * 0.45, Math.sin(orbit) * radius);
+        // The cage closes from fifty six blocks to thirty, which is the tightest ring a hundred and
+        // twenty six blocks of spine can actually hold. Tighter than that is not a coil, it is a
+        // knot: the body folds through itself and the whole pattern stops reading as a creature.
+        double radius = Mth.lerp(progress, 56.0, 30.0);
+        // Angular rate follows the radius so the tangential speed stays somewhere a body can swim.
+        orbit += orbitSign * (1.7 / radius);
+        Vec3 ring = victim.position().add(Math.cos(orbit) * radius, Math.sin(orbit * 0.7) * radius * 0.30, Math.sin(orbit) * radius);
         steer(ring, 1.5 + progress * 1.4, 1.0f);
 
         if (tick >= attack.windup) {
@@ -242,8 +249,9 @@ public final class LeviathanCombatController {
                 }
             }
             if (tick == attack.windup + attack.active - 1) {
-                for (LivingEntity hit : around(victim.position(), 7)) damage(hit, 18f, 0.4);
-                for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.BODY, 1.5)) damage(hit, 10f, 0.6);
+                // The ring is wide, so the kill is the water it moves rather than the hull itself.
+                for (LivingEntity hit : around(victim.position(), 13)) damage(hit, 18f, 0.4);
+                for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.BODY, 2.0)) damage(hit, 10f, 0.6);
                 pulse(victim.position(), 14, 1.1f, "crush");
             }
         }
@@ -317,30 +325,36 @@ public final class LeviathanCombatController {
 
     private void breachBite() {
         double line = self.surfaceY();
-        Vec3 aim = victim != null ? victim.position() : self.position().add(0, 40, 0);
+        Vec3 aim = victim != null ? intercept(victim) : new Vec3(self.getX(), line + 45, self.getZ());
         if (tick < attack.windup) {
             breachPreparation++;
-            double dive = Math.max(self.floorY() + 16, line - 125);
+            double dive = Math.max(self.floorY() + 16, line - 95);
             Vec3 launch = new Vec3(anchor.x, dive, anchor.z);
-            if (tick < attack.windup - 20) {
+            if (tick < attack.windup - 26) {
                 steer(launch, 2.1, 0.85f);
                 // Finish the physical descent before starting the ascent, with a bounded fallback.
-                if (tick == attack.windup - 21 && self.position().distanceToSqr(launch) > 24 * 24
-                        && breachPreparation < 180) tick--;
+                if (tick == attack.windup - 27 && self.position().distanceToSqr(launch) > 30 * 30
+                        && breachPreparation < 200) tick--;
             } else {
-                steer(new Vec3(aim.x, Math.max(line + 40, aim.y + 22), aim.z), 1.2, 1.0f);
-                if (tick == attack.windup - 1 && self.getXRot() > -65 && breachPreparation < 240) tick--;
+                // Come up under the interception point with the whole body already pointing at it.
+                steer(new Vec3(aim.x, self.getY() + 60, aim.z), 2.6, 1.0f);
+                self.control().addBurst(0.9);
+                if (tick == attack.windup - 1 && self.getXRot() > -45 && breachPreparation < 240) tick--;
             }
             self.setGlow(Mth.clamp(tick / (float) attack.windup, 0.2f, 1f));
             if (breachPreparation == 1) self.voice(HexGodOfStories.PILGRIM_BREACH_CHARGE.get(), 110f, 0.7f);
-        } else if (tick < attack.windup + attack.active) {
+        } else if (tick == attack.windup) {
+            // One solved impulse, then the arc belongs to gravity. Steering at a point in the sky
+            // is what used to leave the body wallowing at the surface with its nose in the air.
             self.setGlow(1f);
-            steer(new Vec3(aim.x, aim.y + 22, aim.z), 3.4, 0.45f);
-            self.control().addBurst(2.2);
+            self.control().launch(arcTo(aim), 40);
+            self.control().setAirSteer(0.04);
+            self.voice(HexGodOfStories.PILGRIM_BREACH.get(), 128f, 0.85f);
+        } else if (tick < attack.windup + attack.active) {
+            steer(aim, 3.4, 0.45f);
             if (!crossedSurface && self.getY() >= line - 1) {
                 crossedSurface = true;
                 splash(new Vec3(self.getX(), line, self.getZ()), 2.0f);
-                self.voice(HexGodOfStories.PILGRIM_BREACH.get(), 128f, 0.85f);
             }
             for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.HEAD, 3.0)) {
                 damage(hit, 20f, 1.0);
@@ -356,6 +370,98 @@ public final class LeviathanCombatController {
             steer(new Vec3(self.getX(), line - 40, self.getZ()), 1.2, 0.3f);
             if (tick == attack.total() - 12 && self.held() != null && self.getRandom().nextFloat() < 0.5f) releaseHold(new Vec3(0, 0.2, 0), true);
         }
+    }
+
+    /**
+     * The jump. Everything else the creature does happens in water; this is the one pattern whose
+     * whole purpose is to stop being in it.
+     *
+     * <p>Prey that has left the surface — thrown, flying, gliding, or simply standing on something
+     * — used to be safe by default, because a swimming body aimed at a point in the sky arrives
+     * late and short every time. So the arc is solved instead of steered: the creature reads where
+     * the target will be, works out the launch that meets it there, lines up underneath, and then
+     * throws itself. After the launch nothing corrects it but one tail flick's worth of drift.
+     */
+    private void skyLeap() {
+        if (victim == null) { abort(); return; }
+        double line = self.surfaceY();
+        Vec3 aim = intercept(victim);
+
+        if (tick < attack.windup) {
+            // Run up. Deep enough to build speed, directly under the interception point, nose up.
+            double depth = Math.max(self.floorY() + 20, line - 52);
+            steer(new Vec3(aim.x, depth, aim.z), 2.4, 0.9f);
+            self.control().addBurst(0.6);
+            if (tick == 0) self.voice(HexGodOfStories.PILGRIM_BREACH_CHARGE.get(), 96f, 0.95f);
+            self.setGlow(Mth.clamp(tick / (float) attack.windup, 0.25f, 1f));
+        } else if (tick == attack.windup) {
+            anchor = aim;
+            self.setGlow(1f);
+            self.control().launch(arcTo(aim), 30);
+            self.control().setAirSteer(0.05);
+            self.voice(HexGodOfStories.PILGRIM_BREACH.get(), 132f, 0.95f);
+        } else if (tick < attack.windup + attack.active) {
+            // Keep the aim fresh so the permitted drift is spent on the right place.
+            steer(aim, 2.6, 0.3f);
+            if (!crossedSurface && self.getY() >= line - 1) {
+                crossedSurface = true;
+                splash(new Vec3(self.getX(), line, self.getZ()), 2.2f);
+            }
+            for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.HEAD, 3.2)) {
+                damage(hit, 22f, 1.0);
+                if (self.held() == null && attack.canHold) takeHold(hit);
+            }
+            // Down again, one way or the other.
+            if (crossedSurface && self.getY() < line - 1 && !splashed) {
+                splashed = true;
+                impact(new Vec3(self.getX(), line, self.getZ()));
+            }
+        } else {
+            if (crossedSurface && !splashed && self.getY() < line) { splashed = true; impact(new Vec3(self.getX(), line, self.getZ())); }
+            steer(new Vec3(self.getX(), line - 45, self.getZ()), 1.3, 0.3f);
+        }
+    }
+
+    /**
+     * Where the prey will be by the time a leap could reach it. Three passes, because the flight
+     * time depends on the height and the height depends on the lead.
+     */
+    private Vec3 intercept(Entity prey) {
+        Vec3 here = prey.position();
+        Vec3 drift = prey.getDeltaMovement();
+        Vec3 aim = here;
+        for (int pass = 0; pass < 3; pass++) {
+            double rise = Math.max(6.0, aim.y - self.getY());
+            double climb = Math.min(140, Math.sqrt(2 * rise / LeviathanMoveControl.GRAVITY));
+            // Leads are damped: prey that jinks should be missed sometimes, not chased by magic.
+            aim = new Vec3(here.x + drift.x * climb * 0.7, here.y + drift.y * climb * 0.35, here.z + drift.z * climb * 0.7);
+        }
+        return new Vec3(aim.x, Math.min(aim.y, self.surfaceY() + MAX_LEAP), aim.z);
+    }
+
+    /**
+     * Launch velocity whose upward arc passes through {@code aim}.
+     *
+     * <p>Solved in two parts, because the creature does not start in the air. The speed it needs at
+     * the waterline is ordinary projectile arithmetic; the speed it needs at the launch is that
+     * plus whatever the remaining column of water will take off it on the way up.
+     */
+    private Vec3 arcTo(Vec3 aim) {
+        double gravity = LeviathanMoveControl.GRAVITY;
+        double surface = self.surfaceY();
+        double above = Mth.clamp(aim.y - surface, 3.0, MAX_LEAP);
+        // The extra fifteen percent pays for the air drag that this solution ignores, and the
+        // floor keeps even a leap at something barely off the water a breach rather than a wallow.
+        double atLine = Math.sqrt(2 * gravity * above);
+        double depth = Math.max(0, surface - self.getY());
+        double up = Mth.clamp(atLine * 1.15, 1.9, 4.6);
+        // Time to the top: the climb through water, then the climb against gravity.
+        double climb = Math.max(1.0, depth / Math.max(0.5, up) + atLine / gravity);
+        double dx = aim.x - self.getX(), dz = aim.z - self.getZ();
+        double flat = Math.sqrt(dx * dx + dz * dz);
+        if (flat < 1.0E-4) return new Vec3(0, up, 0);
+        double forward = Math.min(flat / climb, 2.4);
+        return new Vec3(dx / flat * forward, up, dz / flat * forward);
     }
 
     private void airThrow() {
@@ -390,19 +496,20 @@ public final class LeviathanCombatController {
 
     private void vortex() {
         if (victim == null) { abort(); return; }
-        double radius = 22;
-        orbit += orbitSign * 0.17;
+        // Wide enough for the body to hold the circle; the water it drags does the rest.
+        double radius = 34;
+        orbit += orbitSign * (2.0 / radius);
         Vec3 ring = anchor.add(Math.cos(orbit) * radius, -6 + Math.sin(orbit * 0.5) * 5, Math.sin(orbit) * radius);
         steer(ring, 2.6, 1.0f);
         if (tick >= attack.windup && tick < attack.windup + attack.active) {
-            for (LivingEntity near : around(anchor, 32)) {
+            for (LivingEntity near : around(anchor, 36)) {
                 Vec3 inward = anchor.subtract(near.position());
                 double d = Math.max(0.8, inward.length());
                 Vec3 swirl = new Vec3(-inward.z, 0, inward.x).scale(orbitSign / d);
                 near.setDeltaMovement(near.getDeltaMovement().scale(0.86).add(inward.scale(0.10 / d)).add(swirl.scale(0.16)));
                 near.hurtMarked = true;
             }
-            for (Boat boat : self.level().getEntitiesOfClass(Boat.class, new AABB(anchor, anchor).inflate(32))) {
+            for (Boat boat : self.level().getEntitiesOfClass(Boat.class, new AABB(anchor, anchor).inflate(36))) {
                 Vec3 inward = anchor.subtract(boat.position());
                 double d = Math.max(0.8, inward.length());
                 boat.setDeltaMovement(boat.getDeltaMovement().scale(0.9).add(inward.scale(0.09 / d)));

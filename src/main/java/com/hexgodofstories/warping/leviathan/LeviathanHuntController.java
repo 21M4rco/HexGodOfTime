@@ -69,7 +69,9 @@ public final class LeviathanHuntController {
     private void pickOrbit() {
         RandomSource random = self.getRandom();
         orbitDirection = random.nextBoolean() ? 1 : -1;
-        orbitRadius = 26 + random.nextDouble() * 44;
+        // Never inside the creature's own turning circle. A twenty six block orbit was a request
+        // for a body twenty times that long to tie itself in a knot, and it obliged.
+        orbitRadius = 46 + random.nextDouble() * 44;
         orbitDepth = 30 + random.nextDouble() * 50;
         orbitPhase = random.nextFloat() * Mth.TWO_PI;
     }
@@ -107,7 +109,9 @@ public final class LeviathanHuntController {
                 (random.nextDouble() - 0.5) * error * 0.35,
                 (random.nextDouble() - 0.5) * error);
         }
-        orbitPhase += orbitDirection * (0.012f + 0.02f * self.frenzy());
+        // Radians per tick that hold the tangential speed near a block a tick whatever the radius,
+        // so a wide orbit is a patient one rather than an impossible sprint.
+        orbitPhase += (float) (orbitDirection * (0.9 + 0.7 * self.frenzy()) / orbitRadius);
     }
 
     @Nullable
@@ -220,6 +224,22 @@ public final class LeviathanHuntController {
     /** True when the victim has left the water and is high enough that only a breach reaches them. */
     public boolean airborneTarget() {
         return target != null && !target.isInWater() && target.getY() > waterline() + 1.2;
+    }
+
+    /** Blocks the victim is currently holding above the waterline. Zero when it is in the sea. */
+    public double airborneHeight() {
+        return target == null ? 0 : Math.max(0, target.getY() - waterline());
+    }
+
+    /**
+     * Whether a leap could plausibly meet the target: off the water, inside a reachable arc, and
+     * not so high that the jump would be a gesture at the sky.
+     */
+    public boolean leapable(double maxHeight, double maxReach) {
+        if (!airborneTarget()) return false;
+        if (airborneHeight() > maxHeight) return false;
+        double dx = target.getX() - self.getX(), dz = target.getZ() - self.getZ();
+        return dx * dx + dz * dz < maxReach * maxReach;
     }
 
     public double targetDistance() { return target == null ? Double.MAX_VALUE : Math.sqrt(self.distanceToSqr(target)); }

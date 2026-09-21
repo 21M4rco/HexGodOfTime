@@ -47,7 +47,7 @@ public final class AbyssalPilgrimAnimations {
             case DRAG_BELOW -> tick < attack.windup ? GRAB : DRAG;
             case BODY_CRUSH -> BODY_CRUSH;
             case VOID_SCREAM -> VOID_SCREAM;
-            case BREACH_BITE -> tick < attack.windup ? VERTICAL_ASCENT : BREACH;
+            case BREACH_BITE, SKY_LEAP -> tick < attack.windup ? VERTICAL_ASCENT : BREACH;
             case AIR_THROW -> THROW;
             case FAKE_ATTACK -> FAKE_LUNGE;
             case WATER_VORTEX -> VORTEX;

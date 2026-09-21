@@ -121,7 +121,7 @@ public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
         if (attack == null) return idle;
         float t = entity.attackTick() + partial;
         return switch (attack) {
-            case BREACH_BITE, DEEP_CHARGE ->
+            case BREACH_BITE, SKY_LEAP, DEEP_CHARGE ->
                 t < attack.windup ? Mth.clamp(t / attack.windup, 0, 1)
                 : t < attack.windup + attack.active ? 0.95f
                 : Mth.clamp(1f - (t - attack.windup - attack.active) / 12f, idle, 1f);
