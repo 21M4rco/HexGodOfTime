@@ -46,6 +46,7 @@ public final class LeviathanSegmentController {
     private final float[] rollVel = new float[SEGMENTS];
     private Vec3 backward = new Vec3(0, 0, -1);
     private boolean primed;
+    private Vec3 leading = Vec3.ZERO;
 
     public LeviathanSegmentController() {
         for (int i = 0; i < SEGMENTS; i++) seg[i] = Vec3.ZERO;
@@ -76,6 +77,7 @@ public final class LeviathanSegmentController {
         Vec3 look = new Vec3(-Math.sin(yr) * Math.cos(pr), -Math.sin(pr), Math.cos(yr) * Math.cos(pr));
         if (look.lengthSqr() < 1.0E-6) look = new Vec3(0, 0, 1);
         backward = look.normalize().reverse();
+        leading = position;
         count = 0; head = 0;
         for (int k = 0; k < MAX_NODES; k++) {
             Vec3 p = position.add(backward.scale(k * NODE_STEP));
@@ -97,6 +99,7 @@ public final class LeviathanSegmentController {
      */
     public boolean push(Vec3 position, float yawDegrees, float pitchDegrees) {
         if (!primed) { reset(position, yawDegrees, pitchDegrees); return false; }
+        leading = position;
         Vec3 newest = node(0);
         double moved = newest.distanceTo(position);
         if (moved > TELEPORT) { reset(position, yawDegrees, pitchDegrees); return false; }
@@ -111,9 +114,6 @@ public final class LeviathanSegmentController {
             }
             Vec3 dir = position.subtract(newest);
             if (dir.lengthSqr() > 1.0E-8) backward = dir.normalize().reverse();
-        } else {
-            // Still moving, just slowly: keep the newest node glued to the true position.
-            nx[head] = position.x; ny[head] = position.y; nz[head] = position.z;
         }
         return true;
     }
@@ -129,11 +129,13 @@ public final class LeviathanSegmentController {
      */
     public void rebuild() {
         for (int i = 0; i < SEGMENTS; i++) { prevYaw[i] = yaw[i]; prevPitch[i] = pitch[i]; prevRoll[i] = roll[i]; }
-        Vec3 cursor = node(0);
+        // Keep the unsampled leading point separate. Overwriting node(0) during slow
+        // movement loses every turn until a single tick exceeds NODE_STEP.
+        Vec3 cursor = leading;
         seg[0] = cursor;
         int placed = 1;
         double travelled = 0, wanted = SPACING;
-        for (int k = 1; k < count && placed < SEGMENTS; k++) {
+        for (int k = 0; k < count && placed < SEGMENTS; k++) {
             Vec3 next = node(k);
             double step = cursor.distanceTo(next);
             if (step > 1.0E-7) {

@@ -102,6 +102,8 @@ public final class LeviathanCombatController {
             case WATER_VORTEX -> vortex();
         }
 
+        // A pattern may abort when its prey disappears or a grab misses.
+        if (attack == null) return;
         tick++;
         if (tick >= attack.total()) {
             LeviathanAttack finished = attack;
