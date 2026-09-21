@@ -74,8 +74,7 @@ public final class WarpRealms {
         }
         long now=l.getGameTime();
         if(d==Destination.VOID_SEA){com.hexgodofstories.warping.leviathan.PilgrimWarden.tick(l,now);
-            // The swell, applied to the players in it and to nothing else. No block is touched
-            // and nothing is scanned: a handful of evaluations of a formula, per player, per tick.
+            // Preserve player prediction; mobs receive the same swell in the existing loop below.
             VoidSeaWaves.tick(l,now);}
         List<Entity> active=new ArrayList<>();l.getAllEntities().forEach(active::add);
         for(Entity e:active){
@@ -103,7 +102,7 @@ public final class WarpRealms {
             rescue(l,d,e,cell);
             switch(d){
                 case SUN -> solarExposure(l,e,cell,now);
-                case VOID_SEA -> {}  // the realm's only hazard is alive and has its own AI
+                case VOID_SEA -> {if(e instanceof Mob)VoidSeaWaves.apply(e,now);}
                 case GRAVITY_WELL -> singularity(l,e,cell,now);
                 case SHATTERED_WORLD -> {
                     // Gravity lets go for thirty five ticks in every twelve seconds, and what is

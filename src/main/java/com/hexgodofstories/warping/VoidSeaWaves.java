@@ -1,7 +1,9 @@
 package com.hexgodofstories.warping;
 
+import com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
@@ -236,11 +238,10 @@ public final class VoidSeaWaves {
     private static final double STEP = 2.0;
 
     /**
-     * Moves everybody the sea has hold of, once a tick.
+     * Moves players once a tick, matching the local player's prediction on the client.
      *
-     * <p>Only players are looked at, and only the ones in this realm's water. There is no scan of
-     * the dimension and no per-block anything: a handful of evaluations of the formula above, per
-     * player, per tick.
+     * <p>Mobs are handled by WarpRealms' existing entity loop, so extending the swell to NPCs
+     * adds no second scan of the dimension and never applies it to a player twice.
      */
     public static void tick(ServerLevel level, long now) {
         for (Player player : level.players()) apply(player, now);
@@ -249,23 +250,26 @@ public final class VoidSeaWaves {
     /**
      * Applies one tick of water movement to one entity, if the sea is entitled to move it.
      *
-     * <p>The guard on the first line is the whole of the Leviathan's exemption, and it is a guard
-     * rather than a check against that class on purpose: the sea moves players and nothing else, so
-     * there is no list for the creature to be left off and no future edit that can quietly put it
-     * back on. It swims through a sea that, as far as its own movement is concerned, is still flat.
-     * Everything it gains from this is gained by the water taking hold of the person it is hunting.
+     * <p>Players keep their existing prediction and exemptions. Ordinary vanilla and modded mobs
+     * use the same forces on the server and normal entity movement tracking on clients. Hexor is
+     * explicitly exempt; dry mobs and passengers must not acquire their own swimming motion.
      */
     public static void apply(Entity entity, double time) {
-        if (!(entity instanceof Player player)) return;
-        if (player.isSpectator() || player.isCreative()) return;
-        if (Destination.from(player.level()) != Destination.VOID_SEA) return;
+        if (entity instanceof Player player) {
+            if (player.isSpectator() || player.isCreative()) return;
+        } else {
+            if (!(entity instanceof Mob) || entity instanceof AbyssalPilgrimEntity) return;
+            if (entity.level().isClientSide || !entity.isAlive()
+                    || !entity.isInWater() || entity.isPassenger()) return;
+        }
+        if (Destination.from(entity.level()) != Destination.VOID_SEA) return;
 
-        double y = player.getY();
+        double y = entity.getY();
         if (y > VoidSea.SURFACE + GRIP_ABOVE) return;
-        if (!player.isInWater() && y > VoidSea.SURFACE) return;
+        if (!entity.isInWater() && y > VoidSea.SURFACE) return;
         double depth = Math.max(0, VoidSea.SURFACE - y);
 
-        double x = player.getX(), z = player.getZ();
+        double x = entity.getX(), z = entity.getZ();
         Wave[] waves = collect(x, z, 8.0, time);
         double here = height(x, z, depth, time, waves);
         // The rate the surface is changing under them, read a couple of ticks apart so a single
@@ -278,9 +282,9 @@ public final class VoidSeaWaves {
         double flow = here * SURGE;
         double rise = rate * LIFT;
 
-        Vec3 motion = player.getDeltaMovement();
+        Vec3 motion = entity.getDeltaMovement();
         double wantX = DIR_X * flow, wantZ = DIR_Z * flow;
-        player.setDeltaMovement(
+        entity.setDeltaMovement(
             motion.x + (wantX - motion.x) * COUPLE,
             motion.y + (rise - motion.y) * COUPLE_VERTICAL,
             motion.z + (wantZ - motion.z) * COUPLE);
