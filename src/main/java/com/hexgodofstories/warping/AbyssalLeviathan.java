@@ -26,7 +26,10 @@ public final class AbyssalLeviathan extends PathfinderMob {
         LivingEntity prey=getTarget();
         if(tickCount%10==0||prey==null||!prey.isAlive()){
             Player p=level().getNearestPlayer(getX(),getY(),getZ(),160,e->e instanceof Player q&&!q.isSpectator()&&!q.isCreative());
-            setTarget(p);prey=p;
+            prey=p;
+            if(prey==null)prey=level().getEntitiesOfClass(LivingEntity.class,getBoundingBox().inflate(96),e->e!=this&&!(e instanceof AbyssalLeviathan)&&e.isAlive()&&!e.isSpectator()&&!(e instanceof Player q&&q.isCreative()))
+                .stream().min(java.util.Comparator.comparingDouble(this::distanceToSqr)).orElse(null);
+            setTarget(prey);
         }
         if(prey!=null){
             double distance=distanceTo(prey);boolean strike=distance<25&&attackCooldown<25;

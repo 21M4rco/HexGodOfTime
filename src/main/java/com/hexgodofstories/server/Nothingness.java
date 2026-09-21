@@ -151,6 +151,19 @@ public final class Nothingness extends SavedData {
         data.setDirty();
     }
 
+    /** A short-lived Warping aperture restores its own due cells without waiting behind a distant torrent.
+     * A later torrent may extend a cell's lifetime; that ownership is respected rather than shortened.
+     */
+    public static void restoreDue(ServerLevel level,Collection<BlockPos> positions) {
+        Nothingness data=of(level);boolean changed=false;
+        for(BlockPos pos:positions){
+            Wound wound=data.wounds.get(pos.asLong());
+            if(wound==null||wound.due>level.getGameTime()||!level.hasChunkAt(pos))continue;
+            data.restore(level,wound);data.wounds.remove(pos.asLong());changed=true;
+        }
+        if(changed)data.setDirty();
+    }
+
     /** How many positions are still owed a restore, for diagnostics and commands. */
     public static int pending(ServerLevel level) {return of(level).wounds.size();}
 

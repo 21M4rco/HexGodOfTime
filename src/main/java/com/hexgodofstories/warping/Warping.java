@@ -18,7 +18,7 @@ public final class Warping {
     private static final Map<UUID,Charge> CHARGES=new HashMap<>();
     private static final class Charge {
         final ServerLevel level;final Vec3 at;final Destination destination;final long start;final double cell;
-        long opened=-1;int held;final Set<UUID> moved=new HashSet<>();
+        long opened=-1;int held;final Set<UUID> moved=new HashSet<>();final List<BlockPos> replaced=new ArrayList<>();
         Charge(ServerPlayer p,Vec3 at,Destination d,double cell){level=p.serverLevel();this.at=at;destination=d;start=level.getGameTime();this.cell=cell;}
     }
     public static boolean charging(ServerPlayer p){return CHARGES.containsKey(p.getUUID());}
@@ -58,7 +58,7 @@ public final class Warping {
         double r=WarpMath.width(c.held)*.5;
         for(int x=(int)Math.ceil(c.at.x-r);x<c.at.x+r;x++)for(int z=(int)Math.ceil(c.at.z-r);z<c.at.z+r;z++){
             BlockPos b=BlockPos.containing(x,c.at.y-.1,z);
-            if(c.level.getBlockState(b).getDestroySpeed(c.level,b)>=0)Nothingness.take(c.level,b,c.opened+WarpMath.OPEN_TICKS);
+            if(c.level.getBlockState(b).getDestroySpeed(c.level,b)>=0&&Nothingness.take(c.level,b,c.opened+WarpMath.OPEN_TICKS))c.replaced.add(b);
         }
         WarpRealms.start(p.server.getLevel(c.destination.key),c.cell);
         HexData.get(p).putDouble("warpCell_"+c.destination.name(),c.cell);
@@ -80,7 +80,7 @@ public final class Warping {
                 if(now-c.start>=WarpMath.MAX_HOLD){release(p);continue;}
                 if(now%4==0)send(p,c,false);
             }else{
-                if(now-c.opened>=WarpMath.OPEN_TICKS){cancel(p);continue;}
+                if(now-c.opened>=WarpMath.OPEN_TICKS){Nothingness.restoreDue(level,c.replaced);cancel(p);continue;}
                 double r=WarpMath.width(c.held)*.5;
                 AABB area=new AABB(c.at.x-r,c.at.y-.4,c.at.z-r,c.at.x+r,c.at.y+2.5,c.at.z+r);
                 for(Entity e:level.getEntities(p,area,e->e.isAlive()&&!e.isSpectator()&&!sovereign(e)&&!(e instanceof net.minecraft.world.entity.player.Player q&&q.isCreative()))){
