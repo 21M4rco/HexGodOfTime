@@ -3,14 +3,17 @@ package com.hexgodofstories.client;
 import com.hexgodofstories.warping.Destination;
 import com.hexgodofstories.warping.VoidSea;
 import com.hexgodofstories.warping.VoidSeaWaves;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.client.ForgeHooksClient;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -46,7 +49,7 @@ public final class VoidSeaWaveRenderer {
     private VoidSeaWaveRenderer() { }
 
     /** Blocks between grid samples. Close enough that a crest reads as curved, not as a staircase. */
-    private static final int CELL = 5;
+    private static final int CELL = 3;
     /** Where the vanilla fluid surface of a full water block actually sits inside its block. */
     private static final double WATER_TOP = 0.8888889;
     /** Clear of that surface even at dead calm, so the two never argue over the same depth. */
@@ -122,13 +125,13 @@ public final class VoidSeaWaveRenderer {
         Vector3f look = event.getCamera().getLookVector();
 
         PoseStack pose = event.getPoseStack();
-        pose.pushPose();
-        pose.translate(-camX, -camY, -camZ);
+        // corner() already subtracts the camera in double precision. Translating the pose as
+        // well applied that offset twice, putting the waves a whole camera-height below the sea
+        // (and displacing them horizontally). Keep only the event's view rotation here.
         Matrix4f matrix = pose.last().pose();
         Matrix3f normal = pose.last().normal();
         var buffers = mc.renderBuffers().bufferSource();
-        // Blended, unculled, and drawn after the entity pass: over the creature, never under it.
-        RenderType type = RenderType.entityTranslucent(WorldEffects.WHITE);
+        RenderType type = SurfaceRenderType.TYPE;
         VertexConsumer buffer = buffers.getBuffer(type);
 
         for (int i = 0; i < cells; i++) {
@@ -145,8 +148,29 @@ public final class VoidSeaWaveRenderer {
                 corner(buffer, matrix, normal, i + 1, j);
             }
         }
-        pose.popPose();
         buffers.endBatch(type);
+    }
+
+    /** Own batch and an explicit particles target for Fabulous transparency compositing. */
+    private static final class SurfaceRenderType extends RenderType {
+        private static final RenderType TYPE = create("hexgodofstories_void_sea_waves",
+            DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 262144, false, true,
+            CompositeState.builder()
+                // The slope colours below supply the lighting. The unlit shader also preserves
+                // low vertex alpha, so the calm water and the near/edge fades remain continuous.
+                .setShaderState(new ShaderStateShard(ForgeHooksClient.ClientEvents::getEntityTranslucentUnlitShader))
+                .setTextureState(new TextureStateShard(WorldEffects.WHITE, false, false))
+                .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                .setCullState(NO_CULL)
+                .setLightmapState(LIGHTMAP)
+                .setOverlayState(OVERLAY)
+                .setOutputState(PARTICLES_TARGET)
+                .createCompositeState(false));
+
+        private SurfaceRenderType(String name, VertexFormat format, VertexFormat.Mode mode,
+                                  int size, boolean crumbling, boolean sorted, Runnable setup, Runnable clear) {
+            super(name, format, mode, size, crumbling, sorted, setup, clear);
+        }
     }
 
     /** One at the heart of the patch, easing to nothing over the last stretch before the rim. */

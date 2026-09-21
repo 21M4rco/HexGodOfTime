@@ -202,9 +202,9 @@ public final class HexClient {
         @SubscribeEvent public static void world(RenderLevelStageEvent e) {
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES)WarpRenderer.renderRealm(e);
-            // Straight after the water itself, which is after every entity has been drawn: the
-            // swell can only ever blend over what is under it, never reveal it.
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS)VoidSeaWaveRenderer.render(e);
+            // Forge's supported translucent-effects stage, paired with the wave's particles
+            // target so Fabulous composites the swell correctly over the water and entities.
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES)VoidSeaWaveRenderer.render(e);
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES){WorldEffects.render(e);WarpRenderer.render(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL)TemporalScreen.render(e.getPartialTick());
         }
