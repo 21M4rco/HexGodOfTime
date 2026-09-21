@@ -24,6 +24,8 @@ public final class HexGodOfStories {
     public static final DeferredRegister<CreativeModeTab> TABS = DeferredRegister.create(net.minecraft.core.registries.Registries.CREATIVE_MODE_TAB, ID);
     public static final DeferredRegister<net.minecraft.core.particles.ParticleType<?>> PARTICLES = DeferredRegister.create(ForgeRegistries.PARTICLE_TYPES, ID);
 
+    public static final RegistryObject<EntityType<com.hexgodofstories.warping.AbyssalLeviathan>> LEVIATHAN=ENTITIES.register("abyssal_leviathan",()->EntityType.Builder.of(com.hexgodofstories.warping.AbyssalLeviathan::new,MobCategory.MONSTER).sized(5,4).clientTrackingRange(16).updateInterval(2).build(ID+":abyssal_leviathan"));
+    public static final RegistryObject<EntityType<com.hexgodofstories.warping.WarpHazard>> WARP_HAZARD=ENTITIES.register("warp_hazard",()->EntityType.Builder.<com.hexgodofstories.warping.WarpHazard>of(com.hexgodofstories.warping.WarpHazard::new,MobCategory.MISC).sized(6,2).clientTrackingRange(16).updateInterval(2).fireImmune().build(ID+":warp_hazard"));
     public static final RegistryObject<EntityType<IllusionEntity>> ILLUSION = ENTITIES.register("projection", () -> EntityType.Builder.of(IllusionEntity::new, MobCategory.MISC).sized(.6f, 1.8f).clientTrackingRange(10).updateInterval(2).build("hexgodofstories:projection"));
     public static final RegistryObject<EntityType<SpellProjectile>> PROJECTILE = ENTITIES.register("spell", () -> EntityType.Builder.<SpellProjectile>of(SpellProjectile::new, MobCategory.MISC).sized(.18f,.18f).clientTrackingRange(10).updateInterval(1).build("hexgodofstories:spell"));
     public static final RegistryObject<EntityType<ThrownDagger>> THROWN_DAGGER = ENTITIES.register("thrown_dagger", () -> EntityType.Builder.<ThrownDagger>of(ThrownDagger::new, MobCategory.MISC).sized(.28f,.28f).clientTrackingRange(8).updateInterval(1).build("hexgodofstories:thrown_dagger"));
@@ -98,7 +100,7 @@ public final class HexGodOfStories {
     public HexGodOfStories() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
         ENTITIES.register(bus); ITEMS.register(bus); BLOCKS.register(bus); SOUNDS.register(bus); TABS.register(bus); PARTICLES.register(bus);
-        bus.addListener((EntityAttributeCreationEvent e) -> e.put(ILLUSION.get(), IllusionEntity.attributes().build()));
+        bus.addListener((EntityAttributeCreationEvent e) -> {e.put(ILLUSION.get(), IllusionEntity.attributes().build());e.put(LEVIATHAN.get(),com.hexgodofstories.warping.AbyssalLeviathan.attributes().build());});
         bus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) -> e.enqueueWork(HexNetwork::init));
     }
 }

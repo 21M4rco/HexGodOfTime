@@ -1,0 +1,18 @@
+{
+  "type": "hexgodofstories:warping_crushing_realm",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "biome": "hexgodofstories:warping_crushing_realm",
+      "lakes": false,
+      "features": false,
+      "structure_overrides": [],
+      "layers": [
+        {
+          "height": 1,
+          "block": "minecraft:air"
+        }
+      ]
+    }
+  }
+}

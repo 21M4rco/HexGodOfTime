@@ -1,0 +1,18 @@
+{
+  "type": "hexgodofstories:warping_shattered_world",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "biome": "hexgodofstories:warping_shattered_world",
+      "lakes": false,
+      "features": false,
+      "structure_overrides": [],
+      "layers": [
+        {
+          "height": 1,
+          "block": "minecraft:air"
+        }
+      ]
+    }
+  }
+}

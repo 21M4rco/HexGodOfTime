@@ -5,6 +5,7 @@ import com.hexgodofstories.data.*;
 import com.hexgodofstories.entity.ConjuredWeapon;
 import com.hexgodofstories.network.HexNetwork;
 import net.minecraft.server.level.*;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraftforge.event.TickEvent;
@@ -90,6 +91,10 @@ public final class ServerEvents {
     @SubscribeEvent public static void ward(net.minecraftforge.event.entity.living.LivingAttackEvent e) {
         // Only something attacking them. A fall, the void or drowning is the island's business and
         // the owner's own problem; blinking away from gravity would be nonsense.
+        // Administrative death must bypass every mod ward, including erasure and stopped time.
+        if(e.getSource().is(DamageTypes.GENERIC_KILL))return;
+        var realm=com.hexgodofstories.warping.Destination.from(e.getEntity().level());
+        if(realm!=null&&realm!=com.hexgodofstories.warping.Destination.SUN&&com.hexgodofstories.warping.Warping.sovereign(e.getEntity())&&e.getSource().getEntity()==null){e.setCanceled(true);return;}
         if(Erasure.erasing(e.getEntity())){e.setCanceled(true);return;}
         if(e.getSource().getEntity()==null&&e.getSource().getDirectEntity()==null)return;
         if(SanctumWard.evade(e.getEntity()))e.setCanceled(true);
@@ -114,6 +119,7 @@ public final class ServerEvents {
     public static void branchPunch(LivingDamageEvent e) {BranchFist.damage(e);}
 
     @SubscribeEvent public static void hurt(LivingHurtEvent e) {
+        if(e.getSource().is(DamageTypes.GENERIC_KILL))return;
         if(Erasure.erasing(e.getSource().getEntity())){e.setCanceled(true);return;}
         // A body being taken out of the timeline cannot be hurt out of it. Without this, anything else
         // landing a hit mid-sequence would flash it red or kill it outright, and the slow coming-apart the

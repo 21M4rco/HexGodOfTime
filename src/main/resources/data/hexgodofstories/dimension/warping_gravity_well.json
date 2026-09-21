@@ -1,0 +1,18 @@
+{
+  "type": "hexgodofstories:warping_gravity_well",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "biome": "hexgodofstories:warping_gravity_well",
+      "lakes": false,
+      "features": false,
+      "structure_overrides": [],
+      "layers": [
+        {
+          "height": 1,
+          "block": "minecraft:air"
+        }
+      ]
+    }
+  }
+}

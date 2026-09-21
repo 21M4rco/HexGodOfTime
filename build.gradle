@@ -4,7 +4,7 @@ plugins {
     id 'org.spongepowered.mixin' version '0.7.+'
 }
 group = 'com.hexgodofstories'
-version = '0.5.0'
+version = '0.5.3-warping'
 base { archivesName = 'hexgodofstories' }
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 java.withSourcesJar()
@@ -18,7 +18,13 @@ minecraft {
             mods { hexgodofstories { source sourceSets.main } }
         }
         client {}
-        server { args '--nogui' }
+        server {
+            args '--nogui'
+            // The integration listener is test-only and is never included in the release JAR.
+            if (project.hasProperty('warpingSmoke')) {
+                mods { hexgodofstories { source sourceSets.test } }
+            }
+        }
         gameTestServer { property 'forge.enabledGameTestNamespaces', 'hexgodofstories' }
     }
 }
@@ -64,3 +70,11 @@ tasks.register('verifyIllusoryWall', JavaExec) {
     enableAssertions = true
 }
 tasks.named('check') { dependsOn 'verifyIllusoryWall' }
+
+// Warping's footprint, charge telegraph and environmental boundaries.
+tasks.register('verifyWarping', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.hexgodofstories.warping.WarpMathTest'
+}
+tasks.named('check') { dependsOn 'verifyWarping' }

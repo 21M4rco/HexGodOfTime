@@ -1,0 +1,18 @@
+{
+  "type": "hexgodofstories:warping_end_of_time",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "biome": "hexgodofstories:warping_end_of_time",
+      "lakes": false,
+      "features": false,
+      "structure_overrides": [],
+      "layers": [
+        {
+          "height": 1,
+          "block": "minecraft:air"
+        }
+      ]
+    }
+  }
+}

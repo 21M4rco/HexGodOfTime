@@ -9,7 +9,7 @@ public final class CosmicFlight {
     private CosmicFlight() {}
     public static void tick(ServerPlayer p) {
         var d=HexData.get(p);var a=p.getAbilities();
-        boolean allowed=HexData.access(p)&&p.isAlive()&&d.getBoolean("ascended")&&!p.isSpectator();
+        boolean allowed=HexData.access(p)&&p.isAlive()&&(d.getBoolean("ascended")||com.hexgodofstories.warping.Destination.from(p.level())!=null&&com.hexgodofstories.warping.Warping.sovereign(p))&&!p.isSpectator();
         if(!allowed){revoke(p);return;}
         if(!d.getBoolean("flightGranted")) {
             d.putBoolean("flightHadMayfly",a.mayfly&&!p.isCreative());
@@ -24,7 +24,7 @@ public final class CosmicFlight {
         }
     }
     public static void toggle(ServerPlayer p) {
-        if(!HexData.access(p)||!HexData.get(p).getBoolean("ascended")||p.isSpectator()||p.isPassenger()||TemporalEngine.frozen(p))return;
+        if(!HexData.access(p)||!(HexData.get(p).getBoolean("ascended")||com.hexgodofstories.warping.Destination.from(p.level())!=null&&com.hexgodofstories.warping.Warping.sovereign(p))||p.isSpectator()||p.isPassenger()||TemporalEngine.frozen(p))return;
         tick(p);
         p.getAbilities().flying=!p.getAbilities().flying;
         p.resetFallDistance();p.onUpdateAbilities();

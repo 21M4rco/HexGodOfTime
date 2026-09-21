@@ -1,0 +1,22 @@
+{
+  "type": "hexgodofstories:warping_void_sea",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "biome": "hexgodofstories:warping_void_sea",
+      "lakes": false,
+      "features": false,
+      "structure_overrides": [],
+      "layers": [
+        {
+          "height": 1,
+          "block": "minecraft:bedrock"
+        },
+        {
+          "height": 135,
+          "block": "minecraft:water"
+        }
+      ]
+    }
+  }
+}

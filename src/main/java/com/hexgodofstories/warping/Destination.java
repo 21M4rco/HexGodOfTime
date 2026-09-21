@@ -1,0 +1,28 @@
+package com.hexgodofstories.warping;
+
+import com.hexgodofstories.HexGodOfStories;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+
+/** Stable IDs: append destinations, never reorder saved selections. */
+public enum Destination {
+    SUN("Sun", "A stellar furnace. Captives fall fifty-six blocks into its corona.",0xffb34b, new Vec3(0,184,0)),
+    VOID_SEA("Void Sea", "An endless abyssal ocean. Something enormous hunts beneath it.",0x426887,new Vec3(0,139,0)),
+    GRAVITY_WELL("Gravity Well", "An accretion disk surrounds a singularity. Pull intensifies inward.",0xb273ff,new Vec3(64,110,0)),
+    SHATTERED_WORLD("Shattered World", "Broken forests and ruins. Unstable gravity between islands.",0x92b5b1,new Vec3(0,143,0)),
+    TIME_STORM("Time Storm", "A storm of branching time. Your enemies' recent steps unravel.",0xca82ff,new Vec3(0,132,0)),
+    FALLING_WORLD("Falling World", "An endless collapse of towers, earth and debris. Nothing stays still.",0xd2a17b,new Vec3(0,170,0)),
+    FROZEN_MOMENT("Frozen Moment", "A catastrophe held still. Press X here to release nearby suspended hazards.",0xa3e5f1,new Vec3(0,132,0)),
+    CRUSHING_REALM("Crushing Realm", "Two cosmic planes approach. Their remaining separation is your warning.",0xbe83ce,new Vec3(0,101,0)),
+    END_OF_TIME("End of Time", "The exhausted remains of a universe. Living strength fades here.",0x998d9e,new Vec3(0,132,0));
+    public final String title,description; public final int color; public final Vec3 arrival;
+    public final ResourceKey<Level> key;
+    Destination(String title,String description,int color,Vec3 arrival) {
+        this.title=title;this.description=description;this.color=color;this.arrival=arrival;
+        key=ResourceKey.create(Registries.DIMENSION,HexGodOfStories.id("warping_"+name().toLowerCase(java.util.Locale.ROOT)));
+    }
+    public static Destination from(Level level){for(var d:values())if(d.key.equals(level.dimension()))return d;return null;}
+    public static Destination at(int id){return id>=0&&id<values().length?values()[id]:SUN;}
+}
