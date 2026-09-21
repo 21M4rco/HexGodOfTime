@@ -60,6 +60,7 @@ public final class Warping {
             if(c.level.getBlockState(b).getDestroySpeed(c.level,b)>=0)Nothingness.take(c.level,b,c.opened+WarpMath.OPEN_TICKS);
         }
         WarpRealms.start(p.server.getLevel(c.destination.key),c.cell);
+        HexData.get(p).putDouble("warpCell_"+c.destination.name(),c.cell);
         send(p,c,false);
     }
     private static boolean valid(ServerPlayer p,Charge c){
@@ -97,7 +98,7 @@ public final class Warping {
         // Deliberate entry separate from the trap: crouch + X while Warping is selected.
         if(p.isShiftKeyDown()){
             Destination selected=Destination.at(HexData.get(p).getInt("warpDestination"));ServerLevel level=p.server.getLevel(selected.key);if(level==null)return;
-            double cell=WarpRealms.latest(level);
+            double cell=HexData.get(p).getDouble("warpCell_"+selected.name());
             if(!WarpRealms.ready(level,cell)){notice(p,"Open a stabilized trap before entering its destination.");return;}
             WarpRealms.transfer(p,selected,cell,true);
         }

@@ -40,13 +40,15 @@ public final class HexClient {
 
     @Mod.EventBusSubscriber(modid=HexGodOfStories.ID,value=Dist.CLIENT,bus=Mod.EventBusSubscriber.Bus.MOD)
     public static final class ModBus {
-        @SubscribeEvent public static void dimensionEffects(RegisterDimensionSpecialEffectsEvent e){e.register(HexGodOfStories.id("pocket"),new RealmSky());}
+        @SubscribeEvent public static void dimensionEffects(RegisterDimensionSpecialEffectsEvent e){e.register(HexGodOfStories.id("pocket"),new RealmSky());e.register(HexGodOfStories.id("warping"),new WarpSky());}
         @SubscribeEvent public static void keys(RegisterKeyMappingsEvent e) {
             for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT})e.register(k);
             for(KeyMapping k:TIME_KEYS)e.register(k);
         }
         @SubscribeEvent public static void entities(EntityRenderersEvent.RegisterRenderers e) {
             e.registerEntityRenderer(HexGodOfStories.ILLUSION.get(),IllusionRenderer::new);
+            e.registerEntityRenderer(HexGodOfStories.LEVIATHAN.get(),LeviathanRenderer::new);
+            e.registerEntityRenderer(HexGodOfStories.WARP_HAZARD.get(),WarpHazardRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.PROJECTILE.get(),SpellRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.THROWN_DAGGER.get(),DaggerRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.RIFT.get(),RiftRenderer::new);
@@ -61,7 +63,7 @@ public final class HexClient {
         }
         @SubscribeEvent public static void reload(RegisterClientReloadListenersEvent e) {
             e.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)r->{
-                HexLayer.clear();WeaponRenderer.clear();RiftRenderer.clear();RealmSky.clear();CosmicNebula.clear();
+                WarpRenderer.clear();HexLayer.clear();WeaponRenderer.clear();RiftRenderer.clear();RealmSky.clear();CosmicNebula.clear();
                 BranchVfx.clear();TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();
                 DisguiseRenderer.clear();DisguiseRenderer.forgive();Blood.clear();WoundAnchor.clear();TemporalScreen.close();
             });
@@ -83,7 +85,7 @@ public final class HexClient {
                 primaryDown=false;primaryWasHold=false;repeat=0;
                 selectDown=SELECT.isDown();
                 QuickBar.closeBar(false);
-                if(mc.screen instanceof MasteryScreen||mc.screen instanceof FractureScreen)mc.setScreen(null);
+                if(mc.screen instanceof WarpScreen||mc.screen instanceof MasteryScreen||mc.screen instanceof FractureScreen)mc.setScreen(null);
                 drain();return;
             }
             if(mc.screen!=null) {
@@ -119,7 +121,8 @@ public final class HexClient {
             // only place the break has a choice to make. Outside it there is one destination and the
             // cast key is the whole control. Every other spell keeps its ordinary alternate action.
             while(SECONDARY.consumeClick()) {
-                if(Ability.at(ClientState.self().getInt("selected"))!=Ability.RIFT)HexNetwork.send(HexServer.ALTERNATE,0);
+                if(Ability.at(ClientState.self().getInt("selected"))==Ability.WARPING)mc.setScreen(new WarpScreen());
+                else if(Ability.at(ClientState.self().getInt("selected"))!=Ability.RIFT)HexNetwork.send(HexServer.ALTERNATE,0);
                 else FractureScreen.open();
             }
             while(TRANSFORM.consumeClick())HexNetwork.send(HexServer.TRANSFORM,0);
@@ -184,7 +187,7 @@ public final class HexClient {
         }
         @SubscribeEvent public static void world(RenderLevelStageEvent e) {
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);}
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES)WorldEffects.render(e);
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES){WorldEffects.render(e);WarpRenderer.render(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL)TemporalScreen.render(e.getPartialTick());
         }
         @SubscribeEvent public static void player(RenderPlayerEvent.Pre e) {

@@ -44,6 +44,8 @@ public final class ClientState {
         if(mc.level==null)return;
         if(world!=mc.level)tick();
         switch(m.kind()) {
+            case HexNetwork.WARP -> WarpRenderer.receive(m.entity(),m.data());
+            case HexNetwork.WARP_REALM -> WarpRenderer.realm(m.data());
             case HexNetwork.SYNC -> PLAYERS.put(m.entity(),m.data());
             case HexNetwork.ANIMATE -> HexAnimations.playRemote(m.entity(),m.data().getString("animation"),3);
             case HexNetwork.FX -> WorldEffects.add(m.entity(),m.data());
@@ -79,7 +81,7 @@ public final class ClientState {
     public static void tick() {
         var mc=Minecraft.getInstance();
         if(mc.level!=world) {
-            PLAYERS.clear();FROZEN.clear();SLOWED.clear();THREADS.clear();DISGUISES.clear();
+            WarpRenderer.clear();PLAYERS.clear();FROZEN.clear();SLOWED.clear();THREADS.clear();DISGUISES.clear();
             WorldEffects.clear();HexSkin.clear();HexLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();
             TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();GripRenderer.clear();
             HexClient.ForgeBus.releaseHeldCast();

@@ -37,7 +37,7 @@ public final class WarpRealms {
         if(e instanceof ServerPlayer p){
             if(Destination.from(old)==null)HexData.get(p).put("warpReturn",new FractureAnchor(old.dimension(),p.position(),p.getYRot(),p.getXRot()).save());
             p.stopRiding();p.teleportTo(to,pos.x,pos.y,pos.z,p.getYRot(),p.getXRot());
-            if(owner){p.getAbilities().mayfly=true;p.getAbilities().flying=true;p.onUpdateAbilities();}
+            if(owner){com.hexgodofstories.server.CosmicFlight.tick(p);p.getAbilities().flying=true;p.onUpdateAbilities();}
         }else{
             e.stopRiding();e.changeDimension(to,new ITeleporter(){public Entity placeEntity(Entity entity,ServerLevel current,ServerLevel dest,float yaw,java.util.function.Function<Boolean,Entity> reposition){Entity moved=reposition.apply(false);if(moved!=null){moved.moveTo(pos.x,pos.y,pos.z,yaw,0);moved.setDeltaMovement(0,-.3,0);moved.fallDistance=0;}return moved;}});
         }
@@ -82,7 +82,7 @@ public final class WarpRealms {
                 case END_OF_TIME -> {if(e instanceof LivingEntity living&&now%40==0){living.addEffect(new MobEffectInstance(MobEffects.WEAKNESS,65,2,false,false));living.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN,65,1,false,false));living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,65,0,false,false));if(age>200)living.hurt(l.damageSources().wither(),2);}}
             }
         }
-        if(now%200==0)HISTORY.keySet().removeIf(id->l.getServer().getAllLevels().iterator().hasNext()&&l.getEntity(id)==null);
+        if(d==Destination.TIME_STORM&&now%200==0)HISTORY.keySet().removeIf(id->l.getEntity(id)==null);
     }
     private static void populate(ServerLevel l,Destination d,double cell){
         if(d==Destination.VOID_SEA){AbyssalLeviathan leviathan=HexGodOfStories.LEVIATHAN.get().create(l);if(leviathan!=null){leviathan.moveTo(cell+24,109,24,0,0);l.addFreshEntity(leviathan);}}

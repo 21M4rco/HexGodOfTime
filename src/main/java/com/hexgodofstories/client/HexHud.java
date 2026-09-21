@@ -110,6 +110,7 @@ public final class HexHud {
 
     private static String primary(Ability a) {
         return switch(a) {
+            case WARPING -> "Hold: fracture the floor. Release: trap.";
             case RIFT -> "Tap: doorway. Hold: pull 5 blocks.";
             case DUPLICATE -> "Create a living decoy.";
             case PROJECTION_SWAP -> "Swap with your nearest decoy.";
@@ -138,6 +139,7 @@ public final class HexHud {
     }
     private static String alternate(Ability a) {
         return switch(a) {
+            case WARPING -> "Choose dimensional destination";
             case RIFT -> "Close the break / open the way out";
             case DUPLICATE -> "Direct / dismiss decoys";
             case PROJECTION_SWAP -> "Place a decoy at your aim";
