@@ -12,11 +12,11 @@ import net.minecraftforge.network.*;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class HexNetwork {
-    public static final SimpleChannel CHANNEL=NetworkRegistry.newSimpleChannel(HexGodOfStories.id("main"),()->"3","3"::equals,"3"::equals);
+    public static final SimpleChannel CHANNEL=NetworkRegistry.newSimpleChannel(HexGodOfStories.id("main"),()->"4","4"::equals,"4"::equals);
     /** Highest accepted client action id; see {@link HexServer#input}. */
-    public static final int MAX_ACTION=13;
+    public static final int MAX_ACTION=14;
     public static final int SYNC=0,ANIMATE=1,FX=2,FROZEN=3,GRIP=4,MEMORY=5,THREADS=6,SLOWED=7,ARCHITECTURE=8,BLEED=9,FIELD=10,DISGUISE=11,
-        BRANCH=12,TORRENT=13,ERASURE=14;
+        BRANCH=12,TORRENT=13,ERASURE=14,WARP=15,WARP_REALM=16;
     public record Input(int action,int value) {}
     /** A deliberate Fracture selection: a catalogue index and, where the mode needs one, a target. */
     public record Choice(int mode,java.util.UUID target) {}

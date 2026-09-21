@@ -1,6 +1,7 @@
 package com.hexgodofstories.server;
 
 import com.hexgodofstories.HexGodOfStories;
+import com.hexgodofstories.warping.*;
 import com.hexgodofstories.data.*;
 import com.hexgodofstories.entity.*;
 import com.hexgodofstories.network.HexNetwork;
@@ -19,7 +20,7 @@ import net.minecraft.world.phys.*;
 import java.util.*;
 
 public final class HexServer {
-    public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12,BRANCH_TAP=13;
+    public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12,BRANCH_TAP=13,WARP_CHOICE=14;
     /** Values carried by {@link #TIME}: the permanent time controls, each on its own key. */
     public static final int TIME_HALT=0,TIME_RESUME=1,TIME_REWIND=2,TIME_DILATE=3;
     public record Moment(Vec3 position,float yaw,float pitch,float health) {}
@@ -48,7 +49,9 @@ public final class HexServer {
         long now=HexData.now(p);
         if(action==RESYNC){HexNetwork.sync(p);return;}
         if(!HexData.access(p)){notice(p,"Your powers are locked. An operator must use /hgos unlock "+p.getGameProfile().getName()+" on.");return;}
+        if(action==WARP_CHOICE){Warping.choose(p,value);return;}
         if(action==SELECT) {
+            if(Warping.charging(p))Warping.cancel(p);
             if(now-INPUT.getOrDefault(p.getUUID(),-100L)<2)return;
             INPUT.put(p.getUUID(),now);
             if(value>=0&&value<Ability.values().length&&HexData.unlocked(p,Ability.at(value)))HexData.get(p).putInt("selected",value);
@@ -66,6 +69,7 @@ public final class HexServer {
         if(TimeBranch.charging(p)&&action!=HOLD_END){if(action==UTILITY)TimeBranch.cancel(p);return;}
         if(action==SCROLL){Telekinesis.adjust(p,Math.max(-4,Math.min(4,value-8)));return;}
         if(action==HOLD_END){
+            if(Warping.charging(p)){Warping.release(p);return;}
             // Read from the charge itself rather than the selector, so switching spells mid-hold still
             // releases the torrent instead of stranding the caster planted in place.
             if(TimeBranch.charging(p)){TimeBranch.release(p);return;}
@@ -76,6 +80,7 @@ public final class HexServer {
         if(now-INPUT.getOrDefault(p.getUUID(),-100L)<(TemporalEngine.slowed(p)?15:3))return;
         INPUT.put(p.getUUID(),now);
         if(action==BRANCH_TAP){BranchFist.arm(p);return;}
+        if(action==UTILITY&&HexData.selected(p)==Ability.WARPING&&Warping.sovereign(p)){Warping.utility(p);return;}
         if(action==UTILITY){Telekinesis.release(p,false);Architecture.forget(p);TemporalEngine.clear(p);dismissRift(p);return;}
         if(action==WEAPON){weapon(p,value!=0);return;}
         if(action==FLIGHT){CosmicFlight.toggle(p);return;}
@@ -83,6 +88,7 @@ public final class HexServer {
         Ability a=action==TRANSFORM?Ability.ASCENSION:HexData.selected(p);
         // Returning home must never depend on energy, mastery or the entry spell's recovery. The way
         // out follows whatever the owner's saved mode currently points at.
+        if(a==Ability.WARPING&&(action==CAST||action==HOLD_BEGIN)&&Warping.leave(p))return;
         if(a==Ability.RIFT&&PocketRealm.inside(p.level())&&(action==CAST||action==HOLD_BEGIN)) {
             UUID active=RIFTS.get(p.getUUID());
             if(active==null||!(p.serverLevel().getEntity(active) instanceof RiftEntity))openFracture(p,FractureTravel.exit(p));
@@ -95,6 +101,7 @@ public final class HexServer {
         if(!HexData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return;}
         if(HexData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return;}
         if(HexData.energy(p)<a.cost){notice(p,"Not enough Temporal Energy.");return;}
+        if(a==Ability.WARPING){if(action==HOLD_BEGIN||action==CAST)Warping.begin(p);return;}
         if(action==HOLD_BEGIN) {
             if(!a.hold)return;
             if(a==Ability.RIFT) {
@@ -436,6 +443,7 @@ public final class HexServer {
         Nothingness.tick(level);
         IllusoryWalls.tick(level);
         PocketRealm.tick(level);
+        Warping.tick(level);WarpRealms.tick(level);
         if(now%200==0)WATCHED.entrySet().removeIf(e->level.getEntity(e.getKey())==null);
     }
 
@@ -562,6 +570,7 @@ public final class HexServer {
     }
 
     public static void clear(ServerPlayer p,boolean death) {
+        Warping.cancel(p);
         Telekinesis.forget(p);Architecture.dismiss(p);clearIllusions(p);dismissRift(p);TemporalEngine.clear(p);
         Masquerade.drop(p);Threat.forget(p);
         CosmicFlight.revoke(p);
@@ -573,6 +582,7 @@ public final class HexServer {
     }
     public static void reset() {
         HISTORY.clear();CHARMS.clear();STRIKES.clear();INPUT.clear();TRAINING.clear();ILLUSIONS.clear();WATCHED.clear();RIFTS.clear();
+        Warping.reset();
         Telekinesis.reset();Architecture.reset();Bleed.reset();PocketRealm.reset();TemporalEngine.reset();
         Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();
     }
