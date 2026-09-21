@@ -17,8 +17,13 @@ public final class RealmLayout {
                 // A solid stellar interior and exposed lava shell; the renderer supplies the luminous photosphere.
                 for(int x=-33;x<=33;x++)for(int y=-33;y<=33;y++)for(int z=-33;z<=33;z++){
                     double n=x*x+y*y+z*z;if(n>1089||n<28*28)continue;
-                    put(b,x,94+y,z,n>31*31?Blocks.LAVA.defaultBlockState():Blocks.MAGMA_BLOCK.defaultBlockState());
+                    if(x*x+z*z<100&&y>24)continue;
+                    put(b,x,94+y,z,Blocks.MAGMA_BLOCK.defaultBlockState());
                 }
+                // The lava lies inside the photosphere, contained by the solid stellar shell.
+                // An open pole lets captives fall into it without thousands of lava streams spilling into space.
+                for(int x=-9;x<=9;x++)for(int z=-9;z<=9;z++)if(x*x+z*z<81)
+                    put(b,x,116,z,Blocks.LAVA.defaultBlockState());
             }
             case VOID_SEA,GRAVITY_WELL,FALLING_WORLD -> {}
             case SHATTERED_WORLD -> {

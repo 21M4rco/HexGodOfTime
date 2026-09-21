@@ -40,7 +40,8 @@ public final class Warping {
         Destination d=Destination.at(HexData.get(p).getInt("warpDestination"));
         ServerLevel target=p.server.getLevel(d.key);
         if(target==null){notice(p,"Warping dimensions are unavailable. Restart the server after installing the update.");return;}
-        double cell=WarpRealms.allocate(target);
+        double cell=HexData.get(p).getDouble("warpPrepared_"+d.name());
+        if(cell==0){cell=WarpRealms.allocate(target);HexData.get(p).putDouble("warpPrepared_"+d.name(),cell);}
         WarpRealms.prepare(target,d,cell);
         Charge c=new Charge(p,new Vec3(hit.getBlockPos().getX()+.5,hit.getLocation().y+.025,hit.getBlockPos().getZ()+.5),d,cell);
         CHARGES.put(p.getUUID(),c);HexNetwork.animate(p,"threads");send(p,c,false);

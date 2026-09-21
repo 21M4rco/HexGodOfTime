@@ -32,6 +32,11 @@ public final class WarpScene {
             double a=i*.16+g*2,rad=i*.085;Vec3 center=new Vec3(Math.cos(g*2.1)*235,190+g*20,Math.sin(g*2.1)*235);
             Vec3 p=center.add(Math.cos(a)*rad,Math.sin(a)*rad*.4,Math.sin(a)*rad*.7);WarpMesh.box(b,m,p.x,p.y,p.z,.35,.35,.35,i<30?0xf1dfff:0x784c9e,.55f);
         }
+        if(d==Destination.SUN)for(int i=0;i<5;i++){
+            double phase=(time+i*117)%520;if(phase>55)continue;
+            double a=i*2.399;Vec3 p=new Vec3(Math.cos(a)*220+phase,205-phase*.3,Math.sin(a)*220);
+            WarpMesh.ribbon(b,m,p,p.add(-8,2.4,0),.12,0xffffff,(float)Math.sin(phase/55*Math.PI));
+        }
         BufferUploader.drawWithShader(b.end());
     }
     public static void draw(PoseStack pose,Destination d,double time,long age,boolean preview){
@@ -51,7 +56,7 @@ public final class WarpScene {
                 for(int i=0;i<110;i++){double a=i*2.399,timeShift=(time*.15+i*4)%45;Vec3 p=c.add(Math.cos(a)*(36+timeShift*.1),Math.sin(a)*(36+timeShift*.1),Math.sin(i*5.7)*25);WarpMesh.box(b,m,p.x,p.y,p.z,.18,.18,.18,0xffe2a0,(float)(1-timeShift/45));}
             }
             case VOID_SEA -> {
-                if(preview){WarpMesh.box(b,m,-250,0,-250,500,135,500,0x020810,1);for(int i=0;i<90;i++){double x=Math.sin(i*5.2)*180,z=Math.cos(i*3.7)*180;WarpMesh.ribbon(b,m,new Vec3(x,135.03,z),new Vec3(x+5,135.03,z+Math.sin(time*.03+i)),.08,0x244454,.5f);}leviathanSilhouette(b,m,time);}
+                if(preview){WarpMesh.box(b,m,-250,0,-250,500,136,500,0x020810,1);for(int i=0;i<90;i++){double x=Math.sin(i*5.2)*180,z=Math.cos(i*3.7)*180;WarpMesh.ribbon(b,m,new Vec3(x,136.03,z),new Vec3(x+5,136.03,z+Math.sin(time*.03+i)),.08,0x244454,.5f);}leviathanSilhouette(b,m,time);}
             }
             case GRAVITY_WELL -> {
                 Vec3 c=new Vec3(0,96,0);

@@ -27,7 +27,7 @@ public final class WarpRealms {
     private static Ledger ledger(ServerLevel l){return l.getDataStorage().computeIfAbsent(Ledger::load,Ledger::new,"warping_realms");}
     public static double allocate(ServerLevel l){Ledger a=ledger(l);a.next++;a.setDirty();return a.next*1024.0;}
     public static double latest(ServerLevel l){return ledger(l).next*1024.0;}
-    public static void prepare(ServerLevel l,Destination d,double x){if(!ready(l,x))JOBS.add(new Job(l,d,x,RealmLayout.blocks(d).iterator()));}
+    public static void prepare(ServerLevel l,Destination d,double x){if(!ready(l,x)&&JOBS.stream().noneMatch(j->j.level==l&&j.cell==x))JOBS.add(new Job(l,d,x,RealmLayout.blocks(d).iterator()));}
     public static boolean ready(ServerLevel l,double x){return l!=null&&ledger(l).ready.contains((long)x);}
     public static void start(ServerLevel l,double x){Ledger a=ledger(l);a.clocks.put((long)x,l.getGameTime());a.setDirty();}
     public static long age(ServerLevel l,double x){return Math.max(0,l.getGameTime()-ledger(l).clocks.getOrDefault((long)x,l.getGameTime()));}
