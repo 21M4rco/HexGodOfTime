@@ -689,10 +689,17 @@ public final class LeviathanCombatController {
         return !(entity instanceof Player player) || (!player.isCreative() && !player.isSpectator());
     }
 
+    /**
+     * One blow, once per entity per pattern.
+     *
+     * <p>{@code amount} is the blow as the pattern wrote it: points against a person. What is
+     * actually dealt comes from {@link AbyssalPilgrimEntity#attackAmount}, which weighs it against
+     * how much health the thing in front of it is carrying and how busy the ocean is.
+     */
     private boolean damage(LivingEntity entity, float amount, double knockback) {
         if (!struck.add(entity.getUUID())) return false;
         connected = landedThisTick = true;
-        entity.hurt(self.attackDamage(entity), amount);
+        entity.hurt(self.attackDamage(entity), self.attackAmount(entity, amount));
         if (knockback > 0) {
             Vec3 away = entity.position().subtract(self.segments().segment(0));
             if (away.lengthSqr() < 1.0E-4) away = new Vec3(0, 1, 0);

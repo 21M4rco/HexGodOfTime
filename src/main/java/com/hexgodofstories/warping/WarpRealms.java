@@ -4,11 +4,19 @@ import com.hexgodofstories.HexGodOfStories;
 import com.hexgodofstories.data.HexData;
 import com.hexgodofstories.network.HexNetwork;
 import com.hexgodofstories.server.FractureAnchor;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.*;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextColor;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.*;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.effect.*;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.*;
 import net.minecraftforge.common.util.ITeleporter;
@@ -63,6 +71,24 @@ public final class WarpRealms {
             e.stopRiding();e.changeDimension(to,new ITeleporter(){public Entity placeEntity(Entity entity,ServerLevel current,ServerLevel dest,float yaw,java.util.function.Function<Boolean,Entity> reposition){Entity moved=reposition.apply(false);if(moved!=null){moved.moveTo(pos.x,pos.y,pos.z,yaw,0);moved.setDeltaMovement(0,-.3,0);moved.fallDistance=0;}return moved;}});
         }
         e.setDeltaMovement(0,owner?0:-.3,0);e.fallDistance=0;HexNetwork.arrival(e);
+    }
+    /** The title's colour: a dark blue with the green and the violet either side of it in it. */
+    private static final int COSMIC=0x354B8D;
+    /**
+     * The Void Sea introduces itself to whoever has just arrived in it.
+     *
+     * <p>Sent on the dimension change rather than from the transfer, so every way in says the same
+     * thing: the trap, a deliberate crossing, an operator's teleport. The realm drops arrivals
+     * fifty blocks above the waterline precisely so there is a moment to read it in, and the
+     * timings here are written to outlast the fall and the splash at the end of it.
+     */
+    public static void greet(ServerPlayer p,ResourceKey<Level> to){
+        if(!Destination.VOID_SEA.key.equals(to))return;
+        p.connection.send(new ClientboundSetTitlesAnimationPacket(15,70,25));
+        // Subtitle first: the client stores it, and it is the title packet that starts the animation.
+        p.connection.send(new ClientboundSetSubtitleTextPacket(Component.literal("The water feels strange...").withStyle(ChatFormatting.DARK_GRAY)));
+        p.connection.send(new ClientboundSetTitleTextPacket(Component.literal("Cosmic Sea")
+            .withStyle(style->style.withColor(TextColor.fromRgb(COSMIC)).withBold(true))));
     }
     public static void tick(ServerLevel l){
         Destination d=Destination.from(l);if(d==null)return;

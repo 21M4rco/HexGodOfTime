@@ -67,9 +67,15 @@ public final class LeviathanMoveControl extends MoveControl {
         this.leviathan = leviathan;
     }
 
+    /**
+     * The creature's own urgency is applied here rather than at the thirty call sites that ask for
+     * a speed, for the same reason {@link #SCALE} is: every pattern keeps the pacing it was
+     * written with, and a busier ocean simply runs all of it harder. The turning radius is
+     * deliberately not touched — it covers ground faster, it does not corner tighter.
+     */
     public void moveTo(Vec3 target, double blocksPerTick, float turnAuthority) {
         this.wanted = target;
-        this.speed = blocksPerTick * SCALE;
+        this.speed = blocksPerTick * SCALE * leviathan.urgency();
         this.authority = Mth.clamp(turnAuthority, 0.02f, 1.0f);
         this.active = true;
         super.setWantedPosition(target.x, target.y, target.z, this.speed);
@@ -96,7 +102,7 @@ public final class LeviathanMoveControl extends MoveControl {
     /** Blocks per tick of horizontal correction permitted mid leap. Zero is a pure ballistic arc. */
     public void setAirSteer(double amount) { this.airSteer = Math.max(0, amount); }
     /** One off forward impulse, used by lunges, deep charges and breach launches. */
-    public void addBurst(double amount) { this.burst = Math.max(this.burst, amount * SCALE * 0.6); }
+    public void addBurst(double amount) { this.burst = Math.max(this.burst, amount * SCALE * leviathan.urgency() * 0.6); }
     public void setRollIntent(float degrees) { this.rollIntent = degrees; }
     public Vec3 wanted() { return wanted; }
     public boolean active() { return active; }

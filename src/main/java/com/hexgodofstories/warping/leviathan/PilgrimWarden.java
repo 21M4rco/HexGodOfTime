@@ -159,31 +159,41 @@ public final class PilgrimWarden {
                     if (entity instanceof AbyssalPilgrimEntity rival && rival != owner) rival.discard();
             }
         }
-        if (now % 10 == 0) detectEntries(level, players, now % 200 == 0);
+        if (now % 10 == 0) surveyRealm(level, players, now % 200 == 0);
         if (now % 200 == 0 && !players.isEmpty()) reposition(level, players);
     }
 
     /**
-     * Anything crossing into the water is an event, not a statistic.
+     * One walk of the realm, for the two things that have to know who is in it.
      *
-     * <p>Waiting for the hunt controller's deliberately fuzzed long range sampling to notice a
-     * swimmer is what made the ocean feel empty: you could drop in, dive, and be treated as
-     * scenery. A dry to wet transition now reaches the creature with an exact position attached.
+     * <p>Anything crossing into the water is an event, not a statistic. Waiting for the hunt
+     * controller's deliberately fuzzed long range sampling to notice a swimmer is what made the
+     * ocean feel empty: you could drop in, dive, and be treated as scenery. A dry to wet
+     * transition reaches the creature with an exact position attached.
+     *
+     * <p>The same pass counts how many of them there are, which is what Trill of the Hunt reads.
+     * Everything that could be hunted is counted wherever it is — treading water, standing on a
+     * boat or falling toward the surface — because the passive is about how busy the ocean is, not
+     * about how many things are currently wet. Loaded entities only, which in practice is every
+     * player and everything near one.
      */
-    private static void detectEntries(ServerLevel level, List<ServerPlayer> players, boolean sweep) {
+    private static void surveyRealm(ServerLevel level, List<ServerPlayer> players, boolean sweep) {
         Set<UUID> wetNow = new HashSet<>();
         AbyssalPilgrimEntity pilgrim = ensure(level);
         if (pilgrim == null || pilgrim.ai() == null || pilgrim.isDying()) return;
         net.minecraft.world.entity.Entity entrant = null;
+        int occupants = 0;
         for (net.minecraft.world.entity.Entity entity : level.getAllEntities()) {
             if (!(entity instanceof LivingEntity) || entity instanceof AbyssalPilgrimEntity
                     || !entity.isAlive() || entity.isSpectator()
                     || entity instanceof Player p && p.isCreative()) continue;
+            occupants++;
             // Airborne presence is handled by global hunting. WET must only track actual water.
             if (!entity.isInWater()) continue;
             wetNow.add(entity.getUUID());
             if (!WET.contains(entity.getUUID()) && (entrant == null || entity instanceof Player)) entrant = entity;
         }
+        pilgrim.ai().occupants(occupants);
         if (entrant != null) pilgrim.ai().alert(entrant);
         WET.clear(); WET.addAll(wetNow);
     }

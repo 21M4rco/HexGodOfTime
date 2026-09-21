@@ -75,6 +75,8 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
     private long heldChunk = Long.MIN_VALUE;
     /** Client side, used to fade ambience and decide appendage detail. */
     private double viewerDistance = 1024;
+    /** Server side. How full the ocean is, as {@link TrillOfTheHunt} reads it. */
+    private float thrill;
 
     public AbyssalPilgrimEntity(EntityType<? extends AbyssalPilgrimEntity> type, Level level) {
         super(type, level);
@@ -346,6 +348,32 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
     private static final net.minecraft.resources.ResourceKey<net.minecraft.world.damagesource.DamageType> HEXOR_KILL =
         net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DAMAGE_TYPE, HexGodOfStories.id("hexor"));
 
+    /**
+     * What a blow worth {@code amount} against a person actually costs {@code victim}.
+     *
+     * <p>Every blow the creature lands comes through here — the patterns' damage, the body's own
+     * contact, the graze it takes while playing — so there is one place that decides how hard it
+     * hits. Two things happen to the number: {@link TrillOfTheHunt} multiplies it by how busy the
+     * ocean is, and {@link HexorBlow} weighs the result against the victim's own health pool.
+     *
+     * <p>Anything without a pool to weigh against, a boat being the usual case, takes the blow as
+     * the pattern wrote it.
+     */
+    public float attackAmount(Entity victim, float amount) {
+        float blow = amount * TrillOfTheHunt.violence(thrill);
+        return victim instanceof LivingEntity living ? HexorBlow.against(blow, living.getMaxHealth()) : blow;
+    }
+
+    /**
+     * How wound up the hunt is, nought to one. Owned by the AI, which recounts the realm's
+     * occupants a few times a second; zero on a client, where nothing asks.
+     */
+    public void setThrill(float value) { this.thrill = Mth.clamp(value, 0f, 1f); }
+    public float thrill() { return thrill; }
+
+    /** Multiplier the move control puts on every speed the behaviour asks for. */
+    public double urgency() { return TrillOfTheHunt.urgency(thrill); }
+
     /** Apply contact to the actual section volumes, including boats and moving modded objects. */
     private void bodyContact() {
         if (isDying() || !segments.primed()) return;
@@ -367,7 +395,7 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
                 victim.setDeltaMovement(victim.getDeltaMovement().scale(0.55).add(away.scale(0.35 + speed * 1.6)));
                 victim.hurtMarked = true; victim.fallDistance = 0;
                 if (speed > 0.3 && tickCount % 10 == 0 && attack() != LeviathanAttack.FAKE_ATTACK)
-                    victim.hurt(attackDamage(victim), (float) (2.0 + speed * 9.0));
+                    victim.hurt(attackDamage(victim), attackAmount(victim, (float) (2.0 + speed * 9.0)));
                 break;
             }
         }

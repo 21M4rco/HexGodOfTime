@@ -33,6 +33,15 @@ Everything below needs a recorded in-game session and **has not had one**. Nothi
   the world height, both of which the build checks. How it reads on the way down does not.
 - **How the new skin reads in game.** The tiles were measured for seamlessness and designed for low contrast at cube scale, which is an argument, not an observation. Whether the hull now reads as one surface rather than as stacked boxes needs eyes on it.
 - **Whether the joint limits are the right ones.** They are provably sufficient to prevent self-intersection and they hold the model's exact pivot spacing, but 7 to 21 degrees per joint is a judgement about how a leviathan should bend, and only play establishes that.
+- **What the new damage scale feels like.** The arithmetic is checked by `verifyHexor` and the
+  consequence — a fixed handful of blows whatever the health bar says — is arithmetic too. Whether
+  four bites is the right number of bites for a warden is not.
+- **Trill of the Hunt in a crowded sea.** The curve is checked and the frenzy floor is proven to
+  cross the threshold the AI branches on. Whether a sea with eight things in it reads as a creature
+  that has stopped playing, rather than merely as a faster one, needs several players in the water
+  at once, which has not happened.
+- **The Void Sea's arrival title.** That it is sent on every entry is source-level; that the colour
+  is legible against the realm's sky during the fifty block fall has not been seen.
 - **Flight removal in play.** That no dimension but the fracture world grants flight is enforced in one place and exercised by the server regression for the Void Sea. Whether the Sun, the Crushing Realm and the Falling World are now fair without it has not been played.
 
 ## Known limitations

@@ -445,3 +445,94 @@ body crush, the scream and the pressure of being dragged deep stay blunt, and bl
 plain UUID, and when the owner of a wound is not a player but is Hexor, the ticking damage is dealt
 with Hexor's own damage type — so bleeding out from a bite is still a kill by Hexor and still says
 so in red, rather than being reported as plain magic.
+
+## 0.5.12 — a blow worth what it lands on, Trill of the Hunt, and a name for the water
+
+Base: successful Actions run 35642086112, commit d0a463e5e3e752bcd2b1f6fd9cdaecbe8ec538f2.
+
+### Damage is a share of the pool, not a number of points
+
+Every attack pattern names its damage in points, and every one of those numbers was written against
+a player: twenty of them, so a bite is most of a person and a body crush is all of one. Against a
+health bar built to be large those numbers are wrong by the size of the bar. A warden carries five
+hundred points and no armour, so as written it survived thirty-six bites — minutes of being chewed
+on by a hundred and fifty blocks of apex predator whose whole behaviour is built around playing
+with what it has caught. Points do not scale with the fiction. A share of the pool does.
+
+`HexorBlow` weighs every blow against the maximum health of what it lands on. Below a pivot of two
+people nothing changes at all: a player takes the numbers the patterns were balanced with, and so
+does a drowned, a zombie and anything else ordinary in the water. Above it a blow takes the share
+of the victim's pool that it would have taken of a person's, which has one consequence worth
+stating plainly — **time to kill stops depending on the size of the health bar.** A bite finishes
+anything past the pivot in four, a lunge in three, a body crush in three, whether that is an iron
+golem, a warden, a wither or a ten thousand point modded boss. A warden is a toy because a warden
+dies in the same handful of blows a swimmer does.
+
+The maximum is read, never the current health: current health would shrink every blow as the fight
+wore on and make the last point of a boss the most expensive one to take, which is the opposite of
+what a proportional weapon is for. A ceiling of 4096× exists only so an entity carrying an absurd
+or infinite attribute cannot produce a non-finite number; nothing anyone would fight approaches it.
+
+Everything the creature does goes through one place, `AbyssalPilgrimEntity.attackAmount`: the
+patterns' damage, the body's own contact while it brushes past, and the graze it takes while
+playing. Bleeding is deliberately left alone — the wound is the conjured dagger's, shared with the
+blades, and it is a wound rather than a blow.
+
+### Trill of the Hunt
+
+Hexor's passive, and the first thing about it that is not damage: **the busier its ocean is, the
+less of a game the hunt is allowed to be.**
+
+Alone with one swimmer nothing moves. It still circles, watches, grazes, feints and takes its time,
+because a lone thing in an ocean is something to play with. Every further living occupant of the
+realm winds the curve up, to its limit at eight.
+
+The realm's population is counted in the sweep `PilgrimWarden` already runs several times a second
+to catch things entering the water, so the passive costs no second scan. Everything that could be
+hunted is counted wherever it is — treading water, standing on a boat, falling toward the surface —
+because what is being measured is how busy the ocean is, not how many things are currently wet.
+
+Three things follow, and the first two come out of the existing mood rather than out of new
+behaviour, because mood is what the whole repertoire already reads:
+
+- **It plays less.** A ceiling drops onto patience and a floor rises under frenzy. The state roll's
+  play share is the product of the two, so toying, stalking and the feint are squeezed out from
+  both ends, and a full sea holds the creature past the frenzy threshold, where the only states
+  left are the ones that end in a strike. The commit clock runs up to three times over, so what
+  circling remains turns into committing sooner. Both bounds are applied after everything else, so
+  a kill still buys patience and a quiet minute still bleeds frenzy — neither can cross the line
+  the water's own population sets.
+- **It moves faster.** Half again as fast at a full sea, applied in `LeviathanMoveControl` next to
+  the existing weight scale rather than at the thirty call sites that ask for a speed, so every
+  pattern keeps its relative pacing and simply happens harder. The turn radius is deliberately
+  untouched: it covers ground faster, it does not corner tighter, so none of the joint work of
+  0.5.6 is undone.
+- **It hits harder.** Half again as hard at a full sea, multiplied into the blow before the pool is
+  weighed against it, so the violence lands on a player and on a boss alike.
+
+This replaces the old trickle of frenzy for a second player, which said the same thing far more
+weakly and counted only players. Shorter attack cooldowns come for free: the combat controller
+already shortens the pause between patterns with frenzy.
+
+### The sea says what it is
+
+Arriving in the Void Sea now puts a title on the screen — **Cosmic Sea** in bold, in a dark blue
+with the green and the violet either side of it in it, over *The water feels strange...* in dark
+grey. Sent on the dimension change rather than from the transfer, so the trap, a deliberate
+crossing and an operator's teleport all say the same thing, and timed to outlast the fifty block
+fall the realm drops arrivals into.
+
+### What is checked, and what is not
+
+`verifyHexor` runs in the build. It holds the patterns' numbers unchanged for a player at every
+blow they deal, holds the proportional rule above the pivot, holds time to kill constant across
+pools from an iron golem to ten thousand points, keeps absurd pools finite, and holds the passive
+dormant at one occupant, monotonic across the curve and — read out of the AI's own source rather
+than restated — high enough at a full sea to actually cross the frenzy threshold it is aiming at.
+It also reads the creature's source and fails if any blow reaches `hurt` without being weighed,
+which is the hole a pattern added later would otherwise leave.
+
+None of that is play. Whether four bites is the right number of bites for a warden, whether a sea
+with eight things in it reads as a creature that has stopped playing or merely as a faster one, and
+whether the title's colour is legible against the sky it is read against, are all judgements only a
+game session settles.

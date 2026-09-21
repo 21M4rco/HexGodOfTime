@@ -22,6 +22,11 @@ import javax.annotation.Nullable;
  * extend a hunt instead of ending it, and <em>frenzy</em>, which is how far it has stopped caring.
  * High patience produces the toying repertoire below; high frenzy suppresses it entirely. Neither
  * is visible to the player, which is the point: an approach never announces what it is.
+ *
+ * <p>Both are bounded by {@link TrillOfTheHunt}, the passive that reads how many living things are
+ * in the realm: alone with one swimmer the creature behaves exactly as it always has, and every
+ * further occupant caps its patience, floors its frenzy, winds the commit clock faster and, out in
+ * {@link LeviathanMoveControl} and {@link HexorBlow}, makes it faster and heavier handed.
  */
 public final class AbyssalPilgrimAI {
     /** Deliberately non lethal harassment. */
@@ -63,6 +68,8 @@ public final class AbyssalPilgrimAI {
     private int waterPursuit;
     /** Keeps the leap a decisive event rather than a constant fountain. */
     private int leapCooldown;
+    /** Living things in the realm that are not Hexor, as the realm's own sweep last counted them. */
+    private int occupants = TrillOfTheHunt.ALONE;
 
     public AbyssalPilgrimAI(AbyssalPilgrimEntity self) {
         this.self = self;
@@ -77,6 +84,16 @@ public final class AbyssalPilgrimAI {
 
     public LeviathanHuntController hunt() { return hunt; }
     public LeviathanCombatController combat() { return combat; }
+
+    /**
+     * Handed the realm's population by {@link PilgrimWarden}, which already walks every entity in
+     * the dimension several times a second looking for things entering the water, so counting them
+     * while it is there costs nothing and no second sweep exists.
+     */
+    public void occupants(int count) { occupants = Math.max(0, count); }
+
+    /** Trill of the Hunt: nought while the ocean is its own, one once the water is full. */
+    public float thrill() { return TrillOfTheHunt.thrill(occupants); }
 
     /** Nought while the hunt is young, one once it has gone on too long to keep playing. */
     public float commitment() { return Mth.clamp(pressure / (float) PATIENCE_LIMIT, 0f, 1f); }
@@ -123,7 +140,8 @@ public final class AbyssalPilgrimAI {
         // rather than from the standing flag, which stays set for the rest of the pattern and
         // would otherwise hold the clock at zero right through the next bout of circling.
         if (combat.landed()) pressure = 0;
-        else if (hunt.hasTarget() && hunt.targetDistance() < ENGAGE) pressure++;
+        else if (hunt.hasTarget() && hunt.targetDistance() < ENGAGE)
+            pressure = Math.min(PATIENCE_LIMIT, pressure + TrillOfTheHunt.pressureStep(thrill()));
         else pressure = Math.max(0, pressure - 2);
         updateMood(level);
         ambience(level);
@@ -181,8 +199,16 @@ public final class AbyssalPilgrimAI {
             quietTicks++;
             if (quietTicks > 400 && now % 60 == 0) { frenzy = Math.max(0f, frenzy - 0.02f); patience = Math.min(1f, patience + 0.01f); }
         }
-        if (level.players().size() > 1 && now % 200 == 0) frenzy = Math.min(1f, frenzy + 0.01f);
         if (now - lastKill < 600) { patience = Math.min(1f, patience + 0.004f); frenzy = Math.max(0f, frenzy - 0.004f); }
+
+        // Trill of the Hunt, applied last so nothing above can talk the creature back down out of
+        // it: a kill still buys patience, a quiet minute still bleeds frenzy away, but neither can
+        // cross the bounds the water's own population sets. It replaces the old trickle of frenzy
+        // for a second player, which said the same thing far more weakly and counted only players.
+        float thrill = thrill();
+        patience = Math.min(patience, TrillOfTheHunt.patienceCeiling(thrill));
+        frenzy = Math.max(frenzy, TrillOfTheHunt.frenzyFloor(thrill));
+        self.setThrill(thrill);
 
         hunt.airborneTargetRecently = hunt.airborneTarget();
         self.setFrenzy(Mth.floor(frenzy * 16) / 16f);
@@ -420,7 +446,7 @@ public final class AbyssalPilgrimAI {
                 self.control().moveTo(target.position(), 1.4, 0.6f);
                 for (LivingEntity near : level.getEntitiesOfClass(LivingEntity.class, self.segments().box(2).inflate(2.5), e -> e != self && e.isAlive())) {
                     if (near instanceof Player player && player.isCreative()) continue;
-                    near.hurt(self.attackDamage(near), 2f);
+                    near.hurt(self.attackDamage(near), self.attackAmount(near, 2f));
                     Vec3 away = near.position().subtract(self.segments().segment(2));
                     if (away.lengthSqr() > 1.0E-4) near.setDeltaMovement(near.getDeltaMovement().add(away.normalize().scale(1.1)));
                     near.hurtMarked = true;

@@ -110,6 +110,16 @@ tasks.register('verifyPilgrimMotion', JavaExec) {
 }
 tasks.named('check') { dependsOn 'verifyPilgrimMotion' }
 
+// How hard Hexor hits what it bites, and what a crowded ocean does to the hunt. Pure arithmetic
+// plus a read of the creature's own source, so no Minecraft world is needed for either.
+tasks.register('verifyHexor', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.hexgodofstories.warping.HexorTest'
+    enableAssertions = true
+}
+tasks.named('check') { dependsOn 'verifyHexor' }
+
 // Converging singularity orbits and a continuous moon surface, without launching Minecraft.
 tasks.register('verifyCosmicPhysics', JavaExec) {
     dependsOn testClasses
