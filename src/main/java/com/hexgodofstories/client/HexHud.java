@@ -42,7 +42,7 @@ public final class HexHud {
         boolean home=a==Ability.RIFT&&com.hexgodofstories.server.PocketRealm.inside(mc.player.level())||a==Ability.WARPING&&com.hexgodofstories.warping.Destination.from(mc.player.level())!=null;
         String status=home?"Return: free":cd>0?String.format(Locale.ROOT,"Recovery %.1fs",cd/20f):d.getFloat("energy")<a.cost?"Low energy":"Ready";
         g.drawString(mc.font,status+"  |  Cost "+(home?0:a.cost),7,18,cd>0&&!home?0xd2b27f:0x93caaa,false);
-        if(a==Ability.WARPING){String charge=WarpRenderer.chargeLabel(mc.player.getId());if(!charge.isEmpty())g.drawString(mc.font,charge,3,-12,0xd7b9f0,false);}
+        if(a==Ability.WARPING){String charge=WarpRenderer.chargeLabel(mc.player.getId());if(!charge.isEmpty())g.drawString(mc.font,charge,3,d.getBoolean("ascended")?-24:-12,0xd7b9f0,false);}
         String primary=HexClient.PRIMARY.getTranslatedKeyMessage().getString();
         String secondary=HexClient.SECONDARY.getTranslatedKeyMessage().getString();
         // Outside the sanctum the Fracture only does one thing — it takes you and whatever is
@@ -113,7 +113,7 @@ public final class HexHud {
 
     private static String primary(Ability a) {
         return switch(a) {
-            case WARPING -> "Hold: fracture the floor. Release: trap.";
+            case WARPING -> "Hold/release: open 10s. Step in: follow.";
             case RIFT -> "Tap: doorway. Hold: pull 5 blocks.";
             case DUPLICATE -> "Create a living decoy.";
             case PROJECTION_SWAP -> "Swap with your nearest decoy.";

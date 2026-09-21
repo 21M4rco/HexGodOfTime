@@ -16,10 +16,12 @@ import java.util.*;
 /** Server-owned floor selection; release never trusts a client position, duration or destination. */
 public final class Warping {
     private static final Map<UUID,Charge> CHARGES=new HashMap<>();
+    // Released portals own their lifetime, even when their caster crosses, logs out or changes spells.
+    private static final Map<UUID,Charge> PORTALS=new HashMap<>();
     private static final class Charge {
-        final ServerLevel level;final Vec3 at;final Destination destination;final long start;final double cell;
+        final ServerLevel level;final Vec3 at;final Destination destination;final long start;final double cell;final int ownerId;
         long opened=-1;int held;final Set<UUID> moved=new HashSet<>();final List<BlockPos> replaced=new ArrayList<>();
-        Charge(ServerPlayer p,Vec3 at,Destination d,double cell){level=p.serverLevel();this.at=at;destination=d;start=level.getGameTime();this.cell=cell;}
+        Charge(ServerPlayer p,Vec3 at,Destination d,double cell){level=p.serverLevel();this.at=at;destination=d;start=level.getGameTime();this.cell=cell;ownerId=p.getId();}
     }
     public static boolean charging(ServerPlayer p){return CHARGES.containsKey(p.getUUID());}
     public static boolean sovereign(Entity e){return e instanceof ServerPlayer p&&HexData.access(p)&&HexData.unlocked(p,Ability.WARPING);}
@@ -34,7 +36,7 @@ public final class Warping {
         return h;
     }
     public static void begin(ServerPlayer p){
-        if(charging(p))return;
+        if(charging(p)||PORTALS.containsKey(p.getUUID()))return;
         BlockHitResult hit=aim(p);
         if(hit==null){notice(p,"Warping requires a solid floor within 32 blocks.");return;}
         Destination d=Destination.at(HexData.get(p).getInt("warpDestination"));
@@ -44,7 +46,7 @@ public final class Warping {
         if(cell==0){cell=WarpRealms.allocate(target);HexData.get(p).putDouble("warpPrepared_"+d.name(),cell);}
         WarpRealms.prepare(target,d,cell);
         Charge c=new Charge(p,new Vec3(hit.getBlockPos().getX()+.5,hit.getLocation().y+.025,hit.getBlockPos().getZ()+.5),d,cell);
-        CHARGES.put(p.getUUID(),c);HexNetwork.animate(p,"threads");send(p,c,false);
+        CHARGES.put(p.getUUID(),c);HexNetwork.animate(p,"threads");send(c,false);
         c.level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.RIFT_OPEN.get(),SoundSource.PLAYERS,1,.65f);
     }
     public static void release(ServerPlayer p){
@@ -52,17 +54,24 @@ public final class Warping {
         int held=(int)(c.level.getGameTime()-c.start);
         if(held<WarpMath.MIN_CHARGE||!valid(p,c)||!WarpRealms.ready(p.server.getLevel(c.destination.key),c.cell)){cancel(p);notice(p,"The fracture did not stabilize.");return;}
         c.held=Math.min(held,WarpMath.FULL_CHARGE);c.opened=c.level.getGameTime();
+        CHARGES.remove(p.getUUID());PORTALS.put(p.getUUID(),c);
         HexData.spend(p,Ability.WARPING.cost);HexData.get(p).putLong("cd_WARPING",HexData.now(p)+Ability.WARPING.cooldown);
         HexServer.reward(p,Ability.WARPING.discipline,90);HexNetwork.sync(p);
         // Existing persistence/restoration code owns every replaced block, including block entities.
         double r=WarpMath.width(c.held)*.5;
         for(int x=(int)Math.ceil(c.at.x-r);x<c.at.x+r;x++)for(int z=(int)Math.ceil(c.at.z-r);z<c.at.z+r;z++){
             BlockPos b=BlockPos.containing(x,c.at.y-.1,z);
+            // Only replace whole cells inside the mirror, keeping the jagged perimeter on intact terrain.
+            boolean interior=true;
+            for(int dx=0;dx<=1;dx++)for(int dz=0;dz<=1;dz++)
+                interior&=WarpMath.inside(b.getX()+dx-c.at.x,b.getZ()+dz-c.at.z,c.held);
+            if(!interior)continue;
             if(c.level.getBlockState(b).getDestroySpeed(c.level,b)>=0&&Nothingness.take(c.level,b,c.opened+WarpMath.OPEN_TICKS))c.replaced.add(b);
         }
         WarpRealms.start(p.server.getLevel(c.destination.key),c.cell);
         HexData.get(p).putDouble("warpCell_"+c.destination.name(),c.cell);
-        send(p,c,false);
+        c.level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.RIFT_OPEN.get(),SoundSource.PLAYERS,1.25f,1.15f);
+        send(c,false);
     }
     private static boolean valid(ServerPlayer p,Charge c){
         if(!p.isAlive()||!HexData.access(p)||!HexData.unlocked(p,Ability.WARPING)||p.isSpectator()||p.level()!=c.level||HexData.selected(p)!=Ability.WARPING||TemporalEngine.frozen(p)||Erasure.erasing(p))return false;
@@ -73,22 +82,27 @@ public final class Warping {
         for(var entry:new ArrayList<>(CHARGES.entrySet())){
             Charge c=entry.getValue();if(c.level!=level)continue;
             ServerPlayer p=level.getServer().getPlayerList().getPlayer(entry.getKey());
-            if(p==null||p.level()!=level||!p.isAlive()||!HexData.access(p)){remove(entry.getKey(),p,c);continue;}
+            if(p==null||p.level()!=level||!p.isAlive()||!HexData.access(p)){CHARGES.remove(entry.getKey());send(c,true);continue;}
             long now=level.getGameTime();
-            if(c.opened<0){
-                if(!valid(p,c)){cancel(p);continue;}
-                if(now-c.start>=WarpMath.MAX_HOLD){release(p);continue;}
-                if(now%4==0)send(p,c,false);
-            }else{
-                if(now-c.opened>=WarpMath.OPEN_TICKS){Nothingness.restoreDue(level,c.replaced);cancel(p);continue;}
-                double r=WarpMath.width(c.held)*.5;
-                AABB area=new AABB(c.at.x-r,c.at.y-.4,c.at.z-r,c.at.x+r,c.at.y+2.5,c.at.z+r);
-                for(Entity e:level.getEntities(p,area,e->e.isAlive()&&!e.isSpectator()&&!sovereign(e)&&!(e instanceof net.minecraft.world.entity.player.Player q&&q.isCreative()))){
-                    if(e.getY()>c.at.y+1.3||!WarpMath.inside(e.getX()-c.at.x,e.getZ()-c.at.z,c.held)||!c.moved.add(e.getUUID()))continue;
-                    WarpRealms.transfer(e,c.destination,c.cell,false);
-                }
-                if(now%4==0)send(p,c,false);
+            if(!valid(p,c)){cancel(p);continue;}
+            if(now-c.start>=WarpMath.MAX_HOLD){release(p);continue;}
+            if(now%4==0)send(c,false);
+        }
+        for(var entry:new ArrayList<>(PORTALS.entrySet())){
+            Charge c=entry.getValue();if(c.level!=level)continue;
+            long now=level.getGameTime();
+            if(!WarpMath.openAt(c.opened,now)){
+                Nothingness.restoreDue(level,c.replaced);PORTALS.remove(entry.getKey());send(c,true);
+                level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.RIFT_CLOSE.get(),SoundSource.PLAYERS,.8f,.7f);continue;
             }
+            double r=WarpMath.width(c.held)*.5;
+            AABB area=new AABB(c.at.x-r,c.at.y-.4,c.at.z-r,c.at.x+r,c.at.y+1.3,c.at.z+r);
+            for(Entity e:level.getEntities((Entity)null,area,e->e.isAlive()&&!e.isSpectator()&&
+                (e.getUUID().equals(entry.getKey())||!sovereign(e)&&!(e instanceof net.minecraft.world.entity.player.Player q&&q.isCreative())))){
+                if(e.getY()<c.at.y-.4||e.getY()>c.at.y+.3||!WarpMath.inside(e.getX()-c.at.x,e.getZ()-c.at.z,c.held)||!c.moved.add(e.getUUID()))continue;
+                WarpRealms.transfer(e,c.destination,c.cell,e.getUUID().equals(entry.getKey())&&sovereign(e));
+            }
+            if(now%4==0)send(c,false);
         }
     }
     public static void utility(ServerPlayer p){
@@ -112,12 +126,14 @@ public final class Warping {
         cancel(p);HexNetwork.fx(p,"depart");p.teleportTo(to,a.at().x,a.at().y,a.at().z,a.yaw(),a.pitch());p.setDeltaMovement(Vec3.ZERO);p.fallDistance=0;
         HexNetwork.arrival(p);return true;
     }
-    private static void send(ServerPlayer p,Charge c,boolean clear){
-        CompoundTag n=new CompoundTag();n.putBoolean("clear",clear);n.putDouble("x",c.at.x);n.putDouble("y",c.at.y);n.putDouble("z",c.at.z);n.putLong("start",c.start);n.putInt("destination",c.destination.ordinal());n.putLong("opened",c.opened);n.putInt("held",c.held);n.putLong("until",c.level.getGameTime()+12);
-        HexNetwork.near(c.level,c.at,96,new HexNetwork.Message(HexNetwork.WARP,p==null?-1:p.getId(),n));
+    private static void send(Charge c,boolean clear){
+        CompoundTag n=new CompoundTag();n.putBoolean("clear",clear);n.putDouble("x",c.at.x);n.putDouble("y",c.at.y);n.putDouble("z",c.at.z);n.putLong("start",c.start);n.putInt("destination",c.destination.ordinal());n.putLong("opened",c.opened);n.putInt("held",c.held);n.putLong("until",c.opened<0?c.level.getGameTime()+12:Math.min(c.opened+WarpMath.OPEN_TICKS,c.level.getGameTime()+12));
+        n.putString("dimension",c.level.dimension().location().toString());n.putLong("sent",c.level.getGameTime());
+        ServerLevel target=c.level.getServer().getLevel(c.destination.key);
+        n.putLong("realmAge",c.opened>=0&&target!=null?WarpRealms.age(target,c.cell):0);
+        HexNetwork.near(c.level,c.at,96,new HexNetwork.Message(HexNetwork.WARP,c.ownerId,n));
     }
-    private static void remove(UUID id,ServerPlayer p,Charge c){CHARGES.remove(id);if(p!=null)send(p,c,true);}
-    public static void cancel(ServerPlayer p){Charge c=CHARGES.remove(p.getUUID());if(c!=null){send(p,c,true);c.level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.RIFT_CLOSE.get(),SoundSource.PLAYERS,.8f,.7f);}}
-    public static void reset(){CHARGES.clear();WarpRealms.reset();}
+    public static void cancel(ServerPlayer p){Charge c=CHARGES.remove(p.getUUID());if(c!=null){send(c,true);c.level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.RIFT_CLOSE.get(),SoundSource.PLAYERS,.8f,.7f);}}
+    public static void reset(){CHARGES.clear();PORTALS.clear();WarpRealms.reset();}
     private static void notice(ServerPlayer p,String text){p.displayClientMessage(net.minecraft.network.chat.Component.literal(text),true);}
 }

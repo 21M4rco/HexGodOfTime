@@ -1,6 +1,6 @@
-# Warping — 0.5.1-warping
+# Warping — 0.5.2-warping
 
-Built from the linked successful run at `1a42170818074a038035744a6849678e948fc13b`.
+Portal update based on the linked successful run at `296c0e9271c207e0fc46c7874471832ecc0d37e1`.
 Existing ability ordinals are preserved. Warping is appended to the existing catalogue at Sorcery mastery 800.
 No existing mastery thresholds, abilities, transformation stats or fracture destinations are rebalanced.
 
@@ -10,7 +10,8 @@ Select Warping in the existing mastery/quick-slot system.
 
 - **G:** dedicated compact destination selector, with descriptions on hover.
 - **Hold R:** aim down at the upper face of solid terrain within 32 blocks. The location locks when charging starts; keep aiming there.
-- **Release R:** minimum 1.2 seconds; full 10 × 10 footprint at 5 seconds. Opening lasts 1.2 seconds.
+- **Release R:** minimum 1.2 seconds; full jagged footprint within 10 × 10 blocks at 5 seconds. Opening lasts 10 seconds.
+- **Step onto your open portal:** travel to its destination with owner flight and return access. The portal stays open for its remaining lifetime.
 - **X during charge:** cancel.
 - **Crouch + X outside a destination:** follow your own last completed trap for the selected destination.
 - **R inside a destination:** return to the saved entry position, regardless of energy and cooldown.
@@ -39,12 +40,15 @@ Each destination is a distinct registered dimension. Casters receive separated 1
 Prepared instances are reused per caster/destination to prevent canceled charges generating unlimited terrain.
 Generation is budgeted to 4096 block placements per realm tick. An unfinished destination cannot receive victims.
 Nothingness uses the existing persistent block restoration ledger; original block entities and inventories are retained.
-Loki-capable players are excluded from trap targeting and realm environmental penalties. The leviathan remains hostile to all survival players.
+The caster can enter their own portal, including in creative mode. Other Loki-capable and creative players remain excluded from trap targeting. Loki-capable players retain protection from realm environmental penalties.
+Released portals continue for 200 server ticks independently of caster movement, ability selection, death or logout. Each entity crosses a given portal only once, so returning with R does not immediately trap the caster again. The leviathan remains hostile to all survival players.
 Flight permission is managed by the existing flight system and revoked on leaving as appropriate.
 
 ## Rendering
 
-The floor window uses a depth-tested stencil aperture. Jagged fractures expose a spatial destination scene during charging and fill the square on release.
+The floor window uses a depth-tested stencil aperture. Jagged fractures expose a spatial destination scene during charging and keep their irregular broken-mirror outline on release.
+Branching glass cracks, layered edge glow, reflective tinted facets and a staggered burst of rising triangular shards frame the destination. The closing facets return during the final 0.7 seconds. Server collision uses the exact same outline as the open stencil window.
+Only whole interior floor cells are temporarily replaced, and the original floor is restored when the ten-second window expires. Preview clocks track the prepared destination instance.
 The aperture and destination share procedural celestial geometry and the deterministic terrain blueprint.
 Preview architecture is an untextured geometric representation of that blueprint; it is not a second live Minecraft world renderer.
 Previews show authored initial hazards rather than live remote entities or player-made terrain changes.
