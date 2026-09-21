@@ -6,6 +6,7 @@
 - Runtime source and registration scan for obsolete gameplay identity.
 - Procedural asset generation executed successfully: 5 authored meshes, 6 particle sprites, 25 animations, 14 original sounds.
 - Java/Forge compilation through the **Build HexGodOfStories** GitHub Action, which is the only compiler available to this project's working environment.
+- Abyssal Pilgrim: compiles against Forge 47.4.10 and GeckoLib 4.4.9, and `verifyVoidSea` passes in the same Action, so the shipped geometry, animation, audio and the Void Sea's Java constants are proven to agree with the dimension JSON. Its body reconstruction was additionally exercised offline against straight, drifting, stationary, tight S-curve, spiral, vertical and post-teleport paths: joint spacing held to within 0.08 blocks of 6.0 in every case, and did not bunch when the creature stopped.
 
 ## Not verified
 
@@ -21,6 +22,7 @@ Everything below needs a recorded in-game session and **has not had one**. Nothi
 - Illusory architecture geometry and its per-frame cost at the block cap.
 - Two-player transformation, illusion combat, overlapping time fields and projectiles entering a stop.
 - Logout/reconnect, death/respawn and dimension changes while transformed or holding state.
+- **The Abyssal Pilgrim in the water.** Nothing about how it looks or feels is established. Specifically: whether a 160-block body reads at that scale; the bone rotation sign conventions, which `AbyssalPilgrimModel.YAW_SIGN`, `PITCH_SIGN` and `ROLL_SIGN` exist to make a one-character fix if the spine is inverted; breach arc timing and the feel of crossing the waterline; camera shake magnitude; whether 935 blocks of water costs measurable frame time at high render distance; multiplayer target switching with several players in one Warping cell; and whether the emissive mask suffix GeckoLib expects matches the generated `_glowmask.png`.
 
 ## Known limitations
 
