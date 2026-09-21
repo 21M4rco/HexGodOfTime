@@ -140,7 +140,17 @@ public final class PilgrimWarden {
     /** Cheap upkeep. Most ticks do nothing at all. */
     public static void tick(ServerLevel level, long now) {
         List<ServerPlayer> players = level.players();
-        if (players.isEmpty()) return;
+        if (players.isEmpty()) {
+            boolean prey = false;
+            for (net.minecraft.world.entity.Entity entity : level.getAllEntities()) {
+                if (!(entity instanceof AbyssalPilgrimEntity) && entity.isAlive()
+                        && (entity instanceof LivingEntity || entity instanceof net.minecraft.world.entity.vehicle.Boat)) {
+                    prey = true;
+                    break;
+                }
+            }
+            if (!prey) return;
+        }
 
         if (now % 20 == 0) {
             ChunkPos last = PilgrimRegistry.of(level).lastSeen();
@@ -148,7 +158,7 @@ public final class PilgrimWarden {
         }
         if (now % 40 == 0) ensure(level);
         if (now % 10 == 0) detectEntries(level, players, now % 200 == 0);
-        if (now % 200 == 0) { purge(level, players); reposition(level, players); }
+        if (now % 200 == 0 && !players.isEmpty()) reposition(level, players);
     }
 
     /**
@@ -190,22 +200,6 @@ public final class PilgrimWarden {
         if (pilgrim == null || pilgrim.ai() == null) return;
         if (!entered && pilgrim.ai().hunt().target() == entity) return;   // already on them
         pilgrim.ai().alert(entity);
-    }
-
-    /**
-     * Removes anything that would make this an ecosystem. Summoned and player-made creatures are
-     * left alone deliberately, because the design wants them present, as prey.
-     */
-    private static void purge(ServerLevel level, List<ServerPlayer> players) {
-        for (ServerPlayer player : players) {
-            for (LivingEntity entity : level.getEntitiesOfClass(LivingEntity.class, player.getBoundingBox().inflate(160))) {
-                if (entity instanceof AbyssalPilgrimEntity || entity instanceof ServerPlayer || entity.hasCustomName()) continue;
-                MobCategory category = entity.getType().getCategory();
-                if (category == MobCategory.CREATURE || category == MobCategory.AMBIENT || category == MobCategory.WATER_CREATURE
-                    || category == MobCategory.WATER_AMBIENT || category == MobCategory.UNDERGROUND_WATER_CREATURE || category == MobCategory.AXOLOTLS)
-                    entity.discard();
-            }
-        }
     }
 
     /**

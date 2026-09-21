@@ -18,6 +18,17 @@ import net.minecraftforge.fml.common.Mod;
 
 @Mod.EventBusSubscriber(modid=HexGodOfStories.ID)
 public final class ServerEvents {
+    @SubscribeEvent public static void abyssNaturalSpawn(MobSpawnEvent.PositionCheck event) {
+        if (com.hexgodofstories.warping.Destination.from(event.getEntity().level())
+                != com.hexgodofstories.warping.Destination.VOID_SEA) return;
+        var reason = event.getSpawnType();
+        if (reason == net.minecraft.world.entity.MobSpawnType.NATURAL
+                || reason == net.minecraft.world.entity.MobSpawnType.CHUNK_GENERATION
+                || reason == net.minecraft.world.entity.MobSpawnType.PATROL) {
+            event.setResult(net.minecraftforge.eventbus.api.Event.Result.DENY);
+        }
+    }
+
     /** Cancel the spawn itself, before pickup, hoppers or another mod can collect a dropped illusion. */
     @SubscribeEvent public static void conjuredDrop(net.minecraftforge.event.entity.EntityJoinLevelEvent e) {
         if(!e.getLevel().isClientSide&&e.getEntity() instanceof net.minecraft.world.entity.item.ItemEntity item

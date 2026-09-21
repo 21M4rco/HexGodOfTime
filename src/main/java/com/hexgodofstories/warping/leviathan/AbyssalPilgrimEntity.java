@@ -169,6 +169,12 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
     public double depth() { return Math.max(0, cachedSurface - getY()); }
 
     private void refreshTerrain() {
+        if (com.hexgodofstories.warping.Destination.from(level()) == com.hexgodofstories.warping.Destination.VOID_SEA) {
+            // Boats, platforms and player buildings must not redefine the ocean surface or floor.
+            cachedSurface = VoidSea.SURFACE;
+            cachedFloor = VoidSea.FLOOR;
+            return;
+        }
         int x = Mth.floor(getX()), z = Mth.floor(getZ());
         if (!level().hasChunkAt(blockPosition())) return;
         cachedSurface = level().getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1;

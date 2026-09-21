@@ -30,6 +30,7 @@ public final class LeviathanHuntController {
     private int estimateAge;
     private int switchCooldown;
     private int contactTicks;
+    private int scanCooldown;
 
     private float orbitPhase;
     private int orbitDirection = 1;
@@ -77,7 +78,8 @@ public final class LeviathanHuntController {
         if (switchCooldown > 0) switchCooldown--;
         if (target != null && (!target.isAlive() || target.level() != level || target.isSpectator() || (target instanceof Player p && (p.isCreative() || p.isSpectator())))) target = null;
 
-        if (target == null || switchCooldown <= 0) {
+        if ((target == null || switchCooldown <= 0) && scanCooldown-- <= 0) {
+            scanCooldown = 20;
             Entity candidate = choose(level);
             if (candidate != null && candidate != target) {
                 // Unpredictable reassignment: keeps groups from learning who is safe.
@@ -111,11 +113,12 @@ public final class LeviathanHuntController {
     @Nullable
     private Entity choose(ServerLevel level) {
         List<Entity> pool = new ArrayList<>();
-        for (ServerPlayer player : level.players()) if (valid(player)) pool.add(player);
-        // Anything else that wandered in is prey too, but is only looked for nearby.
-        if (pool.isEmpty() || self.getRandom().nextFloat() < 0.08f) {
-            AABB nearby = self.getBoundingBox().inflate(160);
-            for (LivingEntity other : level.getEntitiesOfClass(LivingEntity.class, nearby, this::valid)) pool.add(other);
+        // Scan only loaded entities, once per second at most. No radius cutoff and no chunk loads.
+        // Summons and empty boats remain prey even when their owner has left the dimension.
+        for (Entity other : level.getAllEntities()) {
+            if (valid(other) && (other instanceof LivingEntity
+                    || other instanceof net.minecraft.world.entity.vehicle.Boat
+                    || other.getDeltaMovement().lengthSqr() > 0.0025)) pool.add(other);
         }
         if (pool.isEmpty()) return null;
 

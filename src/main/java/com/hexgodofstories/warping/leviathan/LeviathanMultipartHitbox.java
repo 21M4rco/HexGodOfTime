@@ -43,7 +43,7 @@ public final class LeviathanMultipartHitbox extends PartEntity<AbyssalPilgrimEnt
     /** Every blow is forwarded to the parent, which refuses all of them. */
     @Override public boolean hurt(DamageSource source, float amount) { return parent.hurt(source, amount); }
 
-    @Override public boolean isPickable() { return parent.isAlive(); }
+    @Override public boolean isPickable() { return false; }
 
     @Override public boolean is(Entity other) { return this == other || parent == other; }
 
