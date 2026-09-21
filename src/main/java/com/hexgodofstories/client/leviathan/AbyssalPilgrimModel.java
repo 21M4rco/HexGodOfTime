@@ -1,0 +1,192 @@
+package com.hexgodofstories.client.leviathan;
+
+import com.hexgodofstories.HexGodOfStories;
+import com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity;
+import com.hexgodofstories.warping.leviathan.LeviathanAttack;
+import com.hexgodofstories.warping.leviathan.LeviathanSegmentController;
+import com.hexgodofstories.warping.leviathan.LeviathanState;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
+import software.bernie.geckolib.cache.object.GeoBone;
+import software.bernie.geckolib.core.animation.AnimationState;
+import software.bernie.geckolib.model.GeoModel;
+
+import java.util.Map;
+import java.util.WeakHashMap;
+
+/**
+ * Poses the creature. Keyframed clips supply character; this class supplies the shape.
+ *
+ * <p>The spine is a parent chain of twenty two bones, so only the angle between one joint and the
+ * one in front of it ever has to be written. Feeding those deltas from the shared segment
+ * controller means the rendered body traces the exact path the server used for its hitboxes, with
+ * no body data on the wire.
+ *
+ * <p>Bioluminescence is deliberately expressed as geometry rather than as a shader uniform: the
+ * emissive pixels live only on the glow bones, so hiding those bones genuinely extinguishes the
+ * creature, which is what the stalking behaviour needs.
+ */
+public class AbyssalPilgrimModel extends GeoModel<AbyssalPilgrimEntity> {
+    private static final ResourceLocation MODEL = HexGodOfStories.id("geo/abyssal_pilgrim.geo.json");
+    private static final ResourceLocation TEXTURE = HexGodOfStories.id("textures/entity/abyssal_pilgrim.png");
+    private static final ResourceLocation ANIMATION = HexGodOfStories.id("animations/abyssal_pilgrim.animation.json");
+
+    /**
+     * Blockbench and Minecraft disagree about the sign of a yaw rotation depending on which way a
+     * model is authored to face. These exist so the body can be flipped without touching the maths.
+     */
+    private static final float YAW_SIGN = -1f, PITCH_SIGN = 1f, ROLL_SIGN = 1f;
+
+    private static final String[] SPINE = new String[LeviathanSegmentController.SEGMENTS];
+    static {
+        SPINE[0] = "head";
+        for (int i = LeviathanSegmentController.NECK_START; i < LeviathanSegmentController.BODY_START; i++) SPINE[i] = "neck_" + (i - LeviathanSegmentController.NECK_START);
+        for (int i = LeviathanSegmentController.BODY_START; i < LeviathanSegmentController.TAIL_START; i++) SPINE[i] = "body_" + (i - LeviathanSegmentController.BODY_START);
+        for (int i = LeviathanSegmentController.TAIL_START; i < LeviathanSegmentController.SEGMENTS; i++) SPINE[i] = "tail_" + (i - LeviathanSegmentController.TAIL_START);
+    }
+
+    private final Map<AbyssalPilgrimEntity, LeviathanSegmentRenderController> controllers = new WeakHashMap<>();
+
+    @Override public ResourceLocation getModelResource(AbyssalPilgrimEntity animatable) { return MODEL; }
+    @Override public ResourceLocation getTextureResource(AbyssalPilgrimEntity animatable) { return TEXTURE; }
+    @Override public ResourceLocation getAnimationResource(AbyssalPilgrimEntity animatable) { return ANIMATION; }
+
+    public LeviathanSegmentRenderController controllerFor(AbyssalPilgrimEntity entity) {
+        return controllers.computeIfAbsent(entity, e -> new LeviathanSegmentRenderController());
+    }
+
+    @Override
+    public void setCustomAnimations(AbyssalPilgrimEntity animatable, long instanceId, AnimationState<AbyssalPilgrimEntity> animationState) {
+        super.setCustomAnimations(animatable, instanceId, animationState);
+        float partial = animationState == null ? 1f : animationState.getPartialTick();
+        LeviathanSegmentRenderController render = controllerFor(animatable);
+        render.update(animatable, partial);
+
+        LeviathanSegmentController segments = animatable.segments();
+        poseSpine(animatable, segments, render, partial);
+        poseHead(animatable, render, partial);
+        poseAppendages(animatable, render, partial);
+        poseGlow(animatable, partial);
+    }
+
+    private void poseSpine(AbyssalPilgrimEntity entity, LeviathanSegmentController segments, LeviathanSegmentRenderController render, float partial) {
+        for (int i = 1; i < LeviathanSegmentController.SEGMENTS; i++) {
+            GeoBone bone = bone(SPINE[i]);
+            if (bone == null) continue;
+            float deltaYaw = Mth.wrapDegrees(segments.yaw(i, partial) - segments.yaw(i - 1, partial));
+            float deltaPitch = Mth.wrapDegrees(segments.pitch(i, partial) - segments.pitch(i - 1, partial));
+            float deltaRoll = Mth.wrapDegrees(segments.roll(i, partial) - segments.roll(i - 1, partial));
+            // Additive: the keyframed clip supplies undulation and character, this supplies the path.
+            bone.setRotY(bone.getRotY() + deltaYaw * Mth.DEG_TO_RAD * YAW_SIGN);
+            bone.setRotX(bone.getRotX() + deltaPitch * Mth.DEG_TO_RAD * PITCH_SIGN);
+            bone.setRotZ(bone.getRotZ() + deltaRoll * Mth.DEG_TO_RAD * ROLL_SIGN);
+        }
+    }
+
+    private void poseHead(AbyssalPilgrimEntity entity, LeviathanSegmentRenderController render, float partial) {
+        GeoBone head = bone("head");
+        if (head != null) {
+            head.setRotY(head.getRotY() + render.headYaw() * Mth.DEG_TO_RAD * YAW_SIGN);
+            head.setRotX(head.getRotX() + render.headPitch() * Mth.DEG_TO_RAD * PITCH_SIGN);
+        }
+        float open = jawOpen(entity, partial);
+        GeoBone upper = bone("upper_jaw"), lower = bone("lower_jaw");
+        if (upper != null) upper.setRotX(upper.getRotX() - open * 0.46f);
+        if (lower != null) lower.setRotX(lower.getRotX() + open * 1.05f);
+        // The jaw does not just hinge, it splits.
+        GeoBone left = bone("jaw_split_left"), right = bone("jaw_split_right");
+        if (left != null) { left.setRotY(left.getRotY() + open * 0.58f); left.setRotZ(left.getRotZ() + open * 0.26f); }
+        if (right != null) { right.setRotY(right.getRotY() - open * 0.58f); right.setRotZ(right.getRotZ() - open * 0.26f); }
+
+        GeoBone sensory = bone("sensory_organs");
+        if (sensory != null) {
+            float focus = entity.lookTarget() != null ? 1f : 0.55f;
+            sensory.setScaleX(focus); sensory.setScaleY(focus); sensory.setScaleZ(focus);
+            sensory.setRotY(render.headYaw() * 0.35f * Mth.DEG_TO_RAD * YAW_SIGN);
+        }
+    }
+
+    /** How wide the mouth is right now, 0 closed and 1 fully split open. */
+    private float jawOpen(AbyssalPilgrimEntity entity, float partial) {
+        LeviathanAttack attack = entity.attack();
+        float idle = 0.06f + 0.04f * Mth.sin((entity.tickCount + partial) * 0.05f);
+        if (attack == null) return idle;
+        float t = entity.attackTick() + partial;
+        return switch (attack) {
+            case PREDATORY_BITE, BREACH_BITE, DEEP_CHARGE ->
+                t < attack.windup ? Mth.clamp(t / attack.windup, 0, 1) : Mth.clamp(1f - (t - attack.windup) / 5f, 0.02f, 1f);
+            case VOID_SCREAM -> Mth.clamp(t / attack.windup, 0, 1);
+            case FAKE_ATTACK -> t < attack.windup ? Mth.clamp(t / attack.windup, 0, 1) * 0.9f : Mth.clamp(1f - (t - attack.windup) / 10f, 0f, 1f) * 0.9f;
+            case TENDRIL_GRAB, DRAG_BELOW, AIR_THROW -> 0.55f;
+            default -> idle;
+        };
+    }
+
+    private void poseAppendages(AbyssalPilgrimEntity entity, LeviathanSegmentRenderController render, float partial) {
+        if (render.detail() == 0) return;
+        int bodyCount = LeviathanSegmentController.TAIL_START - LeviathanSegmentController.BODY_START;
+        for (int b = 0; b < bodyCount; b++) {
+            int segment = LeviathanSegmentController.BODY_START + b;
+            float s = render.sway(segment) * Mth.DEG_TO_RAD;
+            float l = render.lift(segment) * Mth.DEG_TO_RAD;
+            GeoBone fin = bone("dorsal_fin_" + b);
+            if (fin != null) { fin.setRotZ(fin.getRotZ() + s * 0.35f); fin.setRotX(fin.getRotX() + l * 0.5f); }
+            GeoBone ribLeft = bone("rib_appendage_l_" + b), ribRight = bone("rib_appendage_r_" + b);
+            if (ribLeft != null) { ribLeft.setRotZ(ribLeft.getRotZ() + 0.22f + s * 0.55f); ribLeft.setRotX(ribLeft.getRotX() + l * 0.7f); }
+            if (ribRight != null) { ribRight.setRotZ(ribRight.getRotZ() - 0.22f + s * 0.55f); ribRight.setRotX(ribRight.getRotX() + l * 0.7f); }
+        }
+        if (render.detail() < 2) return;
+        for (int t = 0; t < 6; t++) {
+            GeoBone tendril = bone("head_tendril_" + t);
+            if (tendril == null) continue;
+            float phase = (entity.tickCount + partial) * 0.09f + t * 0.9f;
+            float amount = render.sway(0) * Mth.DEG_TO_RAD * 0.75f + Mth.sin(phase) * (entity.isSubmerged() ? 0.13f : 0.34f);
+            tendril.setRotZ(tendril.getRotZ() + amount);
+            tendril.setRotX(tendril.getRotX() + Mth.cos(phase * 0.7f) * (entity.isSubmerged() ? 0.1f : 0.3f) + render.lift(0) * Mth.DEG_TO_RAD * 0.4f);
+        }
+        for (int t = 0; t < 4; t++) {
+            GeoBone tendril = bone("tail_tendril_" + t);
+            if (tendril == null) continue;
+            int segment = LeviathanSegmentController.SEGMENTS - 1;
+            float phase = (entity.tickCount + partial) * 0.11f + t * 1.3f;
+            tendril.setRotZ(tendril.getRotZ() + render.sway(segment) * Mth.DEG_TO_RAD * 0.9f + Mth.sin(phase) * 0.22f);
+            tendril.setRotX(tendril.getRotX() + render.lift(segment) * Mth.DEG_TO_RAD * 0.6f);
+        }
+    }
+
+    /**
+     * Stalking is almost dark, tracking pulses slowly, hunting is bright, attacking is flat out and
+     * frenzy is an unstable flicker. Below a threshold the organs are hidden outright.
+     */
+    private void poseGlow(AbyssalPilgrimEntity entity, float partial) {
+        float base = entity.renderGlow(partial);
+        float time = entity.tickCount + partial;
+        LeviathanState state = entity.state();
+        float intensity = switch (state) {
+            case STALK, AMBUSH -> base * (0.55f + 0.45f * Mth.sin(time * 0.014f));
+            case TRACK, SEARCH -> base * (0.62f + 0.38f * Mth.sin(time * 0.045f));
+            case TOY -> base * (0.78f + 0.22f * Mth.sin(time * 0.07f));
+            case HUNT -> base * (0.86f + 0.14f * Mth.sin(time * 0.12f));
+            case ATTACK -> base;
+            case FRENZY -> base * (0.7f + 0.3f * Mth.sin(time * 0.61f) * Mth.cos(time * 0.29f));
+        };
+        if (entity.isDying()) intensity = base;
+        boolean dark = intensity < 0.07f;
+        float scale = Mth.clamp(0.45f + intensity * 0.95f, 0.2f, 1.6f);
+        for (int i = 0; i < LeviathanSegmentController.SEGMENTS; i++) {
+            GeoBone organ = bone("glow_organs_" + i);
+            if (organ == null) continue;
+            // Dying shuts the lights down from the tail forward.
+            boolean off = dark || (entity.isDying() && entity.dying() > 40 && i > LeviathanSegmentController.SEGMENTS - 1 - (entity.dying() - 40) / 12);
+            organ.setHidden(off);
+            if (!off) { organ.setScaleX(scale); organ.setScaleY(scale); organ.setScaleZ(scale); }
+        }
+        GeoBone headOrgans = bone("glow_organs_head");
+        if (headOrgans != null) {
+            headOrgans.setHidden(dark);
+            if (!dark) { headOrgans.setScaleX(scale); headOrgans.setScaleY(scale); headOrgans.setScaleZ(scale); }
+        }
+    }
+
+    private GeoBone bone(String name) { return getBone(name).orElse(null); }
+}

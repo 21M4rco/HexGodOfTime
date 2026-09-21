@@ -13,7 +13,19 @@
           "block": "minecraft:bedrock"
         },
         {
-          "height": 135,
+          "height": 64,
+          "block": "minecraft:deepslate"
+        },
+        {
+          "height": 16,
+          "block": "minecraft:tuff"
+        },
+        {
+          "height": 2,
+          "block": "minecraft:gravel"
+        },
+        {
+          "height": 935,
           "block": "minecraft:water"
         }
       ]

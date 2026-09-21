@@ -9,7 +9,7 @@ import net.minecraft.world.phys.Vec3;
 /** Stable IDs: append destinations, never reorder saved selections. */
 public enum Destination {
     SUN("Sun", "A stellar furnace. Captives fall fifty-six blocks into its corona.",0xffb34b, new Vec3(0,184,0)),
-    VOID_SEA("Void Sea", "An endless abyssal ocean. Something enormous hunts beneath it.",0x426887,new Vec3(0,139,0)),
+    VOID_SEA("Void Sea", "An endless abyssal ocean nearly a thousand blocks deep. Something enormous already hunts it.",0x426887,new Vec3(0,VoidSea.ARRIVAL,0)),
     GRAVITY_WELL("Gravity Well", "An accretion disk surrounds a singularity. Pull intensifies inward.",0xb273ff,new Vec3(64,110,0)),
     SHATTERED_WORLD("Shattered World", "Broken forests and ruins. Unstable gravity between islands.",0x92b5b1,new Vec3(0,143,0)),
     TIME_STORM("Time Storm", "A storm of branching time. Your enemies' recent steps unravel.",0xca82ff,new Vec3(0,132,0)),

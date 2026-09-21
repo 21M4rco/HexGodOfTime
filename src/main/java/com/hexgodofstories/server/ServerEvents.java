@@ -73,6 +73,8 @@ public final class ServerEvents {
     @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p)HexServer.clear(p,false);}
     @SubscribeEvent public static void dimension(PlayerEvent.PlayerChangedDimensionEvent e) {if(e.getEntity() instanceof ServerPlayer p){HexServer.clear(p,false);HexNetwork.sync(p);}}
     @SubscribeEvent public static void death(LivingDeathEvent e) {
+        // A kill feeds the Pilgrim's patience back, which is what makes it willing to play again.
+        if(e.getSource().getEntity() instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity pilgrim&&pilgrim.ai()!=null)pilgrim.ai().noteKill();
         Erasure.forget(e.getEntity());
         Bleed.clear(e.getEntity());
         Threat.forget(e.getEntity());

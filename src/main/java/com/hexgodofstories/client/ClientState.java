@@ -46,6 +46,7 @@ public final class ClientState {
         switch(m.kind()) {
             case HexNetwork.WARP -> WarpRenderer.receive(m.entity(),m.data());
             case HexNetwork.WARP_REALM -> WarpRenderer.realm(m.data());
+            case HexNetwork.PILGRIM -> com.hexgodofstories.client.leviathan.LeviathanEffects.receive(m.data());
             case HexNetwork.SYNC -> PLAYERS.put(m.entity(),m.data());
             case HexNetwork.ANIMATE -> HexAnimations.playRemote(m.entity(),m.data().getString("animation"),3);
             case HexNetwork.FX -> WorldEffects.add(m.entity(),m.data());
@@ -83,10 +84,12 @@ public final class ClientState {
         if(mc.level!=world) {
             WarpRenderer.clear();PLAYERS.clear();FROZEN.clear();SLOWED.clear();THREADS.clear();DISGUISES.clear();
             WorldEffects.clear();HexSkin.clear();HexLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();
+            com.hexgodofstories.client.leviathan.LeviathanEffects.clear();
             TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();GripRenderer.clear();
             HexClient.ForgeBus.releaseHeldCast();
             world=mc.level;
         }
+        com.hexgodofstories.client.leviathan.LeviathanEffects.tick();
         if(mc.level==null)return;
         FROZEN.forEach((id,n)->{
             Entity e=mc.level.getEntity(id);

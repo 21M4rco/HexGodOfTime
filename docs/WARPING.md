@@ -27,7 +27,7 @@ The 8-second maximum hold releases a stable charge. Access to the return action 
 | Destination | Geometry and environment | Threat |
 | --- | --- | --- |
 | Sun | 70-block textured photosphere, contained lava core, anchored plasma flares and Fracture-style stellar galaxies | Escalating stellar heat damages survival casters and captives, including fire-resistant creatures |
-| Void Sea | Procedurally infinite 135-block-deep dark ocean with a bright blue Fracture-style nebula and spiral galaxies | Custom 650-health articulated abyssal leviathan with emissive cyan eyes, gills, fins and dorsal markings, circling underwater and lunging for 60 base damage per bite |
+| Void Sea | Procedurally infinite dark ocean, 935 blocks deep with 262 blocks of clear sky above it | **The Abyssal Pilgrim**: a ~160-block immortal apex predator. See `docs/ABYSSAL_PILGRIM.md`. |
 | Gravity Well | Black singularity, tilted spinning accretion disk and inward debris trails | Directional gravity grows toward the center; increasing central damage |
 | Shattered World | Broken and inverted islands, ruined towers, forest fragments and hanging water | Periodic gravity surges; combat across separated terrain |
 | Time Storm | Broken platforms and branching temporal structures | Recent-position rewinds and intermittent movement disruption |

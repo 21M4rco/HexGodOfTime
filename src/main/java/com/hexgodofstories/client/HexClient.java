@@ -47,7 +47,7 @@ public final class HexClient {
         }
         @SubscribeEvent public static void entities(EntityRenderersEvent.RegisterRenderers e) {
             e.registerEntityRenderer(HexGodOfStories.ILLUSION.get(),IllusionRenderer::new);
-            e.registerEntityRenderer(HexGodOfStories.LEVIATHAN.get(),LeviathanRenderer::new);
+            e.registerEntityRenderer(HexGodOfStories.PILGRIM.get(),com.hexgodofstories.client.leviathan.AbyssalPilgrimRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.WARP_HAZARD.get(),WarpHazardRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.PROJECTILE.get(),SpellRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.THROWN_DAGGER.get(),DaggerRenderer::new);
@@ -205,5 +205,7 @@ public final class HexClient {
             if(ErasureRenderer.consumed(e.getEntity()))e.setCanceled(true);
         }
         @SubscribeEvent public static void playerEnd(RenderPlayerEvent.Post e){WorldEffects.afterPlayer(e);}
+        /** Breaches, impacts and the standing tremor of something enormous passing underneath. */
+        @SubscribeEvent public static void pilgrimCamera(net.minecraftforge.client.event.ViewportEvent.ComputeCameraAngles e){com.hexgodofstories.client.leviathan.LeviathanEffects.camera(e);}
     }
 }

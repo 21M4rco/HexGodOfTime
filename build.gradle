@@ -30,11 +30,13 @@ minecraft {
 }
 repositories {
     maven { url = 'https://cursemaven.com/'; content { includeGroup 'curse.maven' } }
+    maven { url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'; content { includeGroup 'software.bernie.geckolib' } }
     mavenCentral()
 }
 dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.4.10'
     implementation(fg.deobf('curse.maven:playeranimator-658587:4587214')) { transitive = false }
+    implementation fg.deobf("software.bernie.geckolib:geckolib-forge-1.20.1:${geckolib_version}")
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 mixin { add sourceSets.main, 'hexgodofstories.refmap.json'; config 'hexgodofstories.mixins.json' }
@@ -78,3 +80,13 @@ tasks.register('verifyWarping', JavaExec) {
     mainClass = 'com.hexgodofstories.warping.WarpMathTest'
 }
 tasks.named('check') { dependsOn 'verifyWarping' }
+
+// The Abyssal Pilgrim's geometry, animation, audio and realm constants must stay in step with the
+// code that poses and places it. No Minecraft bootstrap required.
+tasks.register('verifyVoidSea', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.hexgodofstories.warping.VoidSeaShapeTest'
+    enableAssertions = true
+}
+tasks.named('check') { dependsOn 'verifyVoidSea' }

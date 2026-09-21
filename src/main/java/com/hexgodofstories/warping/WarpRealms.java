@@ -51,9 +51,10 @@ public final class WarpRealms {
             if(!j.blocks.hasNext()){ledger(l).ready.add((long)j.cell);ledger(l).setDirty();populate(l,d,j.cell);it.remove();}
         }
         long now=l.getGameTime();
+        if(d==Destination.VOID_SEA)com.hexgodofstories.warping.leviathan.PilgrimWarden.tick(l,now);
         List<Entity> active=new ArrayList<>();l.getAllEntities().forEach(active::add);
         for(Entity e:active){
-            if(!e.isAlive()||e.isSpectator()||e instanceof WarpHazard||e instanceof AbyssalLeviathan)continue;
+            if(!e.isAlive()||e.isSpectator()||e instanceof WarpHazard||e instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity)continue;
             double cell=WarpMath.cellX(e.getX());long age=age(l,cell);
             if(e instanceof ServerPlayer p&&now%10==0){CompoundTag n=new CompoundTag();n.putLong("age",age);n.putLong("time",now);n.putDouble("cell",cell);HexNetwork.to(p,new HexNetwork.Message(HexNetwork.WARP_REALM,0,n));}
             if(e instanceof ServerPlayer listener&&now%140==0){
@@ -67,16 +68,11 @@ public final class WarpRealms {
                 };
                 if(ambience!=null)listener.playNotifySound(ambience,net.minecraft.sounds.SoundSource.AMBIENT,.14f,.65f);
             }
-            if(d==Destination.VOID_SEA&&e instanceof ServerPlayer swimmer&&!swimmer.isCreative()&&now%200==0
-                &&l.getEntitiesOfClass(AbyssalLeviathan.class,swimmer.getBoundingBox().inflate(180),Entity::isAlive).isEmpty()){
-                AbyssalLeviathan hunter=HexGodOfStories.LEVIATHAN.get().create(l);
-                if(hunter!=null){hunter.moveTo(e.getX()+45,Math.min(120,e.getY()-16),e.getZ()+24,0,0);l.addFreshEntity(hunter);}
-            }
-            if(Warping.sovereign(e)&&d!=Destination.SUN){e.fallDistance=0;if(e.getY()<0)e.teleportTo(e.getX(),180,e.getZ());continue;}
+            if(Warping.sovereign(e)&&d!=Destination.SUN){e.fallDistance=0;double bottom=d==Destination.VOID_SEA?VoidSea.FLOOR:0,rescue=d==Destination.VOID_SEA?VoidSea.SURFACE-24:180;if(e.getY()<bottom)e.teleportTo(e.getX(),rescue,e.getZ());continue;}
             if(e instanceof net.minecraft.world.entity.player.Player p&&p.isCreative())continue;
             switch(d){
                 case SUN -> solarExposure(l,e,cell,now);
-                case VOID_SEA -> {}
+                case VOID_SEA -> {}  // the realm's only hazard is alive and has its own AI
                 case GRAVITY_WELL -> {
                     Vec3 toward=new Vec3(cell,96,0).subtract(e.position());double dist=toward.length();
                     e.setDeltaMovement(e.getDeltaMovement().scale(.96).add(toward.normalize().scale(WarpMath.pull(dist))).add(0,e.isNoGravity()?0:.08,0));e.hurtMarked=true;
@@ -115,7 +111,7 @@ public final class WarpRealms {
             level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.DAMAGE_TYPE).getHolderOrThrow(SOLAR_HEAT)),damage);
     }
     private static void populate(ServerLevel l,Destination d,double cell){
-        if(d==Destination.VOID_SEA){AbyssalLeviathan leviathan=HexGodOfStories.LEVIATHAN.get().create(l);if(leviathan!=null){leviathan.moveTo(cell+24,109,24,0,0);l.addFreshEntity(leviathan);}}
+        if(d==Destination.VOID_SEA)com.hexgodofstories.warping.leviathan.PilgrimWarden.ensure(l,cell);
         if(d==Destination.FALLING_WORLD||d==Destination.FROZEN_MOMENT){
             Random r=new Random(819+d.ordinal());int count=d==Destination.FALLING_WORLD?48:32;
             for(int i=0;i<count;i++){WarpHazard h=HexGodOfStories.WARP_HAZARD.get().create(l);if(h==null)continue;

@@ -24,7 +24,12 @@ public final class HexGodOfStories {
     public static final DeferredRegister<CreativeModeTab> TABS = DeferredRegister.create(net.minecraft.core.registries.Registries.CREATIVE_MODE_TAB, ID);
     public static final DeferredRegister<net.minecraft.core.particles.ParticleType<?>> PARTICLES = DeferredRegister.create(ForgeRegistries.PARTICLE_TYPES, ID);
 
-    public static final RegistryObject<EntityType<com.hexgodofstories.warping.AbyssalLeviathan>> LEVIATHAN=ENTITIES.register("abyssal_leviathan",()->EntityType.Builder.of(com.hexgodofstories.warping.AbyssalLeviathan::new,MobCategory.MONSTER).sized(5,4).clientTrackingRange(16).updateInterval(2).build(ID+":abyssal_leviathan"));
+    /**
+     * The Abyssal Pilgrim. A hundred and fifty blocks of articulated body, so the tracking range is
+     * far wider than a normal mob's and positions are sent every tick; the body itself costs nothing
+     * on the wire because every client rebuilds it from this entity's own movement history.
+     */
+    public static final RegistryObject<EntityType<com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity>> PILGRIM=ENTITIES.register("abyssal_pilgrim",()->EntityType.Builder.of(com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity::new,MobCategory.MONSTER).sized(9,9).clientTrackingRange(32).updateInterval(1).fireImmune().build(ID+":abyssal_pilgrim"));
     public static final RegistryObject<EntityType<com.hexgodofstories.warping.WarpHazard>> WARP_HAZARD=ENTITIES.register("warp_hazard",()->EntityType.Builder.<com.hexgodofstories.warping.WarpHazard>of(com.hexgodofstories.warping.WarpHazard::new,MobCategory.MISC).sized(6,2).clientTrackingRange(16).updateInterval(2).fireImmune().build(ID+":warp_hazard"));
     public static final RegistryObject<EntityType<IllusionEntity>> ILLUSION = ENTITIES.register("projection", () -> EntityType.Builder.of(IllusionEntity::new, MobCategory.MISC).sized(.6f, 1.8f).clientTrackingRange(10).updateInterval(2).build("hexgodofstories:projection"));
     public static final RegistryObject<EntityType<SpellProjectile>> PROJECTILE = ENTITIES.register("spell", () -> EntityType.Builder.<SpellProjectile>of(SpellProjectile::new, MobCategory.MISC).sized(.18f,.18f).clientTrackingRange(10).updateInterval(1).build("hexgodofstories:spell"));
@@ -51,6 +56,20 @@ public final class HexGodOfStories {
         SLIP = sound("time_slip"), STOP = sound("time_stop"), RESUME = sound("time_resume"), ASCEND = sound("ascend"), CONJURE = sound("conjure"),
         BLADE_SWING = sound("blade_swing"), BLADE_HIT = sound("blade_hit"), BLADE_THROW = sound("blade_throw"), BLADE_EMBED = sound("blade_embed"),
         RIFT_OPEN = sound("rift_open"), RIFT_CLOSE = sound("rift_close");
+    /**
+     * The Pilgrim's voice. Volumes above one do not play louder, they carry further, which is how a
+     * creature the size of a district is heard long before anything is visible.
+     */
+    public static final RegistryObject<SoundEvent>
+        PILGRIM_DISTANT_CALL = sound("pilgrim_distant_call"), PILGRIM_DEEP_IDLE = sound("pilgrim_deep_idle"),
+        PILGRIM_CLICKING = sound("pilgrim_clicking"), PILGRIM_TARGET_DETECTED = sound("pilgrim_target_detected"),
+        PILGRIM_STALK = sound("pilgrim_stalk"), PILGRIM_BREACH_CHARGE = sound("pilgrim_breach_charge"),
+        PILGRIM_BREACH = sound("pilgrim_breach"), PILGRIM_WATER_IMPACT = sound("pilgrim_water_impact"),
+        PILGRIM_ROAR = sound("pilgrim_roar"), PILGRIM_BITE = sound("pilgrim_bite"),
+        PILGRIM_GRAB = sound("pilgrim_grab"), PILGRIM_THROW = sound("pilgrim_throw"),
+        PILGRIM_LUNGE = sound("pilgrim_lunge"), PILGRIM_TAIL_SWEEP = sound("pilgrim_tail_sweep"),
+        PILGRIM_VOID_SCREAM = sound("pilgrim_void_scream"), PILGRIM_HURT = sound("pilgrim_hurt"),
+        PILGRIM_DEATH = sound("pilgrim_death");
     /**
      * Time Branch Unleashing's own bed. Each of these is one layer: the charge stacks the first five and
      * drives their volume and pitch from the synchronised charge, so the build is assembled at the ear
@@ -100,7 +119,7 @@ public final class HexGodOfStories {
     public HexGodOfStories() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
         ENTITIES.register(bus); ITEMS.register(bus); BLOCKS.register(bus); SOUNDS.register(bus); TABS.register(bus); PARTICLES.register(bus);
-        bus.addListener((EntityAttributeCreationEvent e) -> {e.put(ILLUSION.get(), IllusionEntity.attributes().build());e.put(LEVIATHAN.get(),com.hexgodofstories.warping.AbyssalLeviathan.attributes().build());});
+        bus.addListener((EntityAttributeCreationEvent e) -> {e.put(ILLUSION.get(), IllusionEntity.attributes().build());e.put(PILGRIM.get(),com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity.attributes().build());});
         bus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) -> e.enqueueWork(HexNetwork::init));
     }
 }

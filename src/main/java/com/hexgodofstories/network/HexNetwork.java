@@ -16,7 +16,7 @@ public final class HexNetwork {
     /** Highest accepted client action id; see {@link HexServer#input}. */
     public static final int MAX_ACTION=14;
     public static final int SYNC=0,ANIMATE=1,FX=2,FROZEN=3,GRIP=4,MEMORY=5,THREADS=6,SLOWED=7,ARCHITECTURE=8,BLEED=9,FIELD=10,DISGUISE=11,
-        BRANCH=12,TORRENT=13,ERASURE=14,WARP=15,WARP_REALM=16;
+        BRANCH=12,TORRENT=13,ERASURE=14,WARP=15,WARP_REALM=16,PILGRIM=17;
     public record Input(int action,int value) {}
     /** A deliberate Fracture selection: a catalogue index and, where the mode needs one, a target. */
     public record Choice(int mode,java.util.UUID target) {}
@@ -36,6 +36,15 @@ public final class HexNetwork {
             .encoder((m,b)->{b.writeVarInt(m.kind);b.writeVarInt(m.entity);b.writeNbt(m.data);})
             .decoder(b->new Message(b.readVarInt(),b.readVarInt(),b.readNbt()))
             .consumerMainThread((m,c)->{if(m.data!=null)DistExecutor.unsafeRunWhenOn(Dist.CLIENT,()->()->com.hexgodofstories.client.ClientState.receive(m));c.get().setPacketHandled(true);}).add();
+    }
+    /**
+     * One leviathan presentation event, sent to everyone close enough to feel it. These are rare by
+     * construction: the body itself is never networked, only breaches, impacts and screams.
+     */
+    public static void pilgrimEffect(Entity source,String name,net.minecraft.world.phys.Vec3 at,float power) {
+        if(!(source.level() instanceof net.minecraft.server.level.ServerLevel level))return;
+        CompoundTag d=new CompoundTag();d.putString("effect",name);d.putDouble("x",at.x);d.putDouble("y",at.y);d.putDouble("z",at.z);d.putFloat("power",power);
+        near(level,at,160+power*120,new Message(PILGRIM,source.getId(),d));
     }
     public static void send(int action,int value) {CHANNEL.sendToServer(new Input(action,value));}
     public static void chooseFracture(int mode,java.util.UUID target) {CHANNEL.sendToServer(new Choice(mode,target));}
