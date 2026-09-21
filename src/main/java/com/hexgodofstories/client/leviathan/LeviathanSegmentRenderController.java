@@ -54,8 +54,13 @@ public final class LeviathanSegmentRenderController {
         Vec3 motion = entity.getDeltaMovement();
         float speed = (float) motion.length();
         // In air there is nothing to push against, so the restoring force collapses and damping with it.
-        float stiffness = submerged ? 0.22f : 0.055f;
-        float damping = submerged ? 0.74f : 0.93f;
+        //
+        // Underwater these are now near critical: 0.22 against 0.74 put the poles at a magnitude of
+        // 0.86 with a thirteen tick period, so every fin and rib on the creature rang for a second
+        // after each change of heading, and a body being steered continuously rang permanently.
+        // Water is not a trampoline; it is the most damped medium the creature will ever be in.
+        float stiffness = submerged ? 0.12f : 0.055f;
+        float damping = submerged ? 0.47f : 0.93f;
 
         LeviathanSegmentController segments = entity.segments();
         int step = detail == 2 ? 1 : detail == 1 ? 2 : LeviathanSegmentController.SEGMENTS;
@@ -65,8 +70,11 @@ public final class LeviathanSegmentRenderController {
             // Ranges are deliberately narrow. Fins and rib blades that swing far enough to stand
             // out from the hull stop reading as part of the animal and start reading as loose
             // pieces beside it, which is most of what made the body look like scattered boxes.
+            // The undulation term is per block per tick, so it is restated against the move
+            // control's speed scale; otherwise a creature that now cruises at a quarter of a block
+            // a tick would swim with its fins held perfectly still.
             float drive = turn * (submerged ? 1.1f : 2.2f)
-                + (float) Math.sin((entity.tickCount + partialTick) * 0.17 + i * 0.6) * speed * (submerged ? 4.5f : 1.2f);
+                + (float) Math.sin((entity.tickCount + partialTick) * 0.17 + i * 0.6) * speed * (submerged ? 20f : 5f);
             drive += impact * (float) Math.sin(i * 1.7 + entity.tickCount * 0.9) * 20f;
             swayVel[i] = swayVel[i] * damping + (drive - sway[i]) * stiffness;
             sway[i] = Mth.clamp(sway[i] + swayVel[i], -38f, 38f);

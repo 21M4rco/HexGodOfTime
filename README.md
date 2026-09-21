@@ -22,6 +22,30 @@
   — cold hide, lamellar bone, ribbed membrane, a luminous organ — and the rib blades stay swept
   along the hull instead of splaying out. Same geometry, same UV layout, reproducible through
   `python tools/generate_pilgrim_textures.py`.
+- **It stopped twitching.** Three separate causes. The server sends the client a path checkpoint
+  twice a second, anchored at the server's position, and the client pinned the body to it — but a
+  client entity always trails the server one, so the whole creature lurched by the lag distance and
+  snapped back the next tick. Checkpoints are now re-anchored onto the viewer's own copy, since
+  only the shape was ever wanted from the server. The banking and the fin solver were both
+  under-damped springs — poles at 0.88 and 0.86, ringing for one to two seconds — so a body being
+  steered continuously never stopped ringing; both are now critically damped. And whether the
+  creature counts as in the water is decided once a tick across an almost two block band instead of
+  per caller on a bare threshold, so a body holding the waterline no longer flickers between
+  swimming and airborne.
+- **It stopped passing through itself.** The bend a joint may take now comes from its girth rather
+  than its position along the body. The hull at the shoulder is eleven blocks across with its
+  joints six apart, so it is wider than the gap between them and every degree there is geometry
+  pushed through its neighbour; the tail is under a block across and can whip through three times
+  as much. Seven degrees at the widest point, twenty one at the tip, and the steering's turn radius
+  was raised to the fifty blocks that actually implies so the two agree.
+- **It is no longer a torpedo.** Every speed the behaviour asks for is scaled in one place. The
+  patterns were written in blocks per tick without much regard for the size of the thing carrying
+  them, so a lunge crossed a hundred and twenty seven blocks a second — twenty three times a
+  sprinting player. A cruise is now just under a sprint, a committed hunt two and a half times one,
+  and a lunge five. Leaps are untouched: those are solved ballistics, not swimming.
+- **The Void Sea drops you in.** Arrival was three blocks over the waterline, which put you in the
+  water before you had seen any of it. It is now fifty: about two and a half seconds of open sky
+  and an empty horizon on the way down, and the water still takes the fall.
 - **Flight is confined to the fracture world.** It used to follow the mantle into every dimension,
   and sovereignty granted it again in eight of the nine Warping realms, which meant a corona you
   can climb out of, planes that cannot close on you, a collapse you do not fall with and an ocean

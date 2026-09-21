@@ -29,9 +29,25 @@ public final class LeviathanMoveControl extends MoveControl {
     /**
      * Blocks. Tighter than this and the body cannot keep up with its own head: the joint limits in
      * {@link LeviathanSegmentController} would clamp the spine away from the path every tick, which
-     * reads as the creature sliding sideways through its own turn.
+     * reads as the creature sliding sideways through its own turn. Fifty is what the seven degree
+     * limit at the widest part of the hull actually permits, so the two agree and the clamp is a
+     * backstop rather than something the steering fights every tick.
      */
-    private static final double TURN_RADIUS = 30.0;
+    private static final double TURN_RADIUS = 50.0;
+
+    /**
+     * Every speed the behaviour asks for is multiplied by this before it is used.
+     *
+     * <p>The patterns were written in blocks per tick without much regard for how big the thing
+     * carrying them is, and at a hundred and fifty blocks long the result was a creature crossing
+     * sixty blocks a second: ten times a sprinting player, which reads as a torpedo rather than as
+     * something enormous. Scaling here rather than at thirty call sites keeps every pattern's
+     * relative pacing exactly as it was written and makes the weight one number to tune.
+     *
+     * <p>It leaves a cruise near a walking pace, a committed hunt at two to four times that, and a
+     * lunge in the thirties. Leaps are unaffected: those are solved ballistics, not swimming.
+     */
+    private static final double SCALE = 0.35;
 
     private final AbyssalPilgrimEntity leviathan;
     private Vec3 wanted = Vec3.ZERO;
@@ -53,10 +69,10 @@ public final class LeviathanMoveControl extends MoveControl {
 
     public void moveTo(Vec3 target, double blocksPerTick, float turnAuthority) {
         this.wanted = target;
-        this.speed = blocksPerTick;
+        this.speed = blocksPerTick * SCALE;
         this.authority = Mth.clamp(turnAuthority, 0.02f, 1.0f);
         this.active = true;
-        super.setWantedPosition(target.x, target.y, target.z, blocksPerTick);
+        super.setWantedPosition(target.x, target.y, target.z, this.speed);
     }
 
     public void stopMoving() { this.active = false; this.burst = 0; this.airSteer = 0; this.ballistic = 0; this.launchImpulse = null; }
@@ -80,7 +96,7 @@ public final class LeviathanMoveControl extends MoveControl {
     /** Blocks per tick of horizontal correction permitted mid leap. Zero is a pure ballistic arc. */
     public void setAirSteer(double amount) { this.airSteer = Math.max(0, amount); }
     /** One off forward impulse, used by lunges, deep charges and breach launches. */
-    public void addBurst(double amount) { this.burst = Math.max(this.burst, amount); }
+    public void addBurst(double amount) { this.burst = Math.max(this.burst, amount * SCALE * 0.6); }
     public void setRollIntent(float degrees) { this.rollIntent = degrees; }
     public Vec3 wanted() { return wanted; }
     public boolean active() { return active; }
@@ -151,9 +167,11 @@ public final class LeviathanMoveControl extends MoveControl {
         // ...and degrees per tick are then bought with speed, because a turn is an arc: at one
         // block per tick a thirty block circle is worth just under two degrees of heading.
         float arc = (float) (Math.max(motion.length(), 0.03) * Mth.RAD_TO_DEG / TURN_RADIUS);
-        maxYaw = Math.min(maxYaw, Math.max(0.55f, arc));
+        // The floor exists only so a nearly stationary creature can still come about. Keep it low:
+        // a generous floor is a tight path radius at cruising speed, which is the spiral again.
+        maxYaw = Math.min(maxYaw, Math.max(0.30f, arc));
         // Vertical curves may be a little tighter: the body is far shallower than it is wide.
-        maxPitch = Math.min(maxPitch, Math.max(0.5f, arc * 1.35f));
+        maxPitch = Math.min(maxPitch, Math.max(0.30f, arc * 1.35f));
         float yawError = Mth.wrapDegrees(wantYaw - leviathan.getYRot());
         float pitchError = Mth.wrapDegrees(wantPitch - leviathan.getXRot());
         float yawStep = Mth.clamp(yawError, -maxYaw, maxYaw);

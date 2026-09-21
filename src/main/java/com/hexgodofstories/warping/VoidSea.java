@@ -35,8 +35,15 @@ public final class VoidSea {
     /** Clear air above the waterline, which is what a full breach needs. */
     public static final int SKY = MAX_Y - SURFACE;
 
-    /** Where a warped player lands: just above the waterline, so they drop into it. */
-    public static final int ARRIVAL = SURFACE + 3;
+    /**
+     * Where a warped player lands: high enough above the waterline that arriving is a fall.
+     *
+     * <p>Three blocks up put them in the water before they had seen any of it, which wastes the
+     * one moment the realm gets to introduce itself. Fifty gives about two and a half seconds of
+     * open sky and a horizon of nothing, and the water takes the fall damage, so the cost of the
+     * drop is entirely in how long it lasts.
+     */
+    public static final int ARRIVAL = SURFACE + 50;
 
     /**
      * The realm has one occupant and the whole sea is its territory, so nothing bounds it

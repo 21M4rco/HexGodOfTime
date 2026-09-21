@@ -49,7 +49,7 @@ public final class ClientState {
             case HexNetwork.PILGRIM_PATH -> {
                 var world = net.minecraft.client.Minecraft.getInstance().level;
                 if (world != null && world.getEntity(m.entity()) instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity pilgrim)
-                    pilgrim.segments().acceptSnapshot(m.data());
+                    pilgrim.segments().acceptSnapshot(m.data(), pilgrim.position());
             }
             case HexNetwork.PILGRIM -> com.hexgodofstories.client.leviathan.LeviathanEffects.receive(m.data());
             case HexNetwork.SYNC -> PLAYERS.put(m.entity(),m.data());

@@ -69,6 +69,8 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
     private float renderGlow, prevRenderGlow;
     private double cachedSurface = VoidSea.SURFACE, cachedFloor = VoidSea.FLOOR;
     private int terrainClock;
+    /** Resolved once a tick with hysteresis; see updateSubmerged. */
+    private boolean submerged = true;
     /** Chunk the hunting ticket was last renewed for. */
     private long heldChunk = Long.MIN_VALUE;
     /** Client side, used to fade ambience and decide appendage detail. */
@@ -169,7 +171,23 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
     public double surfaceY() { return cachedSurface; }
     public double floorY() { return cachedFloor; }
     public boolean nearSurface() { return getY() > cachedSurface - 14; }
-    public boolean isSubmerged() { return getY() < cachedSurface - 0.4 && level().getFluidState(blockPosition()).is(FluidTags.WATER) || getY() < cachedSurface - 3; }
+    /**
+     * Whether the body is in the water, decided once a tick with hysteresis.
+     *
+     * <p>Both the animation state and the appendage solver switch on this, and the creature spends
+     * a lot of its time deliberately holding the waterline, so a bare threshold had it flickering
+     * between swimming and airborne on a body bobbing across it — one tick of drag, one tick of
+     * none, at whatever rate the surface chop decided. Leaving the water now needs a clear metre
+     * and a half; returning needs only to be under the line.
+     */
+    public boolean isSubmerged() { return submerged; }
+
+    private void updateSubmerged() {
+        double y = getY();
+        boolean water = y < cachedSurface - 3 || level().getFluidState(blockPosition()).is(FluidTags.WATER);
+        // An almost two block band the creature has to cross completely before the answer changes.
+        submerged = water && y < (submerged ? cachedSurface + 0.6 : cachedSurface - 1.0);
+    }
     /** Depth below the waterline in blocks, zero at the surface. */
     public double depth() { return Math.max(0, cachedSurface - getY()); }
 
@@ -247,6 +265,9 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
         prevBank = bank;
         prevRenderGlow = renderGlow;
         if (terrainClock-- <= 0) { terrainClock = 20; refreshTerrain(); }
+        // Before the AI and the move control run, and once only: everything downstream of it,
+        // including the render thread, reads the answer rather than recomputing it.
+        updateSubmerged();
 
         super.tick();
 
@@ -306,10 +327,13 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
                 if (!part.getBoundingBox().intersects(victim.getBoundingBox())) continue;
                 Vec3 away = victim.position().subtract(part.getBoundingBox().getCenter());
                 away = away.lengthSqr() < 1.0E-6 ? new Vec3(0, 1, 0) : away.normalize();
-                victim.setDeltaMovement(victim.getDeltaMovement().scale(0.55).add(away.scale(0.30 + speed * 0.85)));
+                // Shove and brushing damage are both per block per tick, so both are restated
+                // against the move control's speed scale: what used to be a hunting pace is now a
+                // lunge, and a drift-by should push you aside without mauling you.
+                victim.setDeltaMovement(victim.getDeltaMovement().scale(0.55).add(away.scale(0.35 + speed * 1.6)));
                 victim.hurtMarked = true; victim.fallDistance = 0;
-                if (speed > 0.5 && tickCount % 10 == 0 && attack() != LeviathanAttack.FAKE_ATTACK)
-                    victim.hurt(damageSources().mobAttack(this), (float) (2.0 + speed * 4.0));
+                if (speed > 0.3 && tickCount % 10 == 0 && attack() != LeviathanAttack.FAKE_ATTACK)
+                    victim.hurt(damageSources().mobAttack(this), (float) (2.0 + speed * 9.0));
                 break;
             }
         }
@@ -410,9 +434,12 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
         LeviathanState state = state();
         if (state == LeviathanState.FRENZY) return event.setAndContinue(AbyssalPilgrimAnimations.FRENZY);
         if (state == LeviathanState.AMBUSH || state == LeviathanState.STALK) return event.setAndContinue(AbyssalPilgrimAnimations.STALK);
-        if (getXRot() < -42 && speed > 0.6) return event.setAndContinue(AbyssalPilgrimAnimations.VERTICAL_ASCENT);
-        if (getXRot() > 42 && speed > 0.6) return event.setAndContinue(AbyssalPilgrimAnimations.DEEP_DIVE);
-        if (speed > 1.05) return event.setAndContinue(AbyssalPilgrimAnimations.FAST_SWIM);
+        // Thresholds track the move control's speed scale. They were written against a creature
+        // that cruised at three quarters of a block a tick; against one that cruises at a quarter
+        // they would mean the dive and fast swim clips simply never played again.
+        if (getXRot() < -42 && speed > 0.35) return event.setAndContinue(AbyssalPilgrimAnimations.VERTICAL_ASCENT);
+        if (getXRot() > 42 && speed > 0.35) return event.setAndContinue(AbyssalPilgrimAnimations.DEEP_DIVE);
+        if (speed > 0.72) return event.setAndContinue(AbyssalPilgrimAnimations.FAST_SWIM);
         if (state == LeviathanState.TOY) return event.setAndContinue(AbyssalPilgrimAnimations.CIRCLE);
         return event.setAndContinue(AbyssalPilgrimAnimations.SWIM);
     }

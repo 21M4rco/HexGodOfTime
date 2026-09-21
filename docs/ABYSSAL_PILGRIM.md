@@ -99,6 +99,66 @@ same solved impulse instead of steering at a point in the sky, which is what lef
 the surface with its nose in the air. Both aim at most 110 blocks above the waterline; higher than
 that, flight has won.
 
+### Smoothness, and why it twitched
+
+Three independent causes, all of which read as the same symptom.
+
+*The checkpoint lurch.* `AbyssalPilgrimEntity` broadcasts a path checkpoint every forty ticks and
+`acceptSnapshot` set `leading` to the anchor the packet carried, which is the server's position at
+send time. The renderer draws every joint as an offset from the *client's* interpolated entity
+position, and a client entity is always a couple of ticks behind — `LivingEntity.aiStep` eases it
+toward each movement packet. So twice a second the head was placed where the head was not, by
+exactly the lag distance, and the next `push` put it back. Checkpoints are now re-anchored onto the
+viewer's own position: only the shape was ever wanted from the server, and pinning that shape to
+the local head makes the correction invisible. A checkpoint further than a teleport from the local
+copy is still taken at face value, because that is a creature that has genuinely jumped.
+
+*Two ringing springs.* The per-joint bank used damping 0.78 against stiffness 0.09, whose poles sit
+at magnitude 0.88 with a twenty one tick period; the client's sway and lift solver used 0.74
+against 0.22, magnitude 0.86 with a thirteen tick period. Both ring for one to two seconds after
+any input, and a creature under continuous steering supplies continuous input, so neither ever
+settled. The bank is now a first order ease and the appendage solver is near critically damped.
+
+*Waterline flicker.* `isSubmerged` was a bare threshold recomputed by each of its five callers,
+and it switches both the animation state and the appendage solver's drag terms. A body holding the
+surface — which several toy behaviours do on purpose — flipped state on alternate ticks. It is now
+resolved once per tick, before the AI and move control run, across a band from 1.0 below the line
+to 0.6 above it.
+
+### Self intersection
+
+`bendLimit` now derives from `PROFILE[index]` rather than from the index. Girth is what limits a
+bend: the hull is eleven blocks across at the shoulder and its joints are six apart, so it is wider
+than the gap between them and every degree of bend there is solid geometry pushed through the
+neighbouring segment. Seven degrees at the widest point, rising to twenty one at the tail tip.
+
+That makes the stiffest part of the spine a forty nine block turning circle, so `TURN_RADIUS` went
+from thirty to fifty. The two constants have to agree in this direction: steering tighter than the
+spine can follow means the joint limiter clamps the body away from its own path every tick, which
+is a creature sliding sideways through its own turn rather than swimming around it.
+
+### Pace
+
+`LeviathanMoveControl.SCALE` multiplies every commanded speed and every burst. The patterns were
+written in blocks per tick without reference to the size of the body carrying them, so the lunge
+ran at 4.7 blocks a tick before drag, settling near 6.3 — a hundred and twenty seven blocks a
+second, twenty three times a sprinting player, for a creature a hundred and fifty blocks long. At
+0.35 the cruise is 5.2 blocks a second, a committed hunt 14, and a lunge 29.
+
+Scaling in one place keeps the relative pacing of every pattern exactly as written. Three things
+had to be restated against it because they compare against an absolute speed rather than a
+relative one: the locomotion clip thresholds, which would otherwise never select the dive or fast
+swim animations again; the brushing contact damage and shove in `bodyContact`; and the undulation
+term in the client appendage solver, which would otherwise hold the fins still at cruise. Leaps
+are deliberately exempt — `launch` and `arcTo` solve a ballistic problem and have no business being
+scaled by a swimming constant.
+
+### Arrival
+
+`VoidSea.ARRIVAL` moved from three blocks above the waterline to fifty. Three put the player in the
+water before they had seen the realm at all. Fifty is about two and a half seconds of fall with an
+empty horizon, and water negates the landing, so the whole cost of the drop is its duration.
+
 ### Skin
 
 `tools/generate_pilgrim_textures.py` replaces the skin and emissive mask. The geometry, the 4x2

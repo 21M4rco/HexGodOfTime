@@ -51,7 +51,6 @@ public final class LeviathanSegmentController {
     private final Vec3[] previous = new Vec3[SEGMENTS];
     private final float[] yaw = new float[SEGMENTS], pitch = new float[SEGMENTS], roll = new float[SEGMENTS];
     private final float[] prevYaw = new float[SEGMENTS], prevPitch = new float[SEGMENTS], prevRoll = new float[SEGMENTS];
-    private final float[] rollVel = new float[SEGMENTS];
     private Vec3 backward = new Vec3(0, 0, -1);
     private boolean primed;
     private Vec3 leading = Vec3.ZERO;
@@ -97,7 +96,7 @@ public final class LeviathanSegmentController {
         for (int i = 0; i < SEGMENTS; i++) {
             seg[i] = previous[i] = raw[i] = position.add(backward.scale(i * SPACING));
             yaw[i] = prevYaw[i] = yawDegrees; pitch[i] = prevPitch[i] = pitchDegrees;
-            roll[i] = prevRoll[i] = 0; rollVel[i] = 0;
+            roll[i] = prevRoll[i] = 0;
         }
         primed = true;
     }
@@ -188,26 +187,35 @@ public final class LeviathanSegmentController {
                 yaw[i] = (float) (Mth.atan2(-d.x, d.z) * Mth.RAD_TO_DEG);
                 pitch[i] = (float) (-Math.asin(Mth.clamp(d.y, -1, 1)) * Mth.RAD_TO_DEG);
             }
-            // Bank into turns: the difference against the joint in front drives a damped spring.
+            // Bank into turns, by easing rather than by spring. The spring this replaces had a
+            // damping of 0.78 against a stiffness of 0.09, which puts its poles at a magnitude of
+            // 0.88 with a twenty one tick period: every change of heading rang for two seconds,
+            // and a body being steered continuously never stopped ringing. That is the shimmer.
             float lead = i == 0 ? yaw[0] : yaw[i - 1];
             float turn = Mth.wrapDegrees(lead - yaw[i]);
             float goal = Mth.clamp(turn * 2.0f, -34f, 34f);
-            rollVel[i] = rollVel[i] * 0.78f + (goal - roll[i]) * 0.09f;
-            roll[i] = Mth.clamp(roll[i] + rollVel[i], -40f, 40f);
+            roll[i] = Mth.clamp(roll[i] + (goal - roll[i]) * 0.13f, -40f, 40f);
         }
     }
 
     /**
-     * Degrees one joint may turn against the joint in front of it.
+     * Degrees one joint may turn against the joint in front of it, from its girth.
      *
-     * <p>Nine degrees at the shoulder and nineteen at the tail. With six blocks between joints
-     * those are turning circles of about thirty eight and eighteen blocks: the front of the body
-     * is held to roughly what the move control is allowed to fly, and the tail, which is a
-     * fraction of the girth, is allowed to whip through considerably more.
+     * <p>Girth rather than position along the body, because girth is what actually limits a bend.
+     * The hull at the shoulder is eleven blocks across and its joints are six apart, so it is
+     * wider than the gap between them: every degree of bend there is solid geometry pushed through
+     * the neighbouring segment, which is the self intersection you see on a hard turn. The tail is
+     * under a block across and can whip through three times as much without touching itself.
+     *
+     * <p>Seven degrees at the widest point is a forty nine block turning circle, which is where
+     * the move control's turn radius comes from. The two have to agree: a move control that steers
+     * tighter than the spine can follow leaves the body clamped away from its own path every tick,
+     * and that reads as the creature sliding sideways through its own turn.
      */
     private static float bendLimit(int index) {
-        float along = (index - 1) / (float) (SEGMENTS - 2);
-        return 9.0f + 10.0f * along;
+        double widest = PROFILE[5];
+        double girth = Math.min(1.0, radius(index) / widest);
+        return (float) (7.0 + 15.0 * (1.0 - girth));
     }
 
     /** Rotates {@code want} back toward {@code from} until the angle between them fits the limit. */
@@ -241,20 +249,37 @@ public final class LeviathanSegmentController {
         return tag;
     }
 
-    public void acceptSnapshot(net.minecraft.nbt.CompoundTag tag) {
+    /**
+     * Adopts a server path checkpoint, re-anchored onto {@code here}.
+     *
+     * <p>{@code here} is the viewer's own copy of the creature, and using it rather than the anchor
+     * the packet carries is the whole point. A client entity is always a little behind the server
+     * one — it eases toward each movement packet over several ticks — so a path pinned to the
+     * server's position put the head somewhere the head was not, every time a checkpoint landed.
+     * The renderer draws every joint as an offset from the interpolated entity position, so that
+     * showed up as the entire body lurching twice a second and snapping back on the following tick.
+     *
+     * <p>Only the shape is wanted from the server. Pinning that shape to the viewer's own head
+     * keeps the correction invisible, and the ordinary previous-to-current interpolation absorbs
+     * what little of it is left.
+     */
+    public void acceptSnapshot(net.minecraft.nbt.CompoundTag tag, Vec3 here) {
         byte[] data = tag.getByteArray("path");
         if (data.length < 24 || data.length % 12 != 0 || data.length > MAX_NODES * 12) return;
-        Vec3 anchor = new Vec3(tag.getDouble("x"), tag.getDouble("y"), tag.getDouble("z"));
         boolean initial = !primed;
+        // A checkpoint that disagrees with where we already are by more than a teleport is stale
+        // or belongs to a creature that has since jumped; a re-lay is cheaper than believing it.
+        Vec3 anchor = new Vec3(tag.getDouble("x"), tag.getDouble("y"), tag.getDouble("z"));
+        Vec3 origin = initial || anchor.distanceToSqr(here) > TELEPORT * TELEPORT ? anchor : here;
         count = data.length / 12; head = 0;
         java.nio.ByteBuffer bytes = java.nio.ByteBuffer.wrap(data);
         for (int k = 0; k < count; k++) {
             int index = Math.floorMod(-k, MAX_NODES);
-            nx[index] = anchor.x + bytes.getFloat();
-            ny[index] = anchor.y + bytes.getFloat();
-            nz[index] = anchor.z + bytes.getFloat();
+            nx[index] = origin.x + bytes.getFloat();
+            ny[index] = origin.y + bytes.getFloat();
+            nz[index] = origin.z + bytes.getFloat();
         }
-        leading = anchor; primed = true;
+        leading = origin; primed = true;
         backward = node(1).subtract(node(0)).normalize();
         rebuild();
         if (initial) for (int i = 0; i < SEGMENTS; i++) {

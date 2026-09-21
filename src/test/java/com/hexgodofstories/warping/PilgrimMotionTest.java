@@ -20,7 +20,7 @@ public final class PilgrimMotionTest {
             check(spacing > 5.9 && spacing <= 6.001, "curve keeps joint spacing: " + spacing);
         }
         LeviathanSegmentController lateViewer = new LeviathanSegmentController();
-        lateViewer.acceptSnapshot(path.snapshot());
+        lateViewer.acceptSnapshot(path.snapshot(), path.segment(0));
         for (int i = 0; i < LeviathanSegmentController.SEGMENTS; i++)
             check(path.segment(i).distanceTo(lateViewer.segment(i)) < 0.002, "late viewer reconstructs joint " + i);
         path.push(new Vec3(1000, 100, 1000), 90, 0);
