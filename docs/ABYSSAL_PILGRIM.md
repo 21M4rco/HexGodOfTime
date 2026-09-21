@@ -405,3 +405,43 @@ still has its own gate; this is a third voice, and the only one that is neither.
 enough to still be sounding when the next mouthful starts, or if two of them ever become the same
 recording — which would pass every other check here while quietly undoing the reason for splitting
 the source up at all.
+
+## 0.5.11 — waves you can actually see, and teeth that leave a mark
+
+Base: successful Actions run 35635814686 plus the jaws of 0.5.10.
+
+### The swell was drawing and could not be seen
+
+Reported as "I feel the waves but don't see anything happening in the water", which is exactly the
+shape of the bug: the physics was right and the surface was in the buffer.
+
+The realm has `has_skylight: false` over a flat `ambient_light` of 0.18, so every block of the water
+column is lit to the same near nothing. The surface was drawn through that lightmap and tinted with
+the biome's own water colour, which meant it came out at about `(0.013, 0.044, 0.074)` — against
+water sitting at roughly `(0.04, 0.12, 0.22)`. Blended at a third opacity, the difference between a
+crest and a trough was under two percent of the screen value. Present, correct, invisible.
+
+Two changes. The lightmap is out of the argument: what a swell shows you is light coming back off
+it, which is not the block's light, and putting a surface through a 0.18 ambient crushes it to
+black. And the shading now runs off the slope rather than the body colour — flat water is left very
+nearly alone at seven percent opacity, so a calm sea looks as it always did, while a face tipped
+against the light goes to fifty-five percent and lerps toward a pale cool blue. Measured across the
+render grid at its real sampling rate, that puts calm water about a third brighter than the scene,
+busy water at plus one hundred and thirty percent, and the face of a swell at plus one hundred and
+seventy-five. The wave field itself was not touched, so the physics tuning stands.
+
+This makes concealment strictly better, not worse: brighter and more opaque crests mean more water
+blended over anything below, the surface still never drops beneath the still waterline, and the
+veil still reads only the waterline and the camera.
+
+### Bleeding
+
+Hexor's jaws now leave the same wound a conjured dagger does — one stack of five, the same tick
+rate, the same duration. Only the head does it: the bite, the lunge, the deep charge, the surface
+ram, both breaches, the throw, and the chewing of whatever is held in the mouth. A tail sweep, a
+body crush, the scream and the pressure of being dragged deep stay blunt, and blunt does not bleed.
+
+`Bleed` was keyed on a player, because every wound in it had been a blade's. It now also takes a
+plain UUID, and when the owner of a wound is not a player but is Hexor, the ticking damage is dealt
+with Hexor's own damage type — so bleeding out from a bite is still a kill by Hexor and still says
+so in red, rather than being reported as plain magic.

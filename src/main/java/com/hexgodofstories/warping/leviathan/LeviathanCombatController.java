@@ -1,6 +1,7 @@
 package com.hexgodofstories.warping.leviathan;
 
 import com.hexgodofstories.HexGodOfStories;
+import com.hexgodofstories.server.Bleed;
 import com.hexgodofstories.warping.VoidSea;
 import com.hexgodofstories.network.HexNetwork;
 import net.minecraft.server.level.ServerPlayer;
@@ -188,7 +189,7 @@ public final class LeviathanCombatController {
             self.control().addBurst(1.0);
             if (tick == attack.windup + 1) self.voice(HexGodOfStories.PILGRIM_BITE.get(), 22f, 0.85f);
             for (LivingEntity hit : headSweep(2.6)) {
-                damage(hit, 14f, 0.55);
+                jaws(hit, 14f, 0.55);
                 if (hit == victim && attack.canHold && self.getRandom().nextFloat() < 0.55f) takeHold(hit);
             }
         } else if (self.held() != null) {
@@ -196,7 +197,7 @@ public final class LeviathanCombatController {
             // has decided to finish them, it chews, on its own rhythm rather than on this clock.
             shakeVictim(0.9f);
             eat(30f, false);
-            if (tick % 9 == 0 && self.held() instanceof LivingEntity living) damage(living, 2.5f, 0);
+            if (tick % 9 == 0 && self.held() instanceof LivingEntity living) jaws(living, 2.5f, 0);
         }
     }
 
@@ -215,7 +216,7 @@ public final class LeviathanCombatController {
             steer(victim.isAlive() ? aimThrough(victim, 70)
                 : anchor.add(anchor.subtract(self.position()).normalize().scale(70)), 3.1, 0.55f);
             self.control().addBurst(1.6);
-            for (LivingEntity hit : headSweep(2.8)) damage(hit, 16f, 1.6);
+            for (LivingEntity hit : headSweep(2.8)) jaws(hit, 16f, 1.6);
             for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.NECK, 1.6)) damage(hit, 9f, 1.2);
         } else {
             steer(self.position().add(self.getLookAngle().scale(30)), 0.8, 0.18f);
@@ -359,7 +360,7 @@ public final class LeviathanCombatController {
             self.control().addBurst(1.4);
             self.setGlow(1f);
             for (LivingEntity hit : headSweep(2.8)) {
-                damage(hit, 15f, 1.4);
+                jaws(hit, 15f, 1.4);
                 if (self.getRandom().nextFloat() < 0.4f) takeHold(hit);
             }
         } else {
@@ -376,7 +377,7 @@ public final class LeviathanCombatController {
             steer(new Vec3(victim.getX(), line + 3, victim.getZ()), 2.6, 0.7f);
             self.control().addBurst(1.2);
             if (!splashed && self.getY() > line - 4) { splashed = true; splash(new Vec3(self.getX(), line, self.getZ()), 1.3f); }
-            for (LivingEntity hit : headSweep(2.0)) { damage(hit, 11f, 1.0); hit.setDeltaMovement(hit.getDeltaMovement().add(0, 1.35, 0)); hit.hurtMarked = true; }
+            for (LivingEntity hit : headSweep(2.0)) { jaws(hit, 11f, 1.0); hit.setDeltaMovement(hit.getDeltaMovement().add(0, 1.35, 0)); hit.hurtMarked = true; }
             for (LivingEntity hit : contacts(LeviathanMultipartHitbox.Section.NECK, 2.5)) { damage(hit, 9f, 1.0); hit.setDeltaMovement(hit.getDeltaMovement().add(0, 1.35, 0)); hit.hurtMarked = true; }
             for (Boat boat : self.level().getEntitiesOfClass(Boat.class, self.segments().box(0).inflate(9))) {
                 boat.setDeltaMovement(boat.getDeltaMovement().add((self.getRandom().nextDouble() - 0.5) * 0.7, 1.5, (self.getRandom().nextDouble() - 0.5) * 0.7));
@@ -421,7 +422,7 @@ public final class LeviathanCombatController {
                 splash(new Vec3(self.getX(), line, self.getZ()), 2.0f);
             }
             for (LivingEntity hit : headSweep(3.0)) {
-                damage(hit, 20f, 1.0);
+                jaws(hit, 20f, 1.0);
                 if (self.held() == null) takeHold(hit);
             }
             // Coming back down through the waterline.
@@ -475,7 +476,7 @@ public final class LeviathanCombatController {
                 splash(new Vec3(self.getX(), line, self.getZ()), 2.2f);
             }
             for (LivingEntity hit : headSweep(3.2)) {
-                damage(hit, 22f, 1.0);
+                jaws(hit, 22f, 1.0);
                 if (self.held() == null && attack.canHold) takeHold(hit);
             }
             // Down again, one way or the other.
@@ -552,7 +553,7 @@ public final class LeviathanCombatController {
             }
             // Otherwise, try to be underneath them when they come down.
             steer(new Vec3(victim.getX(), Math.min(victim.getY(), self.surfaceY()) - 6, victim.getZ()), 2.4, 0.8f);
-            for (LivingEntity hit : headSweep(2.6)) damage(hit, 12f, 0.8);
+            for (LivingEntity hit : headSweep(2.6)) jaws(hit, 12f, 0.8);
         }
     }
 
@@ -688,8 +689,8 @@ public final class LeviathanCombatController {
         return !(entity instanceof Player player) || (!player.isCreative() && !player.isSpectator());
     }
 
-    private void damage(LivingEntity entity, float amount, double knockback) {
-        if (!struck.add(entity.getUUID())) return;
+    private boolean damage(LivingEntity entity, float amount, double knockback) {
+        if (!struck.add(entity.getUUID())) return false;
         connected = landedThisTick = true;
         entity.hurt(self.attackDamage(entity), amount);
         if (knockback > 0) {
@@ -699,6 +700,23 @@ public final class LeviathanCombatController {
             entity.hurtMarked = true;
         }
         if (entity instanceof ServerPlayer player) player.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(player));
+        return true;
+    }
+
+    /** Stacks and duration of the wound a bite leaves, matched to the conjured daggers'. */
+    private static final int BLEED_STACKS = 1, BLEED_TICKS = 160;
+
+    /**
+     * A blow that lands teeth first.
+     *
+     * <p>Everything the jaws touch leaves the same wound a conjured dagger does: one stack,
+     * stacking to five, ticking away on the same clock, and credited back to whatever opened it so
+     * bleeding out from a bite is still a kill by Hexor and still reads as one. Only the head does
+     * this. A tail sweep and a body crush are blunt, and blunt does not bleed.
+     */
+    private void jaws(LivingEntity entity, float amount, double knockback) {
+        if (!damage(entity, amount, knockback)) return;
+        Bleed.apply(self.getUUID(), entity, BLEED_STACKS, BLEED_TICKS);
     }
 
     private void takeHold(LivingEntity entity) {

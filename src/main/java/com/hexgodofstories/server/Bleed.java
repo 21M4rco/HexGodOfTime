@@ -19,12 +19,23 @@ public final class Bleed {
     public static int stacks(LivingEntity e) {Wound w=WOUNDS.get(e.getUUID());return w==null?0:w.stacks;}
 
     public static void apply(ServerPlayer owner,LivingEntity victim,int stacks,int duration) {
+        apply(owner.getUUID(),victim,stacks,duration);
+    }
+
+    /**
+     * The same wound, opened by something that is not a caster.
+     *
+     * <p>Every wound here was a blade's until now, so the owner was always a player and the whole
+     * thing was keyed on one. Hexor's jaws leave the same wound, and it has a UUID like anything
+     * else, so this is the same bookkeeping with the player requirement lifted off it.
+     */
+    public static void apply(UUID owner,LivingEntity victim,int stacks,int duration) {
         if(!victim.isAlive()||victim.getType().is(net.minecraft.tags.EntityTypeTags.SKELETONS))return;
         long now=victim.level().getGameTime();
         Wound wound=WOUNDS.get(victim.getUUID());
         if(wound==null) {
             if(WOUNDS.size()>=MAX_TRACKED)return;
-            WOUNDS.put(victim.getUUID(),new Wound(owner.getUUID(),Math.min(MAX_STACKS,stacks),now+duration,now+INTERVAL));
+            WOUNDS.put(victim.getUUID(),new Wound(owner,Math.min(MAX_STACKS,stacks),now+duration,now+INTERVAL));
         } else {
             wound.stacks=Math.min(MAX_STACKS,wound.stacks+stacks);
             wound.expires=Math.max(wound.expires,now+duration);
@@ -44,7 +55,13 @@ public final class Bleed {
             if(now<wound.next)continue;
             wound.next=now+INTERVAL;
             ServerPlayer owner=level.getServer().getPlayerList().getPlayer(wound.owner);
-            var source=owner!=null?owner.damageSources().indirectMagic(owner,owner):level.damageSources().magic();
+            // Bleeding out from a bite is still a kill by the thing that bit you, and still says so:
+            // without this the last tick of a wound Hexor opened would be reported as plain magic.
+            net.minecraft.world.damagesource.DamageSource source;
+            if(owner!=null)source=owner.damageSources().indirectMagic(owner,owner);
+            else if(level.getEntity(wound.owner) instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity hexor)
+                source=hexor.attackDamage(victim);
+            else source=level.damageSources().magic();
             victim.hurt(source,.8f*wound.stacks);
             if(owner!=null)HexServer.reward(owner,Discipline.CONJURATION,20);
             if(WOUNDS.containsKey(id))notifyClients(victim,wound.stacks);

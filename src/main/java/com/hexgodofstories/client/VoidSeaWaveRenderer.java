@@ -6,7 +6,6 @@ import com.hexgodofstories.warping.VoidSeaWaves;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
@@ -52,13 +51,21 @@ public final class VoidSeaWaveRenderer {
     private static final double WATER_TOP = 0.8888889;
     /** Clear of that surface even at dead calm, so the two never argue over the same depth. */
     private static final double LIFT = 0.06;
-    private static final float ALPHA = 0.38f;
+    /** How present the sheet is over water that is doing nothing, and over a face that is. */
+    private static final float ALPHA_FLAT = 0.07f, ALPHA_LIT = 0.55f;
+    /** The colour a face of water throws back. Cool, because the thing overhead is a galaxy. */
+    private static final float GLINT_R = 0.45f, GLINT_G = 0.72f, GLINT_B = 0.92f;
+    /** Slope at which a face is fully lit, and the height at which a crest is a crest. */
+    private static final float SLOPE_GAIN = 3.5f, CREST_REF = 2.6f;
     /** Blocks over which the mesh settles back onto the flat water at its outer edge. */
     private static final double SKIRT = 52.0;
     /** The camera is inside the water it is drawing, so the first few blocks of it are faded out. */
     private static final double NEAR_IN = 2.0, NEAR_OUT = 7.0;
     /** Beyond this much height difference the sea is not usefully on screen. */
     private static final double RANGE_Y = 420.0;
+
+    /** Packed light with both channels at maximum; see where it is assigned. */
+    private static final int FULL_BRIGHT = 15728880;
 
     private static float[] field = new float[0];
     private static int span = -1;
@@ -102,7 +109,14 @@ public final class VoidSeaWaveRenderer {
             }
         }
 
-        light = LevelRenderer.getLightColor(mc.level, BlockPos.containing(camX, VoidSea.SURFACE + 1, camZ));
+        // Deliberately not the block light here. The realm has no skylight and a flat ambient of
+        // 0.18 under it, so every block of the water column is lit to the same near nothing, and a
+        // surface drawn through that lightmap came out around two percent different from the water
+        // behind it: present in the buffer, invisible on the screen. What a swell actually shows
+        // you is light coming back off it, which is not the block's light anyway, so the shading
+        // below is done in the vertex colour and the lightmap is taken out of the argument. Fog
+        // still applies, so distance still swallows the far water.
+        light = FULL_BRIGHT;
         int tint = mc.level.getBiome(BlockPos.containing(camX, VoidSea.SURFACE, camZ)).value().getWaterColor();
         tintR = (tint >> 16 & 0xFF) / 255f; tintG = (tint >> 8 & 0xFF) / 255f; tintB = (tint & 0xFF) / 255f;
         Vector3f look = event.getCamera().getLookVector();
@@ -145,23 +159,24 @@ public final class VoidSeaWaveRenderer {
         float height = field[i * points + j];
         double x = originX + i * CELL, z = originZ + j * CELL, y = waterline + height;
 
-        // Slope taken from the samples either side. Flat water is lit plainly and the faces of a
-        // swell catch the light, which is what makes the shape legible from a distance.
+        // Slope from the samples either side, and it is the slope that is the whole picture. Water
+        // lying flat is left very nearly alone, so a calm sea looks exactly as it always did; a
+        // face tipped against the light comes up bright, so what the eye picks out is the shape of
+        // the wave rather than a sheet laid over the ocean. The raised body of a swell is lifted a
+        // little too, so something big reads as a mass of water and not only as two lit faces.
         float dx = (sample(i + 1, j) - sample(i - 1, j)) / (2f * CELL);
         float dz = (sample(i, j + 1) - sample(i, j - 1)) / (2f * CELL);
         float inverse = (float) (1.0 / Math.sqrt(dx * dx + dz * dz + 1.0));
         float nx = -dx * inverse, ny = inverse, nz = -dz * inverse;
-        float shade = 0.62f + 0.38f * ny + Math.min(0.22f, height * 0.035f);
+        float lit = Mth.clamp((float) Math.sqrt(dx * dx + dz * dz) * SLOPE_GAIN
+            + Mth.clamp(height / CREST_REF, 0f, 1f) * 0.45f, 0f, 1f);
 
         double distance = Math.sqrt(sqr(x - camX) + sqr(y - camY) + sqr(z - camZ));
         float near = (float) Mth.clamp((distance - NEAR_IN) / (NEAR_OUT - NEAR_IN), 0, 1);
-        // Crests sit a little more solidly than the water between them, which reads as the light
-        // catching a face rather than as the sheet changing opacity.
-        float body = 0.82f + 0.18f * Mth.clamp(height / 3f, 0f, 1f);
-        float alpha = ALPHA * near * body * (float) skirt(x, z);
+        float alpha = (ALPHA_FLAT + (ALPHA_LIT - ALPHA_FLAT) * lit) * near * (float) skirt(x, z);
 
         buffer.vertex(matrix, (float) (x - camX), (float) (y - camY), (float) (z - camZ))
-            .color(tintR * shade, tintG * shade, tintB * shade, alpha)
+            .color(Mth.lerp(lit, tintR, GLINT_R), Mth.lerp(lit, tintG, GLINT_G), Mth.lerp(lit, tintB, GLINT_B), alpha)
             .uv(0.5f, 0.5f)
             .overlayCoords(OverlayTexture.NO_OVERLAY)
             .uv2(light)
