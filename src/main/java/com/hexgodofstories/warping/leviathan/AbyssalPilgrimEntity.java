@@ -69,6 +69,8 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
     private float renderGlow, prevRenderGlow;
     private double cachedSurface = VoidSea.SURFACE, cachedFloor = VoidSea.FLOOR;
     private int terrainClock;
+    /** Chunk the hunting ticket was last renewed for. */
+    private long heldChunk = Long.MIN_VALUE;
     /** Client side, used to fade ambience and decide appendage detail. */
     private double viewerDistance = 1024;
 
@@ -250,8 +252,13 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
 
         if (!level().isClientSide) {
             // Without this the creature freezes the moment it leaves simulation distance, which is
-            // most of its life: it hunts from beyond sight on purpose.
-            if (tickCount % 20 == 0 && level() instanceof ServerLevel server) PilgrimWarden.renew(server, this);
+            // most of its life: it hunts from beyond sight on purpose. Renewed on a clock and also
+            // the moment it crosses into a new chunk, because at attack speed it covers a chunk
+            // every four ticks and a ticket it has already outrun is not holding anything.
+            if (level() instanceof ServerLevel server && (tickCount % 20 == 0 || chunkPosition().toLong() != heldChunk)) {
+                heldChunk = chunkPosition().toLong();
+                PilgrimWarden.renew(server, this);
+            }
             if (isDying()) tickDeathSequence();
             Vec3 motion = getDeltaMovement();
             if (motion.lengthSqr() > 1.0E-8) {

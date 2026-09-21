@@ -98,7 +98,8 @@ public final class AbyssalPilgrimAI {
         // waiting for an attack roll to come up. A hunter that only looks at the sky when its own
         // dice say so is a hunter that lets everything airborne live, which is how the surface
         // became a safe place to stand.
-        if (leapCooldown <= 0 && !self.isDying() && hunt.leapable(58, LeviathanAttack.SKY_LEAP.range)) {
+        if (leapCooldown <= 0 && !self.isDying() && self.depth() < 220
+                && hunt.leapable(58, LeviathanAttack.SKY_LEAP.range)) {
             leapCooldown = 140 + random.nextInt(200);
             combat.begin(LeviathanAttack.SKY_LEAP, hunt.target());
             setState(LeviathanState.ATTACK);

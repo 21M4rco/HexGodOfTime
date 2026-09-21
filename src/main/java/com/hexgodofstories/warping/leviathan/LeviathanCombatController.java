@@ -398,6 +398,9 @@ public final class LeviathanCombatController {
             self.control().addBurst(0.6);
             if (tick == 0) self.voice(HexGodOfStories.PILGRIM_BREACH_CHARGE.get(), 96f, 0.95f);
             self.setGlow(Mth.clamp(tick / (float) attack.windup, 0.25f, 1f));
+            // Launching from three hundred blocks down is a leap that ends underwater. Hold the
+            // windup until the run up has actually been made, but never indefinitely.
+            if (tick == attack.windup - 1 && self.depth() > 85 && breachPreparation++ < 140) tick--;
         } else if (tick == attack.windup) {
             anchor = aim;
             self.setGlow(1f);

@@ -198,9 +198,12 @@ public final class LeviathanSegmentController {
     }
 
     /**
-     * Degrees one joint may turn against the joint in front of it. Six blocks of spacing at twelve
-     * degrees is a turning circle of about twenty nine blocks, which is roughly what the move
-     * control is allowed to fly; the tail is given more because it is a fraction of the girth.
+     * Degrees one joint may turn against the joint in front of it.
+     *
+     * <p>Nine degrees at the shoulder and nineteen at the tail. With six blocks between joints
+     * those are turning circles of about thirty eight and eighteen blocks: the front of the body
+     * is held to roughly what the move control is allowed to fly, and the tail, which is a
+     * fraction of the girth, is allowed to whip through considerably more.
      */
     private static float bendLimit(int index) {
         float along = (index - 1) / (float) (SEGMENTS - 2);
