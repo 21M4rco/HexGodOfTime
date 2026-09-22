@@ -62,7 +62,12 @@ public final class ServerEvents {
             TemporalEngine.tick(s);HexServer.tickLevel(s);
         }
         // Turning is eased after the creatures have turned, which is the only point it can be done.
-        else TemporalEngine.afterTick(s);
+        else {
+            TemporalEngine.afterTick(s);
+            if (com.hexgodofstories.warping.Destination.from(s)
+                    == com.hexgodofstories.warping.Destination.VOID_SEA)
+                com.hexgodofstories.warping.leviathan.PilgrimWarden.catchUp(s);
+        }
     }
     @SubscribeEvent public static void login(PlayerEvent.PlayerLoggedInEvent e) {
         if(!(e.getEntity() instanceof ServerPlayer p))return;

@@ -310,6 +310,32 @@ public final class PilgrimWarden {
             level.getChunk(destination.x, destination.z);
     }
 
+    /**
+     * End-of-level-tick safety net.
+     *
+     * <p>Forge can leave a live entity registered while its current chunk is below
+     * ENTITY_TICKING. Region tickets are promoted asynchronously, so a fast custom mover can cross
+     * a boundary and then receive no entity ticks at all until a player arrives. The realm and its
+     * passive clocks keep advancing, which made Hexor resume an ancient attack the instant someone
+     * entered to watch.
+     *
+     * <p>ServerEvents calls this after vanilla has had its normal chance to tick entities. The
+     * heartbeat makes the fallback mutually exclusive with the normal path: if Hexor ticked, this
+     * is a no-op; if he did not, mirror ServerLevel#tickNonPassenger's tickCount increment and run
+     * exactly one entity tick. Hexor cannot ride anything, so there is no passenger tree to mirror.
+     */
+    public static void catchUp(ServerLevel level) {
+        if (!WarpResidency.active(level)) return;
+        AbyssalPilgrimEntity pilgrim = ensure(level);
+        if (pilgrim == null || pilgrim.isRemoved() || pilgrim.isDying()) return;
+        long serverTick = level.getServer().getTickCount();
+        if (pilgrim.lastServerTicked() == serverTick) return;
+
+        // This is the same increment vanilla performs immediately before Entity#tick.
+        pilgrim.tickCount++;
+        pilgrim.tick();
+    }
+
     /** Called by the creature itself once it is ticking, so it can roam past simulation distance. */
     public static void renew(ServerLevel level, AbyssalPilgrimEntity pilgrim) {
         if (pilgrim.isDying()) return;   // a sinking corpse must never inherit the realm's claim

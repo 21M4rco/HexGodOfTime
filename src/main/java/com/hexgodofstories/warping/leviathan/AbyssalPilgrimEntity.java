@@ -76,6 +76,8 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
     private long heldChunk = Long.MIN_VALUE;
     /** Client side, used to fade ambience and decide appendage detail. */
     private double viewerDistance = 1024;
+    /** Last logical MinecraftServer tick in which this entity actually ran its tick body. */
+    private long lastServerTicked = Long.MIN_VALUE;
     /** Server side. How full the ocean is, as {@link TrillOfTheHunt} reads it. */
     private float thrill;
 
@@ -136,6 +138,8 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
     public LeviathanSegmentController segments() { return segments; }
     public LeviathanMoveControl control() { return (LeviathanMoveControl) this.moveControl; }
     @Nullable public AbyssalPilgrimAI ai() { return ai; }
+    /** Used by the Warden's end-of-tick safety net to detect a skipped vanilla entity tick. */
+    public long lastServerTicked() { return lastServerTicked; }
 
     public LeviathanState state() { return LeviathanState.byId(this.entityData.get(STATE)); }
     public void setState(LeviathanState state) { this.entityData.set(STATE, (byte) state.ordinal()); }
@@ -272,6 +276,9 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
 
     @Override
     public void tick() {
+        if (!level().isClientSide && level() instanceof ServerLevel server)
+            lastServerTicked = server.getServer().getTickCount();
+
         // Empty Void Sea = dormant Hexor. isAlwaysTicking() keeps Forge from losing this unique
         // entity when no player is around, but it does not mean an empty realm should simulate a
         // hunt forever. Bail out before terrain reads, AI, move control, combat and multipart work.

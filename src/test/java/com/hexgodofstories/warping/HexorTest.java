@@ -351,6 +351,15 @@ public final class HexorTest {
             "src/main/java/com/hexgodofstories/warping/leviathan/PilgrimWarden.java"));
         check(warden.contains("addRegionTicket(HUNT, pos, 3, pos, true)"),
             "the hunt ticket keeps an entity-ticking safety apron around Hexor");
+        check(warden.contains("public static void catchUp(ServerLevel level)")
+                && warden.contains("pilgrim.lastServerTicked() == serverTick")
+                && warden.contains("pilgrim.tickCount++")
+                && warden.contains("pilgrim.tick();"),
+            "the Warden supplies exactly one fallback tick when Forge skips Hexor");
+        String events = Files.readString(root.resolve(
+            "src/main/java/com/hexgodofstories/server/ServerEvents.java"));
+        check(events.contains("PilgrimWarden.catchUp(s)"),
+            "the fallback runs at the end of every Void Sea level tick");
     }
 
     // ------------------------------------------------------------------ plumbing
