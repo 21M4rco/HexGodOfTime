@@ -605,7 +605,15 @@ public final class LeviathanCombatController {
     // ---------------------------------------------------------------- shared mechanics
 
     private void steer(Vec3 point, double speed, float authority) {
-        self.control().moveTo(point, speed, authority);
+        // Enough Is Enough used a tighter, fully committed turn while the AI lined the body up,
+        // then the very first tick of the attack called ordinary moveTo and silently threw that
+        // authority away. That put Hexor back on the fifty-block hunting circle during the bite
+        // itself, which is how a stationary target could survive a "committed" pass untouched.
+        //
+        // Keep the dedicated kill arc for the whole pattern once this victim's patience is gone.
+        // Ordinary hunts still use the authored authority/radius exactly as before.
+        if (decided()) self.control().moveToKill(point, speed);
+        else self.control().moveTo(point, speed, authority);
     }
 
     // ---------------------------------------------------------------- aiming
