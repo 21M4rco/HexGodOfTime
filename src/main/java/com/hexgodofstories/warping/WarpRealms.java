@@ -33,7 +33,7 @@ public final class WarpRealms {
          * placed in any world that had already opened the way once. A mismatch here simply forgets
          * that the realms were built, and the next portal rebuilds them over the top.
          */
-        static final int LAYOUT=2;
+        static final int LAYOUT=3;
         int next;final Map<Long,Long> clocks=new HashMap<>();final Set<Long> ready=new HashSet<>();
         static Ledger load(CompoundTag n){Ledger l=new Ledger();l.next=n.getInt("next");
             if(n.getInt("layout")==LAYOUT)for(long x:n.getLongArray("ready"))l.ready.add(x);
@@ -105,6 +105,10 @@ public final class WarpRealms {
         if(d==Destination.VOID_SEA){com.hexgodofstories.warping.leviathan.PilgrimWarden.tick(l,now);
             // Preserve player prediction; mobs receive the same swell in the existing loop below.
             VoidSeaWaves.tick(l,now);}
+        if(d==Destination.PARADISE){
+            ParadiseRestoration.tick(l);
+            if(now%4==0&&!l.players().isEmpty())steam(l,now);
+        }
         List<Entity> active=new ArrayList<>();l.getAllEntities().forEach(active::add);
         for(Entity e:active){
             if(!e.isAlive()||e.isSpectator()||(d!=Destination.GRAVITY_WELL&&(e instanceof WarpHazard||e instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity)))continue;
@@ -115,7 +119,7 @@ public final class WarpRealms {
                     case SUN -> HexGodOfStories.BRANCH_ROAR.get();
                     case GRAVITY_WELL -> HexGodOfStories.BRANCH_HUM.get();
                     case TIME_STORM -> HexGodOfStories.BRANCH_SHIMMER.get();
-                    case FALLING_WORLD -> HexGodOfStories.METEOR_ROAR.get();
+                    case PARADISE -> HexGodOfStories.BRANCH_SHIMMER.get();
                     case CRUSHING_REALM -> HexGodOfStories.BRANCH_PRESSURE.get();
                     default -> null;
                 };
@@ -143,7 +147,7 @@ public final class WarpRealms {
                         if(age>60&&age%100<5&&h.size()>10){Vec3 back=h.getFirst();place(e,back.x,back.y,back.z);e.setDeltaMovement(Vec3.ZERO);e.hurtMarked=true;HexNetwork.fx(e,"slip");h.clear();}}
                     if(age%100>85&&e instanceof LivingEntity living)living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,8,3,false,false));
                 }
-                case FALLING_WORLD -> {if(e.getY()<48)place(e,e.getX(),231,e.getZ());if(e.getDeltaMovement().y>-.15)e.setDeltaMovement(e.getDeltaMovement().add(0,-.035,0));}
+                case PARADISE -> {Paradise.gravity(e);paradiseWater(l,e,now);}
                 case FROZEN_MOMENT -> freeze(l,e,now);
                 case CRUSHING_REALM -> {
                     MoonGravity.enforce(e);
@@ -168,13 +172,14 @@ public final class WarpRealms {
      *
      * <p>These are places, and a place you hang motionless in is not one. Vanilla's terminal
      * velocity of nearly four blocks a tick is a plummet that ends a hundred blocks later, which
-     * suits none of them either; every realm is a long, slow fall through open space instead. The
-     * Falling World is the exception in the fast direction, because falling is the entire realm,
-     * and the Gravity Well in the other, because down there is decided by the singularity.
+     * suits none of them either; every realm is a long, slow fall through open space instead.
+     * Paradise sets its own, slower still, because dropping between its islands is something you
+     * are meant to be able to steer; the Gravity Well opts out entirely, because down there is
+     * decided by the singularity rather than by gravity.
      */
     private static double sink(Destination d){
         return switch(d){
-            case FALLING_WORLD -> 1.25;
+            case PARADISE -> Paradise.SINK;
             case GRAVITY_WELL, CRUSHING_REALM, VOID_SEA -> 0;
             default -> .35;
         };
@@ -191,14 +196,24 @@ public final class WarpRealms {
     /** Nothing is ever lost out of the bottom of a realm; it is put back at the top of one. */
     private static void rescue(ServerLevel l,Destination d,Entity e,double cell){
         if(d==Destination.GRAVITY_WELL||d==Destination.CRUSHING_REALM)return;
-        double bottom=d==Destination.VOID_SEA?VoidSea.FLOOR-8:0;
+        double bottom=switch(d){
+            case VOID_SEA -> VoidSea.FLOOR-8;
+            case PARADISE -> (double)Paradise.FLOOR;
+            default -> 0;
+        };
         if(e.getY()>=bottom)return;
         double back=switch(d){
             case VOID_SEA -> VoidSea.SURFACE-24;
+            case PARADISE -> (double)Paradise.CEILING;
             case CRUSHING_REALM -> 120;
             default -> 200;
         };
-        place(e,e.getX(),back,e.getZ());
+        // Paradise folds back on itself. Everywhere else it is enough to put a faller back at the
+        // top of the column they fell down, but there is nothing under an island's edge here, so
+        // the same column would simply be fallen down again. A faller reappears over the heart and
+        // drifts back onto it, which is the only way out of the void that is not a death.
+        if(d==Destination.PARADISE)place(e,Destination.PARADISE.arrival.x+cell,back,Destination.PARADISE.arrival.z);
+        else place(e,e.getX(),back,e.getZ());
         e.setDeltaMovement(Vec3.ZERO);
     }
 
@@ -267,6 +282,43 @@ public final class WarpRealms {
         if(chill>=1&&now%30==0)living.hurt(l.damageSources().freeze(),3);
     }
 
+    /**
+     * Paradise's water, and what it pays out for being swum in.
+     *
+     * <p>Every pool in the realm counts. The hot spring is the one the place is built around, but
+     * the ponds on the outer islands and the cascades themselves are the same water, and a realm
+     * that rewarded exactly one puddle would be a realm with one place worth standing in.
+     *
+     * <p>Refreshed rather than stacked: a full duration is handed out once a second while a body
+     * is in the water, so climbing out leaves eleven seconds of it and nothing lasts for ever. The
+     * two vanilla gifts are the ones that read without explanation — the health coming back and the
+     * hearts to hold it — and the third is this realm's own.
+     */
+    private static void paradiseWater(ServerLevel l,Entity e,long now){
+        if(now%20!=0||!(e instanceof LivingEntity living)||!Paradise.bathing(living))return;
+        living.addEffect(new MobEffectInstance(MobEffects.REGENERATION,Paradise.BATHE_TICKS,1,true,true,true));
+        living.addEffect(new MobEffectInstance(MobEffects.HEALTH_BOOST,Paradise.BATHE_TICKS,1,true,true,true));
+        living.addEffect(new MobEffectInstance(HexGodOfStories.CANDY_RUSH.get(),Paradise.BATHE_TICKS,0,true,true,true));
+    }
+
+    /**
+     * The mist standing over the hot spring, and the sugar hanging in the air above it.
+     *
+     * <p>Sent from the server rather than grown on each client because it belongs to a fixed place
+     * rather than to a viewer: the spring is at the middle of the heart whoever is looking at it.
+     * It costs one packet every fifth of a second, and only while somebody is in the realm at all.
+     */
+    private static void steam(ServerLevel l,long now){
+        Paradise.Isle heart=Paradise.heart();
+        Random r=new Random(now*2654435761L);
+        for(int i=0;i<3;i++){
+            double a=r.nextDouble()*Math.PI*2,reach=Math.sqrt(r.nextDouble())*Paradise.springRim(a);
+            double x=heart.x()+Math.cos(a)*reach,z=heart.z()+Math.sin(a)*reach;
+            l.sendParticles(net.minecraft.core.particles.ParticleTypes.CLOUD,x,Paradise.SURFACE+1.15,z,1,.12,.01,.12,.008);
+            if(i==0)l.sendParticles(HexGodOfStories.CANDY.get(),x,Paradise.SURFACE+1.6+r.nextDouble()*2.2,z,1,.5,.35,.5,.01);
+        }
+    }
+
     private static final net.minecraft.resources.ResourceKey<net.minecraft.world.damagesource.DamageType> SOLAR_HEAT=
         net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DAMAGE_TYPE,HexGodOfStories.id("solar_heat"));
     /** Stellar heat is not ordinary fire: the mantle's fire resistance cannot make the Sun harmless. */
@@ -281,14 +333,14 @@ public final class WarpRealms {
     private static void populate(ServerLevel l,Destination d,double cell){
         if(d==Destination.VOID_SEA)com.hexgodofstories.warping.leviathan.PilgrimWarden.ensure(l);
         // A rebuild re-runs this, and the hazards are entities rather than blocks: without this a
-        // layout bump would leave the Falling World with two sets of debris in it, then three.
+        // layout bump would leave the Frozen Moment with two sets of spears in it, then three.
         if(!l.getEntitiesOfClass(WarpHazard.class,new AABB(cell-200,0,-200,cell+200,320,200)).isEmpty())return;
-        if(d==Destination.FALLING_WORLD||d==Destination.FROZEN_MOMENT){
-            Random r=new Random(819+d.ordinal());int count=d==Destination.FALLING_WORLD?48:32;
-            for(int i=0;i<count;i++){WarpHazard h=HexGodOfStories.WARP_HAZARD.get().create(l);if(h==null)continue;
-                h.configure(d==Destination.FROZEN_MOMENT?(i%4==0?5:1):i%3+2,cell,i);h.moveTo(cell+r.nextInt(100)-50,140+r.nextInt(90),r.nextInt(100)-50,0,0);l.addFreshEntity(h);}
+        if(d==Destination.FROZEN_MOMENT){
+            Random r=new Random(819+d.ordinal());
+            for(int i=0;i<32;i++){WarpHazard h=HexGodOfStories.WARP_HAZARD.get().create(l);if(h==null)continue;
+                h.configure(i%4==0?5:1,cell,i);h.moveTo(cell+r.nextInt(100)-50,140+r.nextInt(90),r.nextInt(100)-50,0,0);l.addFreshEntity(h);}
         }
     }
     public static void releaseHazards(ServerPlayer p){if(!Warping.sovereign(p))return;for(WarpHazard h:p.serverLevel().getEntitiesOfClass(WarpHazard.class,p.getBoundingBox().inflate(96)))h.release(p.getLookAngle());HexNetwork.fx(p,"resume");}
-    public static void reset(){RadialRealmRules.clear();MoonGravity.clear();JOBS.clear();HISTORY.clear();com.hexgodofstories.warping.leviathan.PilgrimWarden.reset();}
+    public static void reset(){RadialRealmRules.clear();MoonGravity.clear();JOBS.clear();HISTORY.clear();ParadiseRestoration.reset();com.hexgodofstories.warping.leviathan.PilgrimWarden.reset();}
 }

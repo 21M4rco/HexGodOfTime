@@ -23,6 +23,17 @@ public final class HexGodOfStories {
     public static final DeferredRegister<SoundEvent> SOUNDS = DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, ID);
     public static final DeferredRegister<CreativeModeTab> TABS = DeferredRegister.create(net.minecraft.core.registries.Registries.CREATIVE_MODE_TAB, ID);
     public static final DeferredRegister<net.minecraft.core.particles.ParticleType<?>> PARTICLES = DeferredRegister.create(ForgeRegistries.PARTICLE_TYPES, ID);
+    public static final DeferredRegister<net.minecraft.world.effect.MobEffect> EFFECTS = DeferredRegister.create(ForgeRegistries.MOB_EFFECTS, ID);
+
+    /**
+     * Candy Rush, the one thing Paradise's water hands out that is not already a vanilla effect.
+     *
+     * <p>Registered here rather than in the realm's own code because an effect has to exist before
+     * any world does: a save that carries it on a player is read back during login, long before
+     * anything has opened a portal.
+     */
+    public static final RegistryObject<net.minecraft.world.effect.MobEffect> CANDY_RUSH =
+        EFFECTS.register("candy_rush", com.hexgodofstories.warping.CandyRush::new);
 
     /**
      * The Abyssal Pilgrim. A hundred and fifty blocks of articulated body, so the tracking range is
@@ -124,6 +135,8 @@ public final class HexGodOfStories {
     public static final RegistryObject<Glow> METEOR_FIRE = particle("meteor_fire");
     public static final RegistryObject<Glow> CINDER = particle("cinder");
     public static final RegistryObject<Glow> ASH = particle("ash");
+    /** Sugar: the sparkle Paradise reforms its own terrain out of, and what a sugar high looks like. */
+    public static final RegistryObject<Glow> CANDY = particle("candy");
     private static RegistryObject<Glow> particle(String name) { return PARTICLES.register(name, Glow::new); }
 
     static {
@@ -131,7 +144,7 @@ public final class HexGodOfStories {
     }
     public HexGodOfStories() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
-        ENTITIES.register(bus); ITEMS.register(bus); BLOCKS.register(bus); SOUNDS.register(bus); TABS.register(bus); PARTICLES.register(bus);
+        ENTITIES.register(bus); ITEMS.register(bus); BLOCKS.register(bus); SOUNDS.register(bus); TABS.register(bus); PARTICLES.register(bus); EFFECTS.register(bus);
         bus.addListener((EntityAttributeCreationEvent e) -> {e.put(ILLUSION.get(), IllusionEntity.attributes().build());e.put(PILGRIM.get(),com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity.attributes().build());});
         bus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) -> e.enqueueWork(HexNetwork::init));
     }

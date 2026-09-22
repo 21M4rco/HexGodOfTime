@@ -22,8 +22,16 @@ public final class WarpRenderer {
     public static void receive(int id,CompoundTag n){if(n.getBoolean("clear")){WINDOWS.remove(id);BREAKS.remove(id);}else WINDOWS.put(id,n);}
     public static String chargeLabel(int id){
         CompoundTag n=WINDOWS.get(id);if(n==null)return "";
-        if(n.getLong("opened")>=0)return "REALITY OPEN  /  "+Math.max(0,(WarpMath.OPEN_TICKS-(ClientState.now()-n.getLong("opened"))+19)/20)+"s";
+        boolean recall=n.getBoolean("recall");
+        if(n.getLong("opened")>=0){
+            // The window is sent rather than assumed: a recall stays open for its own count, which
+            // is not the ten seconds a crossing gets.
+            int window=n.contains("window")?n.getInt("window"):WarpMath.OPEN_TICKS;
+            return (recall?"REACHING IN  /  ":"REALITY OPEN  /  ")
+                +Math.max(0,(window-(ClientState.now()-n.getLong("opened"))+19)/20)+"s";
+        }
         int ticks=(int)(ClientState.now()-n.getLong("start"));
+        if(recall)return "Reaching into "+Destination.at(n.getInt("destination")).title+"...";
         return String.format(java.util.Locale.ROOT,"%s  %d%%  /  %.1f blocks  /  %d energy",
             ticks<WarpMath.MIN_CHARGE?"Forming":"Release to trap",Math.min(100,ticks),WarpMath.width(ticks),
             Math.round(com.hexgodofstories.data.Ability.WARPING.cost*WarpMath.costScale(Math.min(ticks,WarpMath.FULL_CHARGE))));
@@ -83,7 +91,7 @@ public final class WarpRenderer {
             // Restore the floor depth after drawing the remote scene, so it cannot occlude unrelated world effects.
             RenderSystem.colorMask(false,false,false,false);GL11.glDepthFunc(GL11.GL_ALWAYS);aperture(pose.last().pose(),brk);GL11.glDepthFunc(GL11.GL_LEQUAL);RenderSystem.colorMask(true,true,true,true);
             GL11.glDisable(GL11.GL_STENCIL_TEST);RenderSystem.depthMask(false);
-            mirror(pose.last().pose(),brk,open,age,held,time,d.color);
+            mirror(pose.last().pose(),brk,at,open,age,held,time,d.color);
         }finally{
             pose.popPose();GL11.glStencilMask(255);GL11.glDisable(GL11.GL_STENCIL_TEST);GL11.glDepthRange(0,1);GL11.glDepthFunc(GL11.GL_LEQUAL);
             RenderSystem.colorMask(true,true,true,true);RenderSystem.depthMask(true);RenderSystem.enableDepthTest();RenderSystem.enableCull();RenderSystem.disableBlend();RenderSystem.setShaderColor(1,1,1,1);
@@ -103,8 +111,28 @@ public final class WarpRenderer {
         int count;double[] v;int[] kind,rim;
         /** Surface height per block column, kept between rebuilds: the glass grows, the floor does not. */
         Map<Long,Double> columns;
+        /**
+         * The colour of the floor, per block column, kept alongside its height.
+         *
+         * <p>This is what makes the shards that come loose look like pieces of <em>this</em> place.
+         * A break over turf throws up green and brown, one over a beach throws up sand, one over
+         * stone throws up grey, and a break spanning the line between two of them throws up both.
+         * The map colour is the right source for it: every block in the game has one, including
+         * every modded block, so nothing has to be enumerated and nothing is ever the wrong colour
+         * by default.
+         */
+        Map<Long,Integer> tints;
         Break(long seed,int held,boolean open,long sampled){this.seed=seed;this.held=held;this.open=open;this.sampled=sampled;}
         Vec3 corner(int piece,int index){int o=piece*12+index*3;return new Vec3(v[o],v[o+1],v[o+2]);}
+        Vec3 centre(int piece){
+            Vec3 sum=Vec3.ZERO;
+            for(int i=0;i<4;i++)sum=sum.add(corner(piece,i));
+            return sum.scale(.25);
+        }
+        int tint(double lx,double lz,Vec3 at){
+            Integer known=tints.get(key(at.x+lx,at.z+lz));
+            return known==null?0x7a7a7a:known;
+        }
     }
     private static Break shape(int id,CompoundTag n,Vec3 at,int held,boolean open,long now){
         long seed=n.getLong("seed");
@@ -118,13 +146,15 @@ public final class WarpRenderer {
         List<WarpFracture.Piece> pieces=WarpFracture.build(seed,WarpMath.reach(held),open?1:WarpMath.charge(held));
         brk.v=new double[pieces.size()*12];brk.kind=new int[pieces.size()];brk.rim=new int[pieces.size()];
         Map<Long,Double> columns=fresh?cached.columns:new HashMap<>();
-        brk.columns=columns;
+        Map<Long,Integer> tints=fresh?cached.tints:new HashMap<>();
+        brk.columns=columns;brk.tints=tints;
         for(WarpFracture.Piece piece:pieces){
             int o=brk.count*12;boolean whole=true;
             for(int i=0;i<4;i++){
                 double lx=piece.x[i],lz=piece.z[i];
                 double y=column(level,columns,at.x+lx,at.z+lz,at.y,Math.sqrt(lx*lx+lz*lz));
                 if(Double.isNaN(y)){whole=false;break;}
+                tint(level,tints,at.x+lx,at.z+lz,y);
                 brk.v[o+i*3]=lx;brk.v[o+i*3+1]=y-at.y+.025;brk.v[o+i*3+2]=lz;
             }
             // A piece whose floor is missing — a cliff face, a hole, a wall — is simply not part of
@@ -137,13 +167,21 @@ public final class WarpRenderer {
     }
     /** Surface height for one block column, cached so a piece spanning a step still shares its corners. */
     private static double column(ClientLevel level,Map<Long,Double> cache,double wx,double wz,double originY,double distance){
-        long key=((long)Mth.floor(wx)<<32)^(Mth.floor(wz)&0xFFFFFFFFL);
+        long key=key(wx,wz);
         Double known=cache.get(key);
         if(known!=null)return known;
         double y=WarpSurface.height(level,wx,wz,originY,distance);
         cache.put(key,y);
         return y;
     }
+    /** What the floor of one block column is coloured, sampled from the block the surface belongs to. */
+    private static void tint(ClientLevel level,Map<Long,Integer> cache,double wx,double wz,double surface){
+        long key=key(wx,wz);
+        if(cache.containsKey(key))return;
+        net.minecraft.core.BlockPos pos=new net.minecraft.core.BlockPos(Mth.floor(wx),Mth.floor(surface-.05),Mth.floor(wz));
+        cache.put(key,level.getBlockState(pos).getMapColor(level,pos).col);
+    }
+    private static long key(double wx,double wz){return ((long)Mth.floor(wx)<<32)^(Mth.floor(wz)&0xFFFFFFFFL);}
 
     // ------------------------------------------------------------------ drawing
 
@@ -152,6 +190,70 @@ public final class WarpRenderer {
         for(int i=0;i<brk.count;i++)WarpMesh.quad(b,m,brk.corner(i,0),brk.corner(i,1),brk.corner(i,2),brk.corner(i,3),0x000000,1);
         BufferUploader.drawWithShader(b.end());
     }
+
+    /**
+     * Pieces of the world coming loose.
+     *
+     * <p>A crack drawn on the ground is a decal. What sells a pane of reality breaking is the
+     * debris: slivers of the actual floor tipping up out of their own plane, turning over, sliding
+     * inward and going into the hole. So every piece of the fracture that has been born yet sheds
+     * one, anchored where that piece lies, cut from the colour of the block that is genuinely
+     * underneath it — turf over a meadow, grey over stone, pale over sand, and both at once where a
+     * break spans the line between two of them.
+     *
+     * <p>The motion is one arc, staggered across the break so it is a continuous shedding rather
+     * than a pulse. A shard trembles where it sits while it is still nearly flat, tips over as it
+     * rises, is drawn toward the middle the whole time, and thins to nothing as it reaches the
+     * opening. How many are loose at once follows the charge, which is what makes the surface look
+     * intact at the first crack, visibly coming apart by the time sections are separating, and
+     * finally spent a second or so after the way through is open.
+     */
+    private static void shards(BufferBuilder b,Matrix4f m,Break brk,Vec3 at,boolean open,double age,int held,double time){
+        double charge=open?1:WarpMath.charge(held);
+        // Nothing comes off a hairline, and the shedding stops shortly after the break is open:
+        // by then there is a portal rather than a surface still failing.
+        double shed=open?Math.max(0,1-age/36.0):Math.max(0,charge-.06)/.94;
+        if(shed<=.001)return;
+        int loose=(int)Math.ceil(brk.count*Math.min(1,shed*1.2));
+        for(int i=0;i<brk.count&&i<loose;i++){
+            // The impact hole is the part that is simply gone rather than the part that is failing,
+            // so most of it is skipped; the cracks and the slivers between them do the shedding.
+            if(brk.kind[i]==WarpFracture.CORE&&i%4!=0)continue;
+            Vec3 anchor=brk.centre(i);
+            double spin=noise(brk.seed,i,1)<.5?-1:1;
+            double p=(time*.034+noise(brk.seed,i,2))%1.0;
+            double size=(.10+noise(brk.seed,i,3)*.17)*(.55+.45*charge);
+            // Up and over in one arc, and inward for the whole of it.
+            double rise=Math.sin(p*Math.PI*.88)*(.18+.62*charge);
+            double drawn=p*(.16+.42*charge);
+            double tremble=(1-Math.min(1,p*3.2))*.022*Math.sin(time*1.7+i*2.1);
+            Vec3 centre=new Vec3(anchor.x*(1-drawn)+tremble,anchor.y+rise+.03,anchor.z*(1-drawn)-tremble);
+            double tilt=Math.min(1.45,p*2.3),yaw=noise(brk.seed,i,4)*6.28+p*5.2*spin;
+            Vec3 n=new Vec3(Math.sin(tilt)*Math.cos(yaw),Math.cos(tilt),Math.sin(tilt)*Math.sin(yaw));
+            Vec3 u=n.cross(new Vec3(0,1,.001)).normalize(),v=n.cross(u);
+            double sx=size*(1-p*.35),sz=size*(.6+noise(brk.seed,i,5)*.5)*(1-p*.35);
+            // Four uneven corners: a shard, not a tile.
+            Vec3 c0=centre.add(u.scale(sx)).add(v.scale(sz*.55));
+            Vec3 c1=centre.add(u.scale(-sx*.72)).add(v.scale(sz));
+            Vec3 c2=centre.add(u.scale(-sx)).add(v.scale(-sz*.48));
+            Vec3 c3=centre.add(u.scale(sx*.5)).add(v.scale(-sz));
+            float alpha=(float)(Math.min(1,p*7)*Math.pow(1-p,1.35)*(.42+.58*charge));
+            if(alpha<=.004)continue;
+            int ground=brk.tint(anchor.x,anchor.z,at);
+            WarpMesh.quad(b,m,c0,c1,c2,c3,WarpMesh.shade(ground,.62+noise(brk.seed,i,6)*.55),alpha);
+            // The lit edge. A fragment of ground that catches the light the break is throwing is
+            // what stops the debris reading as dirt and starts it reading as glass.
+            WarpMesh.ribbon(b,m,c0,c1,size*.055,0xf2fbff,alpha*.8f);
+        }
+    }
+
+    /** A stable number in nought-to-one for one shard and one of its properties. */
+    private static double noise(long seed,int index,int slot){
+        long h=seed*0x9E3779B97F4A7C15L+index*0x632BE59BD9B4E019L+slot*0x4F1BBCDDL;
+        h^=h>>>29;h*=0x94D049BB133111EBL;h^=h>>>32;
+        return (h>>>11)/(double)(1L<<53);
+    }
+
     /**
      * Light along every torn edge, glass over what is left, and slivers thrown up when it opens.
      *
@@ -159,7 +261,7 @@ public final class WarpRenderer {
      * the silhouette the break actually has: long on the side a crack ran, absent where it did not,
      * and tapering to nothing at every point.
      */
-    private static void mirror(Matrix4f m,Break brk,boolean open,double age,int held,double time,int color){
+    private static void mirror(Matrix4f m,Break brk,Vec3 at,boolean open,double age,int held,double time,int color){
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
         BufferBuilder b=Tesselator.getInstance().getBuilder();b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);
         double burst=open?Math.min(1,age/22.0):0;
@@ -192,6 +294,7 @@ public final class WarpRenderer {
                 }
             }
         }
+        shards(b,m,brk,at,open,age,held,time);
         // An angular light front travels outward along the fractures as the mirror breaks open.
         if(open&&age<16){
             double sweep=.15+.85*age/16;

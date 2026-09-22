@@ -4,7 +4,7 @@ plugins {
     id 'org.spongepowered.mixin' version '0.7.+'
 }
 group = 'com.hexgodofstories'
-version = '0.5.8-hexor'
+version = '0.5.9-paradise'
 base { archivesName = 'hexgodofstories' }
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 java.withSourcesJar()
@@ -119,6 +119,16 @@ tasks.register('verifyHexor', JavaExec) {
     enableAssertions = true
 }
 tasks.named('check') { dependsOn 'verifyHexor' }
+
+// Paradise: that its islands can be jumped between at its own gravity, that its cascades land
+// where they were aimed, that the spring has a shore, and that the realm stays a pocket.
+tasks.register('verifyParadise', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.hexgodofstories.warping.ParadiseShapeTest'
+    enableAssertions = true
+}
+tasks.named('check') { dependsOn 'verifyParadise' }
 
 // Converging singularity orbits and a continuous moon surface, without launching Minecraft.
 tasks.register('verifyCosmicPhysics', JavaExec) {

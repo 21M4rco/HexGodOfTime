@@ -13,7 +13,7 @@ public enum Destination {
     GRAVITY_WELL("Gravity Well", "Empty space. An irresistible spiral drags everything into a lethal black center.",0xb273ff,new Vec3(64,110,0)),
     SHATTERED_WORLD("Shattered World", "Broken forests and ruins. Unstable gravity between islands.",0x92b5b1,new Vec3(0,143,0)),
     TIME_STORM("Time Storm", "A storm of branching time. Your enemies' recent steps unravel.",0xca82ff,new Vec3(0,132,0)),
-    FALLING_WORLD("Falling World", "An endless collapse of towers, earth and debris. Nothing stays still.",0xd2a17b,new Vec3(0,170,0)),
+    PARADISE("Paradise", "A small, perfect pocket world of floating islands under a candy sky. Weak gravity, rainbows, drifting sweets, and a hot spring that pays you for swimming in it. Break it and it grows back.",0xff9ad8,new Vec3(0,176,16)),
     FROZEN_MOMENT("Frozen Moment", "A catastrophe held still. Press X here to release nearby suspended hazards.",0xa3e5f1,new Vec3(0,132,0)),
     CRUSHING_REALM("Cosmic Prison", "A cratered moon with crushing radial gravity. Walk around every side, even upside down. Escape is pulled back to the surface.",0xbe83ce,new Vec3(0,CosmicPhysics.MOON_Y+CosmicPhysics.MOON_RADIUS+5,0)),
     END_OF_TIME("End of Time", "The exhausted remains of a universe. Living strength fades here.",0x998d9e,new Vec3(0,132,0));

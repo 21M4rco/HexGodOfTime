@@ -27,8 +27,8 @@ public final class WarpHazard extends Entity {
         Vec3 movement=(kind()==1||kind()==5)?getDeltaMovement():new Vec3(0,speed,0);
         AABB sweep=getBoundingBox().expandTowards(movement).inflate(kind()==1?.5:1);
         // Falling architecture does not check who opened the way in. Exempting the caster meant the
-        // Falling World's debris and the Frozen Moment's spears passed straight through the one
-        // person most likely to be standing in front of them.
+        // Frozen Moment's spears passed straight through the one person most likely to be standing
+        // in front of them.
         for(LivingEntity e:level().getEntitiesOfClass(LivingEntity.class,sweep,e->e.isAlive()&&!e.isSpectator()
                 &&!(e instanceof net.minecraft.world.entity.player.Player p&&p.isCreative()))){
             if(kind()==1||kind()==5){e.hurt(damageSources().magic(),24);e.setDeltaMovement(movement.scale(.5));discard();return;}

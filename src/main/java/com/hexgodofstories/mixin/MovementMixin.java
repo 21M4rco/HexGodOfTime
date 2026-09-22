@@ -30,6 +30,19 @@ public abstract class MovementMixin {
             player.setOnGround(com.hexgodofstories.warping.MoonGravity.grounded(player));
             player.fallDistance=0;
         }
+        // Paradise, where a fall is meant to be slow and a jump is meant to be long.
+        //
+        // Neither of the two things the server does with a descent suits a realm with a quarter of
+        // the gravity in it. The floating check disconnects a player who has not fallen a
+        // thirty-second of a block for eighty ticks, which a high jump's apex brushes against and
+        // which drifting between islands sits near for far longer than a normal fall ever does.
+        // And fall damage counts blocks travelled, so the crossing the realm is built around —
+        // stepping off one island and landing on the next — would be paid for every time. Ground
+        // detection is deliberately untouched: the player still walks, sprints and jumps normally.
+        if(com.hexgodofstories.warping.Destination.from(player.level())==com.hexgodofstories.warping.Destination.PARADISE) {
+            clientIsFloating=false;
+            player.fallDistance=0;
+        }
     }
     @Inject(method="handleMovePlayer",at=@At("HEAD"),cancellable=true)
     private void hgos$hold(ServerboundMovePlayerPacket packet,CallbackInfo ci) {

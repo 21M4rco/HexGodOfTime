@@ -48,6 +48,7 @@ public final class HexorTest {
         aDecidedTargetIsOnlyEverKilled();
         everyBlowGoesThroughTheScale(root);
         theHuntDoesNotNeedAnAudience(root);
+        hexorIsNeverRecalled(root);
         System.out.println("HexorTest: blows are weighed against what they land on, the crowd is felt, and the clock runs out.");
     }
 
@@ -325,6 +326,42 @@ public final class HexorTest {
     }
 
     // ------------------------------------------------------------------ plumbing
+
+    /**
+     * The sea keeps it.
+     *
+     * <p>Warping can now reach into a realm and pull its inhabitants out through the floor of
+     * wherever the caster is standing, and Hexor is a {@code Mob}: every generic test for "a living
+     * thing" says yes to it. A recall that took it would empty the Void Sea of the single creature
+     * the realm exists to contain and put it in somebody's garden, and nothing about that failure
+     * is subtle enough to need a test — which is exactly why it needs one, because the code that
+     * prevents it is three lines that a later refactor of the filter could drop without any other
+     * check noticing.
+     *
+     * <p>Read from the source rather than exercised, because the alternative is a server, an
+     * ocean and a hundred and fifty blocks of leviathan. What is insisted on is structural: there
+     * is one filter, it refuses the creature twice over — by its class and by its registered type,
+     * so neither a subclass nor a re-registration slips through a single check — and the transfer
+     * itself asks that filter again at the moment it moves something, rather than trusting a list
+     * built two seconds earlier.
+     */
+    private static void hexorIsNeverRecalled(Path root) throws Exception {
+        String source = Files.readString(root.resolve("src/main/java/com/hexgodofstories/warping/Warping.java"));
+        int filter = source.indexOf("private static boolean recallable(");
+        check(filter > 0, "the recall has one server-side filter deciding what it may take");
+        int end = source.indexOf("\n    }", filter);
+        check(end > filter, "that filter is a readable method");
+        String body = source.substring(filter, end);
+        check(body.contains("AbyssalPilgrimEntity") && body.contains("return false"),
+            "the recall filter refuses Hexor by class");
+        check(body.contains("PILGRIM.get()"), "the recall filter refuses Hexor by registered type as well");
+        check(source.contains("if(!recallable(e)"), "the queue is built through the filter");
+        check(source.contains("if(!recallable(waiting))return;"),
+            "and the filter is asked again at the moment of the transfer, not only when the key was pressed");
+        // Nothing else in Warping may lay a hand on it: no spawn, no discard, no reposition.
+        for (String forbidden : new String[]{"PILGRIM.get().create", "AbyssalPilgrimEntity)waiting", "pilgrim.discard", "pilgrim.teleportTo"})
+            check(!source.contains(forbidden), "Warping never " + forbidden.replace(".", " ") + "s");
+    }
 
     private static Path projectRoot() {
         Path here = Path.of("").toAbsolutePath();

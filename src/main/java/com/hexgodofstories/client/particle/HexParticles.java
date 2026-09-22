@@ -64,6 +64,7 @@ public final class HexParticles {
         e.registerSpriteSet(HexGodOfStories.METEOR_FIRE.get(),Flame.Provider::new);
         e.registerSpriteSet(HexGodOfStories.CINDER.get(),Cinder.Provider::new);
         e.registerSpriteSet(HexGodOfStories.ASH.get(),set->new Cloud.Provider(set,.21f,.19f,.18f,1.35f,false,150));
+        e.registerSpriteSet(HexGodOfStories.CANDY.get(),Sugar.Provider::new);
     }
 
     /**
@@ -422,6 +423,53 @@ public final class HexParticles {
         record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
             @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
                 return new Flare(level,x,y,z,vx,vy,vz,sprites);
+            }
+        }
+    }
+
+    /**
+     * Sugar: the speck Paradise is made of, and the one it puts itself back together out of.
+     *
+     * <p>Not a tint of any one colour. Every mote carries its own position along a candy spectrum
+     * and travels a little way along it as it lives, so a handful of them together read as pink,
+     * gold and mint at once rather than as a cloud of one hue — which is the difference between a
+     * sparkle and a haze. They rise rather than fall, slowly, and spin the whole time.
+     */
+    public static final class Sugar extends TextureSheetParticle {
+        private static final int[] SPECTRUM={0xff7ac0,0xffb0e3,0xfff0a6,0xa9f0d4,0x9fd6ff,0xc79bff,0xff9d8c};
+        private final float tone,spin;
+        Sugar(ClientLevel level,double x,double y,double z,double vx,double vy,double vz,SpriteSet sprites) {
+            super(level,x,y,z);
+            xd=vx;yd=vy;zd=vz;
+            tone=random.nextFloat();
+            spin=(random.nextFloat()-.5f)*.09f;
+            hasPhysics=false;friction=.982f;
+            lifetime=34+random.nextInt(40);
+            quadSize=.045f+random.nextFloat()*.055f;
+            roll=random.nextFloat()*6.28f;oRoll=roll;
+            alpha=0;
+            pickSprite(sprites);
+            shade(0);
+        }
+        private void shade(float travel) {
+            float at=(tone+travel)%1f*SPECTRUM.length;
+            int i=(int)at;float blend=at-i;
+            int a=SPECTRUM[i%SPECTRUM.length],b=SPECTRUM[(i+1)%SPECTRUM.length];
+            rCol=mix(a>>16&255,b>>16&255,blend);gCol=mix(a>>8&255,b>>8&255,blend);bCol=mix(a&255,b&255,blend);
+        }
+        private static float mix(int a,int b,float t){return (a+(b-a)*t)/255f;}
+        @Override public ParticleRenderType getRenderType() {return GLOW;}
+        @Override public void tick() {
+            super.tick();
+            oRoll=roll;roll+=spin;
+            float t=age/(float)lifetime;
+            shade(t*.35f);
+            yd+=.0016;
+            alpha=bloom(age,0,5)*(1-t)*(1-t*.35f);
+        }
+        record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
+            @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
+                return new Sugar(level,x,y,z,vx,vy,vz,sprites);
             }
         }
     }

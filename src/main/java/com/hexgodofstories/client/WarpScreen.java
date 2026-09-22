@@ -45,8 +45,8 @@ public final class WarpScreen extends Screen {
         }
         for(Destination d:Destination.values())if(mx>=bx(d)&&mx<bx(d)+bw()&&my>=by(d)&&my<by(d)+19)g.renderTooltip(font,font.split(Component.literal(d.description),220),mx,my);
         g.drawString(font,"VOID SEA: a cosmic sea god hunts it. It cannot be killed.",x+9,y+125,ALARM,false);
-        g.drawString(font,"Hold R: fracture   X: control / follow",x+9,y+138,0xb2a5bc,false);
-        g.drawString(font,"Inside a realm: R opens the way home",x+9,y+151,0xb2a5bc,false);
+        g.drawString(font,"Hold R: fracture   Y: pull this realm's creatures to you",x+9,y+138,0xb2a5bc,false);
+        g.drawString(font,"X: control / follow   Inside a realm, R: leave freely",x+9,y+151,0xb2a5bc,false);
     }
     @Override public boolean isPauseScreen(){return false;}
     @Override public boolean keyPressed(int key,int scan,int modifiers){if(HexClient.SECONDARY.matches(key,scan)){onClose();return true;}return super.keyPressed(key,scan,modifiers);}

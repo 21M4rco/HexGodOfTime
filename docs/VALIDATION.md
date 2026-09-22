@@ -9,10 +9,20 @@
 - Abyssal Pilgrim: compiles against Forge 47.4.10 and GeckoLib 4.4.9, and `verifyVoidSea` passes in the same Action, so the shipped geometry, animation, audio and the Void Sea's Java constants are proven to agree with the dimension JSON. Its body reconstruction was additionally exercised offline against straight, drifting, stationary, tight S-curve, spiral, vertical and post-teleport paths: joint spacing is now exactly 6.0 in every case, no two non-neighbouring joints come within 17.2 blocks of each other on any of them, and the worst joint angle is 21 degrees. The same offline harness reproduced the reported knot on the previous code first (126 blocks of body inside a 0.5 block span, joints 0.1 blocks apart), which is what the joint limits were written against.
 - **Dedicated server startup, datapack load and the Warping/Pilgrim regressions**, through the **Warping dedicated server smoke** Action on this branch. A real Forge dedicated server boots, all nine realm dimensions load, and the in-process regression listener passes: the Pilgrim is present in the sea's entity manager the instant it is added, repeated lookups return the same UUID, it ticks and swims with no players connected, it retains vertical pitch under the new steering, it detects prey imported into the water, exactly one remains after a deliberate duplicate is introduced, and a Warping arrival no longer leaves automatic flight switched on.
 - Pilgrim skin and emissive mask regenerate reproducibly from `tools/generate_pilgrim_textures.py`, and every tile was measured for wrap continuity at its own borders.
+- **Paradise's geometry, offline.** `verifyParadise` runs against the realm's own constants with no Minecraft world: it simulates a running jump tick by tick on exactly the lift, clamp, gravity and drag the realm uses (4.6 blocks up, 14.3 along), and then requires the layout to fit inside that answer. On the shipped table the worst crossing between two spiral islands is 8.9 blocks, no two islands merge or share an outline, every outline runs at least 1.6 times further one way than the other, all three cascade shelves catch their water inside their own rims and at their own surface level, no cascade is driven down through an island, the hot spring keeps a shore of at least five blocks all the way round, the catch is below the deepest keel and the ceiling above everything, and the realm places about 27,000 blocks — roughly seven ticks of the realm builder's own budget. The same harness was run locally during development and found four real faults in earlier drafts: a central island bitten in to a third of its radius, rings too far apart to cross, ponds whose clearance test could never pass, and a first layout whose jump fell four blocks short of its own spacing.
+- **Hexor's exclusion from the recall, structurally.** `verifyHexor` reads `Warping.java` and fails the build unless there is exactly one server-side filter, it refuses the creature by class and by registered type, the queue is built through it, and the transfer asks it again at the moment it moves something. It also fails if Warping ever gains a line that spawns, discards, repositions or casts to the creature.
 
 ## Not verified
 
 Everything below needs a recorded in-game session and **has not had one**. Nothing here should be described as working.
+
+- **The whole of Paradise, as a place to look at and be in.** Whether the sky reads as the brief's candy cosmos rather than as a purple fog; whether the five rainbows, four galaxies and drifting confectionery compose or clutter; whether the islands look like land from below and from another island; whether the hot spring glows the way it is meant to; whether the cascades read as waterfalls given that their water is a standing column of source blocks rather than a live flow. The geometry is proven; none of the appearance is.
+- **How a fifth of gravity actually feels**, and whether the client's own copy of it and the server's stay in step over a long fall, on a slope, in water, and while another player is watching. The arithmetic agrees by construction; the feel and the prediction have not been played.
+- **Candy Rush in play**: whether the freezing tremble reads as a sugar high rather than as damage, whether the icon is legible at 18 pixels, and whether Speed II with Haste III is pleasant or overwhelming.
+- **Self-repair under real use**: a player mining a wall out and watching it knit, a build placed in a crater and what the ten seconds of patience feel like, and the restore resuming correctly after a restart inside the window.
+- **Eating the terrain**: whether crouch-and-use is discoverable from the tooltip alone, and whether the five tiers are worth telling apart.
+- **The shards coming off the floor during a portal charge** — whether they read as pieces of the world breaking loose or as coloured confetti, and what they cost per frame at a full twenty-eight block break.
+- **The recall, end to end.** Whether 49 chunks and 44 ticks are enough to wake an unattended realm reliably; whether creatures emerging read as climbing out of the ground; whether ten of them at once is a spectacle or a pile; and what a recall from the Void Sea brings back now that the one thing in it is refused.
 
 - Client shader loading and visual review.
 - Cape behaviour during sprinting, jumping, falling, landing, crouching, rapid rotation and teleportation, viewed from front, rear and sides.
@@ -49,7 +59,7 @@ Everything below needs a recorded in-game session and **has not had one**. Nothi
   is source-level. The feel of it, and that nothing is left drawn on a client when a caster is
   killed mid-charge, needs two players.
 - **Flight in every dimension.** The mantle granting flight everywhere is one condition and is
-  exercised by the same tick that always granted it. What it does to the Sun, the Falling World and
+  exercised by the same tick that always granted it. What it does to the Sun, Paradise and
   the gravity well — all of which were rebalanced in 0.5.6 around not being able to rise out of
   them — has not been played.
 - **Thirty seconds of theatre.** The clock, its per-entity ownership and the decided attack table
@@ -62,7 +72,7 @@ Everything below needs a recorded in-game session and **has not had one**. Nothi
   an idle server over hours has not been measured.
 - **The Void Sea's arrival title.** That it is sent on every entry is source-level; that the colour
   is legible against the realm's sky during the fifty block fall has not been seen.
-- **Flight removal in play.** That no dimension but the fracture world grants flight is enforced in one place and exercised by the server regression for the Void Sea. Whether the Sun, the Crushing Realm and the Falling World are now fair without it has not been played.
+- **Flight removal in play.** That no dimension but the fracture world grants flight is enforced in one place and exercised by the server regression for the Void Sea. Whether the Sun and the Crushing Realm are now fair without it has not been played.
 
 ## Known limitations
 

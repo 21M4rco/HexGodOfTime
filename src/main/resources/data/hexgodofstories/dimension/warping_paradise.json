@@ -1,9 +1,9 @@
 {
-  "type": "hexgodofstories:warping_falling_world",
+  "type": "hexgodofstories:warping_paradise",
   "generator": {
     "type": "minecraft:flat",
     "settings": {
-      "biome": "hexgodofstories:warping_falling_world",
+      "biome": "hexgodofstories:warping_paradise",
       "lakes": false,
       "features": false,
       "structure_overrides": [],

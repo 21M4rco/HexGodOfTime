@@ -28,6 +28,8 @@ public final class HexClient {
     public static final KeyMapping MENU=key("mastery",GLFW.GLFW_KEY_K),SELECT=key("select",GLFW.GLFW_KEY_V),
         PRIMARY=key("primary",GLFW.GLFW_KEY_R),SECONDARY=key("secondary",GLFW.GLFW_KEY_G),
         TRANSFORM=key("transform",GLFW.GLFW_KEY_H),RELEASE=key("release",GLFW.GLFW_KEY_X),FLIGHT=key("flight",GLFW.GLFW_KEY_J),
+        /** Warping's other direction: reach into the realm chosen with G and pull its creatures out. */
+        RECALL=key("recall",GLFW.GLFW_KEY_Y),
         TIME_STOP=key("time_stop",GLFW.GLFW_KEY_Z),TIME_RESUME=key("time_resume",GLFW.GLFW_KEY_B),
         TIME_REWIND=key("time_rewind",GLFW.GLFW_KEY_N),TIME_DILATE=key("time_dilate",GLFW.GLFW_KEY_M);
     /** The permanent time commands, paired with the value {@link HexServer#TIME} carries for each. */
@@ -42,7 +44,7 @@ public final class HexClient {
     public static final class ModBus {
         @SubscribeEvent public static void dimensionEffects(RegisterDimensionSpecialEffectsEvent e){e.register(HexGodOfStories.id("pocket"),new RealmSky());e.register(HexGodOfStories.id("warping"),new WarpSky());}
         @SubscribeEvent public static void keys(RegisterKeyMappingsEvent e) {
-            for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT})e.register(k);
+            for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT,RECALL})e.register(k);
             for(KeyMapping k:TIME_KEYS)e.register(k);
         }
         @SubscribeEvent public static void entities(EntityRenderersEvent.RegisterRenderers e) {
@@ -127,6 +129,7 @@ public final class HexClient {
             }
             while(TRANSFORM.consumeClick())HexNetwork.send(HexServer.TRANSFORM,0);
             while(RELEASE.consumeClick())HexNetwork.send(HexServer.UTILITY,0);
+            while(RECALL.consumeClick())HexNetwork.send(HexServer.WARP_RECALL,0);
             while(FLIGHT.consumeClick())HexNetwork.send(HexServer.FLIGHT,0);
             for(int i=0;i<TIME_KEYS.length;i++)while(TIME_KEYS[i].consumeClick())HexNetwork.send(HexServer.TIME,i);
             drain();
@@ -147,7 +150,7 @@ public final class HexClient {
             return PRIMARY.isDown();
         }
         private static void drain() {
-            for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT})
+            for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT,RECALL})
                 while(k.consumeClick());
             for(KeyMapping k:TIME_KEYS)while(k.consumeClick());
         }
@@ -195,6 +198,27 @@ public final class HexClient {
             Minecraft mc=Minecraft.getInstance();
             if(mc.level==null||e.player!=mc.player)return;
             com.hexgodofstories.warping.VoidSeaWaves.apply(e.player,mc.level.getGameTime());
+        }
+        /**
+         * Paradise's weak gravity, on the one player whose movement this client owns, and the
+         * sugar hanging in the air around them.
+         *
+         * <p>Exactly the arrangement the swell above uses, and for exactly the same reason. The
+         * realm's own tick runs the identical call on the identical formula, so the server decides
+         * what gravity is and this cannot choose differently; running it here as well is what makes
+         * a four block jump feel like a jump instead of like the server correcting a fall.
+         */
+        @SubscribeEvent public static void paradise(TickEvent.PlayerTickEvent e) {
+            if(e.phase!=TickEvent.Phase.START)return;
+            Minecraft mc=Minecraft.getInstance();
+            if(mc.level==null||e.player!=mc.player)return;
+            if(com.hexgodofstories.warping.Destination.from(mc.level)!=com.hexgodofstories.warping.Destination.PARADISE)return;
+            com.hexgodofstories.warping.Paradise.gravity(e.player);
+            if(mc.level.getGameTime()%2!=0||mc.options.particles().get()==net.minecraft.client.ParticleStatus.MINIMAL)return;
+            var random=mc.level.random;
+            for(int i=0;i<2;i++)mc.level.addParticle(HexGodOfStories.CANDY.get(),
+                mc.player.getX()+(random.nextDouble()-.5)*26,mc.player.getY()+random.nextDouble()*15-4,mc.player.getZ()+(random.nextDouble()-.5)*26,
+                (random.nextDouble()-.5)*.012,.005+random.nextDouble()*.01,(random.nextDouble()-.5)*.012);
         }
         @SubscribeEvent public static void hud(RenderGuiOverlayEvent.Post e) {
             if(e.getOverlay().id().equals(net.minecraftforge.client.gui.overlay.VanillaGuiOverlay.HOTBAR.id()))HexHud.render(e.getGuiGraphics());

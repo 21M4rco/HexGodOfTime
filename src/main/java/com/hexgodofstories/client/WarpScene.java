@@ -12,7 +12,7 @@ import java.util.*;
 /** Destination and aperture share this scene. Architecture comes from the server's generation blueprint. */
 public final class WarpScene {
     private static final Map<Destination,VertexBuffer> TERRAIN=new EnumMap<>(Destination.class);
-    public static void clear(){TERRAIN.values().forEach(VertexBuffer::close);TERRAIN.clear();SunRenderer.clear();PrisonMoonRenderer.clear();}
+    public static void clear(){TERRAIN.values().forEach(VertexBuffer::close);TERRAIN.clear();SunRenderer.clear();PrisonMoonRenderer.clear();ParadiseSky.clear();}
     public static void sky(PoseStack pose,Destination d,double time){
         if(d==Destination.SUN||d==Destination.VOID_SEA){
             // Same detailed sky in the portal and in the destination, at the preview's spatial scale.
@@ -21,6 +21,15 @@ public final class WarpScene {
             net.minecraft.client.renderer.FogRenderer.setupNoFog();
             try{RealmSky.drawBackdrop(pose,RenderSystem.getProjectionMatrix(),(float)time,d==Destination.VOID_SEA?RealmSky.Palette.OCEAN:RealmSky.Palette.STELLAR);}
             finally{pose.popPose();RenderSystem.setShaderFogStart(near);RenderSystem.setShaderFogEnd(far);RenderSystem.disableCull();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();}
+            return;
+        }
+        if(d==Destination.PARADISE){
+            // Twenty thousand quads of dome, uploaded once. Drawn through its own path rather than
+            // through the shared immediate buffer below, which could not hold it at any frame rate.
+            float near=RenderSystem.getShaderFogStart(),far=RenderSystem.getShaderFogEnd();
+            net.minecraft.client.renderer.FogRenderer.setupNoFog();
+            try{ParadiseSky.sky(pose,time);}
+            finally{RenderSystem.setShaderFogStart(near);RenderSystem.setShaderFogEnd(far);RenderSystem.disableCull();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();}
             return;
         }
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
@@ -75,7 +84,6 @@ public final class WarpScene {
             case GRAVITY_WELL    -> new int[]{0x01000a,0x3a1060,0x5a2a86,0xe0c2ff,0xcfd6ff};
             case SHATTERED_WORLD -> new int[]{0x04090c,0x2c6b6e,0x49a0a0,0xdffbff,0xe8f6f4};
             case TIME_STORM      -> new int[]{0x0a0316,0x7b2ecc,0xa964ff,0xffe6ff,0xe6ccff};
-            case FALLING_WORLD   -> new int[]{0x0c0703,0x8a4a1e,0xc98a3c,0xffe9c2,0xffdcb0};
             case CRUSHING_REALM  -> new int[]{0x0a0207,0x5a1030,0x8c2050,0xffc4dd,0xffd0d8};
             case END_OF_TIME     -> new int[]{0x070609,0x3a3640,0x55505e,0x9a94a4,0x8e8896};
             case SUN             -> new int[]{0x100401,0xa33a10,0xe0731c,0xfff0c0,0xffe9bf};
@@ -115,9 +123,13 @@ public final class WarpScene {
                 }
                 for(int i=0;i<75;i++){double a=i*2.399+time*.005;Vec3 p=new Vec3(Math.cos(a)*45,85+(i*9+time*.3)%100,Math.sin(a)*45);WarpMesh.sphere(b,m,p,.3,.3,.3,0xe0b5ff,.6f,8,0,false);}
             }
-            case FALLING_WORLD,FROZEN_MOMENT -> {
-                if(preview){Random r=new Random(819+d.ordinal());int count=d==Destination.FALLING_WORLD?48:32;for(int i=0;i<count;i++){int x=r.nextInt(100)-50,y=140+r.nextInt(90),z=r.nextInt(100)-50;hazard(b,m,d==Destination.FROZEN_MOMENT?(i%4==0?5:1):i%3+2,x,d==Destination.FALLING_WORLD?WarpMath.fallingY(y,age):y,z);}}
-                if(d==Destination.FROZEN_MOMENT)for(int i=0;i<130;i++){double a=i*2.399;Vec3 p=new Vec3(Math.cos(a)*(8+i%30),130+i%45,Math.sin(a)*(8+i%30));WarpMesh.box(b,m,p.x,p.y,p.z,.13,.13,.13,0xc6ecff,.7f);}
+            // Waterfalls, mist, drifting confectionery and glitter. The blocks are the server's;
+            // everything here is what the blocks cannot be.
+            case PARADISE -> ParadiseSky.scene(b,m,time,preview);
+            case FROZEN_MOMENT -> {
+                // The same seed the server populates from, so the preview holds the same spears.
+                if(preview){Random r=new Random(819+d.ordinal());for(int i=0;i<32;i++){int x=r.nextInt(100)-50,y=140+r.nextInt(90),z=r.nextInt(100)-50;hazard(b,m,i%4==0?5:1,x,y,z);}}
+                for(int i=0;i<130;i++){double a=i*2.399;Vec3 p=new Vec3(Math.cos(a)*(8+i%30),130+i%45,Math.sin(a)*(8+i%30));WarpMesh.box(b,m,p.x,p.y,p.z,.13,.13,.13,0xc6ecff,.7f);}
             }
             case END_OF_TIME -> {
                 for(int i=0;i<35;i++){double a=i*2.399;Vec3 p=new Vec3(Math.cos(a)*(32+i),125+Math.sin(i*1.7)*40,Math.sin(a)*(32+i));WarpMesh.ribbon(b,m,p,p.add(2+i%5,3,1),.18,0x605267,.55f);}

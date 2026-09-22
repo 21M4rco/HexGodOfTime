@@ -1,3 +1,48 @@
+## 0.5.9 — Paradise, and Warping the other way round
+
+- **The Falling World is gone. Paradise is where it was.** The destination that used to be an
+  endless collapse is now a small, deliberately composed pocket world: fifteen floating islands on
+  a climbing spiral inside ninety blocks of candy-coloured space, a hot spring at the middle of the
+  central one, eleven waterfalls — three of them landing on shelves hung under the rims they leave,
+  the rest falling out of the world — and a lilac sky carrying banded nebulae, four galaxies, five
+  rainbows (two of them doubled, with the second bow's colours in the reverse order, as a real one
+  runs) and a couple of dozen large, readable sweets drifting through it. Every island's outline is
+  its own sum of four harmonics, so no two are the same shape and none of them is a circle.
+- **The layout is measured against the movement rather than guessed at.** Gravity is a fifth of
+  normal, which the build simulates tick by tick to find out what that actually buys: a running
+  jump reaches four and a half blocks up and carries a little over fourteen along. Every island is
+  then required to be inside that, no step outward is more than four blocks of climb, and
+  `verifyParadise` fails the build if either stops being true. Falling off the edge is not a death:
+  you are caught under the lowest keel and put back above the middle to drift down again.
+- **The water pays you for swimming in it.** Any pool in the realm — the spring, the ponds, the
+  cascades — grants Regeneration, Health Boost and **Candy Rush**, a new effect with its own icon
+  that carries Speed II, Haste III and a body that will not keep still, reusing Minecraft's own
+  freezing tremble so it reads instantly. It is entirely positive: nothing about it slows a step,
+  blocks an input or costs a heart, and it all expires eleven seconds after you climb out.
+- **Paradise cannot be spent.** Break any of its terrain and you keep what you mined; the hole
+  closes itself some seconds later, exact block and exact state, with sugar gathering at the empty
+  place first. Only the realm's own blueprint regenerates — a chest you carried in or a bridge you
+  built is not in the index and is never touched — and nothing is ever scanned: the only positions
+  the system knows are the ones something was seen to destroy.
+- **And it is edible.** A block that came out of Paradise's own ground is marked as it drops and can
+  be eaten, crouch and use, anywhere and for ever after. Five tiers, from the meadow up to somebody's
+  candy cane, the better ones carrying a few seconds of something pleasant. None of it hurts.
+- **The portal breaks like glass, with the floor coming off it.** The fracture already spread from
+  one impact into branching cracks; now slivers of the actual surface tip up out of their own plane
+  as it does, turn over, slide inward and go into the hole — cut from the colour of the block that
+  is genuinely underneath, so a break over turf throws up turf, one over a beach throws up sand,
+  and one spanning the line between them throws up both.
+- **Warping now reaches inward as well as outward.** A new key pulls the realm chosen in the G menu
+  to you instead of you to it: the ground where you are looking cracks open for two seconds, the way
+  opens, and the creatures living in that realm climb up out of it a few ticks apart, each into its
+  own collision-checked place, carried across with their health, equipment, names and modded data
+  intact rather than copied. Everything about it — the destination, the point, the recovery, the
+  search and what may be taken — is decided server-side from a bare keypress.
+- **Hexor is not on the list and never will be.** The Void Sea's god is refused by class and by
+  registered type, in the one server-side filter every transfer runs through, and asked again at the
+  moment of the transfer rather than trusted from the keypress. `verifyHexor` now reads the source
+  and fails the build if any of that stops being true. The sea keeps it.
+
 ## 0.5.6 — The Pilgrim stops knotting itself, and starts leaving the water
 
 - **A spine, not a rope.** The body was reconstructed by replaying the head's own recorded path, so
