@@ -23,8 +23,9 @@ import java.util.UUID;
 public final class WarpServerRegression {
     private static com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity pilgrim;
     private static net.minecraft.world.entity.animal.Pig prey;
+    private static net.minecraft.world.entity.animal.Pig sunResident;
     private static net.minecraft.world.phys.Vec3 initial;
-    private static int seaTicks;
+    private static int seaTicks,sunTicks;
     private static float greatestPitch;
 
     @SubscribeEvent public static void started(ServerStartedEvent event){
@@ -57,6 +58,14 @@ public final class WarpServerRegression {
         FakePlayer creative=caster(sun);creative.setGameMode(GameType.CREATIVE);creative.moveTo(0,WarpMath.SUN_Y,0);
         float health=creative.getHealth();WarpRealms.solarExposure(sun,creative,0,10);
         check(creative.getHealth()==health,"creative mode still ignores ordinary solar exposure");
+
+        // No connected player is required to keep a Warping victim alive and simulated. This pig is
+        // left in the Sun and the normal realm tick, not a direct test call, must kill it.
+        sunResident=EntityType.PIG.create(sun);check(sunResident!=null,"sun resident created");
+        sunResident.moveTo(0,WarpMath.SUN_Y,0);
+        check(sun.addFreshEntity(sunResident),"sun resident added");
+        WarpResidency.track(sunResident,UUID.randomUUID());
+        check(WarpResidency.active(sun),"Sun becomes active for an unattended resident");
         radialRealms(event);
         ServerLevel sea=event.getServer().getLevel(Destination.VOID_SEA.key);
         FakePlayer visitor=caster(sea);
@@ -71,9 +80,11 @@ public final class WarpServerRegression {
         prey=EntityType.PIG.create(sea);check(prey!=null,"prey created");
         prey.setNoAi(true);prey.setNoGravity(true);prey.setInvulnerable(true);
         prey.moveTo(initial.x+24,VoidSea.SURFACE+4,initial.z);
-        var chunk=new net.minecraft.world.level.ChunkPos(prey.blockPosition());
-        com.hexgodofstories.warping.leviathan.PilgrimWarden.hold(sea,chunk);sea.getChunk(chunk.x,chunk.z);
         check(sea.addFreshEntity(prey),"imported prey remains in sea");
+        // This is the important regression: do NOT manually hold the prey or Hexor chunk. The same
+        // residency contract real Warping uses has to keep both sides of the hunt simulation-active.
+        WarpResidency.track(prey,UUID.randomUUID());
+        check(WarpResidency.active(sea),"Void Sea becomes active for unattended prey");
         var duplicate=HexGodOfStories.PILGRIM.get().create(sea);
         duplicate.moveTo(initial.x+5,initial.y,initial.z,0,0);sea.addFreshEntity(duplicate);
         System.out.println("WARPING_SERVER_REGRESSIONS_PASSED");
@@ -91,11 +102,23 @@ public final class WarpServerRegression {
             check(pilgrim.position().distanceTo(initial)>10,"Pilgrim actually swims");
             check(greatestPitch>5,"3D steering retains vertical pitch");
             check(pilgrim.ai().hunt().target()==prey,"Pilgrim detects imported water prey");
+            check(sea.getEntity(prey.getUUID())==prey,"residency keeps prey entity-ticking with no player in the sea");
+            check(WarpResidency.active(sea),"Void Sea stays active while prey remains");
             int count=0;for(var entity:sea.getAllEntities())if(entity instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity)count++;
             check(count==1,"one loaded Pilgrim after duplicate recovery, found "+count);
             System.out.println("PILGRIM_SERVER_REGRESSIONS_PASSED ticks="+pilgrim.tickCount+" pitch="+greatestPitch);
         }
     }
+    @SubscribeEvent public static void sunTick(net.minecraftforge.event.TickEvent.LevelTickEvent event) {
+        if(event.phase!=net.minecraftforge.event.TickEvent.Phase.END||sunResident==null
+                ||event.level.dimension()!=Destination.SUN.key||sunTicks>=80)return;
+        sunTicks++;
+        if(sunTicks==40)
+            check(!sunResident.isAlive()||sunResident.getHealth()<=0,"unattended Sun keeps ticking and kills its resident");
+        if(sunTicks==80)
+            check(!WarpResidency.active((ServerLevel)event.level),"Sun goes dormant after its last resident is gone");
+    }
+
     private static void radialRealms(ServerStartedEvent event) {
         ServerLevel moon=event.getServer().getLevel(Destination.CRUSHING_REALM.key);
         var subject=EntityType.PIG.create(moon);check(subject!=null,"moon subject exists");

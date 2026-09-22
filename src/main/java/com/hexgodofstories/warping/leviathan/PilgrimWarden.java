@@ -2,6 +2,7 @@ package com.hexgodofstories.warping.leviathan;
 
 import com.hexgodofstories.HexGodOfStories;
 import com.hexgodofstories.warping.VoidSea;
+import com.hexgodofstories.warping.WarpResidency;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -70,6 +71,13 @@ public final class PilgrimWarden {
         level.getChunkSource().addRegionTicket(HUNT, pos, 2, pos, true);
     }
 
+    /** Drop the current hunter ticket when the sea has no prey; older timed tickets expire naturally. */
+    private static void sleep(ServerLevel level) {
+        ChunkPos last = PilgrimRegistry.of(level).lastSeen();
+        if (last != null) level.getChunkSource().removeRegionTicket(HUNT, last, 2, last, true);
+        WET.clear();
+    }
+
     // ------------------------------------------------------------------ the one occupant
 
     /**
@@ -93,7 +101,9 @@ public final class PilgrimWarden {
             if (last != null && !registry.stale(level.getGameTime())) {
                 // It exists, it is only unloaded. Pull its chunk back rather than spawn a rival.
                 hold(level, last);
-                return null;
+                if (WarpResidency.active(level) && !level.getChunkSource().hasChunk(last.x, last.z))
+                    level.getChunk(last.x, last.z);
+                return level.getEntity(registry.pilgrim()) instanceof AbyssalPilgrimEntity loaded && loaded.isAlive() ? loaded : null;
             }
             // The chunk has been held and it never came back. The claim is dead; start over.
             registry.release();
@@ -149,13 +159,24 @@ public final class PilgrimWarden {
 
     /** Cheap upkeep. Most ticks do nothing at all. */
     public static void tick(ServerLevel level, long now) {
+        // The sea is alive because prey is in it, not because a spectator/caster happens to be
+        // watching. Once the last meaningful resident is gone, stop renewing Hexor's own chunk and
+        // let the custom dimension become dormant again.
+        if (!WarpResidency.active(level)) {
+            if (now % 20 == 0) sleep(level);
+            return;
+        }
+
         List<ServerPlayer> players = level.players();
 
         if (now % 20 == 0) {
             ChunkPos last = PilgrimRegistry.of(level).lastSeen();
-            if (last != null) hold(level, last);
+            if (last != null) {
+                hold(level, last);
+                if (!level.getChunkSource().hasChunk(last.x, last.z)) level.getChunk(last.x, last.z);
+            }
         }
-        if (now % 40 == 0) {
+        if (now % 20 == 0) {
             AbyssalPilgrimEntity owner = ensure(level);
             if (owner != null) {
                 for (net.minecraft.world.entity.Entity entity : level.getAllEntities())
@@ -163,8 +184,7 @@ public final class PilgrimWarden {
             }
         }
         if (now % SURVEY == 0) surveyRealm(level, now);
-        // Deliberately not gated on anybody being here to see it.
-        if (now % 40 == 0) keepHunting(level);
+        if (now % 20 == 0) keepHunting(level);
         if (now % 200 == 0 && !players.isEmpty()) reposition(level, players);
     }
 
@@ -290,6 +310,8 @@ public final class PilgrimWarden {
 
         ChunkPos pos = new ChunkPos(pilgrim.blockPosition());
         registry.remember(pos);
-        hold(level, pos);
+        // No prey, no simulation ticket. The persisted UUID/chunk is enough to wake the same Hexor
+        // again later without keeping an empty ocean ticking forever.
+        if (WarpResidency.active(level)) hold(level, pos);
     }
 }

@@ -240,7 +240,6 @@ public final class WarpRealms {
     }
     public static void tick(ServerLevel l){
         Destination d=Destination.from(l);if(d==null)return;
-        WarpResidency.tick(l);
         RadialRealmRules.clean(l);
         int budget=4096;
         for(var it=JOBS.iterator();it.hasNext()&&budget>0;){Job j=it.next();if(j.level!=l)continue;

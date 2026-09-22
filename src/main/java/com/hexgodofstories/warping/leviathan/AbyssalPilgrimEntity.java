@@ -244,7 +244,12 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
      * ends up with two of something that there is only ever one of. Declaring it always ticking
      * makes presence unconditional: it is live the instant it is added and it never stops.
      */
-    @Override public boolean isAlwaysTicking() { return true; }
+    @Override public boolean isAlwaysTicking() {
+        // Activity belongs to the Void Sea residency contract now. While prey exists, the Warden
+        // holds Hexor's chunk at entity-ticking level; when the sea is empty, allowing normal chunk
+        // unloading is exactly what makes the dormant realm actually dormant.
+        return false;
+    }
     @Override public boolean displayFireAnimation() { return false; }
     @Override public boolean addEffect(net.minecraft.world.effect.MobEffectInstance effect, @Nullable Entity source) { return false; }
     /** Vanilla travel is bypassed entirely; motion belongs to the move control. */

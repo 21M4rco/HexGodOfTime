@@ -7,6 +7,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -37,6 +38,8 @@ import java.util.UUID;
  */
 public final class WarpResidency extends SavedData {
     private static final String DATA="warping_residency";
+    /** Residents discovered in a realm rather than explicitly sent by one caster. Never returned by Y. */
+    private static final UUID UNOWNED=new UUID(0L,0L);
     /** Radius three is the vanilla/Forge entity-ticking forced-chunk tier on 1.20.1. */
     private static final int TICKET_RADIUS=3;
     private static final TicketType<UUID> TICKET=TicketType.create(
@@ -54,8 +57,9 @@ public final class WarpResidency extends SavedData {
         ListTag list=tag.getList("residents",10);
         for(int i=0;i<list.size();i++){
             CompoundTag n=list.getCompound(i);
-            if(!n.hasUUID("id")||!n.hasUUID("owner"))continue;
-            data.residents.put(n.getUUID("id"),new Resident(n.getUUID("owner"),n.getLong("chunk")));
+            if(!n.hasUUID("id"))continue;
+            UUID owner=n.hasUUID("owner")?n.getUUID("owner"):UNOWNED;
+            data.residents.put(n.getUUID("id"),new Resident(owner,n.getLong("chunk")));
         }
         return data;
     }
@@ -78,6 +82,19 @@ public final class WarpResidency extends SavedData {
     /** Remember a body immediately after Warping has successfully placed it in a destination. */
     public static void track(Entity entity,UUID owner){
         if(entity==null||owner==null||!(entity.level() instanceof ServerLevel level)||Destination.from(level)==null)return;
+        register(level,entity,owner);
+    }
+
+    /**
+     * Adopt a real inhabitant that entered by some other route. It keeps the realm active but has
+     * no Loki owner, so Y can never steal somebody else's unrelated entity out of the dimension.
+     */
+    private static void adopt(ServerLevel level,Entity entity){
+        if(entity==null||!inhabitant(entity)||data(level).residents.containsKey(entity.getUUID()))return;
+        register(level,entity,UNOWNED);
+    }
+
+    private static void register(ServerLevel level,Entity entity,UUID owner){
         if(entity instanceof Mob mob)mob.setPersistenceRequired();
         WarpResidency data=data(level);
         ChunkPos chunk=new ChunkPos(entity.blockPosition());
@@ -85,6 +102,28 @@ public final class WarpResidency extends SavedData {
         if(old!=null&&old.chunk()!=chunk.toLong())release(level,entity.getUUID(),new ChunkPos(old.chunk()));
         hold(level,entity.getUUID(),chunk);
         data.setDirty();MISSING.remove(entity.getUUID());
+    }
+
+    /** True while this destination contains at least one meaningful inhabitant. */
+    public static boolean active(ServerLevel level){
+        return level!=null&&Destination.from(level)!=null&&!data(level).residents.isEmpty();
+    }
+
+    public static int count(ServerLevel level){return level==null?0:data(level).residents.size();}
+
+    /**
+     * Native realm machinery does not keep its own world awake. Hexor sleeps when there is no prey;
+     * hazards, projections and decorative living helpers likewise do not count as inhabitants.
+     */
+    private static boolean inhabitant(Entity entity){
+        if(!(entity instanceof LivingEntity living)||!living.isAlive()||living.isRemoved()||living.isSpectator())return false;
+        if(living instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity)return false;
+        if(living.getType()==com.hexgodofstories.HexGodOfStories.PILGRIM.get())return false;
+        if(living instanceof com.hexgodofstories.entity.IllusionEntity)return false;
+        if(living.getType()==com.hexgodofstories.HexGodOfStories.ILLUSION.get())return false;
+        if(living instanceof net.minecraft.world.entity.decoration.ArmorStand)return false;
+        if(living instanceof net.minecraft.world.entity.player.Player p&&(p.isCreative()||p.isSpectator()))return false;
+        return true;
     }
 
     /** Remove a body from this realm's residency after it leaves or is confirmed gone. */
@@ -148,6 +187,14 @@ public final class WarpResidency extends SavedData {
     public static void tick(ServerLevel level){
         if(Destination.from(level)==null)return;
         WarpResidency data=data(level);
+
+        // Census loaded bodies before the realm logic runs. This catches entities brought in by
+        // commands/mods as well as Warping itself and, crucially, installs their ticking ticket
+        // before the destination's hazards/AI ask the entity manager what is present.
+        if(level.getGameTime()%20L==0L){
+            for(Entity entity:level.getAllEntities())if(inhabitant(entity))adopt(level,entity);
+        }
+
         boolean dirty=false;
         Iterator<Map.Entry<UUID,Resident>> it=data.residents.entrySet().iterator();
         while(it.hasNext()){
@@ -180,7 +227,7 @@ public final class WarpResidency extends SavedData {
             // The chunk is forced and synchronously available here. Give entity storage a short
             // grace window after startup, then treat continued absence as death/despawn/removal.
             int missing=MISSING.merge(id,1,Integer::sum);
-            if(missing>40){
+            if(missing>200){
                 release(level,id,recorded);it.remove();MISSING.remove(id);dirty=true;
             }
         }
