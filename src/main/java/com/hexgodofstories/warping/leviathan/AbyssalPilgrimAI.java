@@ -354,8 +354,18 @@ public final class AbyssalPilgrimAI {
         if (target == null) { setState(LeviathanState.SEARCH); return; }
         float commitment = commitment();
         double distance = hunt.targetDistance();
-        self.control().moveTo(hunt.approachPoint(commitment), 1.5 + frenzy + commitment, 0.45f + 0.35f * commitment);
+        // Once it has decided, the setup is part of the kill. Full authority here does not tighten
+        // the 50-block turn radius; it merely lets the body use every degree that radius permits.
+        self.control().moveTo(hunt.approachPoint(commitment), 1.5 + frenzy + commitment,
+            decided ? 1.0f : 0.45f + 0.35f * commitment);
         if (!combat.ready()) return;
+
+        // Range is not the same thing as a hittable attack. At close range a 126-block body can be
+        // twenty blocks from prey while its nose is pointed far enough away that a 16-tick bite is
+        // physically incapable of arriving. Before Enough Is Enough this can remain a miss. After
+        // it, stop rolling doomed attacks and finish lining up the run-through first.
+        if (decided && self.held() == null && !hunt.airborneTarget() && !linedUpForKill(target, distance))
+            return;
 
         LeviathanAttack pick = pickAttack(random, target, distance, false);
         if (pick == null) return;
@@ -374,11 +384,29 @@ public final class AbyssalPilgrimAI {
         // Driven past the prey rather than at it, for the same reason every strike now is: a body
         // this long cannot turn onto a point it is already almost on top of, and trying reads as a
         // lap around them.
-        self.control().moveTo(hunt.approachPoint(1.0), 2.1, 0.7f);
+        double distance = hunt.targetDistance();
+        self.control().moveTo(hunt.approachPoint(1.0), 2.1, decided ? 1.0f : 0.7f);
         if (stateTicks == 1) roar(HexGodOfStories.PILGRIM_ROAR.get(), 112f, 0.8f, 900 + random.nextInt(1400));
         if (!combat.ready()) return;
-        LeviathanAttack pick = pickAttack(random, target, hunt.targetDistance(), true);
+        if (decided && self.held() == null && !hunt.airborneTarget() && !linedUpForKill(target, distance))
+            return;
+        LeviathanAttack pick = pickAttack(random, target, distance, true);
         if (pick != null) commit(pick, target);
+    }
+
+    /**
+     * Whether the present heading can become a real strike inside the selected pattern's windup.
+     *
+     * <p>The closer the prey is, the less angular error there is room to correct: at twenty blocks,
+     * turning twenty degrees means the jaws carve several blocks to one side before the spine can
+     * follow. Farther out, the same body has enough water in front of it to bend onto the line.
+     */
+    private boolean linedUpForKill(Entity target, double distance) {
+        Vec3 toward = target.getBoundingBox().getCenter().subtract(self.position());
+        if (toward.lengthSqr() < 1.0E-6) return true;
+        double dot = self.getLookAngle().dot(toward.normalize());
+        double required = distance < 45 ? 0.95 : distance < 90 ? 0.88 : 0.72;
+        return dot >= required;
     }
 
     /**

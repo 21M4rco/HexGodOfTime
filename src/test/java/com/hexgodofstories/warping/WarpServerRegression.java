@@ -29,6 +29,7 @@ public final class WarpServerRegression {
     private static int lastPilgrimTicks,stalledWhilePreyAlive,enoughAt=-1;
     private static boolean enoughSeen;
     private static float greatestPitch;
+    private static double closestMouth=Double.MAX_VALUE;
 
     @SubscribeEvent public static void started(ServerStartedEvent event){
         ServerLevel sun=event.getServer().getLevel(Destination.SUN.key);
@@ -155,7 +156,7 @@ public final class WarpServerRegression {
         // on. The prey stays invulnerable until that exact transition, then Hexor gets 350 ticks
         // to physically finish a stationary target.
         if(!enoughSeen&&com.hexgodofstories.warping.leviathan.EnoughIsEnough.marked(prey.getUUID())){
-            enoughSeen=true;enoughAt=seaTicks;
+            enoughSeen=true;enoughAt=seaTicks;closestMouth=Double.MAX_VALUE;
             System.out.println("HEXOR_ENOUGH_IS_ENOUGH at="+enoughAt
                 +" distance="+pilgrim.distanceTo(prey)+" pilgrimTicks="+pilgrim.tickCount
                 +" state="+pilgrim.state()+" attack="+pilgrim.attack()
@@ -167,10 +168,14 @@ public final class WarpServerRegression {
             check(false,"Enough Is Enough did not expire for unattended prey; remaining="
                 +com.hexgodofstories.warping.leviathan.EnoughIsEnough.remaining(prey.getUUID()));
 
+        if(enoughSeen&&prey.isAlive())
+            closestMouth=Math.min(closestMouth,pilgrim.mouthPosition().distanceTo(prey.getBoundingBox().getCenter()));
+
         if(enoughSeen&&seaTicks==enoughAt+350){
             System.out.println("HEXOR_KILL_DEADLINE distance="+pilgrim.distanceTo(prey)
                 +" pilgrimTicks="+pilgrim.tickCount+" state="+pilgrim.state()
                 +" attack="+pilgrim.attack()+" preyHealth="+prey.getHealth()
+                +" closestMouth="+closestMouth
                 +" hexor="+pilgrim.position()+" prey="+prey.position());
             check(!prey.isAlive()||prey.getHealth()<=0,
                 "Hexor kills stationary unattended prey within 350 ticks after Enough Is Enough");

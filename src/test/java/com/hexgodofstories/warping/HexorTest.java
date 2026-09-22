@@ -347,6 +347,11 @@ public final class HexorTest {
             "Hexor stays on Forge's ticking list when no player is loading his chunk");
         check(entity.contains("!WarpResidency.active(server)"),
             "an empty Void Sea still short-circuits Hexor's expensive simulation");
+        String ai = Files.readString(root.resolve(
+            "src/main/java/com/hexgodofstories/warping/leviathan/AbyssalPilgrimAI.java"));
+        check(ai.contains("linedUpForKill(target, distance)")
+                && ai.contains("distance < 45 ? 0.95 : distance < 90 ? 0.88 : 0.72"),
+            "Enough Is Enough lines the physical body up before committing a close lethal strike");
         String warden = Files.readString(root.resolve(
             "src/main/java/com/hexgodofstories/warping/leviathan/PilgrimWarden.java"));
         check(warden.contains("addRegionTicket(HUNT, pos, 3, pos, true)"),
