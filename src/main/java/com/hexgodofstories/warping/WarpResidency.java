@@ -47,7 +47,17 @@ public final class WarpResidency extends SavedData {
     );
     private static final Map<UUID,Integer> MISSING=new java.util.HashMap<>();
 
-    private record Resident(UUID owner,long chunk) { }
+    /**
+     * State a living body had when Warping first made it a resident.
+     *
+     * <p>Dimension changes rebuild non-player entities from NBT. Most mobs tolerate that perfectly,
+     * but some modded NPCs also write temporary "frozen" physics/AI flags while they are in an
+     * unusual dimension. Those flags must not become their permanent state when Y brings them home.
+     * Keeping the entry state here lets recall restore what the body arrived with rather than
+     * guessing that every mob should use vanilla gravity or AI.
+     */
+    public record TransportState(boolean known,boolean noGravity,boolean noAi) { }
+    private record Resident(UUID owner,long chunk,boolean transportStateKnown,boolean noGravity,boolean noAi) { }
     private final Map<UUID,Resident> residents=new LinkedHashMap<>();
 
     private WarpResidency() { }
@@ -59,7 +69,9 @@ public final class WarpResidency extends SavedData {
             CompoundTag n=list.getCompound(i);
             if(!n.hasUUID("id"))continue;
             UUID owner=n.hasUUID("owner")?n.getUUID("owner"):UNOWNED;
-            data.residents.put(n.getUUID("id"),new Resident(owner,n.getLong("chunk")));
+            boolean known=n.contains("transportStateKnown")&&n.getBoolean("transportStateKnown");
+            data.residents.put(n.getUUID("id"),new Resident(owner,n.getLong("chunk"),known,
+                n.getBoolean("noGravity"),n.getBoolean("noAi")));
         }
         return data;
     }
@@ -69,6 +81,8 @@ public final class WarpResidency extends SavedData {
         residents.forEach((id,resident)->{
             CompoundTag n=new CompoundTag();
             n.putUUID("id",id);n.putUUID("owner",resident.owner());n.putLong("chunk",resident.chunk());
+            n.putBoolean("transportStateKnown",resident.transportStateKnown());
+            n.putBoolean("noGravity",resident.noGravity());n.putBoolean("noAi",resident.noAi());
             list.add(n);
         });
         tag.put("residents",list);
@@ -98,7 +112,13 @@ public final class WarpResidency extends SavedData {
         if(entity instanceof Mob mob)mob.setPersistenceRequired();
         WarpResidency data=data(level);
         ChunkPos chunk=new ChunkPos(entity.blockPosition());
-        Resident old=data.residents.put(entity.getUUID(),new Resident(owner,chunk.toLong()));
+        Resident prior=data.residents.get(entity.getUUID());
+        // Track is called immediately after the dimension hand-off, before the realm gets a tick.
+        // If this is an already-known resident, keep its original entry snapshot rather than
+        // learning a temporary state a second time.
+        boolean noGravity=prior!=null&&prior.transportStateKnown()?prior.noGravity():entity.isNoGravity();
+        boolean noAi=prior!=null&&prior.transportStateKnown()?prior.noAi():(entity instanceof Mob mob&&mob.isNoAi());
+        Resident old=data.residents.put(entity.getUUID(),new Resident(owner,chunk.toLong(),true,noGravity,noAi));
         if(old!=null&&old.chunk()!=chunk.toLong())release(level,entity.getUUID(),new ChunkPos(old.chunk()));
         hold(level,entity.getUUID(),chunk);
         data.setDirty();MISSING.remove(entity.getUUID());
@@ -140,6 +160,20 @@ public final class WarpResidency extends SavedData {
 
     public static boolean known(ServerLevel level,UUID id){
         return level!=null&&id!=null&&data(level).residents.containsKey(id);
+    }
+
+    /**
+     * The transport-sensitive state this body had when it entered the realm.
+     *
+     * <p>Old saves predate this snapshot and deliberately return {@code known=false}. Recall has a
+     * very narrow compatibility repair for those records rather than pretending we know how an
+     * arbitrary old mob was configured.
+     */
+    public static TransportState transportState(ServerLevel level,UUID id){
+        if(level==null||id==null)return new TransportState(false,false,false);
+        Resident resident=data(level).residents.get(id);
+        return resident==null?new TransportState(false,false,false):
+            new TransportState(resident.transportStateKnown(),resident.noGravity(),resident.noAi());
     }
 
     /** All bodies this caster actually sent to this realm, in stable insertion order. */
@@ -217,7 +251,8 @@ public final class WarpResidency extends SavedData {
                 ChunkPos current=new ChunkPos(entity.blockPosition());
                 if(current.toLong()!=resident.chunk()){
                     release(level,id,recorded);hold(level,id,current);
-                    entry.setValue(new Resident(resident.owner(),current.toLong()));
+                    entry.setValue(new Resident(resident.owner(),current.toLong(),resident.transportStateKnown(),
+                        resident.noGravity(),resident.noAi()));
                     dirty=true;
                 }
                 MISSING.remove(id);
