@@ -54,6 +54,11 @@ public final class LeviathanMoveControl extends MoveControl {
     private double speed = 0.4;
     /** 0 is a lazy drift, 1 is an attack turn. */
     private float authority = 0.25f;
+    /**
+     * Enough Is Enough may temporarily buy a tighter approach arc. This is never used by ordinary
+     * hunting or roaming: the fifty-block radius is still what gives the animal its weight.
+     */
+    private boolean killTurn;
     private boolean active;
     private boolean allowAir;
     private double burst;
@@ -77,11 +82,23 @@ public final class LeviathanMoveControl extends MoveControl {
         this.wanted = target;
         this.speed = blocksPerTick * SCALE * leviathan.urgency();
         this.authority = Mth.clamp(turnAuthority, 0.02f, 1.0f);
+        this.killTurn = false;
         this.active = true;
         super.setWantedPosition(target.x, target.y, target.z, this.speed);
     }
 
-    public void stopMoving() { this.active = false; this.burst = 0; this.airSteer = 0; this.ballistic = 0; this.launchImpulse = null; }
+    /**
+     * A hard but still curved line-up used only after one target's patience clock has expired.
+     * Thirty four blocks is deliberately not a pivot: the body still has to travel an arc, but it
+     * can come about in a few seconds instead of spending another full minute on a fifty-block
+     * hunting circle.
+     */
+    public void moveToKill(Vec3 target,double blocksPerTick) {
+        moveTo(target,blocksPerTick,1.0f);
+        this.killTurn = true;
+    }
+
+    public void stopMoving() { this.active = false; this.killTurn = false; this.burst = 0; this.airSteer = 0; this.ballistic = 0; this.launchImpulse = null; }
 
     /**
      * Throws the whole creature along {@code velocity} and refuses to steer for {@code commit}
@@ -156,7 +173,11 @@ public final class LeviathanMoveControl extends MoveControl {
 
         // Nothing can turn toward a point inside its own turning circle. Attempting it is what a
         // pirouette is; a predator instead carves past and comes back around on the next pass.
-        double reachable = TURN_RADIUS * 0.6;
+        // Once a target's Enough Is Enough clock has expired, the dedicated kill approach is
+        // allowed a harder arc. It is still an arc and therefore still bends the authored spine
+        // through its normal history rather than snapping the model around.
+        double turnRadius = killTurn ? 34.0 : TURN_RADIUS;
+        double reachable = turnRadius * 0.6;
         if (distance < reachable) {
             Vec3 ahead = leviathan.getLookAngle();
             double blend = distance / reachable;
@@ -172,7 +193,7 @@ public final class LeviathanMoveControl extends MoveControl {
         float maxPitch = 0.7f + 6.4f * authority * authority;
         // ...and degrees per tick are then bought with speed, because a turn is an arc: at one
         // block per tick a thirty block circle is worth just under two degrees of heading.
-        float arc = (float) (Math.max(motion.length(), 0.03) * Mth.RAD_TO_DEG / TURN_RADIUS);
+        float arc = (float) (Math.max(motion.length(), 0.03) * Mth.RAD_TO_DEG / turnRadius);
         // The floor exists only so a nearly stationary creature can still come about. Keep it low:
         // a generous floor is a tight path radius at cruising speed, which is the spiral again.
         maxYaw = Math.min(maxYaw, Math.max(0.30f, arc));
