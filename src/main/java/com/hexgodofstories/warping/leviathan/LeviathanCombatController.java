@@ -209,9 +209,15 @@ public final class LeviathanCombatController {
         if (victim == null) { abort(); return; }
         if (tick == 0) anchor = victim.position();
         if (tick < attack.windup) {
-            // Straighten out and line the body up. The fins fold, the glow runs forward.
-            Vec3 line = anchor.subtract(self.position());
-            steer(self.position().add(line.normalize().scale(20)), 0.6, 0.8f);
+            // Straighten out and line the body up. The old station was only twenty blocks ahead.
+            // Both the ordinary 50-block turn radius and the decided 34-block radius treat a point
+            // that close as being inside the curve, so the move control deliberately carved past
+            // it instead of converging. Then the active phase inherited a sideways body and spent
+            // most of its eighteen ticks trying to undo the windup.
+            //
+            // Keep the station beyond the prey instead. The whole windup now buys one continuous
+            // run-through line, and the active burst accelerates along a heading it already owns.
+            steer(aimThrough(victim, 52), 1.4, 0.9f);
             if (tick == 4) self.voice(HexGodOfStories.PILGRIM_LUNGE.get(), 28f, 1.0f);
         } else if (tick < attack.windup + attack.active) {
             // Aimed at where the prey is now rather than where it was when the run started: a
