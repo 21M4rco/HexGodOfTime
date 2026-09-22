@@ -88,6 +88,17 @@ public final class AbyssalPilgrimAI {
     private static final double ENGAGE = 150.0;
     /** Ticks of fruitless hunting that take the creature from patient to fully committed. */
     private static final int PATIENCE_LIMIT = 360;
+    /**
+     * Once Enough Is Enough has fired, this is the most time Hexor may spend trying to obtain a
+     * textbook-perfect heading before it commits anyway.
+     *
+     * <p>The line-up gate exists to stop close bites being thrown sideways, but an exact angular
+     * threshold can itself become an orbit: a body this long may keep carving around a stationary
+     * target without ever crossing the final few degrees. The attack patterns already steer through
+     * the victim during their windup, so after this short setup window the correct fallback is a
+     * long committed run, not another lap.
+     */
+    private static final int KILL_LINE_GRACE = 36;
 
     public LeviathanHuntController hunt() { return hunt; }
     public LeviathanCombatController combat() { return combat; }
@@ -364,7 +375,7 @@ public final class AbyssalPilgrimAI {
         // twenty blocks from prey while its nose is pointed far enough away that a 16-tick bite is
         // physically incapable of arriving. Before Enough Is Enough this can remain a miss. After
         // it, stop rolling doomed attacks and finish lining up the run-through first.
-        if (decided && self.held() == null && !hunt.airborneTarget() && !linedUpForKill(target, distance))
+        if (decided && self.held() == null && !hunt.airborneTarget() && waitForKillLine(target, distance))
             return;
 
         LeviathanAttack pick = pickAttack(random, target, distance, false);
@@ -388,10 +399,24 @@ public final class AbyssalPilgrimAI {
         self.control().moveTo(hunt.approachPoint(1.0), 2.1, decided ? 1.0f : 0.7f);
         if (stateTicks == 1) roar(HexGodOfStories.PILGRIM_ROAR.get(), 112f, 0.8f, 900 + random.nextInt(1400));
         if (!combat.ready()) return;
-        if (decided && self.held() == null && !hunt.airborneTarget() && !linedUpForKill(target, distance))
+        if (decided && self.held() == null && !hunt.airborneTarget() && waitForKillLine(target, distance))
             return;
         LeviathanAttack pick = pickAttack(random, target, distance, true);
         if (pick != null) commit(pick, target);
+    }
+
+    /**
+     * Gives a decided target a short physical line-up window, then forces a committed run.
+     *
+     * @return true when this tick has been consumed either by lining up or by starting the fallback
+     */
+    private boolean waitForKillLine(Entity target,double distance) {
+        if (linedUpForKill(target,distance)) return false;
+        if (stateTicks < KILL_LINE_GRACE) return true;
+        // A lunge has its own straighten-and-run-through windup and is the safest close fallback.
+        // At long range the deep charge has more room and a much larger approach path.
+        commit(distance > 85 ? LeviathanAttack.DEEP_CHARGE : LeviathanAttack.ABYSSAL_LUNGE,target);
+        return true;
     }
 
     /**
