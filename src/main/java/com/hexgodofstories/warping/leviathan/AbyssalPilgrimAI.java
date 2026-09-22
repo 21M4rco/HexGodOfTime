@@ -100,7 +100,7 @@ public final class AbyssalPilgrimAI {
      * the victim during their windup, so after this short setup window the correct fallback is a
      * long committed run, not another lap.
      */
-    private static final int KILL_LINE_GRACE = 180;
+    private static final int KILL_LINE_GRACE = 280;
 
     public LeviathanHuntController hunt() { return hunt; }
     public LeviathanCombatController combat() { return combat; }
@@ -446,7 +446,11 @@ public final class AbyssalPilgrimAI {
         Vec3 toward = target.getBoundingBox().getCenter().subtract(self.position());
         if (toward.lengthSqr() < 1.0E-6) return true;
         double dot = self.getLookAngle().dot(toward.normalize());
-        double required = distance < 45 ? 0.95 : distance < 90 ? 0.88 : 0.72;
+        // The jaws already occupy a wide swept volume and the attack windup keeps correcting.
+        // Requiring a near-perfect 18-degree heading made the line-up itself take longer than the
+        // kill. About thirty five degrees up close still places the thirteen-block jaw offset
+        // inside the head sweep by the time the bite/lunge becomes active.
+        double required = distance < 45 ? 0.82 : distance < 90 ? 0.74 : 0.60;
         return dot >= required;
     }
 
