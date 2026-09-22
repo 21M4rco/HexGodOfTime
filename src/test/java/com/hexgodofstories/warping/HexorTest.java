@@ -49,6 +49,7 @@ public final class HexorTest {
         everyBlowGoesThroughTheScale(root);
         theHuntDoesNotNeedAnAudience(root);
         ticketFollowsHexorAcrossChunkEdges(root);
+        enoughIsEnoughKeepsKillSteering(root);
         recalledBodiesRecoverTransportState(root);
         hexorIsNeverRecalled(root);
         System.out.println("HexorTest: blows are weighed against what they land on, the crowd is felt, and the clock runs out.");
@@ -381,6 +382,31 @@ public final class HexorTest {
     }
 
     // ------------------------------------------------------------------ plumbing
+
+    /**
+     * Enough Is Enough must remain a physical kill, not a return to the ordinary hunting orbit.
+     *
+     * <p>The bug was split across two classes: AI spent most of the kill deadline trying to obtain
+     * a perfect line, then the combat controller discarded the dedicated kill turn on the first
+     * attack tick by calling ordinary moveTo again. This structural check keeps both halves closed.
+     */
+    private static void enoughIsEnoughKeepsKillSteering(Path root) throws Exception {
+        String ai=Files.readString(root.resolve("src/main/java/com/hexgodofstories/warping/leviathan/AbyssalPilgrimAI.java"));
+        Matcher grace=Pattern.compile("KILL_LINE_GRACE\\s*=\\s*(\\d+)").matcher(ai);
+        check(grace.find(),"Enough Is Enough still has a bounded physical line-up window");
+        check(Integer.parseInt(grace.group(1))<=100,
+            "the line-up window leaves time for more than one lethal pass");
+
+        String combat=Files.readString(root.resolve("src/main/java/com/hexgodofstories/warping/leviathan/LeviathanCombatController.java"));
+        int steer=combat.indexOf("private void steer(Vec3 point, double speed, float authority)");
+        check(steer>0,"combat still has one shared steering gate");
+        int end=combat.indexOf("\n    }",steer);
+        String body=combat.substring(steer,end);
+        check(body.contains("if (decided()) self.control().moveToKill(point, speed)"),
+            "a decided attack keeps the tighter kill arc for the whole pattern");
+        check(body.contains("else self.control().moveTo(point, speed, authority)"),
+            "ordinary attacks keep their authored steering unchanged");
+    }
 
     /**
      * A body brought back from a realm must be alive in more than the health-bar sense.
