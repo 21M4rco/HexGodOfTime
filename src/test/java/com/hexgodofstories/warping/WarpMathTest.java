@@ -200,6 +200,20 @@ public final class WarpMathTest {
         check(sunk(200,rate*2)>1.62,"frantic thrashing climbs clear of a player's own height");
         for(double slower=0;slower<rate*2;slower+=.5)
             check(sunk(100,slower)<sunk(100,slower+.5),"hitting it faster is always worth something ("+slower+")");
+
+        // And the reason the server's watchdog for a stuck body measures stillness rather than
+        // elapsed time. A body doing nothing goes under in about two seconds; one very nearly
+        // keeping up holds out for the better part of half a minute. Any clock short enough to
+        // catch a client that never let go of the floor would hand that second body a free escape,
+        // which is the one thing the struggle is meant to cost.
+        check(endures(0)<60,"a body that does nothing is under in under three seconds ("+endures(0)+" ticks)");
+        check(endures(rate*.9)>300,"one that nearly keeps up lasts many times longer ("+endures(rate*.9)+" ticks)");
+    }
+
+    /** Ticks before a player's eye goes under, at this many presses a second. */
+    private static int endures(double perSecond){
+        for(int t=1;t<=2000;t++)if(sunk(t,perSecond)<=-1.62)return t;
+        return 2000;
     }
 
     /**

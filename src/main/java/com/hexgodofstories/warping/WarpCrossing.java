@@ -71,20 +71,30 @@ public final class WarpCrossing {
     private static final int SETTLE = 20;
 
     /**
-     * How long a body may be inside an opening without going through it.
+     * How long a body may sit in an opening without moving at all before the floor is handed back.
      *
      * <p>A passage that cannot finish is the one failure mode worth designing against, because the
-     * body is holding a grant of no-collision while it lasts. Three seconds is far longer than any
-     * real crossing — those take five to ten ticks — and it catches the case where a client never
-     * received, or never honoured, the word that the floor is not there: it stands on ground the
-     * server thinks is open, never descends, and would otherwise wait for ever.
+     * body is holding a grant of no-collision while it lasts. What it catches is the case where a
+     * client never received, or never honoured, the word that the floor is not there: it stands on
+     * ground the server thinks is open, never descends, and would otherwise wait for ever.
+     *
+     * <p>It is deliberately a stillness watchdog rather than a deadline. A deadline used to be
+     * safe, because a crossing was a fall and took five to ten ticks; a crossing is now a sink that
+     * takes forty, and anybody fighting it makes it take longer still — so a clock would hand a
+     * free escape to whoever merely held on, which is precisely the thing the struggle is supposed
+     * to cost. Nothing that is being sunk is ever still, so the two cases do not overlap.
      */
     private static final int PATIENCE = 60;
+
+    /** Movement in a tick below this is no movement: a hundredth of what one tick of sinking is. */
+    private static final double STIRRING = 4.0E-4;
 
     /** One body on its way through one break. Each is its own; nothing about this is shared. */
     private static final class Passage {
         final UUID portal; final long began;
-        double plane; boolean committed;
+        double plane;
+        /** Where the body was last tick, and how many ticks it has failed to move from there. */
+        double was = Double.NaN; int still;
         /**
          * Lift banked by somebody thrashing to get out, in blocks, spent on the next tick.
          *
@@ -175,13 +185,16 @@ public final class WarpCrossing {
     private static void advance(Break brk, Passage passage, Entity e, long now) {
         double plane = plane(brk, e);
         if (!Double.isNaN(plane)) passage.plane = plane;
-        if (e.getY() < passage.plane - COMMITTED) passage.committed = true;
-
-        // Climbed back out, or walked off the side of the opening while still above it. Both are a
-        // body that has changed its mind, and both give the floor back. So does simply having been
-        // in here too long, which is what a client that never let go of the floor looks like.
+        // Climbed back out, or waded off the side of the opening while still above it. Both are a
+        // body that has changed its mind, and both give the floor back.
         if (e.getY() > passage.plane + ESCAPE || !open(brk, e)) { abort(e, passage, true); return; }
-        if (now - passage.began > PATIENCE) { abort(e, passage, true); return; }
+        // Not moving at all is not the same as fighting: a body being sunk shifts every tick, so
+        // anything that has genuinely stood still for three seconds is a client that never let go
+        // of the floor rather than somebody holding their own against the liquid.
+        double y = e.getY();
+        passage.still = !Double.isNaN(passage.was) && Math.abs(y - passage.was) < STIRRING ? passage.still + 1 : 0;
+        passage.was = y;
+        if (passage.still > PATIENCE) { abort(e, passage, true); return; }
         // Fallen further than a break is deep without the crossing having fired. Something is wrong
         // with the floor rather than with the body, so finish the job rather than strand it.
         if (e.getY() < passage.plane - BAND) { cross(brk, passage, e, now); return; }
@@ -263,6 +276,11 @@ public final class WarpCrossing {
      * <p>Past the point of no return — feet clearly under the plane — the crossing is finished
      * anyway, because the alternative is a body inside the floor. Barely begun, the floor is simply
      * handed back, and the body is lifted to stand on it if it has already sunk below.
+     *
+     * <p>Where the body is now, rather than the deepest it ever got. A body sinking into quicksand
+     * dips past this line within half a second of stepping on, so a flag set once would mean that
+     * fighting your way almost back out and then having the pool shut over you took you anyway —
+     * which would make the struggle worth nothing in exactly the case where it was hardest.
      */
     public static void closing(Break brk, long now) {
         for (Map.Entry<UUID, Passage> entry : new ArrayList<>(PASSAGES.entrySet())) {
@@ -270,7 +288,7 @@ public final class WarpCrossing {
             if (!passage.portal.equals(brk.portal())) continue;
             Entity e = brk.level().getEntity(entry.getKey());
             if (e == null) { PASSAGES.remove(entry.getKey()); continue; }
-            if (passage.committed) cross(brk, passage, e, now);
+            if (e.getY() < passage.plane - COMMITTED) cross(brk, passage, e, now);
             else abort(e, passage, true);
         }
     }

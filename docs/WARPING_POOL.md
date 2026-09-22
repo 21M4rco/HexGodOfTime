@@ -104,10 +104,20 @@ of the mechanic exists to serve.
   the body was rather than where it is going; a ring of liquid closing over the place it went in;
   and a little of it trailing the body on the far side. No portal chime and no arrival nebula.
 - **Each body is its own.** Several can be part way through one pool at once, each with its own
-  progress. A pool that expires with somebody in it finishes the crossing for anybody past the point
-  of no return and gives the floor back to anybody who had barely begun, standing them on top of it
-  rather than leaving them inside it. A body that has just come out of one cannot be caught by
-  another for a second.
+  progress. A pool that expires with somebody in it finishes the crossing for anybody who is deep at
+  that moment and gives the floor back to anybody who is not, standing them on top of it rather than
+  leaving them inside it — where they are when it shuts, not the deepest they ever got, because a
+  body sinking into quicksand dips past that line within half a second and a mark set once would
+  make fighting almost all the way back out count for nothing. A body that has just come out of one
+  cannot be caught by another for a second.
+- **Being stuck is caught; holding on is not.** A body inside an opening holds a grant of
+  no-collision, so something has to notice a passage that can never finish — a client that never
+  received, or never honoured, the word that the floor is not there stands on ground the server
+  thinks is open and would otherwise wait for ever. What notices is stillness, not a clock: three
+  seconds of a body not moving at all gives the floor back. A clock was safe when a crossing was a
+  fall of five to ten ticks and is not now that it is a sink of forty that struggling makes longer,
+  because it would hand a free escape to whoever merely held on — which is the one thing the
+  struggle is meant to cost. Nothing being sunk is ever still, so the two cases never overlap.
 
 ## Seeing the far side
 

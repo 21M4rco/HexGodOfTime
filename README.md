@@ -50,9 +50,12 @@
   entities: nothing exists on any server, nothing collides, nothing can be hit.
 - **Held-open edge cases are handled rather than hoped about.** Several bodies can be part way through
   one pool at once, each with its own progress. A pool that expires with somebody in it finishes the
-  crossing for anybody past the point of no return and stands anybody who had barely begun back on
-  top of the floor rather than inside it. A body that just came out of one cannot be caught by another
-  for a second, and a client that never let go of the floor is given it back after three seconds.
+  crossing for anybody who is deep at that moment and stands anybody who is not back on top of the
+  floor — where they are when it shuts, not the deepest they ever got, so fighting almost all the way
+  out and then having the pool close over you is not the same as never having fought. A body that just
+  came out of one cannot be caught by another for a second. And the watchdog for a client that never
+  let go of the floor measures stillness rather than elapsed time, because a clock would hand a free
+  escape to anybody who merely held on rather than climbed.
 
 ## 0.5.9 — Paradise, and Warping the other way round
 
