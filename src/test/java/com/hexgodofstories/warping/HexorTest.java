@@ -49,6 +49,7 @@ public final class HexorTest {
         everyBlowGoesThroughTheScale(root);
         theHuntDoesNotNeedAnAudience(root);
         ticketFollowsHexorAcrossChunkEdges(root);
+        recalledBodiesRecoverTransportState(root);
         hexorIsNeverRecalled(root);
         System.out.println("HexorTest: blows are weighed against what they land on, the crowd is felt, and the clock runs out.");
     }
@@ -368,6 +369,38 @@ public final class HexorTest {
     }
 
     // ------------------------------------------------------------------ plumbing
+
+    /**
+     * A body brought back from a realm must be alive in more than the health-bar sense.
+     *
+     * <p>The regression reported in play was a living, punchable NPC that came out of recall,
+     * received the launch impulse, and then stayed suspended with no movement. That is exactly what
+     * a copied NoAI + NoGravity state looks like. The entry snapshot is what makes the fix safe for
+     * intentionally flying/NoAI mobs, while the narrow legacy branch repairs prisoners saved before
+     * that snapshot existed.
+     */
+    private static void recalledBodiesRecoverTransportState(Path root) throws Exception {
+        String residency=Files.readString(root.resolve("src/main/java/com/hexgodofstories/warping/WarpResidency.java"));
+        check(residency.contains("record TransportState(boolean known,boolean noGravity,boolean noAi)"),
+            "residency records the transport-sensitive AI and gravity state");
+        check(residency.contains("transportStateKnown")&&residency.contains("entity.isNoGravity()")
+                &&residency.contains("mob.isNoAi()"),
+            "the snapshot is captured and persisted with the resident");
+
+        String warping=Files.readString(root.resolve("src/main/java/com/hexgodofstories/warping/Warping.java"));
+        int restore=warping.indexOf("private static void restoreRecallState(");
+        check(restore>0,"recall has one state-restoration point after a dimension copy");
+        int end=warping.indexOf("\n    }",restore);
+        String body=warping.substring(restore,end);
+        check(body.contains("entity.noPhysics=false"),"portal no-physics can never leak out of recall");
+        check(body.contains("state.noGravity()")&&body.contains("state.noAi()"),
+            "new residents get their actual entry gravity and AI state back");
+        check(body.contains("mob.isNoAi()&&entity.isNoGravity()")
+                &&body.contains("mob.setNoAi(false)")&&body.contains("entity.setNoGravity(false)"),
+            "legacy frozen residents are revived only for the NoAI plus NoGravity failure pair");
+        check(warping.contains("restoreRecallState(arrived,transportState);"),
+            "non-player dimension copies are repaired before their recall launch");
+    }
 
     /**
      * The sea keeps it.
