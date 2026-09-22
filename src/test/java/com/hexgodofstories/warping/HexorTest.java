@@ -350,9 +350,12 @@ public final class HexorTest {
             "an empty Void Sea still short-circuits Hexor's expensive simulation");
         String ai = Files.readString(root.resolve(
             "src/main/java/com/hexgodofstories/warping/leviathan/AbyssalPilgrimAI.java"));
-        check(ai.contains("linedUpForKill(target, distance)")
+        check(ai.contains("linedUpForKill(target,distance)")
                 && ai.contains("distance < 45 ? 0.95 : distance < 90 ? 0.88 : 0.72"),
             "Enough Is Enough lines the physical body up before committing a close lethal strike");
+        check(ai.contains("KILL_LINE_GRACE = 36")
+                && ai.contains("commit(distance > 85 ? LeviathanAttack.DEEP_CHARGE : LeviathanAttack.ABYSSAL_LUNGE,target)"),
+            "a perfect heading is bounded and cannot turn Enough Is Enough into another orbit");
         String warden = Files.readString(root.resolve(
             "src/main/java/com/hexgodofstories/warping/leviathan/PilgrimWarden.java"));
         check(warden.contains("addRegionTicket(HUNT, pos, 3, pos, true)"),
