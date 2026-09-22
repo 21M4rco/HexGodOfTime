@@ -256,11 +256,16 @@ public final class ParadiseShapeTest {
         check(Paradise.FLOOR > 0, "the catch is inside the dimension rather than under it");
     }
 
+    /**
+     * Read from Paradise's own table rather than from the destination enum, which cannot be loaded
+     * outside a running game: every one of its constants builds a {@code ResourceKey}, and that
+     * needs Minecraft's registries bootstrapped. The realm is a formula, and this check stays one.
+     */
     private static void arrivalIsOnLand() {
-        double x = Destination.PARADISE.arrival.x, z = Destination.PARADISE.arrival.z;
+        double x = Paradise.ARRIVAL.x, y = Paradise.ARRIVAL.y, z = Paradise.ARRIVAL.z;
         check(Paradise.inland(Paradise.heart(), x, z) > 3, "arrivals land well inside the central island");
         check(!Paradise.spring(x, z), "arrivals do not land in the hot spring");
-        check(Destination.PARADISE.arrival.y > Paradise.SURFACE + 8, "arrivals have air under them on the way in");
+        check(y > Paradise.SURFACE + 8, "arrivals have air under them on the way in");
     }
 
     /** The realm has to be placeable inside the block budget the realm builder runs on. */

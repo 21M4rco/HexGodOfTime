@@ -40,6 +40,15 @@ public final class Paradise {
     public static final int SPRING_DEPTH = 3;
     /** Below this there is nothing left to fall past, and a faller is put back at {@link #CEILING}. */
     public static final int FLOOR = 86, CEILING = 214;
+    /**
+     * Where a traveller comes in: sixteen blocks of air over the meadow beside the spring.
+     *
+     * <p>It lives here rather than in {@link Destination} because it is a fact about this island —
+     * which part of it is open ground, and how much sky there is above that — and because the
+     * layout, the planting and the build's own checks all need it. The destination table reads it
+     * from here, exactly as it reads the Void Sea's waterline from {@link VoidSea}.
+     */
+    public static final Vec3 ARRIVAL = new Vec3(0, SURFACE + 16, 16);
 
     // ------------------------------------------------------------------ gravity
 

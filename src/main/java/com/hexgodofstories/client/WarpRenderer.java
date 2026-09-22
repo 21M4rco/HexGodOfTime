@@ -239,7 +239,11 @@ public final class WarpRenderer {
             Vec3 c3=centre.add(u.scale(sx*.5)).add(v.scale(-sz));
             float alpha=(float)(Math.min(1,p*7)*Math.pow(1-p,1.35)*(.42+.58*charge));
             if(alpha<=.004)continue;
-            int ground=brk.tint(anchor.x,anchor.z,at);
+            // Sampled at a corner rather than at the middle. Only the corners' columns were asked
+            // about when the break was resolved onto the floor, so a wide piece whose centre falls
+            // in a column nobody sampled would have come back grey.
+            Vec3 sample=brk.corner(i,0);
+            int ground=brk.tint(sample.x,sample.z,at);
             WarpMesh.quad(b,m,c0,c1,c2,c3,WarpMesh.shade(ground,.62+noise(brk.seed,i,6)*.55),alpha);
             // The lit edge. A fragment of ground that catches the light the break is throwing is
             // what stops the debris reading as dirt and starts it reading as glass.

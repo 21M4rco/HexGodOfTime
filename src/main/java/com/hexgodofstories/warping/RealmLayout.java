@@ -90,7 +90,7 @@ public final class RealmLayout {
 
     /** Where the traveller arrives. Nothing tall is grown here, so nobody lands inside a tree. */
     private static boolean paradiseArrival(int x,int z){
-        return Math.abs(x-(int)Destination.PARADISE.arrival.x)<=5&&Math.abs(z-(int)Destination.PARADISE.arrival.z)<=5;
+        return Math.abs(x-(int)Paradise.ARRIVAL.x)<=5&&Math.abs(z-(int)Paradise.ARRIVAL.z)<=5;
     }
 
     private static void paradiseIsle(Map<BlockPos,BlockState>b,Paradise.Isle isle,boolean heart,Random r){
