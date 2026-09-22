@@ -77,6 +77,8 @@ public final class AbyssalPilgrimAI {
     private int occupants = TrillOfTheHunt.ALONE;
     /** True while the thing currently being hunted has run its {@link EnoughIsEnough} clock out. */
     private boolean decided;
+    /** Consecutive ticks spent physically lining up on a decided target. */
+    private int killLineTicks;
 
     public AbyssalPilgrimAI(AbyssalPilgrimEntity self) {
         this.self = self;
@@ -98,7 +100,7 @@ public final class AbyssalPilgrimAI {
      * the victim during their windup, so after this short setup window the correct fallback is a
      * long committed run, not another lap.
      */
-    private static final int KILL_LINE_GRACE = 36;
+    private static final int KILL_LINE_GRACE = 90;
 
     public LeviathanHuntController hunt() { return hunt; }
     public LeviathanCombatController combat() { return combat; }
@@ -119,6 +121,7 @@ public final class AbyssalPilgrimAI {
     /** Starts a pattern and puts the state machine into the state that matches it, together. */
     private void commit(LeviathanAttack pattern, @Nullable Entity target) {
         lastWasFeint = pattern == LeviathanAttack.FAKE_ATTACK;
+        killLineTicks = 0;
         combat.begin(pattern, target);
         setState(LeviathanState.ATTACK);
     }
@@ -158,7 +161,7 @@ public final class AbyssalPilgrimAI {
         // estimate the long range search runs on.
         Entity quarry = hunt.target();
         decided = quarry != null && EnoughIsEnough.marked(quarry.getUUID());
-        if (decided) hunt.sharpen(quarry);
+        if (decided) hunt.sharpen(quarry); else killLineTicks = 0;
         combat.tick();
         // Landing something is the only thing that buys patience back. Nothing else resets this:
         // not a new state, not a new target, not another lap. Read on the tick the blow lands
@@ -411,10 +414,20 @@ public final class AbyssalPilgrimAI {
      * @return true when this tick has been consumed either by lining up or by starting the fallback
      */
     private boolean waitForKillLine(Entity target,double distance) {
-        if (linedUpForKill(target,distance)) return false;
-        if (stateTicks < KILL_LINE_GRACE) return true;
-        // A lunge has its own straighten-and-run-through windup and is the safest close fallback.
-        // At long range the deep charge has more room and a much larger approach path.
+        if (linedUpForKill(target,distance)) { killLineTicks = 0; return false; }
+
+        // Do not keep using the ordinary fifty-block hunting circle after the patience clock has
+        // expired. The model still turns as one continuous body; it is simply permitted a harder
+        // arc while it points its jaws at the one thing it has decided to finish.
+        killLineTicks++;
+        self.control().moveToKill(hunt.approachPoint(1.0),1.7 + frenzy);
+
+        if (killLineTicks < KILL_LINE_GRACE) return true;
+
+        // A pathological geometry/modded collision still cannot turn the line-up into an infinite
+        // wait. After the hard approach has had several seconds, start the longest suitable
+        // run-through and let that pattern's own windup continue correcting the heading.
+        killLineTicks = 0;
         commit(distance > 85 ? LeviathanAttack.DEEP_CHARGE : LeviathanAttack.ABYSSAL_LUNGE,target);
         return true;
     }
