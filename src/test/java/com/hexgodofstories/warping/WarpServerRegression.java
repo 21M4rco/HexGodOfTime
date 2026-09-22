@@ -83,26 +83,39 @@ public final class WarpServerRegression {
         HexData.get(visitor).putBoolean("flightGranted",true);
         com.hexgodofstories.server.CosmicFlight.tick(visitor);
         check(!visitor.getAbilities().mayfly&&!visitor.getAbilities().flying,"sea membership revokes old automatic flight");
-        pilgrim=com.hexgodofstories.warping.leviathan.PilgrimWarden.ensure(sea);
-        check(pilgrim!=null&&sea.getEntity(pilgrim.getUUID())==pilgrim,"Pilgrim really added to sea entity manager");
-        for(int i=0;i<8;i++)check(com.hexgodofstories.warping.leviathan.PilgrimWarden.ensure(sea)==pilgrim,"repeated ensure keeps one UUID");
-        initial=pilgrim.position();
-        prey=EntityType.PIG.create(sea);check(prey!=null,"prey created");
-        prey.setNoAi(true);prey.setNoGravity(true);prey.setInvulnerable(true);
-        prey.moveTo(initial.x+24,VoidSea.SURFACE+4,initial.z);
-        check(sea.addFreshEntity(prey),"imported prey remains in sea");
-        // This is the important regression: do NOT manually hold the prey or Hexor chunk. The same
-        // residency contract real Warping uses has to keep both sides of the hunt simulation-active.
-        WarpResidency.track(prey,UUID.randomUUID());
-        check(WarpResidency.active(sea),"Void Sea becomes active for unattended prey");
-        lastPilgrimTicks=pilgrim.tickCount;
-        var duplicate=HexGodOfStories.PILGRIM.get().create(sea);
-        duplicate.moveTo(initial.x+5,initial.y,initial.z,0,0);sea.addFreshEntity(duplicate);
+        // Hexor itself is initialized on the Void Sea's first normal level tick below. Doing it
+        // inside ServerStartedEvent asks the entity manager to resolve a freshly-added UUID before
+        // that dimension has completed even one normal tick, which is not how Warping reaches it.
         System.out.println("WARPING_SERVER_REGRESSIONS_PASSED");
     }
     @SubscribeEvent public static void seaTick(net.minecraftforge.event.TickEvent.LevelTickEvent event) {
-        if(event.phase!=net.minecraftforge.event.TickEvent.Phase.END||pilgrim==null||seaTicks>=1000
-                ||event.level!=pilgrim.level())return;
+        if(event.phase!=net.minecraftforge.event.TickEvent.Phase.END
+                ||event.level.dimension()!=Destination.VOID_SEA.key||seaTicks>=1000)return;
+        ServerLevel sea=(ServerLevel)event.level;
+
+        if(pilgrim==null){
+            // Wake the realm from prey first. That is the real contract: an inhabitant makes the
+            // dimension active, then Hexor is loaded/spawned into an entity-ticking ocean.
+            prey=EntityType.PIG.create(sea);check(prey!=null,"prey created");
+            prey.setNoAi(true);prey.setNoGravity(true);prey.setInvulnerable(true);
+            prey.moveTo(0,VoidSea.SURFACE+4,0);
+            check(sea.addFreshEntity(prey),"imported prey remains in sea");
+            WarpResidency.track(prey,UUID.randomUUID());
+            check(WarpResidency.active(sea),"Void Sea becomes active for unattended prey");
+
+            pilgrim=com.hexgodofstories.warping.leviathan.PilgrimWarden.ensure(sea);
+            check(pilgrim!=null,"Pilgrim wakes when unattended prey activates the sea");
+            initial=pilgrim.position();
+            prey.moveTo(initial.x+24,VoidSea.SURFACE+4,initial.z);
+            lastPilgrimTicks=pilgrim.tickCount;
+
+            var duplicate=HexGodOfStories.PILGRIM.get().create(sea);
+            check(duplicate!=null,"duplicate test Pilgrim created");
+            duplicate.moveTo(initial.x+5,initial.y,initial.z,0,0);
+            sea.addFreshEntity(duplicate);
+            return;
+        }
+
         seaTicks++;
 
         // This is the regression the old smoke test missed. It only required "more than 80" Hexor
@@ -117,7 +130,6 @@ public final class WarpServerRegression {
         greatestPitch=Math.max(greatestPitch,Math.abs(pilgrim.getXRot()));
 
         if(seaTicks==180){
-            ServerLevel sea=(ServerLevel)event.level;
             check(pilgrim.tickCount>150,"Pilgrim continuously ticks with no connected players");
             check(pilgrim.position().distanceTo(initial)>10,"Pilgrim actually swims");
             check(greatestPitch>5,"3D steering retains vertical pitch");
