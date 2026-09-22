@@ -341,6 +341,12 @@ public final class HexorTest {
         check(move > 0, "Hexor still applies its custom movement");
         int handoff = entity.indexOf("PilgrimWarden.renew(server, this);", move);
         check(handoff > move, "the chunk ticket is renewed after movement, not only before it");
+        check(entity.contains("@Override public boolean isAlwaysTicking()")
+                && entity.substring(entity.indexOf("@Override public boolean isAlwaysTicking()"),
+                    entity.indexOf("@Override public boolean displayFireAnimation()")).contains("return true;"),
+            "Hexor stays on Forge's ticking list when no player is loading his chunk");
+        check(entity.contains("!WarpResidency.active(server)"),
+            "an empty Void Sea still short-circuits Hexor's expensive simulation");
         String warden = Files.readString(root.resolve(
             "src/main/java/com/hexgodofstories/warping/leviathan/PilgrimWarden.java"));
         check(warden.contains("addRegionTicket(HUNT, pos, 3, pos, true)"),

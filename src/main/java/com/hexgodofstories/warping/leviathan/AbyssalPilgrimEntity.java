@@ -3,6 +3,7 @@ package com.hexgodofstories.warping.leviathan;
 import com.hexgodofstories.HexGodOfStories;
 import com.hexgodofstories.network.HexNetwork;
 import com.hexgodofstories.warping.VoidSea;
+import com.hexgodofstories.warping.WarpResidency;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -245,10 +246,12 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
      * makes presence unconditional: it is live the instant it is added and it never stops.
      */
     @Override public boolean isAlwaysTicking() {
-        // Activity belongs to the Void Sea residency contract now. While prey exists, the Warden
-        // holds Hexor's chunk at entity-ticking level; when the sea is empty, allowing normal chunk
-        // unloading is exactly what makes the dormant realm actually dormant.
-        return false;
+        // Forge chunk promotion is asynchronous. Hexor's authored movement can cross chunk borders
+        // much faster than a playerless dimension promotes them, so a normal Mob can fall out of
+        // the server ticking list between two strokes. Keep the entity itself registered as an
+        // unconditional ticker; tick() below immediately sleeps the expensive AI/movement path
+        // whenever WarpResidency says the sea has no prey.
+        return true;
     }
     @Override public boolean displayFireAnimation() { return false; }
     @Override public boolean addEffect(net.minecraft.world.effect.MobEffectInstance effect, @Nullable Entity source) { return false; }
@@ -269,6 +272,17 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
 
     @Override
     public void tick() {
+        // Empty Void Sea = dormant Hexor. isAlwaysTicking() keeps Forge from losing this unique
+        // entity when no player is around, but it does not mean an empty realm should simulate a
+        // hunt forever. Bail out before terrain reads, AI, move control, combat and multipart work.
+        // ServerLevel still owns the tiny bookkeeping tick; no ocean chunk is kept awake by this.
+        if (!level().isClientSide && level() instanceof ServerLevel server && !WarpResidency.active(server)) {
+            setDeltaMovement(Vec3.ZERO);
+            if (attack() != null) setAttack(null);
+            control().stopMoving();
+            return;
+        }
+
         prevBank = bank;
         prevRenderGlow = renderGlow;
         if (terrainClock-- <= 0) { terrainClock = 20; refreshTerrain(); }
