@@ -24,7 +24,7 @@ public final class WarpServerRegression {
     private static com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity pilgrim;
     private static net.minecraft.world.entity.animal.Pig prey;
     private static net.minecraft.world.entity.animal.Pig sunResident;
-    private static net.minecraft.world.phys.Vec3 initial;
+    private static net.minecraft.world.phys.Vec3 initial,preyAnchor;
     private static int seaTicks,sunTicks;
     private static int lastPilgrimTicks,stalledWhilePreyAlive;
     private static boolean enoughSeen;
@@ -106,7 +106,8 @@ public final class WarpServerRegression {
             pilgrim=com.hexgodofstories.warping.leviathan.PilgrimWarden.ensure(sea);
             check(pilgrim!=null,"Pilgrim wakes when unattended prey activates the sea");
             initial=pilgrim.position();
-            prey.moveTo(initial.x+24,VoidSea.SURFACE+4,initial.z);
+            preyAnchor=new net.minecraft.world.phys.Vec3(initial.x+24,VoidSea.SURFACE-3,initial.z);
+            prey.moveTo(preyAnchor.x,preyAnchor.y,preyAnchor.z);
             lastPilgrimTicks=pilgrim.tickCount;
 
             var duplicate=HexGodOfStories.PILGRIM.get().create(sea);
@@ -125,8 +126,17 @@ public final class WarpServerRegression {
         if(seaTicks>20&&prey.isAlive()&&pilgrim.tickCount<=lastPilgrimTicks)stalledWhilePreyAlive++;
         lastPilgrimTicks=pilgrim.tickCount;
 
-        prey.setAirSupply(300);
-        if(seaTicks==20)prey.moveTo(initial.x+24,VoidSea.SURFACE-3,initial.z);
+        // Keep this victim exactly where it was dropped. While it was invulnerable, Hexor's
+        // successful contact attempts still applied knockback even though hurt() rejected damage;
+        // that made the old test quietly turn into a kilometres-away pursuit test. The user's
+        // report is the simpler case: an NPC sitting there with Hexor free to line up and eat it.
+        if(prey.isAlive()&&preyAnchor!=null){
+            prey.moveTo(preyAnchor.x,preyAnchor.y,preyAnchor.z);
+            prey.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+            prey.hurtMarked=false;
+            prey.fallDistance=0;
+            prey.setAirSupply(300);
+        }
         greatestPitch=Math.max(greatestPitch,Math.abs(pilgrim.getXRot()));
 
         if(seaTicks==180){
@@ -147,13 +157,21 @@ public final class WarpServerRegression {
             check(com.hexgodofstories.warping.leviathan.EnoughIsEnough.marked(prey.getUUID()),
                 "Enough Is Enough expires for unattended prey");
             enoughSeen=true;
+            System.out.println("HEXOR_ENOUGH_IS_ENOUGH distance="+pilgrim.distanceTo(prey)
+                +" pilgrimTicks="+pilgrim.tickCount+" state="+pilgrim.state()
+                +" attack="+pilgrim.attack()+" preyHealth="+prey.getHealth()
+                +" hexor="+pilgrim.position()+" prey="+prey.position());
             prey.setInvulnerable(false);
         }
 
         if(seaTicks==1000){
             check(enoughSeen,"Enough Is Enough was observed before the kill phase");
+            System.out.println("HEXOR_KILL_DEADLINE distance="+pilgrim.distanceTo(prey)
+                +" pilgrimTicks="+pilgrim.tickCount+" state="+pilgrim.state()
+                +" attack="+pilgrim.attack()+" preyHealth="+prey.getHealth()
+                +" hexor="+pilgrim.position()+" prey="+prey.position());
             check(!prey.isAlive()||prey.getHealth()<=0,
-                "Hexor kills unattended prey after Enough Is Enough instead of freezing until a player arrives");
+                "Hexor kills stationary unattended prey after Enough Is Enough");
             check(stalledWhilePreyAlive<=2,
                 "Hexor keeps entity-ticking across chunk borders while prey exists; stalled ticks="+stalledWhilePreyAlive);
             System.out.println("PILGRIM_SERVER_REGRESSIONS_PASSED ticks="+pilgrim.tickCount
