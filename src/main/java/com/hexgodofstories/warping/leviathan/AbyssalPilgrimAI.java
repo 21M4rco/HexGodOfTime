@@ -100,7 +100,7 @@ public final class AbyssalPilgrimAI {
      * the victim during their windup, so after this short setup window the correct fallback is a
      * long committed run, not another lap.
      */
-    private static final int KILL_LINE_GRACE = 90;
+    private static final int KILL_LINE_GRACE = 180;
 
     public LeviathanHuntController hunt() { return hunt; }
     public LeviathanCombatController combat() { return combat; }
@@ -420,7 +420,10 @@ public final class AbyssalPilgrimAI {
         // expired. The model still turns as one continuous body; it is simply permitted a harder
         // arc while it points its jaws at the one thing it has decided to finish.
         killLineTicks++;
-        self.control().moveToKill(hunt.approachPoint(1.0),1.7 + frenzy);
+        // Speed matters to a radius-limited turn: more forward motion buys more heading change
+        // without tightening the curve or snapping the spine. Once patience is gone, this is a
+        // committed run-up, not another stalking lap.
+        self.control().moveToKill(hunt.approachPoint(1.0),2.7 + frenzy);
 
         if (killLineTicks < KILL_LINE_GRACE) return true;
 
@@ -468,10 +471,20 @@ public final class AbyssalPilgrimAI {
         boolean surface = target.getY() > self.surfaceY() - 6;
         boolean holding = self.held() != null;
 
-        // Decided: one table, nothing in it that is not a kill. Claiming the leap is skipped while
-        // something is already in the jaws, because that pattern never comes up holding.
-        if (decided) return EnoughIsEnough.strike(random.nextFloat(), distance, holding,
-            hunt.airborneTarget(), !holding && takeLeap());
+        // Decided: stop spending the first clean line-up on another random set-piece. Grounded
+        // prey gets the direct physical strike whose run length fits the distance; once something
+        // is already held, the existing finishing table still decides how it is eaten.
+        if (decided) {
+            if (holding) return EnoughIsEnough.strike(random.nextFloat(),distance,true,
+                hunt.airborneTarget(),false);
+            if (hunt.airborneTarget()) {
+                if (takeLeap()) return LeviathanAttack.SKY_LEAP;
+                return distance < LeviathanAttack.BREACH_BITE.range ? LeviathanAttack.BREACH_BITE : null;
+            }
+            if (distance < 50) return LeviathanAttack.PREDATORY_BITE;
+            if (distance < 105) return LeviathanAttack.ABYSSAL_LUNGE;
+            return LeviathanAttack.DEEP_CHARGE;
+        }
         if (holding) return random.nextFloat() < 0.5f ? LeviathanAttack.AIR_THROW : LeviathanAttack.DRAG_BELOW;
         // Anything off the water is answered by leaving the water. The short leap is the ordinary
         // reply; the long breach is saved for prey far enough up to be worth the whole run up.
