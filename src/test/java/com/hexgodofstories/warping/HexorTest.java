@@ -353,10 +353,13 @@ public final class HexorTest {
         check(ai.contains("linedUpForKill(target,distance)")
                 && ai.contains("distance < 45 ? 0.95 : distance < 90 ? 0.88 : 0.72"),
             "Enough Is Enough lines the physical body up before committing a close lethal strike");
-        check(ai.contains("KILL_LINE_GRACE = 90")
-                && ai.contains("moveToKill(hunt.approachPoint(1.0),1.7 + frenzy)")
+        check(ai.contains("KILL_LINE_GRACE = 180")
+                && ai.contains("moveToKill(hunt.approachPoint(1.0),2.7 + frenzy)")
                 && ai.contains("commit(distance > 85 ? LeviathanAttack.DEEP_CHARGE : LeviathanAttack.ABYSSAL_LUNGE,target)"),
             "a perfect heading is actively converged and still bounded instead of becoming another orbit");
+        check(ai.contains("if (distance < 50) return LeviathanAttack.PREDATORY_BITE;")
+                &&ai.contains("if (distance < 105) return LeviathanAttack.ABYSSAL_LUNGE;"),
+            "a decided grounded target receives a direct physical finishing strike once lined up");
         String moveControlSource=Files.readString(root.resolve(
             "src/main/java/com/hexgodofstories/warping/leviathan/LeviathanMoveControl.java"));
         check(moveControlSource.contains("public void moveToKill(")
