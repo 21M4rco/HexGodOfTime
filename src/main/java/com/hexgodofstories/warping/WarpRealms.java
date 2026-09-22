@@ -98,6 +98,16 @@ public final class WarpRealms {
      * between two places rather than as two coordinates.
      */
     public static void fallThrough(Entity e,Destination d,double cell,Vec3 offset,Vec3 momentum,float fall,boolean owner){
+        fallThrough(e,d,cell,offset,momentum,fall,owner,null);
+    }
+    /**
+     * @param stood where the body was standing when the pool first took it, or null for the paths
+     *              that do not sink anybody. This, and never the position at the moment of the
+     *              crossing, is what a caster is brought back to: by then the sink has drawn them
+     *              well under the floor with their collision off, and remembering that point is
+     *              what used to put them back inside the ground on the way out.
+     */
+    public static void fallThrough(Entity e,Destination d,double cell,Vec3 offset,Vec3 momentum,float fall,boolean owner,Vec3 stood){
         ServerLevel old=(ServerLevel)e.level(),to=old.getServer().getLevel(d.key);
         if(to==null){e.noPhysics=false;return;}
         double spreadX=net.minecraft.util.Mth.clamp(offset.x,-ENTRY_SPREAD,ENTRY_SPREAD);
@@ -105,7 +115,7 @@ public final class WarpRealms {
         Vec3 pos=landing(to,e,d.arrival.add(cell,owner?8:0,0),spreadX,spreadZ);
         float yaw=e.getYRot(),pitch=e.getXRot();
         if(e instanceof ServerPlayer p){
-            if(Destination.from(old)==null)HexData.get(p).put("warpReturn",new FractureAnchor(old.dimension(),p.position(),yaw,pitch).save());
+            if(Destination.from(old)==null)HexData.get(p).put("warpReturn",new FractureAnchor(old.dimension(),stood==null?p.position():stood,yaw,pitch).save());
             p.stopRiding();
             p.teleportTo(to,pos.x,pos.y,pos.z,yaw,pitch);
             p.noPhysics=false;

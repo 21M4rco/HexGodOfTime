@@ -110,7 +110,20 @@ public final class WarpCrossing {
          * player cannot bank presses before stepping in.
          */
         double struggle;
-        Passage(UUID portal, double plane, long began) { this.portal = portal; this.plane = plane; this.began = began; }
+        /**
+         * The spot the body was standing on when the pool took it, kept for the way back.
+         *
+         * <p>A crossing is quicksand: by the time the dimension change fires, the body has been
+         * drawn a metre or so under the floor with its collision off, and its position then is
+         * inside the ground rather than on it. That sink is the point of the thing and is left
+         * exactly as it is — but it means the position at the moment of the crossing is the one
+         * position that must never be remembered as somewhere to come back to.
+         *
+         * <p>This is taken once, here, the tick the body is first offered the pool: still standing,
+         * still on top of the plane, before a single tick of sinking has been applied.
+         */
+        final Vec3 stood;
+        Passage(UUID portal, double plane, long began, Vec3 stood) { this.portal = portal; this.plane = plane; this.began = began; this.stood = stood; }
     }
 
     private static final Map<UUID, Passage> PASSAGES = new HashMap<>();
@@ -206,7 +219,7 @@ public final class WarpCrossing {
         // Standing on it, or already dropping onto it. Not leaping over it from a height, and not
         // walking past a metre underneath it.
         if (e.getY() > plane + 0.45 || e.getY() < plane - 0.8) return;
-        PASSAGES.put(e.getUUID(), new Passage(brk.portal(), plane, now));
+        PASSAGES.put(e.getUUID(), new Passage(brk.portal(), plane, now, new Vec3(e.getX(), plane + 0.02, e.getZ())));
         e.noPhysics = true;
         phase(e, plane, now);
         entering(brk, e);
@@ -298,7 +311,7 @@ public final class WarpCrossing {
         membrane(brk, e);
         e.noPhysics = false;
         boolean owner = e.getUUID().equals(brk.portal()) && Warping.sovereign(e);
-        WarpRealms.fallThrough(e, brk.destination(), brk.cell(), offset, momentum, fall, owner);
+        WarpRealms.fallThrough(e, brk.destination(), brk.cell(), offset, momentum, fall, owner, passage.stood);
     }
 
     /**
