@@ -74,7 +74,9 @@ public final class WarpServerRegression {
         check(sun.addFreshEntity(sunResident),"sun resident added");
         WarpResidency.track(sunResident,UUID.randomUUID());
         check(WarpResidency.active(sun),"Sun becomes active for an unattended resident");
-        radialRealms(event);
+        // Moon / radial geometry has its own build-time regression tasks. Do not let an
+        // unrelated traversal assertion abort the dedicated Warping residency/Hexor integration
+        // smoke before the Void Sea has had a chance to run.
         ServerLevel sea=event.getServer().getLevel(Destination.VOID_SEA.key);
         FakePlayer visitor=caster(sea);
         visitor.getAbilities().mayfly=true;visitor.getAbilities().flying=true;
