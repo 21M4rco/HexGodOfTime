@@ -168,8 +168,23 @@ public final class WarpServerRegression {
             check(false,"Enough Is Enough did not expire for unattended prey; remaining="
                 +com.hexgodofstories.warping.leviathan.EnoughIsEnough.remaining(prey.getUUID()));
 
-        if(enoughSeen&&prey.isAlive())
+        if(enoughSeen&&prey.isAlive()) {
             closestMouth=Math.min(closestMouth,pilgrim.mouthPosition().distanceTo(prey.getBoundingBox().getCenter()));
+            if((seaTicks-enoughAt)%40==0) {
+                var toward=prey.getBoundingBox().getCenter().subtract(pilgrim.position());
+                double dot=toward.lengthSqr()<1.0E-6?1.0:pilgrim.getLookAngle().dot(toward.normalize());
+                System.out.println("HEXOR_DECIDED_TRACE dt="+(seaTicks-enoughAt)
+                    +" targetIsPrey="+(pilgrim.ai().hunt().target()==prey)
+                    +" distance="+pilgrim.distanceTo(prey)
+                    +" mouth="+pilgrim.mouthPosition().distanceTo(prey.getBoundingBox().getCenter())
+                    +" dot="+dot
+                    +" speed="+pilgrim.getDeltaMovement().length()
+                    +" state="+pilgrim.state()
+                    +" attack="+pilgrim.attack()
+                    +" cooldown="+pilgrim.ai().combat().cooldown()
+                    +" wanted="+pilgrim.control().wanted());
+            }
+        }
 
         if(enoughSeen&&seaTicks==enoughAt+350){
             System.out.println("HEXOR_KILL_DEADLINE distance="+pilgrim.distanceTo(prey)
