@@ -199,6 +199,13 @@ public final class WarpRealms {
             // pull, no planes, no storm, no cold. Creative and spectator remain the way to look
             // around without being killed for it.
             if(e instanceof net.minecraft.world.entity.player.Player p&&p.isCreative()&&d!=Destination.GRAVITY_WELL&&!(d==Destination.CRUSHING_REALM&&MoonGravity.active(e)))continue;
+            // A body going down into a Warping pool is between worlds, and this one has let go of
+            // it. Every realm below pushes bodies about — a pull, a lift, a gravity pulse, a
+            // rewind — and any of them applied to somebody half way into an opening would fight
+            // the sink or drag them off it. Paradise is the plain case: its weak gravity hands
+            // back more each tick than the sink takes, so leaving it running would not slow a
+            // crossing, it would reverse one.
+            if(WarpCrossing.crossing(e))continue;
             descend(d,e);
             rescue(l,d,e,cell);
             switch(d){

@@ -110,6 +110,11 @@ of the mechanic exists to serve.
   body sinking into quicksand dips past that line within half a second and a mark set once would
   make fighting almost all the way back out count for nothing. A body that has just come out of one
   cannot be caught by another for a second.
+- **The realm you are standing in lets go of you.** Every Warping realm pushes bodies about — a
+  pull toward a singularity, a gravity pulse, a rewind, radial moon gravity, Paradise's weak lift —
+  and none of it reaches a body that is going down into a pool. Paradise is the plain case: it hands
+  back more lift each tick than the sink takes, so leaving it running would not slow a crossing, it
+  would reverse one. The Void Sea's swell is held off the same way on the client that owns the body.
 - **Being stuck is caught; holding on is not.** A body inside an opening holds a grant of
   no-collision, so something has to notice a passage that can never finish — a client that never
   received, or never honoured, the word that the floor is not there stands on ground the server

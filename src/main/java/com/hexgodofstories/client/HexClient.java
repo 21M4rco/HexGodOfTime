@@ -196,18 +196,9 @@ public final class HexClient {
         @SubscribeEvent public static void voidSeaSwell(TickEvent.PlayerTickEvent e) {
             if(e.phase!=TickEvent.Phase.START)return;
             Minecraft mc=Minecraft.getInstance();
-            if(mc.level==null||e.player!=mc.player)return;
+            if(mc.level==null||e.player!=mc.player||WarpCrossingClient.phasing(mc.player.getId()))return;
             com.hexgodofstories.warping.VoidSeaWaves.apply(e.player,mc.level.getGameTime());
         }
-        /**
-         * Paradise's weak gravity, on the one player whose movement this client owns, and the
-         * sugar hanging in the air around them.
-         *
-         * <p>Exactly the arrangement the swell above uses, and for exactly the same reason. The
-         * realm's own tick runs the identical call on the identical formula, so the server decides
-         * what gravity is and this cannot choose differently; running it here as well is what makes
-         * a four block jump feel like a jump instead of like the server correcting a fall.
-         */
         /**
          * Sinking into an open Warping pool, on the one player this client owns. Start of the tick,
          * for the same reason Paradise's gravity is: a velocity set after the movement it is meant
@@ -219,10 +210,23 @@ public final class HexClient {
             if(mc.level==null||e.player!=mc.player)return;
             WarpCrossingClient.sink(mc.player);
         }
+        /**
+         * Paradise's weak gravity, on the one player whose movement this client owns, and the
+         * sugar hanging in the air around them.
+         *
+         * <p>Exactly the arrangement the swell above uses, and for exactly the same reason. The
+         * realm's own tick runs the identical call on the identical formula, so the server decides
+         * what gravity is and this cannot choose differently; running it here as well is what makes
+         * a four block jump feel like a jump instead of like the server correcting a fall.
+         */
         @SubscribeEvent public static void paradise(TickEvent.PlayerTickEvent e) {
             if(e.phase!=TickEvent.Phase.START)return;
             Minecraft mc=Minecraft.getInstance();
             if(mc.level==null||e.player!=mc.player)return;
+            // A body going down into a pool is between worlds, and this one's gravity has let go of
+            // it. Weak gravity hands back more each tick than the sink takes, so leaving it running
+            // would not slow the crossing, it would reverse it.
+            if(WarpCrossingClient.phasing(mc.player.getId()))return;
             if(com.hexgodofstories.warping.Destination.from(mc.level)!=com.hexgodofstories.warping.Destination.PARADISE)return;
             com.hexgodofstories.warping.Paradise.gravity(e.player);
             if(mc.level.getGameTime()%2!=0||mc.options.particles().get()==net.minecraft.client.ParticleStatus.MINIMAL)return;
