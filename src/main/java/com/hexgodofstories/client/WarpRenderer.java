@@ -117,7 +117,15 @@ public final class WarpRenderer {
             // Restore the floor depth after drawing the remote scene, so it cannot occlude unrelated world effects.
             RenderSystem.colorMask(false,false,false,false);GL11.glDepthFunc(GL11.GL_ALWAYS);aperture(pose.last().pose(),brk);GL11.glDepthFunc(GL11.GL_LEQUAL);RenderSystem.colorMask(true,true,true,true);
             GL11.glDisable(GL11.GL_STENCIL_TEST);RenderSystem.depthMask(false);
+            // Tall grass and other cutout plants have no collision surface, so the pool correctly
+            // lies on the block beneath them. Their pixels are nevertheless already in the depth
+            // buffer by this stage. Draw only the cosmetic liquid film without a depth rejection:
+            // the authoritative aperture/crossing remains exactly where it was, while vegetation
+            // inside the footprint reads as submerged under the portal instead of punching through.
+            GL11.glDepthFunc(GL11.GL_ALWAYS);
+            groundFilm(pose.last().pose(),brk,open,d.color);
             surface(pose.last().pose(),brk,at,open,age,held,time,d.color);
+            GL11.glDepthFunc(GL11.GL_LEQUAL);
         }finally{
             pose.popPose();GL11.glStencilMask(255);GL11.glDisable(GL11.GL_STENCIL_TEST);GL11.glDepthRange(0,1);GL11.glDepthFunc(GL11.GL_LEQUAL);
             RenderSystem.colorMask(true,true,true,true);RenderSystem.depthMask(true);RenderSystem.enableDepthTest();RenderSystem.enableCull();RenderSystem.disableBlend();RenderSystem.setShaderColor(1,1,1,1);
@@ -278,6 +286,26 @@ public final class WarpRenderer {
         for(int ring=0;ring<brk.rings;ring++)for(int step=0;step<brk.steps;step++){
             if(!brk.face(ring,step))continue;
             face(b,m,brk,ring,step,0x000000,1);
+        }
+        BufferUploader.drawWithShader(b.end());
+    }
+
+    /**
+     * A very dark translucent wash across the exact portal footprint.
+     *
+     * <p>This is presentation only and is intentionally drawn with the caller's ALWAYS depth mode:
+     * cutout vegetation is terrain visually but has no collision, so it must look submerged without
+     * changing WarpSurface, the stencil aperture or any server-side crossing test.
+     */
+    private static void groundFilm(Matrix4f m,Break brk,boolean open,int colour){
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        BufferBuilder b=Tesselator.getInstance().getBuilder();
+        b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);
+        int dark=WarpMesh.shade(colour,.10);
+        float alpha=open?.58f:.46f;
+        for(int ring=0;ring<brk.rings;ring++)for(int step=0;step<brk.steps;step++){
+            if(!brk.face(ring,step))continue;
+            face(b,m,brk,ring,step,dark,alpha);
         }
         BufferUploader.drawWithShader(b.end());
     }

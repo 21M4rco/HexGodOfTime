@@ -63,6 +63,7 @@ public final class WarpRealms {
         if(e instanceof ServerPlayer p){
             if(Destination.from(old)==null)HexData.get(p).put("warpReturn",new FractureAnchor(old.dimension(),p.position(),p.getYRot(),p.getXRot()).save());
             p.stopRiding();p.teleportTo(to,pos.x,pos.y,pos.z,p.getYRot(),p.getXRot());
+            WarpResidency.track(p,p.getUUID());
             // A destination still hands out nothing: arriving does not grant flight, and a caster
             // without the mantle crosses on foot. What the mantle carries, it carries everywhere,
             // so a transformed keeper is left alone here rather than being stripped on arrival.
@@ -71,7 +72,7 @@ public final class WarpRealms {
                 if(!p.isCreative()&&!p.isSpectator()){p.getAbilities().flying=false;p.onUpdateAbilities();}
             }
         }else{
-            e.stopRiding();e.changeDimension(to,new ITeleporter(){public Entity placeEntity(Entity entity,ServerLevel current,ServerLevel dest,float yaw,java.util.function.Function<Boolean,Entity> reposition){Entity moved=reposition.apply(false);if(moved!=null){moved.moveTo(pos.x,pos.y,pos.z,yaw,0);moved.setDeltaMovement(0,-.3,0);moved.fallDistance=0;}return moved;}});
+            e.stopRiding();e.changeDimension(to,new ITeleporter(){public Entity placeEntity(Entity entity,ServerLevel current,ServerLevel dest,float yaw,java.util.function.Function<Boolean,Entity> reposition){Entity moved=reposition.apply(false);if(moved!=null){moved.moveTo(pos.x,pos.y,pos.z,yaw,0);moved.setDeltaMovement(0,-.3,0);moved.fallDistance=0;WarpResidency.track(moved,e.getUUID());}return moved;}});
         }
         e.setDeltaMovement(0,owner?0:-.3,0);e.fallDistance=0;HexNetwork.arrival(e);
     }
@@ -98,7 +99,10 @@ public final class WarpRealms {
      * between two places rather than as two coordinates.
      */
     public static void fallThrough(Entity e,Destination d,double cell,Vec3 offset,Vec3 momentum,float fall,boolean owner){
-        fallThrough(e,d,cell,offset,momentum,fall,owner,null);
+        fallThrough(e,d,cell,offset,momentum,fall,owner,null,e.getUUID());
+    }
+    public static void fallThrough(Entity e,Destination d,double cell,Vec3 offset,Vec3 momentum,float fall,boolean owner,Vec3 stood){
+        fallThrough(e,d,cell,offset,momentum,fall,owner,stood,e.getUUID());
     }
     /**
      * @param stood where the body was standing when the pool first took it, or null for the paths
@@ -106,8 +110,9 @@ public final class WarpRealms {
      *              crossing, is what a caster is brought back to: by then the sink has drawn them
      *              well under the floor with their collision off, and remembering that point is
      *              what used to put them back inside the ground on the way out.
+     * @param sender the Loki player whose break sent this body, used by persistent realm residency
      */
-    public static void fallThrough(Entity e,Destination d,double cell,Vec3 offset,Vec3 momentum,float fall,boolean owner,Vec3 stood){
+    public static void fallThrough(Entity e,Destination d,double cell,Vec3 offset,Vec3 momentum,float fall,boolean owner,Vec3 stood,UUID sender){
         ServerLevel old=(ServerLevel)e.level(),to=old.getServer().getLevel(d.key);
         if(to==null){e.noPhysics=false;return;}
         double spreadX=net.minecraft.util.Mth.clamp(offset.x,-ENTRY_SPREAD,ENTRY_SPREAD);
@@ -127,6 +132,7 @@ public final class WarpRealms {
             p.setDeltaMovement(momentum);
             p.fallDistance=fall;
             p.hurtMarked=true;
+            WarpResidency.track(p,sender);
             p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(p));
             emerging(to,p);
             return;
@@ -140,6 +146,7 @@ public final class WarpRealms {
         moved.setDeltaMovement(momentum);
         moved.fallDistance=fall;
         moved.hurtMarked=true;
+        WarpResidency.track(moved,sender);
         emerging(to,moved);
     }
     /** How far from a realm's entry point a crossing may come out, in blocks. */
@@ -233,6 +240,7 @@ public final class WarpRealms {
     }
     public static void tick(ServerLevel l){
         Destination d=Destination.from(l);if(d==null)return;
+        WarpResidency.tick(l);
         RadialRealmRules.clean(l);
         int budget=4096;
         for(var it=JOBS.iterator();it.hasNext()&&budget>0;){Job j=it.next();if(j.level!=l)continue;

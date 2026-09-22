@@ -311,7 +311,7 @@ public final class WarpCrossing {
         membrane(brk, e);
         e.noPhysics = false;
         boolean owner = e.getUUID().equals(brk.portal()) && Warping.sovereign(e);
-        WarpRealms.fallThrough(e, brk.destination(), brk.cell(), offset, momentum, fall, owner, passage.stood);
+        WarpRealms.fallThrough(e, brk.destination(), brk.cell(), offset, momentum, fall, owner, passage.stood, brk.portal());
     }
 
     /**

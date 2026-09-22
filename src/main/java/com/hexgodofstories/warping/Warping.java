@@ -36,8 +36,8 @@ public final class Warping {
          * in. Only what happens once it is open differs, and these three fields are the whole of
          * that difference.
          */
-        boolean recall;ArrayDeque<UUID> summons;long nextArrival;
-        int openTicks(){return recall?RECALL_OPEN:WarpMath.OPEN_TICKS;}
+        boolean recall;ArrayDeque<UUID> summons;long nextArrival;int recallWindow,arrivals;
+        int openTicks(){return recall?(recallWindow>0?recallWindow:RECALL_OPEN):WarpMath.OPEN_TICKS;}
         /** The opened pool, built once: held stops changing the moment the portal is released. */
         private double[] shape;private double extent;
         Charge(ServerPlayer p,Vec3 at,Destination d,double cell){level=p.serverLevel();this.at=at;destination=d;start=level.getGameTime();this.cell=cell;ownerId=p.getId();
@@ -254,7 +254,7 @@ public final class Warping {
         HexNetwork.near(c.level,c.at,96,new HexNetwork.Message(HexNetwork.WARP,c.ownerId,n));
     }
     public static void cancel(ServerPlayer p){Charge c=CHARGES.remove(p.getUUID());if(c!=null){forget(c);send(c,true);c.level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.RIFT_CLOSE.get(),SoundSource.PLAYERS,.8f,.7f);}}
-    public static void reset(){CHARGES.values().forEach(Warping::forget);PORTALS.values().forEach(Warping::forget);CHARGES.clear();PORTALS.clear();RECALLING.clear();WarpRealms.reset();}
+    public static void reset(){CHARGES.values().forEach(Warping::forget);PORTALS.values().forEach(Warping::forget);CHARGES.clear();PORTALS.clear();RECALLING.clear();WarpResidency.resetRuntime();WarpRealms.reset();}
 
     // ------------------------------------------------------------------ dimension entity recall
 
@@ -263,7 +263,7 @@ public final class Warping {
     /** How long the way stays open afterwards. Long enough for the whole queue to climb out. */
     private static final int RECALL_OPEN=110;
     /** Ticks between arrivals, the most that come through at once, and what it costs. */
-    private static final int RECALL_GAP=6,RECALL_MAX=10;
+    private static final int RECALL_GAP=6;
     private static final float RECALL_COST=(float)(Ability.WARPING.cost*.75);
     /** Recovery after a recall, and the shorter one for a realm that had nothing to give. */
     private static final int RECALL_COOLDOWN=600,RECALL_EMPTY=100;
@@ -313,9 +313,10 @@ public final class Warping {
         if(target==null){notice(p,"Warping dimensions are unavailable. Restart the server after installing the update.");return;}
         BlockHitResult hit=aim(p);
         if(hit==null){notice(p,"Warping requires a solid floor within 32 blocks.");return;}
-        // Wake the realm, and ask it what is in it once the break has finished spreading. The two
-        // seconds the fracture takes are not a delay to be worked around here — they are exactly
-        // the window the level needs to bring an unattended realm's creatures back into memory.
+        // Wake the exact chunks belonging to bodies this caster sent here. The small arrival
+        // patch is kept only as a backwards-compatibility sweep for worlds created before residency
+        // tracking existed; new victims stay simulation-loaded from the moment they cross.
+        WarpResidency.wakeOwned(target,p.getUUID());
         wake(target,d);
         Charge c=new Charge(p,new Vec3(hit.getBlockPos().getX()+.5,hit.getLocation().y+.025,hit.getBlockPos().getZ()+.5),d,WarpRealms.CELL);
         c.recall=true;c.summons=new ArrayDeque<>();
@@ -357,18 +358,30 @@ public final class Warping {
      * <p>The ones nearest the realm's own arrival point are preferred, because that is the part of
      * a realm anything sent there was sent to, and the part this has just woken.
      */
-    private static List<UUID> answering(ServerLevel target,Destination d){
-        List<LivingEntity> found=new ArrayList<>();
+    private static List<UUID> answering(ServerLevel target,Destination d,UUID owner){
+        LinkedHashSet<UUID> ids=new LinkedHashSet<>();
+
+        // New worlds have an exact ledger: every body this Loki sent, regardless of how far it has
+        // fallen or wandered from the realm's arrival point. Resolve each recorded chunk directly.
+        for(UUID id:WarpResidency.owned(target,owner)){
+            if(RECALLING.contains(id))continue;
+            Entity e=WarpResidency.resolve(target,id);
+            if(recallable(e))ids.add(id);
+        }
+        if(!ids.isEmpty())return new ArrayList<>(ids);
+
+        // Compatibility for victims that were already inside a realm before residency tracking was
+        // introduced. This is deliberately only a fallback; once new transfers are tracked, Y never
+        // depends on a proximity census again.
+        List<LivingEntity> legacy=new ArrayList<>();
         for(Entity e:target.getAllEntities()){
             if(!recallable(e)||RECALLING.contains(e.getUUID()))continue;
-            found.add((LivingEntity)e);
-            if(found.size()>RECALL_MAX*4)break;
+            legacy.add((LivingEntity)e);
         }
         Vec3 heart=d.arrival;
-        found.sort(java.util.Comparator.comparingDouble(e->e.position().distanceToSqr(heart)));
-        List<UUID> ids=new ArrayList<>();
-        for(LivingEntity e:found){if(ids.size()>=RECALL_MAX)break;ids.add(e.getUUID());}
-        return ids;
+        legacy.sort(java.util.Comparator.comparingDouble(e->e.position().distanceToSqr(heart)));
+        for(LivingEntity e:legacy)ids.add(e.getUUID());
+        return new ArrayList<>(ids);
     }
 
     /**
@@ -392,8 +405,8 @@ public final class Warping {
         if(!(e instanceof LivingEntity living)||!living.isAlive()||living.isRemoved()||living.isSpectator())return false;
         if(living instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity)return false;
         if(living.getType()==HexGodOfStories.PILGRIM.get())return false;
-        // People are not livestock, and a projection is a lie with a body rather than a creature.
-        if(living instanceof net.minecraft.world.entity.player.Player)return false;
+        // Players deliberately thrown through a Warping break are valid recall targets too.
+        // Projections remain lies with bodies rather than inhabitants.
         if(living instanceof com.hexgodofstories.entity.IllusionEntity)return false;
         if(living.getType()==HexGodOfStories.ILLUSION.get())return false;
         // An armour stand is a living entity the way a coat rack is a person.
@@ -416,9 +429,12 @@ public final class Warping {
      */
     private static void openRecall(ServerPlayer p,Charge c){
         ServerLevel target=c.level.getServer().getLevel(c.destination.key);
-        List<UUID> caught=target==null?new ArrayList<>():answering(target,c.destination);
+        List<UUID> caught=target==null?new ArrayList<>():answering(target,c.destination,p.getUUID());
         c.summons.addAll(caught);RECALLING.addAll(caught);
         c.held=RECALL_FORM;c.opened=c.level.getGameTime();c.nextArrival=c.opened+2;
+        // Y means all of them. A large prison keeps the break open long enough to drain its whole
+        // queue instead of silently truncating the old fixed ten-entity batch.
+        c.recallWindow=Math.max(RECALL_OPEN,18+caught.size()*RECALL_GAP);
         CHARGES.remove(p.getUUID());PORTALS.put(p.getUUID(),c);
         c.level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.RIFT_OPEN.get(),SoundSource.PLAYERS,1.3f,caught.isEmpty()?.6f:.85f);
         if(caught.isEmpty()){
@@ -449,16 +465,34 @@ public final class Warping {
         c.nextArrival=now+RECALL_GAP;
         ServerLevel source=level.getServer().getLevel(c.destination.key);
         UUID id=c.summons.poll();
-        if(id==null)return;
+        if(id==null||source==null||source==level){if(id!=null)RECALLING.remove(id);return;}
+
+        Entity waiting=WarpResidency.resolve(source,id);
+        // If a tracked chunk is still finishing entity load, keep the body in the queue rather than
+        // turning one transient null into "nothing came out". A dead/removed resident is pruned by
+        // WarpResidency and then falls out normally.
+        if(!recallable(waiting)){
+            if(WarpResidency.known(source,id)){c.summons.addLast(id);return;}
+            RECALLING.remove(id);return;
+        }
+
         RECALLING.remove(id);
-        if(source==null||source==level)return;
-        Entity waiting=source.getEntity(id);
-        // Asked again at the moment of the transfer rather than trusted from the keypress: a
-        // creature can die, be removed or be mounted in the two seconds the break takes to spread.
-        if(!recallable(waiting))return;
-        int index=RECALL_MAX-c.summons.size();
+        int index=++c.arrivals;
         Vec3 spot=footing(level,c,(LivingEntity)waiting,index);
         double spread=index*2.399;
+
+        if(waiting instanceof ServerPlayer player){
+            player.stopRiding();
+            player.teleportTo(level,spot.x,spot.y,spot.z,player.getYRot(),player.getXRot());
+            player.setDeltaMovement(Math.cos(spread)*.09,RECALL_LAUNCH,Math.sin(spread)*.09);
+            player.hurtMarked=true;player.fallDistance=0;
+            player.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(player));
+            WarpResidency.untrack(source,id);
+            HexNetwork.arrival(player);
+            emergence(level,c.destination,player);
+            return;
+        }
+
         Entity arrived=waiting.changeDimension(level,new ITeleporter(){
             public Entity placeEntity(Entity entity,ServerLevel from,ServerLevel to,float yaw,java.util.function.Function<Boolean,Entity> reposition){
                 Entity moved=reposition.apply(false);
@@ -472,6 +506,7 @@ public final class Warping {
         arrived.setDeltaMovement(Math.cos(spread)*.09,RECALL_LAUNCH,Math.sin(spread)*.09);
         arrived.hurtMarked=true;arrived.fallDistance=0;
         if(arrived instanceof Mob mob)mob.setPersistenceRequired();
+        WarpResidency.untrack(source,id);
         HexNetwork.arrival(arrived);
         emergence(level,c.destination,arrived);
     }
