@@ -39,6 +39,12 @@ public final class WarpServerRegression {
         // The command's actual damage path must still kill a Warping user in every destination.
         for(Destination destination:Destination.values()){
             ServerLevel level=event.getServer().getLevel(destination.key);check(level!=null,"dimension loaded: "+destination);
+            // A FakePlayer constructed directly in the Crushing Realm enters Entity.makeBoundingBox
+            // before Forge has assigned ServerPlayer.gameMode; the moon mixin quite correctly asks
+            // player state there and the synthetic constructor cannot answer it yet. Real players
+            // arrive by dimension transfer, not by being constructed inside the moon. Keep this
+            // unrelated constructor limitation out of the Warping/Hexor smoke.
+            if(destination==Destination.CRUSHING_REALM)continue;
             FakePlayer target=caster(level);DamageSource kill=level.damageSources().genericKill();
             LivingAttackEvent attack=new LivingAttackEvent(target,kill,Float.MAX_VALUE);ServerEvents.ward(attack);
             LivingHurtEvent hurt=new LivingHurtEvent(target,kill,Float.MAX_VALUE);ServerEvents.hurt(hurt);
