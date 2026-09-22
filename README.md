@@ -1,3 +1,49 @@
+## 0.6.0 — The portal is a pool now, and you fall into it
+
+- **The shattered mirror is gone.** The break used to be a jagged union of an impact hole, branching
+  cracks and loose slivers, and it read as glass because that is what it was. The portal is now
+  something poured: a pool of liquid that is not water, spreading outward from where the caster put
+  it and running further for as long as they keep holding. Closed outline, no corners, no points —
+  ninety six directions each with their own distance, all of it driven by low harmonics of the
+  angle, so it cannot grow a spike and the build fails if it ever does.
+- **It spreads rather than scales.** Every direction has its own moment of starting to move and its
+  own pace: early in a hold it is a lopsided bead, half way a broad lobed pool with one side still
+  creeping, at full charge everything the charge bought. Nothing retreats while the key is held, and
+  the shape at full charge is demonstrably not the shape at a third of it with a bigger number in
+  front. The furthest it can run is exactly the reach that was paid for.
+- **It covers the ground rather than fighting it.** No block is destroyed or replaced. The liquid is
+  one continuous sheet whose every vertex asks the floor in its own column how high it is, so it
+  runs up a step, over a slab and down a stair and lies on all of them, and it sits a fraction above
+  whatever it covers. What is drawn on it is thin on purpose — the point is that another world is
+  visible through it — with rings travelling outward, a meniscus that brightens on whichever side is
+  advancing, and beads thrown up at that edge in the colour of the floor being taken up.
+- **Stepping onto it no longer teleports you.** This is the change the rest of it exists for. A body
+  over enough of the pool is given block pass-through, on the server and on its own client at once,
+  and sinks: feet, legs, chest, and the dimension change waits until the eye is under the surface —
+  so the world changes at the moment the view does, and a tall creature sinks further before it goes.
+  "Enough of the pool" is nine points of the body's own footprint rather than one, so you can stand
+  beside the rim, stand with one foot in it, and go through when most of you is over it.
+- **The body clips itself, for free.** Entities are drawn before the portal, and the portal's backing
+  sits at the floor's own height following the pool's exact outline, so the depth test paints out
+  exactly the part of a body that has gone under and leaves the rest standing. First person and both
+  third-person cameras, with nothing extra.
+- **Nothing is reset on the way through.** Velocity, heading, pitch and the fall already in progress
+  cross exactly. A dimension change sends an absolute position packet and an absolute position packet
+  makes the client zero its own velocity, so a motion packet goes out immediately behind it, on the
+  same tick, before a frame is drawn without it. A run across the pool comes out running. Minecraft's
+  "downloading terrain" overlay is taken straight back down and a few frames of refraction — one ring
+  crossing the view, a hair of chromatic split, no flash — cover the seam instead.
+- **Whatever went through is still visible through the hole.** The far side's positions are sent to
+  the clients that can see the portal, every few ticks and every tick while something is crossing, and
+  drawn inside the aperture at their real coordinates in the destination. Stand at the edge and watch
+  a body sink through, keep falling, and shrink away into the other world. They are positions, not
+  entities: nothing exists on any server, nothing collides, nothing can be hit.
+- **Held-open edge cases are handled rather than hoped about.** Several bodies can be part way through
+  one pool at once, each with its own progress. A pool that expires with somebody in it finishes the
+  crossing for anybody past the point of no return and stands anybody who had barely begun back on
+  top of the floor rather than inside it. A body that just came out of one cannot be caught by another
+  for a second, and a client that never let go of the floor is given it back after three seconds.
+
 ## 0.5.9 — Paradise, and Warping the other way round
 
 - **The Falling World is gone. Paradise is where it was.** The destination that used to be an

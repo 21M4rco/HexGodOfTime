@@ -75,6 +75,74 @@ public final class WarpRealms {
         }
         e.setDeltaMovement(0,owner?0:-.3,0);e.fallDistance=0;HexNetwork.arrival(e);
     }
+    /**
+     * A crossing that carries its motion with it.
+     *
+     * <p>{@link #transfer} puts a body at a destination. This puts it <em>through</em> one: it is
+     * what the end of a fall through a Warping break runs, and every difference between the two is
+     * about not interrupting the movement that is already happening.
+     *
+     * <p>Three things are preserved exactly. The velocity, so a body that went in sprinting comes
+     * out travelling; the heading and pitch, so the view does not so much as twitch; and the fall
+     * already in progress, so a drop that began in one world is still the same drop in the next.
+     *
+     * <p>The one thing that has to be worked around is the position packet. A dimension change sends
+     * an absolute one, and an absolute position packet makes the receiving client zero its own
+     * velocity — which is exactly the "appears stationary at a destination coordinate" that the
+     * whole of this is trying not to be. The motion packet sent immediately behind it puts the fall
+     * back on the same tick, before the client has drawn a frame without it.
+     *
+     * <p>Where it comes out is the realm's own entry point, offset by however far from the middle of
+     * the break the body went in. Two creatures that went through opposite sides of the same hole
+     * come out on opposite sides of the entry, which is what makes an opening read as a connection
+     * between two places rather than as two coordinates.
+     */
+    public static void fallThrough(Entity e,Destination d,double cell,Vec3 offset,Vec3 momentum,float fall,boolean owner){
+        ServerLevel old=(ServerLevel)e.level(),to=old.getServer().getLevel(d.key);
+        if(to==null){e.noPhysics=false;return;}
+        double spreadX=net.minecraft.util.Mth.clamp(offset.x,-ENTRY_SPREAD,ENTRY_SPREAD);
+        double spreadZ=net.minecraft.util.Mth.clamp(offset.z,-ENTRY_SPREAD,ENTRY_SPREAD);
+        Vec3 pos=d.arrival.add(cell+spreadX,owner?8:0,spreadZ);
+        float yaw=e.getYRot(),pitch=e.getXRot();
+        if(e instanceof ServerPlayer p){
+            if(Destination.from(old)==null)HexData.get(p).put("warpReturn",new FractureAnchor(old.dimension(),p.position(),yaw,pitch).save());
+            p.stopRiding();
+            p.teleportTo(to,pos.x,pos.y,pos.z,yaw,pitch);
+            p.noPhysics=false;
+            // The mantle carries flight everywhere; nothing else does, and arriving grants nothing.
+            if(!com.hexgodofstories.server.CosmicFlight.mantled(p)){
+                com.hexgodofstories.server.CosmicFlight.revoke(p);
+                if(!p.isCreative()&&!p.isSpectator()){p.getAbilities().flying=false;p.onUpdateAbilities();}
+            }
+            p.setDeltaMovement(momentum);
+            p.fallDistance=fall;
+            p.hurtMarked=true;
+            p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(p));
+            emerging(to,p);
+            return;
+        }
+        e.stopRiding();
+        Entity moved=e.changeDimension(to,new ITeleporter(){public Entity placeEntity(Entity entity,ServerLevel current,ServerLevel dest,float ignored,java.util.function.Function<Boolean,Entity> reposition){
+            Entity copy=reposition.apply(false);
+            if(copy!=null){copy.moveTo(pos.x,pos.y,pos.z,yaw,pitch);copy.setDeltaMovement(momentum);copy.fallDistance=fall;copy.noPhysics=false;}
+            return copy;}});
+        if(moved==null){e.noPhysics=false;return;}
+        moved.setDeltaMovement(momentum);
+        moved.fallDistance=fall;
+        moved.hurtMarked=true;
+        emerging(to,moved);
+    }
+    /** How far from a realm's entry point a crossing may come out, in blocks. */
+    private static final double ENTRY_SPREAD=6;
+    /**
+     * Coming out of the other side. A little of the liquid trailing the body rather than the
+     * arrival nebula, because a nebula around somebody still falling reads as having been put there.
+     */
+    private static void emerging(ServerLevel to,Entity e){
+        to.sendParticles(HexGodOfStories.MOTE.get(),e.getX(),e.getY()+e.getBbHeight()*.6,e.getZ(),
+            9,e.getBbWidth()*.5,e.getBbHeight()*.4,e.getBbWidth()*.5,.03);
+    }
+
     /** The title's colour: a dark blue with the green and the violet either side of it in it. */
     private static final int COSMIC=0x354B8D;
     /**
@@ -342,5 +410,5 @@ public final class WarpRealms {
         }
     }
     public static void releaseHazards(ServerPlayer p){if(!Warping.sovereign(p))return;for(WarpHazard h:p.serverLevel().getEntitiesOfClass(WarpHazard.class,p.getBoundingBox().inflate(96)))h.release(p.getLookAngle());HexNetwork.fx(p,"resume");}
-    public static void reset(){RadialRealmRules.clear();MoonGravity.clear();JOBS.clear();HISTORY.clear();ParadiseRestoration.reset();com.hexgodofstories.warping.leviathan.PilgrimWarden.reset();}
+    public static void reset(){RadialRealmRules.clear();MoonGravity.clear();JOBS.clear();HISTORY.clear();ParadiseRestoration.reset();WarpCrossing.reset();com.hexgodofstories.warping.leviathan.PilgrimWarden.reset();}
 }

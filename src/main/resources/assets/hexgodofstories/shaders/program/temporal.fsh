@@ -25,13 +25,21 @@ void main() {
  // purpose, because the caster has to aim through this.
  float charge=Mode==6.0?1.0:0.0;
  float burst=Mode==5.0?1.0:0.0;
+ // The membrane: the frame a body's camera passes through a Warping break. A single ring of
+ // refraction travelling out from the middle of the view, a little lensing with it and a hair of
+ // chromatic split - no flash, no wash, nothing that hides the world it is arriving in. It exists
+ // only to make the one frame the client swaps levels on look like glass rather than like a cut.
+ float membrane=Mode==7.0?1.0:0.0;
+ float ring=exp(-pow(r-(1.0-Strength)*0.95,2.0)*55.0);
  float strain=charge*(.020+.014*sin(Phase*5.0)+.010*sin(Phase*11.0));
  warp+=c*pulse*onset+vec2(sin(uv.y*31.0+Phase*28.0)*.007,0.0)*slip;
  warp-=c*strain*Strength;
  warp+=c*burst*exp(-Phase*2.4)*.055;
+ warp+=c*ring*membrane*.030;
+ warp+=vec2(sin(uv.y*8.0+Phase*16.0),cos(uv.x*6.0+Phase*13.0))*membrane*.0035;
  vec2 at=clamp(uv+warp*Strength,vec2(.002),vec2(.998));
  vec3 rgb=texture(DiffuseSampler,at).rgb;
- float split=Strength*(.0015+.004*onset+slip*.008+charge*.0075+burst*.014);
+ float split=Strength*(.0015+.004*onset+slip*.008+charge*.0075+burst*.014+membrane*(.004+ring*.005));
  rgb.r=texture(DiffuseSampler,clamp(at+c*split,0.001,0.999)).r;
  rgb.b=texture(DiffuseSampler,clamp(at-c*split,0.001,0.999)).b;
  float gray=dot(rgb,vec3(.2126,.7152,.0722));
@@ -44,6 +52,6 @@ void main() {
  rgb+=fracture*vec3(.38,.88,.58)*Strength*charge*.40*step(.62,abs(sin(Phase*2.7)));
  rgb+=vec3(.13,.30,.20)*charge*Strength*.55*smoothstep(.12,.82,r);
  rgb+=vec3(.42,.95,.66)*burst*Strength*exp(-Phase*3.1)*.35;
- rgb*=1.0-Strength*smoothstep(.24,.75,r)*.28;
+ rgb*=1.0-Strength*smoothstep(.24,.75,r)*.28*(1.0-membrane);
  fragColor=vec4(rgb,1.0);
 }

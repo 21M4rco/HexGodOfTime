@@ -39,15 +39,19 @@ The 8-second maximum hold releases a stable charge. Access to the return action 
 Each destination is a distinct registered dimension. Casters receive separated 1024-block-spaced instances.
 Prepared instances are reused per caster/destination to prevent canceled charges generating unlimited terrain.
 Generation is budgeted to 4096 block placements per realm tick. An unfinished destination cannot receive victims.
-Warping draws a continuous Nothingness surface clipped to the same polygon as the glass. It no longer replaces whole floor blocks. The original terrain, block entities and inventories remain intact. Time Branch Nothingness blocks still use their existing persistent restoration ledger.
+Warping draws a continuous Nothingness surface clipped to the same outline as the pool. It no longer replaces whole floor blocks. The original terrain, block entities and inventories remain intact. Time Branch Nothingness blocks still use their existing persistent restoration ledger.
 The caster can enter their own portal, including in creative mode. Other Loki-capable and creative players remain excluded from trap targeting. Loki-capable players retain environmental protection in the other destinations; the Sun harms survival casters too. `/kill` bypasses all mod damage wards. Solar heat is a separate, armor-bypassing damage type, so normal fire resistance does not make a star harmless; creative and spectator modes retain their normal protections.
 Released portals continue for 200 server ticks independently of caster movement, ability selection, death or logout. Each entity crosses a given portal only once, so returning with R does not immediately trap the caster again. The leviathan remains hostile to all survival players.
 Flight permission is managed by the existing flight system and revoked on leaving as appropriate.
 
 ## Rendering
 
-The floor window uses a depth-tested stencil aperture. Jagged fractures expose a spatial destination scene during charging and keep their irregular broken-mirror outline on release.
-Branching glass cracks, layered edge glow, reflective tinted facets and a staggered burst of rising triangular shards frame the destination. The closing facets return during the final 0.7 seconds. Server collision uses the exact same outline as the open stencil window.
+The floor window uses a depth-tested stencil aperture. The opening is a pool of liquid that spreads
+across the ground while the charge is held, and the destination is a spatial scene seen through it.
+The sheet conforms to the terrain column by column, sits a fraction above whatever it covers, and
+carries a thin film with rings travelling outward, a meniscus that brightens on the advancing side,
+and beads thrown up at that edge in the colour of the floor it is taking up. Server collision uses
+the exact same outline as the stencil window. See `docs/WARPING_POOL.md`.
 The black backing, destination stencil, glass facets and entry boundary share the exact polygon, including edges that cross fractional block coordinates. The ground needs no replacement or restoration when the ten-second window expires. Preview clocks track the prepared destination instance.
 The aperture and destination share procedural celestial geometry and the deterministic terrain blueprint. Sun and Void Sea reuse the Fracture sky renderer with stellar-violet and ocean-blue palettes; the original emerald Fracture palette is preserved.
 The photosphere is an opaque depth-tested surface. Its corona and anchored flares add light without writing depth, and realm geometry renders before particles with explicit depth state so foreground player bodies remain visible.

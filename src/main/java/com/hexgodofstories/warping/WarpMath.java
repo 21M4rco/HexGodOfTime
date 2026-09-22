@@ -8,9 +8,9 @@ public final class WarpMath {
     /**
      * How far the break reaches across the floor, corner to corner, at this charge.
      *
-     * <p>A held charge now buys a genuinely large tear rather than a ten block one: a full charge
-     * is twenty eight blocks across, and what that width means is the span of the whole fracture,
-     * not a radius — {@link WarpFracture} spends it on an impact hole and the cracks leaving it.
+     * <p>A held charge buys a genuinely large opening rather than a ten block one: a full charge is
+     * twenty eight blocks across, and what that width means is how far the pool may run corner to
+     * corner — {@link WarpPool} spends it on a rim that reaches further one way than another.
      */
     public static double width(int ticks){return 2+26*charge(ticks);}
     /** Nought at the first tick of a hold, one once the charge is full. */

@@ -12,16 +12,17 @@ public final class WarpMathTest {
         check(!WarpMath.openAt(-1,0)&&!WarpMath.openAt(500,499),"unreleased portal cannot accept entry");
         for(int age=0;age<200;age++)check(WarpMath.openAt(500,500+age),"entry remains open through tick "+age);
         check(!WarpMath.openAt(500,700)&&!WarpMath.openAt(500,701),"entry stops exactly at expiration");
-        shatters();
-        growsRatherThanScaling();
+        spreads();
+        spreadsRatherThanScaling();
         sizeIsPaidFor();
+        theEdgeIsAnEdge();
         check(WarpMath.pull(10)>WarpMath.pull(40)&&WarpMath.pull(40)>WarpMath.pull(100),"inward pull intensifies");
         check(WarpMath.cellX(1024+200)==1024&&WarpMath.cellX(2048-100)==2048,"separate instances remain separate");
         check(WarpMath.solarDamage(WarpMath.SUN_CORONA)==0,"outside corona is safe");
         check(WarpMath.solarDamage(WarpMath.SUN_CORONA-.01)>0,"corona inflicts heat");
         check(WarpMath.solarDamage(WarpMath.SUN_RADIUS-.01)>WarpMath.solarDamage(WarpMath.SUN_RADIUS+.01),"photosphere is lethal faster than corona");
         check(WarpMath.SUN_RADIUS>33+Math.sqrt(3),"photosphere encloses every corner of the existing magma shell");
-        System.out.println("Warping geometry, fracture and cost checks passed");
+        System.out.println("Warping geometry, pool and cost checks passed");
     }
 
     /**
@@ -31,78 +32,67 @@ public final class WarpMathTest {
      * rounded end, a way through that reaches the tip of a hairline and a shape that is the same
      * every time are all things that would pass a build and read as a decorated disc in play.
      */
-    private static void shatters(){
+    /**
+     * A pool, and not a circle.
+     *
+     * <p>The portal was a shattered mirror and is now a spreading liquid, which moves every property
+     * worth checking. A break had to be violently uneven and end in points; a pool has to be the
+     * opposite — closed, smooth, and nowhere spiked — while still never settling on a radius, because
+     * a perfect circle of liquid reads as a decal and a spiked one reads as glass again.
+     */
+    private static void spreads(){
         double reach=WarpMath.reach(WarpMath.FULL_CHARGE);
-        double worstRatio=Double.MAX_VALUE;int leastPointed=Integer.MAX_VALUE;
+        double[] first=null;
         for(long seed=1;seed<=16;seed++){
-            var pieces=WarpFracture.build(seed,reach,1);
-            double extent=WarpFracture.extent(pieces);
-            check(extent>8&&extent<32,"a full break is large but bounded ("+extent+")");
-            check(WarpFracture.inside(pieces,0,0),"the impact itself is always a way through");
-
-            double[] rim=profile(pieces,32,false),through=profile(pieces,32,true);
-            double max=0,min=Double.MAX_VALUE;
-            for(double v:rim){max=Math.max(max,v);min=Math.min(min,v);}
-            check(min>0,"the break closes around its own centre");
-            worstRatio=Math.min(worstRatio,max/min);
-            check(max/min>2.2,"the outline is violently uneven, not a radius ("+(max/min)+")");
-
-            // Sharp ends: a piece whose far edge has collapsed to a single point.
-            int pointed=0,solid=0;double farthestThrough=0,meanThrough=0;int throughDirections=0;
-            for(var piece:pieces){
-                if(piece.solid)solid++;
-                for(int i=0,j=3;i<4;j=i++)if(Math.hypot(piece.x[i]-piece.x[j],piece.z[i]-piece.z[j])<1.0E-9){pointed++;break;}
-            }
-            leastPointed=Math.min(leastPointed,pointed);
-            check(pointed>=8,"fractures end in points rather than caps ("+pointed+")");
-            check(solid>=4,"and enough of the break is open to be walked into ("+solid+")");
-            for(double v:through){farthestThrough=Math.max(farthestThrough,v);if(v>0){meanThrough+=v;throughDirections++;}}
-            check(farthestThrough<extent*0.85,"no hairline tip carries a teleport ("+farthestThrough+" of "+extent+")");
-            check(meanThrough/Math.max(1,throughDirections)<extent*0.6,"the way through is the middle of the break");
-
-            // Area: enough of the break to be a portal, nowhere near enough to be an invisible disc.
-            int inside=0,through2=0,samples=0;
-            for(double x=-extent;x<=extent;x+=extent/60)for(double z=-extent;z<=extent;z+=extent/60){
-                samples++;boolean any=false,open=false;
-                for(var piece:pieces){if(piece.contains(x,z)){any=true;if(piece.solid){open=true;break;}}}
-                if(any)inside++;
-                if(open)through2++;
-            }
-            check(inside*20>samples,"the break covers a real share of its own footprint");
-            check(through2<inside,"not every crack you can see is a way through");
-            check(through2*3<samples,"the teleport is nothing like the box it lives in");
+            double[] rim=WarpPool.rim(seed,reach,1);
+            double extent=WarpPool.extent(rim),least=WarpPool.narrowest(rim);
+            check(extent>8&&extent<=reach+1.0E-9,"a full pool runs to what it was paid for and no further ("+extent+")");
+            check(least>extent*.35,"it is a pool everywhere rather than a spur off one side");
+            check(extent/least>1.25,"and it never settles on a radius ("+(extent/least)+")");
+            double worst=0;
+            for(int i=0;i<rim.length;i++)worst=Math.max(worst,Math.abs(rim[i]-rim[(i+1)%rim.length]));
+            check(worst<extent*.07,"the outline is smooth: no direction disagrees with its neighbour ("+worst+")");
+            check(WarpPool.inside(rim,0,0),"the middle of a pool is liquid");
+            check(!WarpPool.inside(rim,extent+.5,0)&&!WarpPool.inside(rim,0,extent+.5),"and past its rim is floor");
+            if(first==null){first=rim;continue;}
+            double difference=0;
+            for(int i=0;i<rim.length;i++)difference+=Math.abs(rim[i]-first[i]);
+            check(difference/rim.length>extent*.02,"two seeds are two different pools");
         }
-        check(worstRatio>2.2&&leastPointed>=8,"every seed shatters ("+worstRatio+", "+leastPointed+" points)");
-
-        // Two breaks are not the same break.
-        double[] a=profile(WarpFracture.build(11,reach,1),32,false),b=profile(WarpFracture.build(12,reach,1),32,false);
-        double apart=0;for(int i=0;i<32;i++)apart+=Math.abs(a[i]-b[i]);
-        check(apart/32>1.0,"two breaks differ by more than a block in the average direction ("+apart/32+")");
-        double[] again=profile(WarpFracture.build(11,reach,1),32,false);
-        for(int i=0;i<32;i++)check(again[i]==a[i],"the same seed is the same break, on both sides of the wire");
     }
 
     /**
-     * Charging develops the break rather than enlarging one shape.
+     * Holding the key pours more, rather than resizing what is there.
      *
-     * <p>A pattern that only scaled would keep its outline exactly and simply get bigger, and a
-     * pattern that re-rolled would lose the cracks it already had. Neither is what a mirror does.
+     * <p>Two things, and the first is the one a player feels: no direction may ever come back in
+     * while the charge is being held, so the liquid only ever gains ground. The second is what stops
+     * that from reading as a circle being inflated — the directions run at different times, so the
+     * shape at full charge is not the shape at a third of it with a bigger number in front.
      */
-    private static void growsRatherThanScaling(){
-        for(long seed=20;seed<26;seed++){
-            var early=WarpFracture.build(seed,WarpMath.reach(35),WarpMath.charge(35));
-            var late=WarpFracture.build(seed,WarpMath.reach(WarpMath.FULL_CHARGE),1);
-            check(late.size()>early.size(),"more of the glass has broken by full charge");
-            double e1=WarpFracture.extent(early),e2=WarpFracture.extent(late);
-            check(e2>e1*1.5,"and the fractures have travelled ("+e1+" to "+e2+")");
-            double[] a=profile(early,32,false),b=profile(late,32,false);
-            double shape=0,kept=0;
-            for(int i=0;i<32;i++){
-                shape+=Math.abs(a[i]/e1-b[i]/e2);
-                if(a[i]<=b[i]+1.0E-9)kept++;
+    private static void spreadsRatherThanScaling(){
+        double reach=WarpMath.reach(WarpMath.FULL_CHARGE);
+        for(long seed=1;seed<=12;seed++){
+            double[] early=WarpPool.rim(seed,reach,.35),late=WarpPool.rim(seed,reach,1);
+            double thinnest=Double.MAX_VALUE,widest=0;
+            for(int i=0;i<early.length;i++){
+                double grown=late[i]/Math.max(1.0E-6,early[i]);
+                thinnest=Math.min(thinnest,grown);widest=Math.max(widest,grown);
             }
-            check(shape/32>0.02,"the outline is not the same outline scaled up ("+shape/32+")");
-            check(kept>=30,"nothing that had already cracked has closed up again ("+kept+" of 32)");
+            check(widest/thinnest>1.3,"the pool spreads unevenly rather than scaling up ("+(widest/thinnest)+")");
+        }
+        for(long seed=1;seed<=6;seed++){
+            double[] before=null;
+            for(int held=0;held<=WarpMath.FULL_CHARGE;held+=4){
+                double[] rim=WarpPool.rim(seed,WarpMath.reach(held),WarpMath.charge(held));
+                if(before!=null)for(int i=0;i<rim.length;i++)
+                    check(rim[i]>=before[i]-1.0E-9,"holding longer only ever adds liquid (direction "+i+" at "+held+")");
+                before=rim;
+                // Smooth at every moment of the pour, not only once it has finished: a pool that is
+                // ragged while it is still running is a pool that reads as cracking.
+                double extent=WarpPool.extent(rim),worst=0;
+                for(int i=0;i<rim.length;i++)worst=Math.max(worst,Math.abs(rim[i]-rim[(i+1)%rim.length]));
+                check(extent<=0||worst<extent*.11,"the outline stays smooth part way through the pour ("+worst/extent+")");
+            }
         }
     }
 
@@ -125,20 +115,54 @@ public final class WarpMathTest {
         }
     }
 
-    /** How far the break reaches in each direction, by marching inward until something is there. */
-    private static double[] profile(java.util.List<WarpFracture.Piece> pieces,int directions,boolean openOnly){
-        double extent=WarpFracture.extent(pieces);
-        double[] out=new double[directions];
-        for(int i=0;i<directions;i++){
-            double angle=i*Math.PI*2/directions;
-            for(double d=extent;d>0;d-=extent/150){
-                double x=Math.cos(angle)*d,z=Math.sin(angle)*d;
-                boolean hit=false;
-                for(var piece:pieces)if((!openOnly||piece.solid)&&piece.contains(x,z)){hit=true;break;}
-                if(hit){out[i]=d;break;}
+
+    /**
+     * The rim is an edge, not a trigger.
+     *
+     * <p>A body now sinks through the pool rather than being teleported by touching it, which makes
+     * {@link WarpPool#footing} the thing that decides where the floor stops. Every property here is
+     * one that, if it stopped holding, would put the invisible square trigger back: a footprint that
+     * goes through dry floor beside the pool, a rule that ignores how wide the body asking is, or an
+     * edge with no band at all — which is what "you may stand with one foot in it" means in numbers.
+     */
+    private static void theEdgeIsAnEdge(){
+        double reach=WarpMath.reach(WarpMath.FULL_CHARGE);
+        for(long seed=1;seed<=12;seed++){
+            double[] rim=WarpPool.rim(seed,reach,1);
+            double extent=WarpPool.extent(rim);
+            check(WarpPool.footing(rim,0,0,.6),"a body standing in the middle of a pool goes through it");
+            check(!WarpPool.footing(rim,extent+2,0,.6),"floor beside the pool stays floor");
+            int within=0,player=0,wide=0;
+            for(double x=-extent;x<=extent;x+=.12)for(double z=-extent;z<=extent;z+=.12){
+                boolean liquid=WarpPool.inside(rim,x,z);
+                boolean small=WarpPool.footing(rim,x,z,.6),large=WarpPool.footing(rim,x,z,2.0);
+                // Both sizes need liquid under their middle. What differs is how much of the rest
+                // of them has to be over it, and on a lobed outline that is not a strict subset
+                // point by point — a wide footprint can reach across a notch that a narrow one sits
+                // in. It is a subset in the aggregate, which is the claim worth making.
+                check(!small||liquid,"nothing narrow goes through where there is no pool");
+                check(!large||liquid,"nothing wide goes through where there is no pool");
+                if(liquid)within++;
+                if(small)player++;
+                if(large)wide++;
             }
+            check(within>0&&player>0,"the pool has somewhere to go through");
+            check(player<=within&&wide<=player,"what carries a body is never more than the pool itself");
+            // Standing at the rim with part of you over the liquid is standing on the floor. This
+            // is the whole of "you may put one foot in", and the thing that stops the outline from
+            // behaving like a trigger a little wider than it looks.
+            int overhanging=0;
+            for(int i=0;i<rim.length;i+=3){
+                double angle=i*Math.PI*2/rim.length,r=WarpPool.radius(rim,angle);
+                for(double out=.25;out<=.71;out+=.22){
+                    overhanging++;
+                    check(!WarpPool.footing(rim,Math.cos(angle)*(r+out),Math.sin(angle)*(r+out),2.0),
+                        "a body whose middle is outside the rim stands on the floor, however much of it overhangs");
+                }
+            }
+            check(overhanging>0,"the rim was actually walked");
         }
-        return out;
     }
+
     private static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
 }

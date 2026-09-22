@@ -12,7 +12,7 @@ import java.util.*;
 /** Destination and aperture share this scene. Architecture comes from the server's generation blueprint. */
 public final class WarpScene {
     private static final Map<Destination,VertexBuffer> TERRAIN=new EnumMap<>(Destination.class);
-    public static void clear(){TERRAIN.values().forEach(VertexBuffer::close);TERRAIN.clear();SunRenderer.clear();PrisonMoonRenderer.clear();ParadiseSky.clear();}
+    public static void clear(){TERRAIN.values().forEach(VertexBuffer::close);TERRAIN.clear();SunRenderer.clear();PrisonMoonRenderer.clear();ParadiseSky.clear();WarpShadows.clear();}
     public static void sky(PoseStack pose,Destination d,double time){
         if(d==Destination.SUN||d==Destination.VOID_SEA){
             // Same detailed sky in the portal and in the destination, at the preview's spatial scale.
@@ -91,6 +91,19 @@ public final class WarpScene {
         };
     }
 
+    /**
+     * The far side's occupants, drawn into the destination scene an aperture is already showing.
+     *
+     * <p>Its own pass rather than part of {@link #draw}, because it is the one thing in the scene
+     * that is per portal rather than per realm: two breaks onto the same destination are two
+     * different windows onto it, and each is told separately what is in front of it.
+     */
+    public static void shadows(PoseStack pose,int portal,double time,Destination d){
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        BufferBuilder b=Tesselator.getInstance().getBuilder();b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);
+        WarpShadows.draw(b,pose.last().pose(),portal,time,d.color);
+        BufferUploader.drawWithShader(b.end());
+    }
     public static void draw(PoseStack pose,Destination d,double time,long age,boolean preview){
         if(d==Destination.SUN){SunRenderer.draw(pose,time);return;}
         if(d==Destination.CRUSHING_REALM){PrisonMoonRenderer.draw(pose,time);return;}
