@@ -279,10 +279,11 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
         super.tick();
 
         if (!level().isClientSide) {
-            // Without this the creature freezes the moment it leaves simulation distance, which is
-            // most of its life: it hunts from beyond sight on purpose. Renewed on a clock and also
-            // the moment it crosses into a new chunk, because at attack speed it covers a chunk
-            // every four ticks and a ticket it has already outrun is not holding anything.
+            // Keep the chunk we started this tick in alive. The post-move handoff below is the
+            // important half: movement is applied manually after super.tick(), so checking only
+            // here used to discover a chunk crossing one tick too late. With no player in the
+            // Void Sea that destination chunk was not entity-ticking, which could freeze Hexor
+            // before he ever got the next tick needed to renew his ticket.
             if (level() instanceof ServerLevel server && (tickCount % 20 == 0 || chunkPosition().toLong() != heldChunk)) {
                 heldChunk = chunkPosition().toLong();
                 PilgrimWarden.renew(server, this);
@@ -294,6 +295,14 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
                 // and the ceiling a full breach needs are enforced.
                 double ny = Mth.clamp(getY() + motion.y, cachedFloor + 3.5, Math.min(cachedSurface + 190, VoidSea.MAX_Y - 12));
                 setPos(getX() + motion.x, ny, getZ() + motion.z);
+
+                // Secure the destination chunk immediately, in the same tick as the crossing.
+                // This is what makes off-screen hunting continuous instead of a stop/start chase
+                // that only looks healthy while a player is loading the surrounding ocean.
+                if (level() instanceof ServerLevel server && chunkPosition().toLong() != heldChunk) {
+                    heldChunk = chunkPosition().toLong();
+                    PilgrimWarden.renew(server, this);
+                }
             }
             setYHeadRot(getYRot());
 

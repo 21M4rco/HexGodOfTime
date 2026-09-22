@@ -26,6 +26,8 @@ public final class WarpServerRegression {
     private static net.minecraft.world.entity.animal.Pig sunResident;
     private static net.minecraft.world.phys.Vec3 initial;
     private static int seaTicks,sunTicks;
+    private static int lastPilgrimTicks,stalledWhilePreyAlive;
+    private static boolean enoughSeen;
     private static float greatestPitch;
 
     @SubscribeEvent public static void started(ServerStartedEvent event){
@@ -85,20 +87,30 @@ public final class WarpServerRegression {
         // residency contract real Warping uses has to keep both sides of the hunt simulation-active.
         WarpResidency.track(prey,UUID.randomUUID());
         check(WarpResidency.active(sea),"Void Sea becomes active for unattended prey");
+        lastPilgrimTicks=pilgrim.tickCount;
         var duplicate=HexGodOfStories.PILGRIM.get().create(sea);
         duplicate.moveTo(initial.x+5,initial.y,initial.z,0,0);sea.addFreshEntity(duplicate);
         System.out.println("WARPING_SERVER_REGRESSIONS_PASSED");
     }
     @SubscribeEvent public static void seaTick(net.minecraftforge.event.TickEvent.LevelTickEvent event) {
-        if(event.phase!=net.minecraftforge.event.TickEvent.Phase.END||pilgrim==null||seaTicks>=180
+        if(event.phase!=net.minecraftforge.event.TickEvent.Phase.END||pilgrim==null||seaTicks>=1000
                 ||event.level!=pilgrim.level())return;
         seaTicks++;
+
+        // This is the regression the old smoke test missed. It only required "more than 80" Hexor
+        // ticks in nine seconds, so a creature repeatedly freezing every time it crossed into the
+        // next unticketed chunk still passed. While prey exists there must be no meaningful gaps:
+        // player presence is not allowed to be what keeps Hexor's own entity tick alive.
+        if(seaTicks>20&&prey.isAlive()&&pilgrim.tickCount<=lastPilgrimTicks)stalledWhilePreyAlive++;
+        lastPilgrimTicks=pilgrim.tickCount;
+
         prey.setAirSupply(300);
         if(seaTicks==20)prey.moveTo(initial.x+24,VoidSea.SURFACE-3,initial.z);
         greatestPitch=Math.max(greatestPitch,Math.abs(pilgrim.getXRot()));
+
         if(seaTicks==180){
             ServerLevel sea=(ServerLevel)event.level;
-            check(pilgrim.tickCount>80,"Pilgrim ticks with no connected players");
+            check(pilgrim.tickCount>150,"Pilgrim continuously ticks with no connected players");
             check(pilgrim.position().distanceTo(initial)>10,"Pilgrim actually swims");
             check(greatestPitch>5,"3D steering retains vertical pitch");
             check(pilgrim.ai().hunt().target()==prey,"Pilgrim detects imported water prey");
@@ -106,7 +118,26 @@ public final class WarpServerRegression {
             check(WarpResidency.active(sea),"Void Sea stays active while prey remains");
             int count=0;for(var entity:sea.getAllEntities())if(entity instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity)count++;
             check(count==1,"one loaded Pilgrim after duplicate recovery, found "+count);
-            System.out.println("PILGRIM_SERVER_REGRESSIONS_PASSED ticks="+pilgrim.tickCount+" pitch="+greatestPitch);
+        }
+
+        // Enough Is Enough is fed by the realm sweep, not by a watching player. Keep the prey
+        // invulnerable through the full patience clock so we can prove the passive really expires
+        // off-screen, then remove that test shield and require the decided hunt to finish the kill.
+        if(seaTicks==650){
+            check(com.hexgodofstories.warping.leviathan.EnoughIsEnough.marked(prey.getUUID()),
+                "Enough Is Enough expires for unattended prey");
+            enoughSeen=true;
+            prey.setInvulnerable(false);
+        }
+
+        if(seaTicks==1000){
+            check(enoughSeen,"Enough Is Enough was observed before the kill phase");
+            check(!prey.isAlive()||prey.getHealth()<=0,
+                "Hexor kills unattended prey after Enough Is Enough instead of freezing until a player arrives");
+            check(stalledWhilePreyAlive<=2,
+                "Hexor keeps entity-ticking across chunk borders while prey exists; stalled ticks="+stalledWhilePreyAlive);
+            System.out.println("PILGRIM_SERVER_REGRESSIONS_PASSED ticks="+pilgrim.tickCount
+                +" pitch="+greatestPitch+" stalls="+stalledWhilePreyAlive);
         }
     }
     @SubscribeEvent public static void sunTick(net.minecraftforge.event.TickEvent.LevelTickEvent event) {

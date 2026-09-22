@@ -48,6 +48,7 @@ public final class HexorTest {
         aDecidedTargetIsOnlyEverKilled();
         everyBlowGoesThroughTheScale(root);
         theHuntDoesNotNeedAnAudience(root);
+        ticketFollowsHexorAcrossChunkEdges(root);
         hexorIsNeverRecalled(root);
         System.out.println("HexorTest: blows are weighed against what they land on, the crowd is felt, and the clock runs out.");
     }
@@ -323,6 +324,27 @@ public final class HexorTest {
         String source = String.join("\n", lines);
         check(source.contains("rememberQuarry("), "the realm remembers what was left in it");
         check(source.contains("EnoughIsEnough.present("), "and spends every occupant's clock as it sweeps");
+    }
+
+    /**
+     * Hexor's custom movement happens after the vanilla entity tick. A ticket check that only runs
+     * before that movement is one tick too early: the body can cross the chunk border at the very
+     * end of its tick and arrive in a chunk that is not entity-ticking when nobody is watching.
+     *
+     * <p>The build therefore insists on both halves of the fix: a safety apron on the hunt ticket
+     * and an explicit ticket handoff after setPos has applied the movement.
+     */
+    private static void ticketFollowsHexorAcrossChunkEdges(Path root) throws Exception {
+        String entity = Files.readString(root.resolve(
+            "src/main/java/com/hexgodofstories/warping/leviathan/AbyssalPilgrimEntity.java"));
+        int move = entity.indexOf("setPos(getX() + motion.x");
+        check(move > 0, "Hexor still applies its custom movement");
+        int handoff = entity.indexOf("PilgrimWarden.renew(server, this);", move);
+        check(handoff > move, "the chunk ticket is renewed after movement, not only before it");
+        String warden = Files.readString(root.resolve(
+            "src/main/java/com/hexgodofstories/warping/leviathan/PilgrimWarden.java"));
+        check(warden.contains("addRegionTicket(HUNT, pos, 3, pos, true)"),
+            "the hunt ticket keeps an entity-ticking safety apron around Hexor");
     }
 
     // ------------------------------------------------------------------ plumbing

@@ -50,8 +50,10 @@ public final class PilgrimWarden {
     private static final AABB EVERYWHERE = new AABB(-3.0E7, VoidSea.MIN_Y - 64, -3.0E7, 3.0E7, VoidSea.MAX_Y + 64, 3.0E7);
 
     /**
-     * Keeps the hunter's own chunk ticking wherever it has wandered to. Radius 2 resolves to chunk
-     * level 31, which is entity ticking, and the ticket lapses on its own if this stops renewing.
+     * Keeps the hunter's own chunk ticking wherever it has wandered to. Radius 3 gives the current
+     * chunk an entity-ticking safety apron as well as the centre itself, so a fast manual setPos()
+     * cannot step across a border into a non-ticking chunk between ticket handoffs. The ticket
+     * lapses on its own if this stops renewing.
      */
     private static final TicketType<ChunkPos> HUNT =
         TicketType.create("hexgodofstories:abyssal_pilgrim", Comparator.comparingLong(ChunkPos::toLong), 120);
@@ -68,13 +70,13 @@ public final class PilgrimWarden {
 
     /** Holds one chunk in an entity ticking state for the lifetime of the ticket. */
     public static void hold(ServerLevel level, ChunkPos pos) {
-        level.getChunkSource().addRegionTicket(HUNT, pos, 2, pos, true);
+        level.getChunkSource().addRegionTicket(HUNT, pos, 3, pos, true);
     }
 
     /** Drop the current hunter ticket when the sea has no prey; older timed tickets expire naturally. */
     private static void sleep(ServerLevel level) {
         ChunkPos last = PilgrimRegistry.of(level).lastSeen();
-        if (last != null) level.getChunkSource().removeRegionTicket(HUNT, last, 2, last, true);
+        if (last != null) level.getChunkSource().removeRegionTicket(HUNT, last, 3, last, true);
         WET.clear();
     }
 
@@ -298,7 +300,14 @@ public final class PilgrimWarden {
         pilgrim.moveTo(anchor.x + Math.cos(angle) * radius,
             Mth.clamp(anchor.y, VoidSea.FLOOR + 40, VoidSea.SURFACE - 50),
             anchor.z + Math.sin(angle) * radius, random.nextFloat() * 360f, 0f);
-        PilgrimRegistry.of(level).remember(new ChunkPos(pilgrim.blockPosition()));
+        ChunkPos destination = new ChunkPos(pilgrim.blockPosition());
+        PilgrimRegistry.of(level).remember(destination);
+        // relocateNear() is a teleport, not ordinary swimming. Secure and synchronously load the
+        // destination now; waiting for the next entity tick recreates the exact off-screen freeze
+        // this warden exists to prevent.
+        hold(level, destination);
+        if (!level.getChunkSource().hasChunk(destination.x, destination.z))
+            level.getChunk(destination.x, destination.z);
     }
 
     /** Called by the creature itself once it is ticking, so it can roam past simulation distance. */
@@ -312,6 +321,12 @@ public final class PilgrimWarden {
         registry.remember(pos);
         // No prey, no simulation ticket. The persisted UUID/chunk is enough to wake the same Hexor
         // again later without keeping an empty ocean ticking forever.
-        if (WarpResidency.active(level)) hold(level, pos);
+        if (WarpResidency.active(level)) {
+            hold(level, pos);
+            // Most handoffs are into the safety apron and are already loaded. If a modded burst or
+            // relocation crossed farther than that, make the destination real immediately instead
+            // of relying on a future Hexor tick that may never arrive.
+            if (!level.getChunkSource().hasChunk(pos.x, pos.z)) level.getChunk(pos.x, pos.z);
+        }
     }
 }
