@@ -100,7 +100,7 @@ public final class AbyssalPilgrimAI {
      * the victim during their windup, so after this short setup window the correct fallback is a
      * long committed run, not another lap.
      */
-    private static final int KILL_LINE_GRACE = 280;
+    private static final int KILL_LINE_GRACE = 80;
 
     public LeviathanHuntController hunt() { return hunt; }
     public LeviathanCombatController combat() { return combat; }
