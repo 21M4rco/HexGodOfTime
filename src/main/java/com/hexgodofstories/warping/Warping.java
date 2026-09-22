@@ -471,9 +471,14 @@ public final class Warping {
         // If a tracked chunk is still finishing entity load, keep the body in the queue rather than
         // turning one transient null into "nothing came out". A dead/removed resident is pruned by
         // WarpResidency and then falls out normally.
+        if(!WarpResidency.known(source,id)){
+            // Legacy/untracked entities keep the old transfer-time safety contract verbatim.
+            if(!recallable(waiting))return;
+        }
         if(!recallable(waiting)){
-            if(WarpResidency.known(source,id)){c.summons.addLast(id);return;}
-            RECALLING.remove(id);return;
+            // A tracked body can be momentarily absent while its forced chunk finishes entity load;
+            // keep its place in the queue instead of silently losing it.
+            c.summons.addLast(id);return;
         }
 
         RECALLING.remove(id);
