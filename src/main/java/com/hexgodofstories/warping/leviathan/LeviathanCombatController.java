@@ -201,7 +201,7 @@ public final class LeviathanCombatController {
             shakeVictim(0.9f);
             eat(30f, false);
             // Chewing, on the jaws' own rhythm — nearly twice as often once it has decided.
-            if (tick % (decided() ? 5 : 9) == 0 && self.held() instanceof LivingEntity living) jaws(living, 2.5f, 0);
+            if (tick % (decided() ? 5 : 9) == 0 && self.held() instanceof LivingEntity living) repeatedJaws(living, 2.5f, 0);
         }
     }
 
@@ -283,7 +283,7 @@ public final class LeviathanCombatController {
             double bottom = Math.max(self.floorY() + 12, self.surfaceY() - DRAG_LIMIT);
             steer(new Vec3(self.getX(), bottom, self.getZ()), 2.0, 0.65f);
             self.control().addBurst(0.5);
-            if (tick % 20 == 0 && self.held() instanceof LivingEntity living && self.depth() > 90) damage(living, 3f, 0);
+            if (tick % 20 == 0 && self.held() instanceof LivingEntity living && self.depth() > 90) repeatedDamage(living, 3f, 0);
         } else if (tick == attack.windup + attack.active) {
             // The release is the cruelty: alive, very deep, and alone.
             releaseHold(new Vec3(0, 0.15, 0), true);
@@ -712,17 +712,45 @@ public final class LeviathanCombatController {
      * how much health the thing in front of it is carrying and how busy the ocean is.
      */
     private boolean damage(LivingEntity entity, float amount, double knockback) {
-        if (!struck.add(entity.getUUID())) return false;
+        if (struck.contains(entity.getUUID())) return false;
+        // Only consume the once-per-pattern slot if damage was actually accepted. Previously an
+        // invulnerability frame (or a modded immunity) made the controller believe it had landed,
+        // then prevented every later contact in the same pass from trying again.
+        if (!hurt(entity, amount, false)) return false;
+        struck.add(entity.getUUID());
+        applyKnockback(entity, knockback);
+        return true;
+    }
+
+    /**
+     * A distinct bite/pressure pulse on a held victim. This is deliberately not gated by
+     * {@link #struck}: the whole point of chewing is that each jaw closure is another blow.
+     * Vanilla's ten-tick hurt cooldown is cleared for Hexor's own repeated bite so a five-tick
+     * Enough-Is-Enough chew is not merely an animation every other time. Modded invulnerability
+     * still wins because {@link LivingEntity#hurt} must actually accept the damage.
+     */
+    private boolean repeatedDamage(LivingEntity entity, float amount, double knockback) {
+        if (!hurt(entity, amount, true)) return false;
+        applyKnockback(entity, knockback);
+        return true;
+    }
+
+    private boolean hurt(LivingEntity entity, float amount, boolean clearVanillaIFrames) {
+        if (clearVanillaIFrames) entity.invulnerableTime = 0;
+        if (!entity.hurt(self.attackDamage(entity), self.attackAmount(entity, amount))) return false;
         connected = landedThisTick = true;
-        entity.hurt(self.attackDamage(entity), self.attackAmount(entity, amount));
+        return true;
+    }
+
+    private void applyKnockback(LivingEntity entity, double knockback) {
         if (knockback > 0) {
             Vec3 away = entity.position().subtract(self.segments().segment(0));
             if (away.lengthSqr() < 1.0E-4) away = new Vec3(0, 1, 0);
             entity.setDeltaMovement(entity.getDeltaMovement().add(away.normalize().scale(knockback)).add(0, knockback * 0.35, 0));
             entity.hurtMarked = true;
         }
-        if (entity instanceof ServerPlayer player) player.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(player));
-        return true;
+        if (entity instanceof ServerPlayer player)
+            player.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(player));
     }
 
     /** Stacks and duration of the wound a bite leaves, matched to the conjured daggers'. */
@@ -738,6 +766,11 @@ public final class LeviathanCombatController {
      */
     private void jaws(LivingEntity entity, float amount, double knockback) {
         if (!damage(entity, amount, knockback)) return;
+        Bleed.apply(self.getUUID(), entity, BLEED_STACKS, BLEED_TICKS);
+    }
+
+    private void repeatedJaws(LivingEntity entity, float amount, double knockback) {
+        if (!repeatedDamage(entity, amount, knockback)) return;
         Bleed.apply(self.getUUID(), entity, BLEED_STACKS, BLEED_TICKS);
     }
 
