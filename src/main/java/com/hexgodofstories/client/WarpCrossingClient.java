@@ -62,7 +62,7 @@ public final class WarpCrossingClient {
         return phase == null ? Double.NaN : phase.plane();
     }
 
-    public static boolean phasing(int id) { return PHASES.containsKey(id); }
+    public static boolean phasing(int id) { return !PHASES.isEmpty() && PHASES.containsKey(id); }
 
     /**
      * One tick of sinking, on the one player this client owns.

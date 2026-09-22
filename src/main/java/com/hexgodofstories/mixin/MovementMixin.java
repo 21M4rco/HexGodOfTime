@@ -30,6 +30,15 @@ public abstract class MovementMixin {
             player.setOnGround(com.hexgodofstories.warping.MoonGravity.grounded(player));
             player.fallDistance=0;
         }
+        // Sinking into a Warping pool, where there is deliberately no ground under the feet at
+        // all. The floating check disconnects a player who has not descended a thirty-second of a
+        // block for eighty ticks, and somebody fighting their way back out of a pool holds very
+        // nearly still for as long as they can keep it up — which is the whole point of the
+        // struggle and would otherwise be a way to get kicked for flying.
+        if(com.hexgodofstories.warping.WarpCrossing.crossing(player)) {
+            clientIsFloating=false;
+            player.fallDistance=0;
+        }
         // Paradise, where a fall is meant to be slow and a jump is meant to be long.
         //
         // Neither of the two things the server does with a descent suits a realm with a quarter of

@@ -114,7 +114,32 @@ public final class WarpScene {
         BufferBuilder b=Tesselator.getInstance().getBuilder();b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);Matrix4f m=pose.last().pose();
         switch(d){
             case VOID_SEA -> {
-                if(preview){WarpMesh.box(b,m,-250,0,-250,500,136,500,0x020810,1);for(int i=0;i<90;i++){double x=Math.sin(i*5.2)*180,z=Math.cos(i*3.7)*180;WarpMesh.ribbon(b,m,new Vec3(x,136.03,z),new Vec3(x+5,136.03,z+Math.sin(time*.03+i)),.08,0x244454,.5f);}leviathanSilhouette(b,m,time);}
+                // The sea drawn where the sea actually is.
+                //
+                // Every number here used to be written against a waterline of 136, because that is
+                // what the Void Sea was when this preview was written: a hundred and thirty five
+                // blocks of water. The realm was later rebuilt nine hundred and thirty five deep so
+                // the Pilgrim would have somewhere to dive, which moved its surface to 249 and its
+                // arrival to fifty blocks above that — and left this drawing the ocean a hundred
+                // and sixty blocks below the hole a caster is looking through. What they saw was
+                // the black backing of the aperture with the pool's own tint over it, which is to
+                // say a flat coloured puddle rather than another world.
+                //
+                // Reading the realm's own constants is the fix and also the guarantee: the next
+                // time the sea moves, the view through the portal moves with it.
+                if(preview){
+                    double surface=VoidSea.SURFACE,floor=VoidSea.FLOOR;
+                    // The deep, stopping short of the waterline so what is cruising under it is
+                    // not buried inside an opaque box the way it used to be.
+                    WarpMesh.box(b,m,-250,floor,-250,500,Math.max(1,surface-26-floor),500,0x020810,1);
+                    leviathanSilhouette(b,m,time,surface-15);
+                    for(int i=0;i<90;i++){
+                        double x=Math.sin(i*5.2)*180,z=Math.cos(i*3.7)*180;
+                        WarpMesh.ribbon(b,m,new Vec3(x,surface+.03,z),new Vec3(x+5,surface+.03,z+Math.sin(time*.03+i)),.08,0x244454,.5f);
+                    }
+                    // The waterline itself, last and translucent, so the silhouette reads through it.
+                    WarpMesh.box(b,m,-250,surface-.06,-250,500,.06,500,0x123a4e,.72f);
+                }
             }
             case GRAVITY_WELL -> {
                 Vec3 c=new Vec3(0,96,0);
@@ -155,7 +180,8 @@ public final class WarpScene {
         else if(kind==3){for(int j=0;j<10;j++){WarpMesh.box(b,m,x-3,y+j,z-3,1,1,6,j%3==0?0x78818a:0x4d5260,1);WarpMesh.box(b,m,x+2,y+j,z-3,1,1,6,0x555361,1);if(j%4==0)WarpMesh.box(b,m,x-3,y+j,z-3,6,.7,6,0x8b8b84,1);}}
         else {WarpMesh.box(b,m,x-3,y,z-3,6,2,6,kind==2?0x454954:0x6b6560,1);if(kind==2){WarpMesh.box(b,m,x-3,y+2,z-3,6,.15,6,0x50654a,1);WarpMesh.box(b,m,x,y+2,z,1,5,1,0x51453a,1);WarpMesh.box(b,m,x-2,y+6,z-2,5,2,5,0x344438,1);}}
     }
-    private static void leviathanSilhouette(BufferBuilder b,Matrix4f m,double time){for(int i=0;i<17;i++){double a=time*.01-i*.07;WarpMesh.sphere(b,m,new Vec3(Math.cos(a)*20,128-i*.12,Math.sin(a)*20),i==0?3:2-i*.075,1.2,2,0x172f38,1,12,0,false);}}
+    /** The shape circling under the waterline, at whatever depth the waterline currently is. */
+    private static void leviathanSilhouette(BufferBuilder b,Matrix4f m,double time,double y){for(int i=0;i<17;i++){double a=time*.01-i*.07;WarpMesh.sphere(b,m,new Vec3(Math.cos(a)*20,y-i*.12,Math.sin(a)*20),i==0?3:2-i*.075,1.2,2,0x172f38,1,12,0,false);}}
     private static VertexBuffer bakeTerrain(Destination d){
         var blocks=RealmLayout.blocks(d);Set<BlockPos> occupied=new HashSet<>();blocks.forEach(v->occupied.add(v.pos()));
         BufferBuilder b=new BufferBuilder(1024*1024);b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);Matrix4f m=new Matrix4f();

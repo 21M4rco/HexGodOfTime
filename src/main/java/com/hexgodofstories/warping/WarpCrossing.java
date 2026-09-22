@@ -28,6 +28,13 @@ import java.util.*;
  * grant is narrow: it lasts only while the body is still over the liquid and inside a short band
  * around the floor it came through, and it is taken away the instant either stops being true.
  *
+ * <p>Setting the flag once a tick is not enough to hold it, which is the one thing about this that
+ * cannot be read off the code here. {@code Player.aiStep} assigns {@code noPhysics = isSpectator()}
+ * on every tick of every player, on both sides, and it does so before the movement that tick — so a
+ * grant handed out from a tick event is cleared again before it has stopped a single collision, and
+ * a player stands on the pool for ever. {@code CrossingPhysicsMixin} re-asserts it in the gap
+ * between that assignment and the movement, and {@link #sinking} is the question it asks.
+ *
  * <p><b>The opening is the pool's own outline, not a box around it.</b> Nine points of the body's
  * own footprint are asked whether they are over liquid; over half of them and the middle one must
  * be, so a body standing at the rim with one foot in stays standing on the floor. The floor height
@@ -119,7 +126,31 @@ public final class WarpCrossing {
     /** Bodies that have just come out of a break somewhere, and the tick they stop being immune. */
     private static final Map<UUID, Long> SETTLING = new HashMap<>();
 
-    public static boolean crossing(Entity e) { return PASSAGES.containsKey(e.getUUID()); }
+    public static boolean crossing(Entity e) { return !PASSAGES.isEmpty() && PASSAGES.containsKey(e.getUUID()); }
+
+    /**
+     * Whether this client is currently honouring a grant, asked of the client rather than of the
+     * map above.
+     *
+     * <p>Installed by the client at startup and left refusing everything on a dedicated server,
+     * which has no client half to ask. It exists so that code running on both sides — the physics
+     * hook below is the only caller — can ask one question and get the right answer on each,
+     * without a common class ever naming a client-only one.
+     */
+    private static java.util.function.IntPredicate CLIENT_GRANT = id -> false;
+
+    public static void clientGrant(java.util.function.IntPredicate grant) { CLIENT_GRANT = grant; }
+
+    /**
+     * Whether this body is part way into a pool right now, on whichever side is asking.
+     *
+     * <p>A player's body is moved by their own machine and everything else by the server, so the
+     * two sides keep the answer in different places and neither is authoritative for the other.
+     * This is what {@code CrossingPhysicsMixin} asks every tick to keep the floor out of the way.
+     */
+    public static boolean sinking(Entity e) {
+        return e.level().isClientSide ? CLIENT_GRANT.test(e.getId()) : crossing(e);
+    }
 
     /** Whether anything is inside this break, or has just left through it. */
     public static boolean busy(UUID portal, long now) {

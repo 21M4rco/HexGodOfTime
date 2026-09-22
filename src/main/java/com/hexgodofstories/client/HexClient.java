@@ -43,6 +43,17 @@ public final class HexClient {
     @Mod.EventBusSubscriber(modid=HexGodOfStories.ID,value=Dist.CLIENT,bus=Mod.EventBusSubscriber.Bus.MOD)
     public static final class ModBus {
         @SubscribeEvent public static void dimensionEffects(RegisterDimensionSpecialEffectsEvent e){e.register(HexGodOfStories.id("pocket"),new RealmSky());e.register(HexGodOfStories.id("warping"),new WarpSky());}
+        /**
+         * Tells the common side how to ask this one whether a body is sinking.
+         *
+         * <p>The physics hook that keeps the floor out of the way runs on both sides, and a
+         * player's own body is moved here rather than on the server, so the answer for the one
+         * player this client owns lives here and nowhere else. Installed as a function so that
+         * nothing common ever has to name a client-only class.
+         */
+        @SubscribeEvent public static void crossings(net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent e) {
+            e.enqueueWork(()->com.hexgodofstories.warping.WarpCrossing.clientGrant(WarpCrossingClient::phasing));
+        }
         @SubscribeEvent public static void keys(RegisterKeyMappingsEvent e) {
             for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT,RECALL})e.register(k);
             for(KeyMapping k:TIME_KEYS)e.register(k);

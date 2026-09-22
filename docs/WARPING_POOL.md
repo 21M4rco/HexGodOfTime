@@ -58,8 +58,15 @@ of the mechanic exists to serve.
   on the server and on its own client at once, because a player's movement is simulated on their own
   machine and the server's copy would otherwise drag them back out with its "moved wrongly"
   correction. The grant lasts only while the body is still over the liquid and inside a short band
-  around the floor it came through, it expires by deadline rather than by switch, and three seconds
-  without a crossing gives the floor back.
+  around the floor it came through, and it expires by deadline rather than by switch.
+- **And it has to be re-asserted every tick, not merely set.** This is the one part of the mechanic
+  that cannot be read off the code that hands the grant out. `Player.aiStep` assigns
+  `noPhysics = isSpectator()` on every tick of every player, on both sides, and it does it before
+  the movement for that tick — so a grant given from a tick event is wiped before it has stopped a
+  single collision, and a player simply stands on an open portal until the pool gives up on them.
+  `CrossingPhysicsMixin` re-states the flag in the gap between that assignment and the movement,
+  which is the head of `LivingEntity.aiStep`. Nothing else is affected: anything that is not a
+  player has nothing clearing its flag, so for those the call changes nothing.
 - **"Enough of the pool" is a footprint, not a point.** Nine points of the body's own base are
   asked, and the middle plus over half the rest must be over liquid. So the rim behaves like the rim
   of a pool: stand beside it and nothing happens, stand with one foot in it and nothing happens, and

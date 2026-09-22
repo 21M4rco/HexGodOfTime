@@ -17,6 +17,17 @@
   whatever it covers. What is drawn on it is thin on purpose — the point is that another world is
   visible through it — with rings travelling outward, a meniscus that brightens on whichever side is
   advancing, and beads thrown up at that edge in the colour of the floor being taken up.
+- **The floor is held open, not merely opened once.** `Player.aiStep` assigns
+  `noPhysics = isSpectator()` on every tick of every player, on the client and the server alike, and
+  it does it before that tick's movement — so a grant handed out from a tick event was wiped before
+  it stopped a single collision, and nobody, caster included, could get into their own portal. It is
+  re-stated each tick between that assignment and the movement now.
+- **The Void Sea looks like the Void Sea again.** Its view through a portal was still drawn against
+  the waterline of 136 the realm had before it was rebuilt nine hundred and thirty five blocks deep,
+  which put the whole ocean a hundred and sixty blocks below the hole you were looking through — so
+  what you actually saw was the aperture's black backing with the pool's tint over it, a flat
+  coloured puddle. It reads the realm's own constants now, so the next time the sea moves the view
+  moves with it, and the shape circling under the surface is no longer buried inside an opaque box.
 - **Stepping onto it no longer teleports you.** This is the change the rest of it exists for. A body
   over enough of the pool is given block pass-through, on the server and on its own client at once,
   and sinks: feet, legs, chest, and the dimension change waits until the eye is under the surface —
