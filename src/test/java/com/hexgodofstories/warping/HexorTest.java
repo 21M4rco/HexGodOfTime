@@ -353,9 +353,14 @@ public final class HexorTest {
         check(ai.contains("linedUpForKill(target,distance)")
                 && ai.contains("distance < 45 ? 0.95 : distance < 90 ? 0.88 : 0.72"),
             "Enough Is Enough lines the physical body up before committing a close lethal strike");
-        check(ai.contains("KILL_LINE_GRACE = 36")
+        check(ai.contains("KILL_LINE_GRACE = 90")
+                && ai.contains("moveToKill(hunt.approachPoint(1.0),1.7 + frenzy)")
                 && ai.contains("commit(distance > 85 ? LeviathanAttack.DEEP_CHARGE : LeviathanAttack.ABYSSAL_LUNGE,target)"),
-            "a perfect heading is bounded and cannot turn Enough Is Enough into another orbit");
+            "a perfect heading is actively converged and still bounded instead of becoming another orbit");
+        String move=Files.readString(root.resolve(
+            "src/main/java/com/hexgodofstories/warping/leviathan/LeviathanMoveControl.java"));
+        check(move.contains("public void moveToKill(")&&move.contains("killTurn ? 34.0 : TURN_RADIUS"),
+            "the decided-only approach may turn harder without changing ordinary hunting");
         String warden = Files.readString(root.resolve(
             "src/main/java/com/hexgodofstories/warping/leviathan/PilgrimWarden.java"));
         check(warden.contains("addRegionTicket(HUNT, pos, 3, pos, true)"),
