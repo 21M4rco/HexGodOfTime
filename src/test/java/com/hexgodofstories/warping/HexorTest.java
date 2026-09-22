@@ -357,9 +357,10 @@ public final class HexorTest {
                 && ai.contains("moveToKill(hunt.approachPoint(1.0),1.7 + frenzy)")
                 && ai.contains("commit(distance > 85 ? LeviathanAttack.DEEP_CHARGE : LeviathanAttack.ABYSSAL_LUNGE,target)"),
             "a perfect heading is actively converged and still bounded instead of becoming another orbit");
-        String move=Files.readString(root.resolve(
+        String moveControlSource=Files.readString(root.resolve(
             "src/main/java/com/hexgodofstories/warping/leviathan/LeviathanMoveControl.java"));
-        check(move.contains("public void moveToKill(")&&move.contains("killTurn ? 34.0 : TURN_RADIUS"),
+        check(moveControlSource.contains("public void moveToKill(")
+                &&moveControlSource.contains("killTurn ? 34.0 : TURN_RADIUS"),
             "the decided-only approach may turn harder without changing ordinary hunting");
         String warden = Files.readString(root.resolve(
             "src/main/java/com/hexgodofstories/warping/leviathan/PilgrimWarden.java"));
