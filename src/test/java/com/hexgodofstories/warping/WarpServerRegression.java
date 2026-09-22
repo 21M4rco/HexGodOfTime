@@ -26,7 +26,7 @@ public final class WarpServerRegression {
     private static net.minecraft.world.entity.animal.Pig sunResident;
     private static net.minecraft.world.phys.Vec3 initial,preyAnchor;
     private static int seaTicks,sunTicks;
-    private static int lastPilgrimTicks,stalledWhilePreyAlive;
+    private static int lastPilgrimTicks,stalledWhilePreyAlive,enoughAt=-1;
     private static boolean enoughSeen;
     private static float greatestPitch;
 
@@ -90,7 +90,7 @@ public final class WarpServerRegression {
     }
     @SubscribeEvent public static void seaTick(net.minecraftforge.event.TickEvent.LevelTickEvent event) {
         if(event.phase!=net.minecraftforge.event.TickEvent.Phase.END
-                ||event.level.dimension()!=Destination.VOID_SEA.key||seaTicks>=1000)return;
+                ||event.level.dimension()!=Destination.VOID_SEA.key||seaTicks>=1300)return;
         ServerLevel sea=(ServerLevel)event.level;
 
         if(pilgrim==null){
@@ -150,32 +150,34 @@ public final class WarpServerRegression {
             check(count==1,"one loaded Pilgrim after duplicate recovery, found "+count);
         }
 
-        // Enough Is Enough is fed by the realm sweep, not by a watching player. Keep the prey
-        // invulnerable through the full patience clock so we can prove the passive really expires
-        // off-screen, then remove that test shield and require the decided hunt to finish the kill.
-        if(seaTicks==650){
-            check(com.hexgodofstories.warping.leviathan.EnoughIsEnough.marked(prey.getUUID()),
-                "Enough Is Enough expires for unattended prey");
-            enoughSeen=true;
-            System.out.println("HEXOR_ENOUGH_IS_ENOUGH distance="+pilgrim.distanceTo(prey)
-                +" pilgrimTicks="+pilgrim.tickCount+" state="+pilgrim.state()
-                +" attack="+pilgrim.attack()+" preyHealth="+prey.getHealth()
-                +" hexor="+pilgrim.position()+" prey="+prey.position());
+        // Enough Is Enough is fed by the realm sweep, not by a watching player. Observe the
+        // passive itself rather than guessing which local test tick its survey cadence should land
+        // on. The prey stays invulnerable until that exact transition, then Hexor gets 350 ticks
+        // to physically finish a stationary target.
+        if(!enoughSeen&&com.hexgodofstories.warping.leviathan.EnoughIsEnough.marked(prey.getUUID())){
+            enoughSeen=true;enoughAt=seaTicks;
+            System.out.println("HEXOR_ENOUGH_IS_ENOUGH at="+enoughAt
+                +" distance="+pilgrim.distanceTo(prey)+" pilgrimTicks="+pilgrim.tickCount
+                +" state="+pilgrim.state()+" attack="+pilgrim.attack()
+                +" preyHealth="+prey.getHealth()+" hexor="+pilgrim.position()+" prey="+prey.position());
             prey.setInvulnerable(false);
         }
 
-        if(seaTicks==1000){
-            check(enoughSeen,"Enough Is Enough was observed before the kill phase");
+        if(seaTicks==800&&!enoughSeen)
+            check(false,"Enough Is Enough did not expire for unattended prey; remaining="
+                +com.hexgodofstories.warping.leviathan.EnoughIsEnough.remaining(prey.getUUID()));
+
+        if(enoughSeen&&seaTicks==enoughAt+350){
             System.out.println("HEXOR_KILL_DEADLINE distance="+pilgrim.distanceTo(prey)
                 +" pilgrimTicks="+pilgrim.tickCount+" state="+pilgrim.state()
                 +" attack="+pilgrim.attack()+" preyHealth="+prey.getHealth()
                 +" hexor="+pilgrim.position()+" prey="+prey.position());
             check(!prey.isAlive()||prey.getHealth()<=0,
-                "Hexor kills stationary unattended prey after Enough Is Enough");
+                "Hexor kills stationary unattended prey within 350 ticks after Enough Is Enough");
             check(stalledWhilePreyAlive<=2,
                 "Hexor keeps entity-ticking across chunk borders while prey exists; stalled ticks="+stalledWhilePreyAlive);
             System.out.println("PILGRIM_SERVER_REGRESSIONS_PASSED ticks="+pilgrim.tickCount
-                +" pitch="+greatestPitch+" stalls="+stalledWhilePreyAlive);
+                +" pitch="+greatestPitch+" stalls="+stalledWhilePreyAlive+" enoughAt="+enoughAt);
         }
     }
     @SubscribeEvent public static void sunTick(net.minecraftforge.event.TickEvent.LevelTickEvent event) {

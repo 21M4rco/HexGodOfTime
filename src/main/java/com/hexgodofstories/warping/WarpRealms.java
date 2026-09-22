@@ -247,7 +247,11 @@ public final class WarpRealms {
             if(!j.blocks.hasNext()){ledger(l).ready.add((long)j.cell);ledger(l).setDirty();populate(l,d,j.cell);it.remove();}
         }
         long now=l.getGameTime();
-        if(d==Destination.VOID_SEA){com.hexgodofstories.warping.leviathan.PilgrimWarden.tick(l,now);
+        if(d==Destination.VOID_SEA){
+            // Hexor's behavioural/passive clocks are server-tick clocks, not destination-world
+            // time. A playerless custom dimension must not make "thirty seconds" depend on how
+            // that level's own gameTime happens to advance.
+            com.hexgodofstories.warping.leviathan.PilgrimWarden.tick(l,l.getServer().getTickCount());
             // Preserve player prediction; mobs receive the same swell in the existing loop below.
             VoidSeaWaves.tick(l,now);}
         if(d==Destination.PARADISE){
