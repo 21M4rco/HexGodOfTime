@@ -482,6 +482,10 @@ public final class Warping {
         }
 
         RECALLING.remove(id);
+        // changeDimension rebuilds a non-player body from its NBT. Keep the state it had when
+        // Warping first delivered it to the realm so temporary realm/mod flags do not become a
+        // permanent "statue" when the body is pulled back out.
+        WarpResidency.TransportState transportState=WarpResidency.transportState(source,id);
         int index=++c.arrivals;
         Vec3 spot=footing(level,c,(LivingEntity)waiting,index);
         double spread=index*2.399;
@@ -489,6 +493,7 @@ public final class Warping {
         if(waiting instanceof ServerPlayer player){
             player.stopRiding();
             player.teleportTo(level,spot.x,spot.y,spot.z,player.getYRot(),player.getXRot());
+            restoreRecallState(player,transportState);
             player.setDeltaMovement(Math.cos(spread)*.09,RECALL_LAUNCH,Math.sin(spread)*.09);
             player.hurtMarked=true;player.fallDistance=0;
             player.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(player));
@@ -506,6 +511,7 @@ public final class Warping {
             }
         });
         if(arrived==null)return;
+        restoreRecallState(arrived,transportState);
         // Thrown up and slightly outward, so it reads as having climbed out of the break rather
         // than as having been placed beside it.
         arrived.setDeltaMovement(Math.cos(spread)*.09,RECALL_LAUNCH,Math.sin(spread)*.09);
@@ -514,6 +520,35 @@ public final class Warping {
         WarpResidency.untrack(source,id);
         HexNetwork.arrival(arrived);
         emergence(level,c.destination,arrived);
+    }
+
+    /**
+     * Removes transport/realm stasis from a body that has just come home.
+     *
+     * <p>The important distinction is between an entity's real configuration and a temporary state
+     * acquired while imprisoned. New residents have their entry AI/gravity flags recorded, so a
+     * flying or intentionally NoAI mob gets exactly those flags back. Records from older saves have
+     * no snapshot; for those, only the unmistakable legacy failure pair — a Mob that is both NoAI
+     * and NoGravity — is repaired. That is the state which produces the observed living, punchable
+     * body that rises out of the recall and then hangs motionless in mid-air.
+     *
+     * <p>NoPhysics is different: Warping itself uses it while a body passes through an opening, and
+     * a recalled living entity must never keep that portal-only grant in the destination.
+     */
+    private static void restoreRecallState(Entity entity,WarpResidency.TransportState state){
+        entity.noPhysics=false;
+        if(state.known()){
+            entity.setNoGravity(state.noGravity());
+            if(entity instanceof Mob mob)mob.setNoAi(state.noAi());
+        }else if(entity instanceof Mob mob&&mob.isNoAi()&&entity.isNoGravity()){
+            // Compatibility for residents tracked before transport-state snapshots existed.
+            mob.setNoAi(false);
+            entity.setNoGravity(false);
+        }
+        // A copied PathNavigation may still contain a path calculated in the source dimension.
+        // Stopping that path does not disable AI; active goals are free to choose a fresh one on
+        // the very next tick instead of inheriting an unusable route from the Void Sea.
+        if(entity instanceof Mob mob&&!mob.isNoAi())mob.getNavigation().stop();
     }
 
     /**
