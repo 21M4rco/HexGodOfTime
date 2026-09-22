@@ -354,7 +354,7 @@ public final class HexorTest {
         check(ai.contains("linedUpForKill(target,distance)")
                 && ai.contains("distance < 45 ? 0.82 : distance < 90 ? 0.74 : 0.60"),
             "Enough Is Enough lines the physical body up before committing a close lethal strike");
-        check(ai.contains("KILL_LINE_GRACE = 280")
+        check(ai.contains("KILL_LINE_GRACE = 80")
                 && ai.contains("moveToKill(hunt.approachPoint(1.0),2.7 + frenzy)")
                 && ai.contains("commit(distance > 85 ? LeviathanAttack.DEEP_CHARGE : LeviathanAttack.ABYSSAL_LUNGE,target)"),
             "a perfect heading is actively converged and still bounded instead of becoming another orbit");
