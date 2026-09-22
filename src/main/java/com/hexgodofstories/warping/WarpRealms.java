@@ -168,6 +168,32 @@ public final class WarpRealms {
     private static boolean room(ServerLevel to,Entity e,Vec3 at){
         return to.noCollision(e.getType().getAABB(at.x,at.y,at.z));
     }
+
+    /**
+     * Daylight for a body that is about to be put somewhere it may no longer fit.
+     *
+     * <p>Coming back out of a realm had no equivalent of {@link #landing}. The return point is the
+     * position the caster stood at when they went in, and a crossing goes in by falling <em>through</em>
+     * the floor with collision off, so the position recorded is routinely a little under the surface
+     * rather than on it. Put back at exactly that coordinate, the body arrives inside the ground —
+     * and the recall does the same thing to everything it drags out with it.
+     *
+     * <p>So every arrival gets asked the same question the way in already asks: does this body fit
+     * here? If it does, nothing changes. If it does not, the answer is straight up — the first clear
+     * height above the point, and failing that the world's own surface in that column, which is the
+     * one place nothing is ever buried.
+     */
+    public static Vec3 daylight(ServerLevel to,Entity e,Vec3 at){
+        if(room(to,e,at))return at;
+        double ceiling=Math.min(at.y+48,to.getMaxBuildHeight()-1);
+        for(double y=Math.floor(at.y)+1;y<=ceiling;y++){
+            Vec3 up=new Vec3(at.x,y,at.z);
+            if(room(to,e,up))return up;
+        }
+        BlockPos ground=to.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,BlockPos.containing(at));
+        Vec3 open=new Vec3(at.x,ground.getY(),at.z);
+        return room(to,e,open)?open:at;
+    }
     /**
      * Coming out of the other side. A little of the liquid trailing the body rather than the
      * arrival nebula, because a nebula around somebody still falling reads as having been put there.

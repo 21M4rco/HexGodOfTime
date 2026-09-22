@@ -235,7 +235,11 @@ public final class Warping {
         FractureAnchor a=FractureAnchor.load(HexData.get(p).getCompound("warpReturn"));
         ServerLevel to=a==null?null:a.level(p.server);
         if(to==null){to=p.server.overworld();a=new FractureAnchor(to.dimension(),Vec3.atBottomCenterOf(to.getSharedSpawnPos()),p.getYRot(),p.getXRot());}
-        cancel(p);HexNetwork.fx(p,"depart");p.teleportTo(to,a.at().x,a.at().y,a.at().z,a.yaw(),a.pitch());p.setDeltaMovement(Vec3.ZERO);p.fallDistance=0;
+        // Where they went in is not necessarily somewhere they fit coming back: a crossing falls
+        // through the floor with collision off, so the recorded point is usually a little under the
+        // surface, and the ground there may have changed since in any case.
+        Vec3 back=WarpRealms.daylight(to,p,a.at());
+        cancel(p);HexNetwork.fx(p,"depart");p.teleportTo(to,back.x,back.y,back.z,a.yaw(),a.pitch());p.setDeltaMovement(Vec3.ZERO);p.fallDistance=0;
         HexNetwork.arrival(p);return true;
     }
     /** This break, as much of it as a crossing needs. Cheap: the shape behind it is already built. */
@@ -492,7 +496,9 @@ public final class Warping {
             AABB box=living.getType().getAABB(x,y,z);
             if(level.noCollision(box)&&!level.containsAnyLiquid(box))return new Vec3(x,y,z);
         }
-        return new Vec3(c.at.x,c.at.y+.1,c.at.z);
+        // Nothing around the break fit. The break's own point is the fallback, and it is lifted
+        // clear rather than trusted, so a crowded arrival surfaces instead of burying itself.
+        return WarpRealms.daylight(level,living,new Vec3(c.at.x,c.at.y+.1,c.at.z));
     }
 
     /**
