@@ -105,12 +105,13 @@ public final class WarpRenderer {
             RenderSystem.depthMask(true);GL11.glDepthFunc(GL11.GL_ALWAYS);GL11.glDepthRange(1,1);aperture(pose.last().pose(),brk);GL11.glDepthRange(0,1);GL11.glDepthFunc(GL11.GL_LEQUAL);
             RenderSystem.colorMask(true,true,true,true);RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
             pose.pushPose();pose.translate(-d.arrival.x,-d.arrival.y,-d.arrival.z);
+            long realmAge=open?n.getLong("realmAge")+(long)Math.max(0,time-n.getLong("sent")):0;
             try{
-                WarpScene.sky(pose,d,time);
-                WarpScene.draw(pose,d,time,open?n.getLong("realmAge")+(long)Math.max(0,time-n.getLong("sent")):0,true);
+                stage("sky",()->WarpScene.sky(pose,d,time));
+                stage("terrain",()->WarpScene.draw(pose,d,time,realmAge,true));
                 // Whatever is on the far side, at its real coordinates there. A body that fell
                 // through this hole is still falling, and this is how it is still watched.
-                WarpScene.shadows(pose,id,time,d);
+                stage("far side",()->WarpScene.shadows(pose,id,time,d));
             }finally{pose.popPose();}
             RenderSystem.disableCull();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
             // Restore the floor depth after drawing the remote scene, so it cannot occlude unrelated world effects.
@@ -120,6 +121,27 @@ public final class WarpRenderer {
         }finally{
             pose.popPose();GL11.glStencilMask(255);GL11.glDisable(GL11.GL_STENCIL_TEST);GL11.glDepthRange(0,1);GL11.glDepthFunc(GL11.GL_LEQUAL);
             RenderSystem.colorMask(true,true,true,true);RenderSystem.depthMask(true);RenderSystem.enableDepthTest();RenderSystem.enableCull();RenderSystem.disableBlend();RenderSystem.setShaderColor(1,1,1,1);
+        }
+    }
+
+    /** Stages that have already been complained about, so a broken one logs once rather than per frame. */
+    private static final Set<String> COMPLAINED=new HashSet<>();
+
+    /**
+     * One piece of the far side, drawn so that its failing cannot blank the rest of the window.
+     *
+     * <p>The three pieces — the realm's sky, its architecture and whatever is moving in it — are
+     * independent, and until now they were not: a throw in any of them skipped the two after it,
+     * skipped putting the floor's depth back, and skipped the pool's own surface, so one broken
+     * stage read as "the portal stopped showing the other side" with nothing in the log to say
+     * which. Worse, it unwound through the whole render pass. Each stands on its own now, and says
+     * so once if it falls over.
+     */
+    private static void stage(String name,Runnable draw){
+        try{draw.run();}
+        catch(Throwable t){
+            if(COMPLAINED.add(name))
+                org.slf4j.LoggerFactory.getLogger("HexGodOfStories").error("Warping: the {} of a destination failed to draw",name,t);
         }
     }
 

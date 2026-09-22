@@ -102,7 +102,7 @@ public final class WarpRealms {
         if(to==null){e.noPhysics=false;return;}
         double spreadX=net.minecraft.util.Mth.clamp(offset.x,-ENTRY_SPREAD,ENTRY_SPREAD);
         double spreadZ=net.minecraft.util.Mth.clamp(offset.z,-ENTRY_SPREAD,ENTRY_SPREAD);
-        Vec3 pos=d.arrival.add(cell+spreadX,owner?8:0,spreadZ);
+        Vec3 pos=landing(to,e,d.arrival.add(cell,owner?8:0,0),spreadX,spreadZ);
         float yaw=e.getYRot(),pitch=e.getXRot();
         if(e instanceof ServerPlayer p){
             if(Destination.from(old)==null)HexData.get(p).put("warpReturn",new FractureAnchor(old.dimension(),p.position(),yaw,pitch).save());
@@ -134,6 +134,40 @@ public final class WarpRealms {
     }
     /** How far from a realm's entry point a crossing may come out, in blocks. */
     private static final double ENTRY_SPREAD=6;
+
+    /**
+     * Somewhere at the entry that the body actually fits.
+     *
+     * <p>The spread is worth having — two creatures that went in on opposite sides of one pool
+     * coming out on opposite sides of the entry is what makes an opening read as a connection
+     * between two places rather than as two coordinates — but it was being applied as though six
+     * blocks either side of a realm's entry point were necessarily six blocks of air. They are
+     * not. An entry point is chosen to be clear; nothing promises the same of the ground around
+     * it, so on a realm of broken islands and ruins an offset could put a body inside a rock or
+     * under a ledge, which is to say arriving buried.
+     *
+     * <p>So the offset is a preference rather than a place. It is walked back toward the entry
+     * until the body fits, and the entry itself — which every realm does guarantee — is what is
+     * left if nothing on the way in does. If even that has been built over since, the answer is
+     * straight up from it, because a realm's sky is the one part of it nothing generates into.
+     */
+    private static Vec3 landing(ServerLevel to,Entity e,Vec3 heart,double dx,double dz){
+        for(double f=1;f>.001;f-=.25){
+            Vec3 at=heart.add(dx*f,0,dz*f);
+            if(room(to,e,at))return at;
+        }
+        if(room(to,e,heart))return heart;
+        for(int lift=2;lift<=32;lift+=2){
+            Vec3 at=heart.add(0,lift,0);
+            if(room(to,e,at))return at;
+        }
+        return heart;
+    }
+
+    /** Whether this body's whole box is clear of blocks here. Liquid is fine: the sea is a landing. */
+    private static boolean room(ServerLevel to,Entity e,Vec3 at){
+        return to.noCollision(e.getType().getAABB(at.x,at.y,at.z));
+    }
     /**
      * Coming out of the other side. A little of the liquid trailing the body rather than the
      * arrival nebula, because a nebula around somebody still falling reads as having been put there.

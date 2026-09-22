@@ -99,10 +99,17 @@ public final class WarpScene {
      * different windows onto it, and each is told separately what is in front of it.
      */
     public static void shadows(PoseStack pose,int portal,double time,Destination d){
+        // Nothing to draw is the ordinary case — most of the time nothing has fallen through — and
+        // a buffer that is begun and then ended with no vertices in it is not a no-op: it is the
+        // one thing BufferBuilder refuses, which is why the game's own code reaches for
+        // endOrDiscardIfEmpty wherever a buffer might come out empty. Since this one knows in
+        // advance, it does not begin at all.
+        if(!WarpShadows.any(portal))return;
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
         BufferBuilder b=Tesselator.getInstance().getBuilder();b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);
         WarpShadows.draw(b,pose.last().pose(),portal,time,d.color);
-        BufferUploader.drawWithShader(b.end());
+        var drawn=b.endOrDiscardIfEmpty();
+        if(drawn!=null)BufferUploader.drawWithShader(drawn);
     }
     public static void draw(PoseStack pose,Destination d,double time,long age,boolean preview){
         if(d==Destination.SUN){SunRenderer.draw(pose,time);return;}

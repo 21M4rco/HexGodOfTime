@@ -79,6 +79,12 @@ public final class WarpShadows {
         if (shades.isEmpty()) BY_PORTAL.remove(portal);
     }
 
+    /** Whether this break has anything on its far side worth opening a buffer for. */
+    public static boolean any(int portal) {
+        Map<Integer, Shade> shades = BY_PORTAL.get(portal);
+        return shades != null && !shades.isEmpty();
+    }
+
     public static void forget(int portal) { BY_PORTAL.remove(portal); }
 
     /** Drops the far sides of breaks this client is no longer being told about. */
