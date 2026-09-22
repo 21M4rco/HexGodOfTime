@@ -73,7 +73,10 @@ public final class WarpRenderer {
     }
     private static void window(PoseStack pose,Vec3 camera,double time,int id,CompoundTag n){
         Vec3 at=new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z"));
-        if(camera.distanceToSqr(at)>96*96||camera.y<at.y)return;
+        // A little below the pool's own height rather than exactly at it: a camera sinking into
+        // one reaches the surface on the tick it crosses, and culling on the nose would blink the
+        // other world out for the frame before the crossing rather than showing it arriving.
+        if(camera.distanceToSqr(at)>96*96||camera.y<at.y-.3)return;
         Destination d=Destination.at(n.getInt("destination"));boolean open=n.getLong("opened")>=0;
         int held=open?n.getInt("held"):(int)(time-n.getLong("start"));
         double age=open?Math.max(0,time-n.getLong("opened")):0;

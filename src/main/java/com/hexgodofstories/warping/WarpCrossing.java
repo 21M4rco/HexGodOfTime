@@ -22,26 +22,37 @@ import java.util.*;
  * while your head is already below the floor.
  *
  * <p><b>How the ground stops being ground.</b> No block is touched. Instead, an entity standing over
- * a genuinely open part of the fracture is given {@code noPhysics} — and given it on the server and
- * on its own client at the same time, because a player's movement is simulated by their own client
- * and the server's copy would otherwise drag them back out with its "moved wrongly" correction. The
- * grant is narrow: it lasts only while the body is still over the opening and inside a short band
+ * a genuinely open part of the pool is given {@code noPhysics} — and given it on the server and on
+ * its own client at the same time, because a player's movement is simulated by their own client and
+ * the server's copy would otherwise drag them back out with its "moved wrongly" correction. The
+ * grant is narrow: it lasts only while the body is still over the liquid and inside a short band
  * around the floor it came through, and it is taken away the instant either stops being true.
  *
- * <p><b>The opening is the fracture, not a box around it.</b> Nine points of the body's own
- * footprint are asked whether they are over a piece of the break wide enough to fall into; over half
- * of them and the middle one must be, so a body standing mostly on the intact stone between two
- * cracks stays standing on it. The floor height is asked of {@link WarpSurface} per column, exactly
- * as the fracture is drawn, so a break lying across a step behaves as the step does.
+ * <p><b>The opening is the pool's own outline, not a box around it.</b> Nine points of the body's
+ * own footprint are asked whether they are over liquid; over half of them and the middle one must
+ * be, so a body standing at the rim with one foot in stays standing on the floor. The floor height
+ * is asked of {@link WarpSurface} per column, exactly as the pool is drawn, so liquid lying across a
+ * step behaves as the step does.
  *
  * <p><b>Crossing is the head, not the feet.</b> The transfer waits until the eye — the camera, for a
  * player — is under the local plane, so feet, legs and chest go through first and the world changes
  * at the moment the view does. A tall creature has a high eye and therefore sinks further before it
  * goes, which is what it should look like.
  *
- * <p><b>Nothing is reset.</b> Velocity, heading, pitch and the fall already in progress are carried
- * across untouched, and the body arrives at the destination offset from the realm's own entry point
- * by however far from the middle of the break it went in. A run across the portal comes out running.
+ * <p><b>It is quicksand, not a hole.</b> A body in the liquid does not fall — its descent is taken
+ * over by the pool's own sink rate, with its sideways movement dragged rather than stopped. A
+ * running jump into the middle does not carry anybody through: it stops them dead and starts them
+ * going down. A player's eye is 1.62 blocks up, so going under takes a little under two seconds,
+ * which is long enough to watch the other world rise around you.
+ *
+ * <p><b>And it can be fought.</b> Thrashing lifts a body, and the arithmetic is set so that six
+ * presses a second exactly cancels the sink: slower loses ground, faster climbs, and the deeper
+ * somebody already is the longer they have to keep it up. Wading to the rim works too, slowly.
+ * Rising back above the rim by either route gives the floor back and stands the body on it.
+ *
+ * <p><b>Heading is never reset.</b> Yaw, pitch and whatever sideways movement survived the drag
+ * cross untouched, and the body arrives at the destination offset from the realm's own entry point
+ * by however far from the middle of the pool it went in.
  */
 public final class WarpCrossing {
     private WarpCrossing() { }
@@ -74,6 +85,14 @@ public final class WarpCrossing {
     private static final class Passage {
         final UUID portal; final long began;
         double plane; boolean committed;
+        /**
+         * Lift banked by somebody thrashing to get out, in blocks, spent on the next tick.
+         *
+         * <p>Per passage rather than per player, because it is a property of being in this pool:
+         * it arrives, it is used, and it is gone. Nothing accumulates across a crossing, so a
+         * player cannot bank presses before stepping in.
+         */
+        double struggle;
         Passage(UUID portal, double plane, long began) { this.portal = portal; this.plane = plane; this.began = began; }
     }
 
@@ -161,17 +180,58 @@ public final class WarpCrossing {
         // Climbed back out, or walked off the side of the opening while still above it. Both are a
         // body that has changed its mind, and both give the floor back. So does simply having been
         // in here too long, which is what a client that never let go of the floor looks like.
-        if (!passage.committed && (e.getY() > passage.plane + ESCAPE || !open(brk, e))) { abort(e, passage, false); return; }
-        if (!passage.committed && now - passage.began > PATIENCE) { abort(e, passage, false); return; }
+        if (e.getY() > passage.plane + ESCAPE || !open(brk, e)) { abort(e, passage, true); return; }
+        if (now - passage.began > PATIENCE) { abort(e, passage, true); return; }
         // Fallen further than a break is deep without the crossing having fired. Something is wrong
         // with the floor rather than with the body, so finish the job rather than strand it.
         if (e.getY() < passage.plane - BAND) { cross(brk, passage, e, now); return; }
 
-        // The fall already in progress is deliberately left alone: it is the same fall on the other
-        // side, and resetting it here is what would turn a drop into a teleport with a landing.
         e.noPhysics = true;
+        sink(e, passage);
         phase(e, passage.plane, now);
         if (e.getY() + e.getEyeHeight() <= passage.plane - 0.02) cross(brk, passage, e, now);
+    }
+
+    /**
+     * One tick of going under.
+     *
+     * <p>Quicksand rather than a hole. Whatever the body arrived doing, its descent is taken over
+     * by the pool's own rate the moment it is in the liquid — a running jump into the middle does
+     * not carry anybody through, it stops them dead and starts them going down — and its sideways
+     * movement is dragged rather than stopped, so wading toward the rim is slow but possible and is
+     * the second way out of one of these.
+     *
+     * <p>Whatever thrashing has been banked since the last tick is spent here, as lift. It is
+     * spent rather than held so that a player cannot save presses up: the only thing that gets
+     * anybody out is doing it now, fast, for as long as it takes.
+     *
+     * <p>A player's own client runs this identical call on the identical numbers in the same tick,
+     * because a player's movement is simulated there and a server pushing against it would fight
+     * for every block. The server runs it anyway — on its own copy, and on everything that is not
+     * a player — so the two agree without anybody being corrected.
+     */
+    private static void sink(Entity e, Passage passage) {
+        double lift = passage.struggle;
+        passage.struggle = 0;
+        Vec3 v = e.getDeltaMovement();
+        e.setDeltaMovement(v.x * WarpMath.SINK_DRAG, -WarpMath.SINK_RATE + lift, v.z * WarpMath.SINK_DRAG);
+        e.fallDistance = 0;
+        if (!(e instanceof ServerPlayer)) e.hurtMarked = true;
+    }
+
+    /**
+     * Somebody is trying very hard to get out.
+     *
+     * <p>One press, one measure of lift, and the arithmetic of whether that is enough is set in
+     * {@link WarpMath}: six presses a second exactly cancels the sink, so slower than that loses
+     * ground and faster than that climbs. Nothing here decides whether they escape — they escape by
+     * actually rising back above the rim, which the ordinary abort above notices — so a client that
+     * lies about pressing the key gains lift it then has to spend on a climb the server can see.
+     */
+    public static void struggle(ServerPlayer p) {
+        Passage passage = PASSAGES.get(p.getUUID());
+        if (passage == null) return;
+        passage.struggle = Math.min(passage.struggle + WarpMath.STRUGGLE_LIFT, WarpMath.STRUGGLE_LIFT * 3);
     }
 
     /**

@@ -16,13 +16,14 @@ public final class WarpMathTest {
         spreadsRatherThanScaling();
         sizeIsPaidFor();
         theEdgeIsAnEdge();
+        quicksand();
         check(WarpMath.pull(10)>WarpMath.pull(40)&&WarpMath.pull(40)>WarpMath.pull(100),"inward pull intensifies");
         check(WarpMath.cellX(1024+200)==1024&&WarpMath.cellX(2048-100)==2048,"separate instances remain separate");
         check(WarpMath.solarDamage(WarpMath.SUN_CORONA)==0,"outside corona is safe");
         check(WarpMath.solarDamage(WarpMath.SUN_CORONA-.01)>0,"corona inflicts heat");
         check(WarpMath.solarDamage(WarpMath.SUN_RADIUS-.01)>WarpMath.solarDamage(WarpMath.SUN_RADIUS+.01),"photosphere is lethal faster than corona");
         check(WarpMath.SUN_RADIUS>33+Math.sqrt(3),"photosphere encloses every corner of the existing magma shell");
-        System.out.println("Warping geometry, pool and cost checks passed");
+        System.out.println("Warping geometry, pool, sink and cost checks passed");
     }
 
     /**
@@ -162,6 +163,65 @@ public final class WarpMathTest {
             }
             check(overhanging>0,"the rim was actually walked");
         }
+    }
+
+    /**
+     * The pool is quicksand, and getting out of it is a fight you can lose.
+     *
+     * <p>Two feelings are being defended here and they pull against each other. The sink has to be
+     * slow enough to be a thing that happens to you rather than a thing that has happened — the
+     * other world comes up around you while you are still standing in this one — and the way out has
+     * to be genuinely hard, because a pool you can casually step back out of is not a pool, it is a
+     * button with a delay on it. Both are decided by two constants and the arithmetic between them,
+     * so both are checkable without a world.
+     */
+    private static void quicksand(){
+        check(WarpMath.SINK_RATE>0,"a pool a body does not go down in is a floor");
+        // A player's eye is 1.62 blocks up, and the eye going under is what crosses somebody over,
+        // so that depth is what a crossing actually costs in time.
+        double crossing=WarpMath.sinkTicks(1.62);
+        check(crossing>30&&crossing<60,"sinking through takes between a second and a half and three ("+crossing/20+"s)");
+        check(crossing>freeFall(1.62)*4,"and it is nothing like falling the same distance ("+freeFall(1.62)+" ticks)");
+        check(WarpMath.sinkTicks(.9)<crossing&&crossing<WarpMath.sinkTicks(2.6),"something taller has further to go under");
+        check(WarpMath.SINK_DRAG>.6&&WarpMath.SINK_DRAG<.95,"the liquid is sluggish rather than setting solid");
+        check(Math.pow(WarpMath.SINK_DRAG,20)<.05,"a body that runs into a pool has stopped running within the second");
+
+        // The way out. One press of the jump key buys a fixed lift, so escaping is a rate: the
+        // question is how many a second it takes to out-climb the sink, and whether that number is
+        // high enough to be a panic and low enough to be possible.
+        double rate=WarpMath.struggleRate();
+        check(rate>5&&rate<8,"escape is a contest of speed and the speed is a fast one ("+rate+" a second)");
+        // Ten seconds of it, and a body has drifted less than one press is worth — the rate is the
+        // break-even one by construction, and all that is left in the number is where the presses
+        // happen to land in the ticks.
+        check(Math.abs(sunk(200,rate))<=WarpMath.STRUGGLE_LIFT+1.0E-6,"at exactly that rate a body holds its depth ("+sunk(200,rate)+")");
+        check(sunk(60,0)<-2,"a body that does nothing goes under");
+        check(sunk(200,rate*.6)<-1.5,"and so does one that tries at a comfortable speed");
+        check(sunk(200,rate*2)>1.62,"frantic thrashing climbs clear of a player's own height");
+        for(double slower=0;slower<rate*2;slower+=.5)
+            check(sunk(100,slower)<sunk(100,slower+.5),"hitting it faster is always worth something ("+slower+")");
+    }
+
+    /**
+     * Where a body ends up, relative to where it entered, after this long in the pool at this many
+     * frantic presses a second. The arithmetic is the one both sides of the wire run each tick.
+     */
+    private static double sunk(int ticks,double perSecond){
+        double y=0,carry=0;
+        for(int t=0;t<ticks;t++){
+            carry+=perSecond/20;
+            int presses=0;
+            while(carry>=1){carry-=1;presses++;}
+            y+=-WarpMath.SINK_RATE+Math.min(presses*WarpMath.STRUGGLE_LIFT,WarpMath.STRUGGLE_LIFT*3);
+        }
+        return y;
+    }
+
+    /** Ticks vanilla gravity takes to drop a body this far, for the comparison that matters. */
+    private static double freeFall(double blocks){
+        double v=0,fallen=0;
+        for(int t=1;t<=400;t++){v=(v-.08)*.98;fallen-=v;if(fallen>=blocks)return t;}
+        return 400;
     }
 
     private static void check(boolean value,String message){if(!value)throw new AssertionError(message);}

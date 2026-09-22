@@ -23,14 +23,24 @@
   so the world changes at the moment the view does, and a tall creature sinks further before it goes.
   "Enough of the pool" is nine points of the body's own footprint rather than one, so you can stand
   beside the rim, stand with one foot in it, and go through when most of you is over it.
+- **You sink into it like quicksand, and you can fight your way out.** A body in the liquid does not
+  fall — its descent is taken over by the pool's own slow rate and its sideways movement is dragged
+  rather than stopped, so a running jump into the middle stops you dead and starts you going down,
+  and a player's eye takes a little under two seconds to go under. Hammering the jump key lifts you,
+  at a rate set from the sink rather than guessed: six presses a second exactly cancels it, so
+  slower loses ground, faster climbs, and the deeper you already are the longer you have to keep it
+  up. Presses are spent the tick they arrive, so there is no saving them up, and that one message
+  skips the input throttle because a three-tick limiter would otherwise decide the contest itself.
+  Get back above the rim by thrashing or by wading and the floor comes back under you.
 - **The body clips itself, for free.** Entities are drawn before the portal, and the portal's backing
   sits at the floor's own height following the pool's exact outline, so the depth test paints out
   exactly the part of a body that has gone under and leaves the rest standing. First person and both
   third-person cameras, with nothing extra.
-- **Nothing is reset on the way through.** Velocity, heading, pitch and the fall already in progress
-  cross exactly. A dimension change sends an absolute position packet and an absolute position packet
-  makes the client zero its own velocity, so a motion packet goes out immediately behind it, on the
-  same tick, before a frame is drawn without it. A run across the pool comes out running. Minecraft's
+- **Nothing is reset on the way through.** Heading, pitch, whatever sideways movement survived the
+  drag and the descent already under way all cross exactly. A dimension change sends an absolute
+  position packet and an absolute position packet makes the client zero its own velocity, so a motion
+  packet goes out immediately behind it, on the same tick, before a frame is drawn without it. A body
+  that waded in sideways comes out still travelling that way. Minecraft's
   "downloading terrain" overlay is taken straight back down and a few frames of refraction — one ring
   crossing the view, a hair of chromatic split, no flash — cover the seam instead.
 - **Whatever went through is still visible through the hole.** The far side's positions are sent to

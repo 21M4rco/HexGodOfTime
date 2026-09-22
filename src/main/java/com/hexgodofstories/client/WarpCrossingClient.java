@@ -4,7 +4,11 @@ import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ReceivingLevelScreen;
 import net.minecraft.client.player.LocalPlayer;
+import com.hexgodofstories.network.HexNetwork;
+import com.hexgodofstories.server.HexServer;
+import com.hexgodofstories.warping.WarpMath;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.phys.Vec3;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -37,7 +41,9 @@ public final class WarpCrossingClient {
      * game time belongs to, and the whole point of these two is to span exactly that moment.
      */
     private static long phasedAt, membraneUntil;
-    private static boolean holding;
+    private static boolean holding, jumpHeld;
+    /** Lift banked by this client's own thrashing, in blocks, spent on the next tick. */
+    private static double banked;
 
     /** How long after the last phase packet a respawn still counts as having fallen through one. */
     private static final long RECENT = 900;
@@ -58,6 +64,38 @@ public final class WarpCrossingClient {
 
     public static boolean phasing(int id) { return PHASES.containsKey(id); }
 
+    /**
+     * One tick of sinking, on the one player this client owns.
+     *
+     * <p>Run at the start of the player's own tick, before Minecraft moves them, because that is
+     * the only place a velocity survives into the movement it is meant to cause: set at the end of
+     * a tick it would have a tick of gravity added to it before it did anything, and the careful
+     * sink rate would be a fall with extra steps.
+     *
+     * <p>The formula is the server's, on the server's numbers, because a player's movement is
+     * simulated here and a server pushing against it would fight for every block. What the server
+     * does instead is watch how deep this gets and decide the crossing from that.
+     *
+     * <p>The jump key is read directly rather than waited for: a player with no collision is never
+     * on the ground, so Minecraft's own jump never fires, and the press has to be noticed rather
+     * than felt. Each fresh one banks a measure of lift here and sends one to the server, so both
+     * copies climb together.
+     */
+    public static void sink(LocalPlayer player) {
+        if (player == null || !PHASES.containsKey(player.getId())) { jumpHeld = false; banked = 0; return; }
+        player.noPhysics = true;
+        boolean jump = Minecraft.getInstance().options.keyJump.isDown();
+        if (jump && !jumpHeld) {
+            banked = Math.min(banked + WarpMath.STRUGGLE_LIFT, WarpMath.STRUGGLE_LIFT * 3);
+            HexNetwork.send(HexServer.WARP_STRUGGLE, 0);
+        }
+        jumpHeld = jump;
+        Vec3 v = player.getDeltaMovement();
+        player.setDeltaMovement(v.x * WarpMath.SINK_DRAG, -WarpMath.SINK_RATE + banked, v.z * WarpMath.SINK_DRAG);
+        player.fallDistance = 0;
+        banked = 0;
+    }
+
     /** Ticked from the client's own state pass, so it ends with everything else. */
     public static void tick() {
         Minecraft mc = Minecraft.getInstance();
@@ -71,6 +109,8 @@ public final class WarpCrossingClient {
             holding = true;
         } else if (holding) {
             holding = false;
+            jumpHeld = false;
+            banked = 0;
             // Never handed back to somebody who is meant to have it: a spectator's noclip is theirs.
             if (!player.isSpectator()) player.noPhysics = false;
         }
@@ -95,5 +135,5 @@ public final class WarpCrossingClient {
      * Cleared when the level changes — except for the wall-clock marks, which exist precisely to
      * survive that and would be useless if this wiped them.
      */
-    public static void clear() { PHASES.clear(); holding = false; }
+    public static void clear() { PHASES.clear(); holding = false; jumpHeld = false; banked = 0; }
 }

@@ -68,15 +68,31 @@ of the mechanic exists to serve.
   a player — is under the local surface. Feet, legs and chest go through first, and the world
   changes at the moment the view does. A tall creature has a high eye and sinks further before it
   goes.
+- **It is quicksand, not a hole.** A body in the liquid does not fall. Its descent is taken over by
+  the pool's own rate — about two and a half blocks every three seconds — and its sideways movement
+  is dragged rather than stopped, so wading toward the rim is slow but possible. A running jump into
+  the middle does not carry anybody through: it stops them dead and starts them going down. A
+  player's eye is 1.62 blocks up, so going under takes a little under two seconds, which is long
+  enough to watch the other world rise around you and long enough to regret it.
+- **And it can be fought.** Hammering the jump key lifts a body, and the arithmetic is set from the
+  sink rate rather than guessed: six presses a second exactly cancels it, so anything slower loses
+  ground and anything faster climbs. Six a second is fast — fast enough to be a thing done in a
+  panic rather than casually — and the deeper somebody already is, the longer they have to keep it
+  up. Presses are spent on the tick they arrive rather than saved, so there is no banking your way
+  out. Rising back above the rim, by thrashing or by wading, gives the floor back and stands the
+  body on top of it. Because a body with no collision is never on the ground, the client reads the
+  key directly and sends its own press — and that one message is deliberately exempt from the input
+  throttle, because a three-tick limiter would otherwise decide the contest itself.
 - **The body clips itself.** Entities are drawn before the portal is, and the portal's backing sits
   at the floor's own height following the pool's exact outline, so the depth test paints out exactly
   the part of a body that has gone under and leaves the rest standing. Nothing extra is needed for
   it, and it works in first person and both third-person cameras.
-- **Nothing is reset.** Velocity, heading, pitch and the fall already in progress are carried across
-  exactly. A dimension change sends an absolute position packet, and an absolute position packet
-  makes the receiving client zero its own velocity — so a motion packet goes out immediately behind
-  it, on the same tick, before a frame is drawn without it. A run across the portal comes out
-  running; a sprint jump into it comes out travelling diagonally downward.
+- **Nothing is reset at the seam.** Whatever the body is doing on the tick its eye goes under is
+  what it is doing on the far side: heading, pitch, the sideways movement that survived the liquid's
+  drag, and the descent it had. A dimension change sends an absolute position packet, and an
+  absolute position packet makes the receiving client zero its own velocity — so a motion packet
+  goes out immediately behind it, on the same tick, before a frame is drawn without it. A body that
+  waded in sideways comes out still travelling that way.
 - **Where it comes out.** The realm's own entry point, offset by however far from the middle of the
   pool the body went in, bounded to six blocks. Two creatures that went through opposite sides of
   one pool come out on opposite sides of the entry.

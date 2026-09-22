@@ -20,7 +20,7 @@ import net.minecraft.world.phys.*;
 import java.util.*;
 
 public final class HexServer {
-    public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12,BRANCH_TAP=13,WARP_CHOICE=14,WARP_RECALL=15;
+    public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12,BRANCH_TAP=13,WARP_CHOICE=14,WARP_RECALL=15,WARP_STRUGGLE=16;
     /** Values carried by {@link #TIME}: the permanent time controls, each on its own key. */
     public static final int TIME_HALT=0,TIME_RESUME=1,TIME_REWIND=2,TIME_DILATE=3;
     public record Moment(Vec3 position,float yaw,float pitch,float health) {}
@@ -50,6 +50,9 @@ public final class HexServer {
         if(action==RESYNC){HexNetwork.sync(p);return;}
         if(!HexData.access(p)){notice(p,"Your powers are locked. An operator must use /hgos unlock "+p.getGameProfile().getName()+" on.");return;}
         if(action==WARP_CHOICE){Warping.choose(p,value);return;}
+        // Deliberately ahead of the input rate limiter below. Getting out of a pool is a contest of
+        // how fast the key can be hit, and a three-tick throttle would decide that contest itself.
+        if(action==WARP_STRUGGLE){com.hexgodofstories.warping.WarpCrossing.struggle(p);return;}
         if(action==SELECT) {
             if(Warping.charging(p))Warping.cancel(p);
             if(now-INPUT.getOrDefault(p.getUUID(),-100L)<2)return;

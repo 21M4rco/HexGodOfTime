@@ -208,6 +208,17 @@ public final class HexClient {
          * what gravity is and this cannot choose differently; running it here as well is what makes
          * a four block jump feel like a jump instead of like the server correcting a fall.
          */
+        /**
+         * Sinking into an open Warping pool, on the one player this client owns. Start of the tick,
+         * for the same reason Paradise's gravity is: a velocity set after the movement it is meant
+         * to cause has a tick of gravity added to it first.
+         */
+        @SubscribeEvent public static void warpSink(TickEvent.PlayerTickEvent e) {
+            if(e.phase!=TickEvent.Phase.START)return;
+            Minecraft mc=Minecraft.getInstance();
+            if(mc.level==null||e.player!=mc.player)return;
+            WarpCrossingClient.sink(mc.player);
+        }
         @SubscribeEvent public static void paradise(TickEvent.PlayerTickEvent e) {
             if(e.phase!=TickEvent.Phase.START)return;
             Minecraft mc=Minecraft.getInstance();
