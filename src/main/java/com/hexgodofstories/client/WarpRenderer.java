@@ -29,7 +29,26 @@ public final class WarpRenderer {
     private static final Map<Integer,CompoundTag> WINDOWS=new HashMap<>();
     private static final Map<Integer,Break> BREAKS=new HashMap<>();
     private static CompoundTag realm=new CompoundTag();
-    public static void receive(int id,CompoundTag n){if(n.getBoolean("clear")){WINDOWS.remove(id);BREAKS.remove(id);WarpShadows.forget(id);}else WINDOWS.put(id,n);}
+    /** About 1.2 seconds for the whole puddle to crawl back into its centre. */
+    private static final int CLOSE_TICKS=24;
+
+    public static void receive(int id,CompoundTag n){
+        if(!n.getBoolean("clear")){WINDOWS.put(id,n);return;}
+        CompoundTag live=WINDOWS.get(id);
+        if(live==null){BREAKS.remove(id);WarpShadows.forget(id);return;}
+        beginClosing(id,live,ClientState.now());
+    }
+
+    private static void beginClosing(int id,CompoundTag live,long now){
+        if(live.getBoolean("closing"))return;
+        CompoundTag close=live.copy();
+        close.putBoolean("closing",true);
+        close.putLong("closeStart",now);
+        boolean open=close.getLong("opened")>=0;
+        close.putInt("closeHeld",open?close.getInt("held"):(int)Math.max(0,now-close.getLong("start")));
+        close.putLong("until",now+CLOSE_TICKS+2);
+        WINDOWS.put(id,close);BREAKS.remove(id);WarpShadows.forget(id);
+    }
     public static String chargeLabel(int id){
         CompoundTag n=WINDOWS.get(id);if(n==null)return "";
         boolean recall=n.getBoolean("recall");
@@ -51,7 +70,14 @@ public final class WarpRenderer {
     public static void render(RenderLevelStageEvent e){
         var mc=Minecraft.getInstance();if(mc.level==null)return;
         var pose=e.getPoseStack();Vec3 camera=e.getCamera().getPosition();double time=mc.level.getGameTime()+e.getPartialTick();
-        WINDOWS.values().removeIf(n->!n.getString("dimension").equals(mc.level.dimension().location().toString())||n.getLong("until")<=mc.level.getGameTime());
+        long now=mc.level.getGameTime();
+        for(var entry:new ArrayList<>(WINDOWS.entrySet())){
+            CompoundTag n=entry.getValue();
+            if(!n.getString("dimension").equals(mc.level.dimension().location().toString())){WINDOWS.remove(entry.getKey());continue;}
+            if(n.getLong("until")>now)continue;
+            if(n.getBoolean("closing"))WINDOWS.remove(entry.getKey());
+            else beginClosing(entry.getKey(),n,now);
+        }
         BREAKS.keySet().removeIf(id->!WINDOWS.containsKey(id));
         WarpShadows.retain(WINDOWS.keySet());
         if(WINDOWS.isEmpty())return;
@@ -79,7 +105,9 @@ public final class WarpRenderer {
         boolean arrival=n.getBoolean("arrival");
         if(camera.distanceToSqr(at)>96*96||camera.y<at.y-(arrival?3.0:.3))return;
         Destination d=Destination.at(n.getInt("destination"));boolean open=n.getLong("opened")>=0;
-        int held=open?n.getInt("held"):(int)(time-n.getLong("start"));
+        boolean closing=n.getBoolean("closing");
+        int held=closing?n.getInt("closeHeld"):(open?n.getInt("held"):(int)(time-n.getLong("start")));
+        double closeScale=closing?closeScale(n,time):1.0;
         double age=open?Math.max(0,time-n.getLong("opened")):0;
         Break brk=shape(id,n,at,held,open,(long)time);
         if(brk==null||brk.count==0)return;
@@ -124,7 +152,7 @@ public final class WarpRenderer {
             // occupy honest 3D space and are hidden by foreground geometry.
             GL11.glDepthFunc(GL11.GL_LEQUAL);
             int window=n.contains("window")?n.getInt("window"):WarpMath.OPEN_TICKS;
-            surface(pose.last().pose(),brk,open,age,held,time,window);
+            surface(pose.last().pose(),brk,open,age,held,time,window,closeScale);
         }finally{
             pose.popPose();GL11.glStencilMask(255);GL11.glDisable(GL11.GL_STENCIL_TEST);GL11.glDepthRange(0,1);GL11.glDepthFunc(GL11.GL_LEQUAL);
             RenderSystem.colorMask(true,true,true,true);RenderSystem.depthMask(true);RenderSystem.enableDepthTest();RenderSystem.enableCull();RenderSystem.disableBlend();RenderSystem.setShaderColor(1,1,1,1);
@@ -206,19 +234,24 @@ public final class WarpRenderer {
 
     /** How far over the floor the liquid sits, so it covers the block rather than z-fighting it. */
     private static final double FILM=.045;
-    /** Dense radial tessellation keeps the raised goo from exposing its construction as visible bands. */
-    private static final int MIN_RINGS=8,MAX_RINGS=24;
+    /** Dense radial tessellation also keeps one-block terrain transitions tight instead of cutting broad holes. */
+    private static final int MIN_RINGS=12,MAX_RINGS=48;
 
     private static Break shape(int id,CompoundTag n,Vec3 at,int held,boolean open,long now){
         long seed=n.getLong("seed");
         Break cached=BREAKS.get(id);
         // The spread is rebuilt whenever the charge has moved it on; the floor under it is asked
         // again a couple of times a second, which is often enough to follow a floor being changed.
-        boolean fresh=cached!=null&&cached.seed==seed&&now-cached.sampled<40;
+        boolean closing=n.getBoolean("closing");
+        boolean fresh=cached!=null&&cached.seed==seed&&now-cached.sampled<40&&!closing;
         if(fresh&&cached.held==held&&cached.open==open)return cached;
         ClientLevel level=Minecraft.getInstance().level;if(level==null)return cached;
         Break brk=new Break(seed,held,open,fresh?cached.sampled:now);
         brk.rim=WarpPool.rim(seed,WarpMath.reach(held),open?1:WarpMath.charge(held));
+        if(closing){
+            double collapse=closeScale(n,now);
+            for(int i=0;i<brk.rim.length;i++)brk.rim[i]*=collapse;
+        }
         brk.extent=WarpPool.extent(brk.rim);
         brk.steps=WarpPool.STEPS;
         brk.rings=Math.max(MIN_RINGS,Math.min(MAX_RINGS,(int)Math.round(brk.extent*1.35)));
@@ -237,7 +270,7 @@ public final class WarpRenderer {
                 brk.v[o]=lx;brk.v[o+2]=lz;
                 // Destination-side emergence is a presentation puddle at the realm's existing
                 // arrival coordinate. Source-side portals still follow real terrain exactly.
-                double y=n.getBoolean("arrival")?at.y:column(level,columns,at.x+lx,at.z+lz,at.y,r);
+                double y=n.getBoolean("arrival")?at.y:column(level,columns,at.x+lx,at.z+lz,at.x,at.y,at.z);
                 if(Double.isNaN(y))continue;
                 if(!n.getBoolean("arrival"))tint(level,tints,at.x+lx,at.z+lz,y);
                 brk.v[o+1]=y-at.y+FILM;
@@ -249,11 +282,11 @@ public final class WarpRenderer {
         return brk;
     }
     /** Surface height for one block column, cached so two vertices in one column agree exactly. */
-    private static double column(ClientLevel level,Map<Long,Double> cache,double wx,double wz,double originY,double distance){
+    private static double column(ClientLevel level,Map<Long,Double> cache,double wx,double wz,double originX,double originY,double originZ){
         long key=key(wx,wz);
         Double known=cache.get(key);
         if(known!=null)return known;
-        double y=WarpSurface.height(level,wx,wz,originY,distance);
+        double y=WarpSurface.height(level,wx,wz,originX,originY,originZ);
         cache.put(key,y);
         return y;
     }
@@ -319,7 +352,7 @@ public final class WarpRenderer {
      * middle, a steep shoulder over the outer third, a genuinely vertical outer wall, and a thick
      * rolled lip around the silhouette. The edge is intentionally the boldest part of the portal.
      */
-    private static void surface(Matrix4f m,Break brk,boolean open,double age,int held,double time,int window){
+    private static void surface(Matrix4f m,Break brk,boolean open,double age,int held,double time,int window,double closeScale){
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
         BufferBuilder b=Tesselator.getInstance().getBuilder();
         b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);
@@ -331,17 +364,17 @@ public final class WarpRenderer {
         // of per-face shading, so the player sees one blob rather than the underlying quad grid.
         for(int ring=0;ring<brk.rings;ring++)for(int step=0;step<brk.steps;step++){
             if(!brk.face(ring,step))continue;
-            double h00=gooHeight(brk,ring,step,time,progress,settle,closing);
-            double h01=gooHeight(brk,ring,step+1,time,progress,settle,closing);
-            double h11=gooHeight(brk,ring+1,step+1,time,progress,settle,closing);
-            double h10=gooHeight(brk,ring+1,step,time,progress,settle,closing);
+            double h00=gooHeight(brk,ring,step,time,progress,settle,closing)*closeScale;
+            double h01=gooHeight(brk,ring,step+1,time,progress,settle,closing)*closeScale;
+            double h11=gooHeight(brk,ring+1,step+1,time,progress,settle,closing)*closeScale;
+            double h10=gooHeight(brk,ring+1,step,time,progress,settle,closing)*closeScale;
             raisedFace(b,m,brk,ring,step,h00,h01,h11,h10,0x070809,1.0f);
         }
 
         // A continuous rounded rim replaces the old per-segment box/tube construction. Every
         // neighbouring segment shares exactly the same profile vertices, so there are no fins,
         // overlaps or radial stripes. The crest is still deliberately the boldest part.
-        roundedRim(b,m,brk,time,progress,settle,closing);
+        roundedRim(b,m,brk,time,progress,settle,closing,closeScale);
 
         // Broad low blisters keep the centre volumetric without competing with the heavy border.
         int mounds=Math.max(8,Math.min(16,brk.rings/2+4));
@@ -352,8 +385,8 @@ public final class WarpRenderer {
             double cycle=(time*(.005+.001*(i%3))+noise(brk.seed,i,7))%1.0;
             double breathe=.72+.28*Math.sin(cycle*Math.PI*2);
             double base=gooHeight(brk,ring,step,time,progress,settle,closing);
-            double radius=.28+.38*noise(brk.seed,i,8);
-            double height=.050+.070*noise(brk.seed,i,9);
+            double radius=(.28+.38*noise(brk.seed,i,8))*closeScale;
+            double height=(.050+.070*noise(brk.seed,i,9))*closeScale;
             WarpMesh.sphere(b,m,new Vec3(brk.x(ring,step),brk.y(ring,step)+base+height*.16,brk.z(ring,step)),
                 radius,height*breathe,radius,0x0d0f10,.24f,12,0,false);
         }
@@ -368,7 +401,7 @@ public final class WarpRenderer {
             if(cycle<.18||cycle>.90)continue;
             double dome=Math.max(0,Math.sin((cycle-.18)/.72*Math.PI));
             if(dome<=0)continue;
-            double size=.09+.14*noise(brk.seed,i,2);
+            double size=(.09+.14*noise(brk.seed,i,2))*closeScale;
             double base=gooHeight(brk,ring,step,time,progress,settle,closing);
             double y=brk.y(ring,step)+base+dome*(.025+.050*noise(brk.seed,i,3));
             WarpMesh.sphere(b,m,new Vec3(brk.x(ring,step),y,brk.z(ring,step)),
@@ -386,7 +419,7 @@ public final class WarpRenderer {
      * instead builds six shared profile rings and connects ring-to-ring, so the lip is one continuous
      * swollen roll of tar.
      */
-    private static void roundedRim(BufferBuilder b,Matrix4f m,Break brk,double time,double progress,double settle,double closing){
+    private static void roundedRim(BufferBuilder b,Matrix4f m,Break brk,double time,double progress,double settle,double closing,double closeScale){
         int edge=brk.rings;
         double[] offset={-.46,-.30,-.13,.04,.19,.31};
         for(int step=0;step<brk.steps;step++){
@@ -399,10 +432,10 @@ public final class WarpRenderer {
             double lead0=WarpPool.advancing(brk.seed,a0,progress);
             double lead1=WarpPool.advancing(brk.seed,a1,progress);
             for(int band=0;band<offset.length-1;band++){
-                Vec3 p0=rimProfile(brk,step,offset[band],rimProfileHeight(band,h0,progress,lead0),edge);
-                Vec3 p1=rimProfile(brk,next,offset[band],rimProfileHeight(band,h1,progress,lead1),edge);
-                Vec3 q1=rimProfile(brk,next,offset[band+1],rimProfileHeight(band+1,h1,progress,lead1),edge);
-                Vec3 q0=rimProfile(brk,step,offset[band+1],rimProfileHeight(band+1,h0,progress,lead0),edge);
+                Vec3 p0=rimProfile(brk,step,offset[band]*closeScale,rimProfileHeight(band,h0,progress,lead0)*closeScale,edge);
+                Vec3 p1=rimProfile(brk,next,offset[band]*closeScale,rimProfileHeight(band,h1,progress,lead1)*closeScale,edge);
+                Vec3 q1=rimProfile(brk,next,offset[band+1]*closeScale,rimProfileHeight(band+1,h1,progress,lead1)*closeScale,edge);
+                Vec3 q0=rimProfile(brk,step,offset[band+1]*closeScale,rimProfileHeight(band+1,h0,progress,lead0)*closeScale,edge);
                 int tone=band==2?0x121516:band==3?0x0b0d0e:band>=4?0x020303:0x080a0b;
                 WarpMesh.quad(b,m,p0,p1,q1,q0,tone,1.0f);
             }
@@ -477,6 +510,14 @@ public final class WarpRenderer {
         vertex(b,m,brk.x(ring,step+1),brk.y(ring,step+1)+h01,brk.z(ring,step+1),colour,alpha);
         vertex(b,m,brk.x(ring+1,step+1),brk.y(ring+1,step+1)+h11,brk.z(ring+1,step+1),colour,alpha);
         vertex(b,m,brk.x(ring+1,step),brk.y(ring+1,step)+h10,brk.z(ring+1,step),colour,alpha);
+    }
+
+    /** Viscous collapse back into the exact centre instead of disappearing on one frame. */
+    private static double closeScale(CompoundTag n,double time){
+        if(!n.getBoolean("closing"))return 1;
+        double t=Math.max(0,Math.min(1,(time-n.getLong("closeStart"))/CLOSE_TICKS));
+        double eased=t*t*(3-2*t);
+        return Math.max(0,1-eased);
     }
 
     /** A stable number in nought-to-one for one bead and one of its properties. */

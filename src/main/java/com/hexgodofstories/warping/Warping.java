@@ -578,7 +578,7 @@ public final class Warping {
             double a=index*2.399+attempt*.98;
             double radius=attempt==0?0:Math.min(reach,.7+attempt*.42);
             double x=c.at.x+Math.cos(a)*radius,z=c.at.z+Math.sin(a)*radius;
-            double surface=WarpSurface.height(level,x,z,c.at.y,radius);
+            double surface=WarpSurface.height(level,x,z,c.at.x,c.at.y,c.at.z);
             double y=(Double.isNaN(surface)?c.at.y:surface)+.08;
             AABB box=living.getType().getAABB(x,y,z);
             if(level.noCollision(box)&&!level.containsAnyLiquid(box))return new Vec3(x,y,z);

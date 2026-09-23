@@ -158,7 +158,8 @@ public final class PocketRealm {
         prepare(realm,plot);
         Vec3 spawn=centre(plot);
         if(!move(p,realm,spawn,180,0))return false;
-        com.hexgodofstories.warping.WarpEmergence.begin(p,spawn,Vec3.ZERO,true);
+        p.setDeltaMovement(0,-.22,0);p.fallDistance=0;p.hurtMarked=true;
+        p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(p));
         p.displayClientMessage(Component.literal("Your world tree. G chooses the exit route; R leaves through it."),true);
         return true;
     }
@@ -223,13 +224,13 @@ public final class PocketRealm {
      * @param spread index within a travelling group, so a crowd fans out around the arrival instead
      *               of piling into one column
      */
-    public static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster) {return cross(e,caster,null,0,null);}
-    public static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster,FractureAnchor anchor,int spread) {return cross(e,caster,anchor,spread,null);}
-    /** Warping sinks below the source floor; remember where the body first stood instead. */
-    public static boolean crossFromWarp(net.minecraft.world.entity.Entity e,ServerPlayer caster,Vec3 stood) {
-        return cross(e,caster,null,0,stood);
+    public static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster) {return cross(e,caster,null,0,null,new Vec3(0,-.22,0),0);}
+    public static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster,FractureAnchor anchor,int spread) {return cross(e,caster,anchor,spread,null,new Vec3(0,-.22,0),0);}
+    /** Warping sinks below the source floor; remember where the body first stood and keep its fall. */
+    public static boolean crossFromWarp(net.minecraft.world.entity.Entity e,ServerPlayer caster,Vec3 stood,Vec3 momentum,float fall) {
+        return cross(e,caster,null,0,stood,momentum,fall);
     }
-    private static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster,FractureAnchor anchor,int spread,Vec3 stood) {
+    private static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster,FractureAnchor anchor,int spread,Vec3 stood,Vec3 inboundMotion,float inboundFall) {
         if(!e.isAlive()||e.isRemoved()||e.isSpectator())return false;
         boolean homeward=inside(e.level());
         CompoundTag d=travelData(e);
@@ -253,10 +254,17 @@ public final class PocketRealm {
         if(at==null)at=safeArrival(e,destination,target);
         if(at==null)return false;
         if(e instanceof ServerPlayer p) {
-            if(!homeward&&anchor==null)d.putInt("realmPlot",plot);
+            boolean exiting=homeward||anchor!=null;
+            if(!exiting)d.putInt("realmPlot",plot);
             if(!move(p,destination,at,yaw,pitch))return false;
-            if(homeward||anchor!=null)d.remove("realmPlot");
-            com.hexgodofstories.warping.WarpEmergence.begin(p,at,Vec3.ZERO,true);return true;
+            if(exiting){
+                d.remove("realmPlot");
+                com.hexgodofstories.warping.WarpEmergence.begin(p,at,Vec3.ZERO,true);
+            }else{
+                p.setDeltaMovement(inboundMotion);p.fallDistance=inboundFall;p.hurtMarked=true;
+                p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(p));
+            }
+            return true;
         }
         e.stopRiding();e.ejectPassengers();
         Vec3 landing=at;
@@ -275,7 +283,8 @@ public final class PocketRealm {
         });
         if(moved==null)return false;
         travelData(moved).putLong("riftGraceUntil",caster.server.overworld().getGameTime()+com.hexgodofstories.entity.RiftEntity.DURATION+20);
-        com.hexgodofstories.warping.WarpEmergence.begin(moved,landing,Vec3.ZERO,true);
+        if(homeward||anchor!=null)com.hexgodofstories.warping.WarpEmergence.begin(moved,landing,Vec3.ZERO,true);
+        else{moved.setDeltaMovement(inboundMotion);moved.fallDistance=inboundFall;moved.hurtMarked=true;}
         return true;
     }
 

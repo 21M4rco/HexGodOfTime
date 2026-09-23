@@ -9,77 +9,85 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
- * The floor a break is spreading across, column by column.
+ * The floor a Warping puddle is spreading across.
  *
- * <p>A portal drawn on one flat plane is a portal that clips through the step it runs into and
- * hangs over the one it runs off. Every point of the fracture asks here what it is lying on
- * instead, and gets the top of whatever is actually there: the collision shape's own upper face,
- * so a slab is half a block, a stair's lower half is half a block, and a full block is a block.
- *
- * <p>The portal is a puddle, not ivy. It may cross slabs, stairs and a single-block terrain step,
- * but it must never discover a tree canopy, wall top or roof several blocks above and then climb
- * vertically toward it. Upward reach is therefore tightly capped from the original floor plane;
- * only the downward search widens with distance so the goo may spill down a bank without crawling
- * up obstacles.
- *
- * <p>Tree logs and leaves are never treated as floor. A candidate surface must also have collision-
- * free space in the block directly above it. That makes a wall column, trunk column or other solid
- * vertical obstacle terminate the puddle instead of becoming a staircase for it.
- *
- * <p>A column with no valid ground surface answers {@link Double#NaN}: there is nothing there for
- * the goo to spread across, and the caller drops that piece rather than floating or climbing.
+ * <p>The important rule is continuity, not a global height cap. Natural terrain often rises two,
+ * three or more blocks across a large puddle, but it does so one step at a time. A wall rises several
+ * blocks in one column. Walking the columns from the portal centre to the requested point lets the
+ * goo follow the former without ever deciding the top of the latter is floor.
  */
 public final class WarpSurface {
-    private WarpSurface() { }
+    private WarpSurface(){}
 
-    /** A puddle may take one normal terrain step upward, but never climb a vertical obstacle. */
-    private static final double RISE = 1.05;
-    /** Downhill spill is more permissive because falling off a bank still reads as liquid. */
-    private static final double DROP = 2.6;
-    /** Only the downward search widens with distance; upward reach stays hard-capped. */
-    private static final double SPREAD = 0.28, LIMIT = 7.0;
+    /** Largest single upward terrain step the goo may climb. */
+    private static final double STEP_UP=1.05;
+    /** It may spill farther down than it may climb up. */
+    private static final double STEP_DOWN=2.65;
+    /** Extra downhill allowance as the puddle runs farther from its centre. */
+    private static final double DOWN_SPREAD=.22,DOWN_LIMIT=5.5;
 
     /**
-     * @param distance blocks from the centre of the break, which widens the window it may find a
-     *                 surface in
-     * @return the world Y of the surface in this column, or NaN when nothing in it can be cracked
+     * Resolve a target column by walking block-columns outward from the portal centre.
+     *
+     * <p>This is what fixes natural hills. A point two blocks above the centre is valid when the
+     * route reaches it as two one-block steps, but invalid when the first column is a two-block wall.
+     * Logs/leaves are never selected as floor, and a tree directly above real ground is allowed to
+     * occlude the goo visually rather than turning the trunk into a staircase.
      */
-    public static double height(BlockGetter level, double x, double z, double originY, double distance) {
-        double window = Math.min(LIMIT, distance * SPREAD);
-        // Critical: distance is allowed to increase only the downhill spill. Letting it increase
-        // 'up' is what made a large charged portal discover leaves and roofs and climb them.
-        double up = originY + RISE, down = originY - DROP - window;
-        int top = Mth.floor(up), bottom = Mth.floor(down);
-        int bx=Mth.floor(x),bz=Mth.floor(z);
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(bx, top, bz);
-        BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos(bx, top+1, bz);
-        for (int y = top; y >= bottom; y--) {
+    public static double height(BlockGetter level,double x,double z,double originX,double originY,double originZ){
+        int ox=Mth.floor(originX),oz=Mth.floor(originZ),tx=Mth.floor(x),tz=Mth.floor(z);
+        int dx=tx-ox,dz=tz-oz,steps=Math.max(Math.abs(dx),Math.abs(dz));
+        double current=surfaceNear(level,ox,oz,originY,STEP_DOWN);
+        if(Double.isNaN(current))current=originY;
+        int lastX=ox,lastZ=oz;
+        if(steps==0)return surfaceNear(level,tx,tz,current,STEP_DOWN);
+
+        for(int i=1;i<=steps;i++){
+            double f=i/(double)steps;
+            int bx=Mth.floor(originX+(x-originX)*f);
+            int bz=Mth.floor(originZ+(z-originZ)*f);
+            if(bx==lastX&&bz==lastZ)continue;
+            double distance=Math.hypot(bx-ox,bz-oz);
+            double down=STEP_DOWN+Math.min(DOWN_LIMIT,distance*DOWN_SPREAD);
+            double next=surfaceNear(level,bx,bz,current,down);
+            if(Double.isNaN(next)||next-current>STEP_UP+.001)return Double.NaN;
+            current=next;lastX=bx;lastZ=bz;
+        }
+        return current;
+    }
+
+    /**
+     * Nearest valid walkable surface in one column around the previous surface height.
+     * Solid buildings terminate the route; foliage/trunks can occlude a ground surface but never
+     * become the surface themselves.
+     */
+    private static double surfaceNear(BlockGetter level,int bx,int bz,double around,double down){
+        int top=Mth.floor(around+STEP_UP),bottom=Mth.floor(around-down);
+        BlockPos.MutableBlockPos pos=new BlockPos.MutableBlockPos(bx,top,bz);
+        BlockPos.MutableBlockPos above=new BlockPos.MutableBlockPos(bx,top+1,bz);
+        for(int y=top;y>=bottom;y--){
             pos.setY(y);
-            BlockState state = level.getBlockState(pos);
-            if (state.isAir()) continue;
+            BlockState state=level.getBlockState(pos);
+            if(state.isAir()||state.is(BlockTags.LOGS)||state.is(BlockTags.LEAVES))continue;
+            VoxelShape shape=state.getCollisionShape(level,pos);
+            if(shape.isEmpty())continue;
+            double surface=y+shape.max(Direction.Axis.Y);
+            if(surface>around+STEP_UP+.001)continue;
 
-            // Trees are obstacles, not terrain. Skipping them also means a canopy can never become
-            // a false floor several blocks above the real ground.
-            if (state.is(BlockTags.LOGS) || state.is(BlockTags.LEAVES)) continue;
-
-            VoxelShape shape = state.getCollisionShape(level, pos);
-            if (shape.isEmpty()) continue;
-            double surface = y + shape.max(Direction.Axis.Y);
-            if (surface > up) continue;
-
-            // A floor surface needs open/non-colliding room directly above it. Solid stacked
-            // columns are walls/trunks/buildings and terminate the puddle instead of lifting it.
             above.setY(y+1);
-            BlockState over = level.getBlockState(above);
-            if (!over.getCollisionShape(level, above).isEmpty()) continue;
-
+            BlockState over=level.getBlockState(above);
+            if(!over.getCollisionShape(level,above).isEmpty()
+                &&!over.is(BlockTags.LOGS)&&!over.is(BlockTags.LEAVES))continue;
             return surface;
         }
         return Double.NaN;
     }
 
-    /** The same question asked straight down from the break's own centre. */
-    public static double height(BlockGetter level, double x, double z, double originY) {
-        return height(level, x, z, originY, 0);
+    /** Compatibility form for callers/tests that only ask the centre column. */
+    public static double height(BlockGetter level,double x,double z,double originY,double distance){
+        return height(level,x,z,x,originY,z);
+    }
+    public static double height(BlockGetter level,double x,double z,double originY){
+        return height(level,x,z,x,originY,z);
     }
 }

@@ -105,7 +105,8 @@ public final class WarpRealms {
                 com.hexgodofstories.server.CosmicFlight.revoke(p);
                 if(!p.isCreative()&&!p.isSpectator()){p.getAbilities().flying=false;p.onUpdateAbilities();}
             }
-            WarpEmergence.begin(p,pos,Vec3.ZERO,true);
+            p.setDeltaMovement(0,-.30,0);p.fallDistance=0;p.hurtMarked=true;
+            p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(p));
             return;
         }
         UUID original=e.getUUID();
@@ -117,10 +118,9 @@ public final class WarpRealms {
                 return copy;
             }
         });
-        if(moved!=null){WarpResidency.track(moved,original);WarpEmergence.begin(moved,pos,Vec3.ZERO,true);}
+        if(moved!=null){moved.setDeltaMovement(0,-.30,0);moved.fallDistance=0;moved.hurtMarked=true;WarpResidency.track(moved,original);}
     }
     /**
-     * A crossing that carries its motion with it.    /**
      * A crossing that carries its motion with it.
      *
      * <p>{@link #transfer} puts a body at a destination. This puts it <em>through</em> one: it is
@@ -160,7 +160,7 @@ public final class WarpRealms {
         ServerLevel old=(ServerLevel)e.level();
         if(d==Destination.SANCTUM){
             ServerPlayer caster=old.getServer().getPlayerList().getPlayer(sender);
-            if(caster==null||!PocketRealm.crossFromWarp(e,caster,stood))e.noPhysics=false;
+            if(caster==null||!PocketRealm.crossFromWarp(e,caster,stood,momentum,fall))e.noPhysics=false;
             return;
         }
         ServerLevel to=old.getServer().getLevel(d.key);
@@ -179,11 +179,13 @@ public final class WarpRealms {
                 com.hexgodofstories.server.CosmicFlight.revoke(p);
                 if(!p.isCreative()&&!p.isSpectator()){p.getAbilities().flying=false;p.onUpdateAbilities();}
             }
-            p.setDeltaMovement(Vec3.ZERO);
-            p.fallDistance=0;
+            // Entering a dimension is still a fall through the source puddle. No destination-side
+            // rise animation: preserve the movement that carried the body through.
+            p.setDeltaMovement(momentum);
+            p.fallDistance=fall;
             p.hurtMarked=true;
             WarpResidency.track(p,sender);
-            WarpEmergence.begin(p,pos,momentum,true);
+            p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(p));
             return;
         }
         e.stopRiding();
@@ -192,11 +194,10 @@ public final class WarpRealms {
             if(copy!=null){copy.moveTo(pos.x,pos.y,pos.z,yaw,pitch);copy.setDeltaMovement(momentum);copy.fallDistance=fall;copy.noPhysics=false;}
             return copy;}});
         if(moved==null){e.noPhysics=false;return;}
-        moved.setDeltaMovement(Vec3.ZERO);
-        moved.fallDistance=0;
+        moved.setDeltaMovement(momentum);
+        moved.fallDistance=fall;
         moved.hurtMarked=true;
         WarpResidency.track(moved,sender);
-        WarpEmergence.begin(moved,pos,momentum,true);
     }
     /** How far from a realm's entry point a crossing may come out, in blocks. */
     private static final double ENTRY_SPREAD=6;

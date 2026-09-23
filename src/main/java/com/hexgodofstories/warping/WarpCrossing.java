@@ -386,7 +386,7 @@ public final class WarpCrossing {
     /** The floor this body is going through, taken from the column it is actually standing in. */
     private static double plane(Break brk, Entity e) {
         double dx = e.getX() - brk.at().x, dz = e.getZ() - brk.at().z;
-        return WarpSurface.height(brk.level(), e.getX(), e.getZ(), brk.at().y, Math.sqrt(dx * dx + dz * dz));
+        return WarpSurface.height(brk.level(),e.getX(),e.getZ(),brk.at().x,brk.at().y,brk.at().z);
     }
 
     // ------------------------------------------------------------------ what it looks like
