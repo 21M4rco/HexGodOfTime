@@ -167,7 +167,7 @@ public final class WarpCrossing {
      * This is what {@code CrossingPhysicsMixin} asks every tick to keep the floor out of the way.
      */
     public static boolean sinking(Entity e) {
-        return e.level().isClientSide ? CLIENT_GRANT.test(e.getId()) : crossing(e);
+        return e.level().isClientSide ? CLIENT_GRANT.test(e.getId()) : crossing(e)||WarpEmergence.active(e);
     }
 
     /** Whether anything is inside this break, or has just left through it. */
@@ -206,8 +206,8 @@ public final class WarpCrossing {
             if (!entry.getValue().portal.equals(brk.portal())) continue;
             Entity e = level.getEntity(entry.getKey());
             if(e!=null&&e.isAlive()&&!e.isRemoved()&&area.intersects(e.getBoundingBox())&&allowed.test(e))continue;
-            PASSAGES.remove(entry.getKey());
-            if(e!=null)release(e);
+            if(e!=null&&e.isAlive()&&area.intersects(e.getBoundingBox()))abort(e,entry.getValue(),true);
+            else {PASSAGES.remove(entry.getKey());if(e!=null)release(e);}
         }
         SETTLING.values().removeIf(until -> until <= now);
         STIRRED.values().removeIf(until -> until <= now);
@@ -369,8 +369,8 @@ public final class WarpCrossing {
     /** Player lifecycle cleanup; never move a player back to a source floor after dimension change. */
     public static void forget(ServerPlayer p){
         Passage passage=PASSAGES.remove(p.getUUID());
-        SETTLING.remove(p.getUUID());
         if(passage==null)return;
+        SETTLING.remove(p.getUUID());
         if(p.isAlive()&&p.level().dimension()==passage.dimension)abort(p,passage,true);
         else release(p);
     }

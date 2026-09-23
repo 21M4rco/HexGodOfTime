@@ -13,7 +13,12 @@ public final class WarpEmergenceClient {
     private static final Map<Integer,Rise> ACTIVE=new HashMap<>();
 
     public static void receive(int id,CompoundTag n){
-        if(n.getBoolean("clear")){ACTIVE.remove(id);return;}
+        if(n.getBoolean("clear")){
+            ACTIVE.remove(id);
+            var player=Minecraft.getInstance().player;
+            if(player!=null&&player.getId()==id&&!player.isSpectator()&&!WarpCrossingClient.phasing(id))player.noPhysics=false;
+            return;
+        }
         ACTIVE.put(id,new Rise(n.getDouble("x"),n.getDouble("z"),n.getDouble("topY"),n.getDouble("startY"),
             n.getLong("start"),Math.max(1,n.getInt("duration"))));
     }
@@ -27,13 +32,13 @@ public final class WarpEmergenceClient {
         double y=s.startY()+(s.topY()-s.startY())*eased;
         p.noPhysics=true;p.setPos(s.x(),y,s.z());
         p.setDeltaMovement(Vec3.ZERO);p.fallDistance=0;p.setSprinting(false);
-        if(t>=1){p.noPhysics=false;ACTIVE.remove(p.getId());}
+        if(t>=1){p.noPhysics=p.isSpectator();ACTIVE.remove(p.getId());}
         return true;
     }
 
     public static void clear(){
         Minecraft mc=Minecraft.getInstance();
-        if(mc.player!=null&&ACTIVE.containsKey(mc.player.getId()))mc.player.noPhysics=false;
+        if(mc.player!=null&&ACTIVE.containsKey(mc.player.getId()))mc.player.noPhysics=mc.player.isSpectator();
         ACTIVE.clear();
     }
 }

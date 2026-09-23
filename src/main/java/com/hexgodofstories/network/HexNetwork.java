@@ -12,7 +12,7 @@ import net.minecraftforge.network.*;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class HexNetwork {
-    public static final SimpleChannel CHANNEL=NetworkRegistry.newSimpleChannel(HexGodOfStories.id("main"),()->"5","5"::equals,"5"::equals);
+    public static final SimpleChannel CHANNEL=NetworkRegistry.newSimpleChannel(HexGodOfStories.id("main"),()->"6","6"::equals,"6"::equals);
     /** Highest accepted client action id; see {@link HexServer#input}. */
     public static final int MAX_ACTION=16;
     public static final int SYNC=0,ANIMATE=1,FX=2,FROZEN=3,GRIP=4,MEMORY=5,THREADS=6,SLOWED=7,ARCHITECTURE=8,BLEED=9,FIELD=10,DISGUISE=11,

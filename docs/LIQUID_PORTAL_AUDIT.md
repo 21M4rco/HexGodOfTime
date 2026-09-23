@@ -22,6 +22,10 @@ The base build succeeded; its dedicated-server run 35862373432 failed at
 - Release residency tickets immediately on confirmed entity removal/transfer, retaining saved
   residency across ordinary chunk unloads. This fixes the baseline Paradise test failure.
 
+Clients and server must both update: protocol version 6 rejects older peers, and the mod-list
+version now matches the 0.6.1-liquid artifact. The living movement hook honours both entry and exit
+phasing, so vanilla player movement cannot clear the exit animation's no-collision grant.
+
 ## Verification gates
 
 `build` includes area-conservation tests across 24 outlines and three spread stages at fractional

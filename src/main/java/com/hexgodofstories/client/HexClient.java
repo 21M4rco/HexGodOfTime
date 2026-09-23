@@ -52,7 +52,7 @@ public final class HexClient {
          * nothing common ever has to name a client-only class.
          */
         @SubscribeEvent public static void crossings(net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent e) {
-            e.enqueueWork(()->com.hexgodofstories.warping.WarpCrossing.clientGrant(WarpCrossingClient::phasing));
+            e.enqueueWork(()->com.hexgodofstories.warping.WarpCrossing.clientGrant(id->WarpCrossingClient.phasing(id)||WarpEmergenceClient.emerging(id)));
         }
         @SubscribeEvent public static void keys(RegisterKeyMappingsEvent e) {
             for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT,RECALL})e.register(k);
