@@ -21,6 +21,7 @@ public final class ParadiseArchitecture {
         for (int i=0;i<Paradise.isles().size();i++) island(b,Paradise.isles().get(i),i,random);
         for (Paradise.Fall fall:Paradise.falls()) waterfall(b,fall);
         castle(b,0,Paradise.SURFACE+1,-12);
+        rearGarden(b,0,Paradise.SURFACE,-12);
         cottage(b,-70,155,10,false);
         cottage(b,-77,155,1,false);
         cottage(b,70,159,12,true);
@@ -69,9 +70,14 @@ public final class ParadiseArchitecture {
             }
             if(inland>3)meadow.add(new BlockPos(x,top,z));
         }
+        // The old blanket +8,+5 pond placement put water directly into bridge approaches on the
+        // small tower islands. Explicit placements keep every pool well inside its island and well
+        // away from every bridge landing. The two tower satellites are gardens now, not lakes.
+        if(index>=1&&index<=5&&index!=3)clearOldPondSurface(b,cx+8,top,cz+5,3.5);
         if(index==0)pond(b,0,top,13,Paradise.SPRING_RADIUS);
         else if(index==3)pond(b,cx,top,cz,8);
-        else if(index<6)pond(b,cx+8,top,cz+5,3.5);
+        else if(index==1)pond(b,cx-18,top,cz-5,3.25);
+        else if(index==2)pond(b,cx+16,top,cz+6,3.25);
         List<BlockPos> planted=new ArrayList<>();
         Collections.shuffle(meadow,random);
         for(BlockPos ground:meadow) {
@@ -131,12 +137,32 @@ public final class ParadiseArchitecture {
     }
 
     private static boolean reserved(int isle,int x,int z) {
-        if(isle==0)return (Math.abs(x)<20&&z<5)||(Math.abs(x)<8&&z>20)
-            ||Math.abs(Math.abs(x)-13)<3||Math.abs(z-27)<3;
+        if(isle==0) {
+            // Do not reserve the entire half of the island behind the castle. That old unbounded
+            // z<5 clause is why the rear lawn was a featureless green plate.
+            boolean castleAndTowers=Math.abs(x)<20&&z>-31&&z<5;
+            boolean formalRearGarden=Math.abs(x)<15&&z>=-38&&z<=-24;
+            return castleAndTowers||formalRearGarden||(Math.abs(x)<8&&z>20)
+                ||Math.abs(Math.abs(x)-13)<3||Math.abs(z-27)<3;
+        }
         if(isle==1||isle==2)return Math.abs(x)<15&&Math.abs(z)<12;
         if(isle==4||isle==5)return Math.abs(x)<7&&Math.abs(z)<7;
         return false;
     }
+    /**
+     * Removes only the old pond's above-surface decorations during a Paradise layout upgrade.
+     * The island terrain itself replaces the old water and floor blocks; explicit AIR here is what
+     * also removes old lily pads instead of leaving them hovering over the restored grass.
+     */
+    private static void clearOldPondSurface(Map<BlockPos,BlockState>b,int cx,int y,int cz,double radius) {
+        int r=(int)Math.ceil(radius+2);
+        for(int dx=-r;dx<=r;dx++)for(int dz=-r;dz<=r;dz++) {
+            double dist=Math.hypot(dx+.5,dz+.5);
+            double rim=radius*(.91+.09*Math.sin(Math.atan2(dz+.5,dx+.5)*3+.8));
+            if(dist<=rim+1.3)put(b,cx+dx,y+1,cz+dz,Blocks.AIR);
+        }
+    }
+
     private static void pond(Map<BlockPos,BlockState>b,int cx,int y,int cz,double radius) {
         int r=(int)Math.ceil(radius+2);
         for(int dx=-r;dx<=r;dx++)for(int dz=-r;dz<=r;dz++) {
@@ -182,13 +208,60 @@ public final class ParadiseArchitecture {
             }
         }
     }
+    /**
+     * A formal candy garden behind the castle. The old broad reservation kept this whole side bare;
+     * this gives it an intentional destination: rear door, tiled walk, flower beds, hedges, lamps
+     * and two small candy standards, while still leaving breathing room around the rear towers.
+     */
+    private static void rearGarden(Map<BlockPos,BlockState>b,int x,int y,int z) {
+        int back=z-12; // one block behind the rear wall / towers
+
+        // Central walk from the new rear door to the edge of the garden.
+        for(int zz=back;zz>=z-25;zz--)for(int dx=-1;dx<=1;dx++) {
+            if(Paradise.inland(Paradise.heart(),x+dx+.5,zz+.5)<2.5)continue;
+            put(b,x+dx,y,zz,((zz+dx)&3)==0?Blocks.PINK_TERRACOTTA:Blocks.SMOOTH_QUARTZ);
+            for(int clear=1;clear<=3;clear++)b.remove(new BlockPos(x+dx,y+clear,zz));
+        }
+        // Cross walk breaks the long strip into a proper courtyard.
+        int cross=z-20;
+        for(int xx=x-11;xx<=x+11;xx++)for(int dz=-1;dz<=1;dz++) {
+            if(Paradise.inland(Paradise.heart(),xx+.5,cross+dz+.5)<2.5)continue;
+            put(b,xx,y,cross+dz,((xx+dz)&3)==0?Blocks.PINK_TERRACOTTA:Blocks.SMOOTH_QUARTZ);
+            for(int clear=1;clear<=3;clear++)b.remove(new BlockPos(xx,y+clear,cross+dz));
+        }
+
+        Block[] flowers={Blocks.PINK_TULIP,Blocks.WHITE_TULIP,Blocks.ALLIUM,Blocks.LILY_OF_THE_VALLEY,
+            Blocks.OXEYE_DAISY,Blocks.CORNFLOWER,Blocks.AZURE_BLUET,Blocks.PINK_PETALS};
+        int far=z-24;
+        for(int side:new int[]{-1,1}) {
+            // Two dense mirrored beds, bounded by low flowering hedges.
+            for(int xx=4;xx<=10;xx++)for(int zz=z-17;zz>=far;zz--) {
+                int px=x+side*xx;
+                if(Paradise.inland(Paradise.heart(),px+.5,zz+.5)<2.5)continue;
+                if(xx==10||zz==z-17||zz==far) {
+                    if(((xx+zz)&1)==0)put(b,px,y+1,zz,Blocks.FLOWERING_AZALEA);
+                } else if(((xx*7+zz*11)&3)!=0) {
+                    put(b,px,y+1,zz,flowers[Math.floorMod(xx*13+zz*5+(side<0?3:0),flowers.length)]);
+                }
+            }
+            // Candy standards make the rear silhouette readable from the satellite islands.
+            int candyX=x+side*13,candyZ=z-22;
+            if(Paradise.inland(Paradise.heart(),candyX+.5,candyZ+.5)>4)
+                lollipop(b,candyX,y+1,candyZ,2,side<0?Blocks.PINK_CONCRETE:Blocks.MAGENTA_CONCRETE);
+            gumdrop(b,x+side*8,y+1,z-19,side<0?Blocks.RED_CONCRETE:Blocks.LIGHT_BLUE_CONCRETE);
+        }
+
+        for(int zz:new int[]{z-18,z-24})for(int sx:new int[]{-3,3})
+            lamp(b,x+sx,y+1,zz);
+    }
+
     private static void castle(Map<BlockPos,BlockState>b,int x,int y,int z) {
         // Hollow hall, two usable floors, open front doors and illuminated lancet windows.
         for(int dx=-9;dx<=9;dx++)for(int dz=-11;dz<=9;dz++)for(int dy=0;dy<=17;dy++) {
             boolean wall=Math.abs(dx)==9||dz==-11||dz==9;
             if(dy==0||dy==9||dy==17)put(b,x+dx,y+dy,z+dz,dy==0?Blocks.QUARTZ_BRICKS:Blocks.CHERRY_PLANKS);
             else if(wall) {
-                boolean door=dz==9&&Math.abs(dx)<=2&&dy<=5;
+                boolean door=(dz==9||dz==-11)&&Math.abs(dx)<=2&&dy<=5;
                 if(door){b.remove(new BlockPos(x+dx,y+dy,z+dz));continue;}
                 boolean window=(dy>=4&&dy<=7||dy>=12&&dy<=15)&&(Math.floorMod(dx+dz,6)==0);
                 put(b,x+dx,y+dy,z+dz,window?Blocks.OCHRE_FROGLIGHT:dy%9==1?Blocks.PINK_TERRACOTTA:Blocks.SMOOTH_QUARTZ);

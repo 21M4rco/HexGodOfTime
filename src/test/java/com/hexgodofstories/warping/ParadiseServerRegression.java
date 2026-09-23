@@ -44,6 +44,32 @@ public final class ParadiseServerRegression {
             ||s.is(Blocks.CORNFLOWER)||s.is(Blocks.AZURE_BLUET)||s.is(Blocks.PINK_PETALS)
             ||s.is(Blocks.FLOWERING_AZALEA)).count();
         check(flowers>180,"the islands have dense garden detail");
+
+        // No surface pool may occupy a bridge approach. This is the exact geometry regression that
+        // previously made the tower-island pond merge into the wooden bridge.
+        for(Paradise.Bridge bridge:Paradise.BRIDGES)for(int isleIndex:new int[]{bridge.from(),bridge.to()}) {
+            Paradise.Isle isle=Paradise.isles().get(isleIndex);
+            Paradise.Isle other=Paradise.isles().get(isleIndex==bridge.from()?bridge.to():bridge.from());
+            Vec3 end=Paradise.bridgeEnd(isle,other);
+            for(var e:blueprint.entrySet()) {
+                BlockPos p=e.getKey();
+                if(!e.getValue().is(Blocks.WATER)||Math.abs(p.getY()-isle.y())>2)continue;
+                check(Math.hypot(p.getX()+.5-end.x,p.getZ()+.5-end.z)>6.5,
+                    "bridge approach "+isleIndex+" stays clear of pond water");
+            }
+        }
+
+        long rearDetail=blueprint.entrySet().stream().filter(e->{
+            BlockPos p=e.getKey();var s=e.getValue();
+            if(p.getX()<-15||p.getX()>15||p.getZ()<-38||p.getZ()>-24||p.getY()<161||p.getY()>170)return false;
+            return s.is(Blocks.PINK_TULIP)||s.is(Blocks.WHITE_TULIP)||s.is(Blocks.ALLIUM)
+                ||s.is(Blocks.LILY_OF_THE_VALLEY)||s.is(Blocks.OXEYE_DAISY)||s.is(Blocks.CORNFLOWER)
+                ||s.is(Blocks.AZURE_BLUET)||s.is(Blocks.PINK_PETALS)||s.is(Blocks.FLOWERING_AZALEA)
+                ||s.is(Blocks.PINK_CONCRETE)||s.is(Blocks.MAGENTA_CONCRETE)||s.is(Blocks.QUARTZ_PILLAR)
+                ||s.is(Blocks.LANTERN);
+        }).count();
+        check(rearDetail>45,"the rear of the castle is a decorated garden rather than empty lawn");
+
         // Dump a reproducible overview for visual inspection of the actual generated blueprint.
         try {
             var lines=new ArrayList<String>();
