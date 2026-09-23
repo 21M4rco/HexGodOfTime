@@ -1,7 +1,7 @@
 name: Warping dedicated server smoke
 on:
   push:
-    branches: [codex/warping, claude/eager-cerf-ujhdbd, claude/leviathan-mod-fixes-damg09, claude/adoring-planck-dmfswl]
+    branches: [codex/warping, codex/paradise-time-rework, claude/eager-cerf-ujhdbd, claude/leviathan-mod-fixes-damg09, claude/adoring-planck-dmfswl]
   workflow_dispatch:
 concurrency:
   group: warping-smoke-${{ github.ref }}
