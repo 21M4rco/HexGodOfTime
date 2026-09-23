@@ -60,3 +60,11 @@ Follow-up presentation patch:
 - The tap move's mechanics are unchanged; its arm and implosion presentation is now black/green too.
 - The beam front advances at 2.25 blocks/tick instead of 6.5. Damage, erasure, Nothingness conversion,
   client rendering and restore scheduling continue to use the same authoritative front.
+
+
+### Visibility/speed correction
+- The first black/green pass still dimmed the released local beam to 18%, which made it almost invisible.
+  Held charge remains restrained for aiming, but the fired beam now renders at 86% local visibility.
+- The black body now uses a dedicated near-solid alpha texture rather than the noisy nebula sheet, so it
+  reads as a dense mass instead of transparent smoke.
+- Sweep speed is now 0.65 blocks/tick; the 100-block front takes roughly 7.7 seconds to travel.

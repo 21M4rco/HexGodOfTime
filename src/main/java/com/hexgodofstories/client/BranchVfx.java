@@ -33,7 +33,7 @@ import java.util.*;
 public final class BranchVfx {
     private BranchVfx() {}
 
-    private static ResourceLocation glowSheet,strandSheet,cloudSheet;
+    private static ResourceLocation glowSheet,strandSheet,cloudSheet,massSheet;
     private static RenderType glowType,strandType,cloudType,shadowType;
 
     public static void clear() {
@@ -41,7 +41,8 @@ public final class BranchVfx {
         if(glowSheet!=null)textures.release(glowSheet);
         if(strandSheet!=null)textures.release(strandSheet);
         if(cloudSheet!=null)textures.release(cloudSheet);
-        glowSheet=null;strandSheet=null;cloudSheet=null;
+        if(massSheet!=null)textures.release(massSheet);
+        glowSheet=null;strandSheet=null;cloudSheet=null;massSheet=null;
         glowType=null;strandType=null;cloudType=null;shadowType=null;
     }
 
@@ -60,9 +61,12 @@ public final class BranchVfx {
         if(cloudType==null)cloudType=RenderType.energySwirl(cloudSheet(),0,0);
         return cloudType;
     }
-    /** Dark alpha-blended volume. Additive black is invisible, so the beam's mass uses this pass. */
+    /**
+     * Dense alpha-blended dark volume. This intentionally does NOT use the noisy cloud sheet: that
+     * texture punched holes through the beam and made the whole attack look nearly transparent.
+     */
     public static RenderType shadow() {
-        if(shadowType==null)shadowType=RenderType.entityTranslucentEmissive(cloudSheet());
+        if(shadowType==null)shadowType=RenderType.entityTranslucentEmissive(massSheet());
         return shadowType;
     }
 
@@ -97,6 +101,18 @@ public final class BranchVfx {
             return Math.min(1,Math.pow(1-r,1.8)*Math.min(1,Math.max(0,(shape-.16)*3))*(.5+.7*detail)*1.5);
         });
         return cloudSheet;
+    }
+    /** Nearly-solid alpha sheet for the actual black beam body. */
+    private static ResourceLocation massSheet() {
+        if(massSheet!=null)return massSheet;
+        massSheet=bake("hexgodofstories_branch_mass",64,(u,v)->{
+            double r=Math.sqrt(u*u+v*v);
+            if(r>=1)return 0;
+            double edge=1-Mth.clamp((float)((r-.76)/.24),0,1);
+            double slowNoise=.92+.08*RealmSky.fbm(u*2.2+4,v*2.2-7,9);
+            return Math.min(1,(.90+.10*edge)*slowNoise);
+        });
+        return massSheet;
     }
 
     @FunctionalInterface private interface Field { double at(double u,double v); }

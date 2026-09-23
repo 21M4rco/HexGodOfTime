@@ -23,10 +23,10 @@ public final class BranchCharge {
     /** The caster's own hitbox ends well short of this, which is what keeps them out of their own beam. */
     public static final double SAFE=2.4;
     /**
-     * Blocks per tick the leading front travels. The old 6.5-block burst crossed the whole attack
-     * almost instantly; this slower value makes the torrent visibly push forward like a heavy wave.
+     * Blocks per tick the leading front travels. This is deliberately very slow: the full hundred-block
+     * front takes roughly eight seconds to travel, so the player actually watches the wave push forward.
      */
-    public static final double SWEEP=2.25;
+    public static final double SWEEP=.65;
     /** Ticks the torrent stays open once the front has arrived, and the dissipation after it. */
     public static final int OPEN=16,FADE=16;
     /** Ticks a block spends coming apart before it is taken out of the world. */

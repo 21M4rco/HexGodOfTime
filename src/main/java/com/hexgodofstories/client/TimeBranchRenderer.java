@@ -184,13 +184,13 @@ public final class TimeBranchRenderer {
             double distance=caster.position().distanceToSqr(camera);
             if(distance>VISIBLE)continue;
             int held=(int)Mth.clamp(time-entry.getValue(),0,BranchCharge.LIMIT);
-            sphere(PAINTER,caster,held,BranchCharge.sphere(held),1,time,distance,partial,visibility(caster));
+            sphere(PAINTER,caster,held,BranchCharge.sphere(held),1,time,distance,partial,chargeVisibility(caster));
         }
         for(Torrent t:TORRENTS) {
             double age=time-t.start;
             if(age<0||age>t.life)continue;
             if(t.origin.distanceToSqr(camera)>VISIBLE*4)continue;
-            torrent(PAINTER,t,age,time,camera,visibility(mc.level.getEntity(t.caster)));
+            torrent(PAINTER,t,age,time,camera,torrentVisibility(mc.level.getEntity(t.caster)));
         }
         PAINTER.flush(pose,buffers);
     }
@@ -203,9 +203,14 @@ public final class TimeBranchRenderer {
      * white at exactly the moment the player most needs to aim. Their own charge is therefore dimmed and
      * its centre pushed out ahead of them; everybody else sees it in full.
      */
-    private static float visibility(Entity caster) {
+    private static float chargeVisibility(Entity caster) {
         var mc=Minecraft.getInstance();
         return caster!=null&&caster==mc.player&&mc.options.getCameraType().isFirstPerson()?.18f:1;
+    }
+    /** Released beam stays clearly visible in first person; only the held charge is heavily dimmed. */
+    private static float torrentVisibility(Entity caster) {
+        var mc=Minecraft.getInstance();
+        return caster!=null&&caster==mc.player&&mc.options.getCameraType().isFirstPerson()?.86f:1;
     }
 
     /**
@@ -444,9 +449,9 @@ public final class TimeBranchRenderer {
             float phase=(float)(time*.036+distance*.028);
             colour[i]=TimeBranchPalette.shade(phase);
             hot[i]=TimeBranchPalette.hot(phase+.1f,(float)Mth.clamp(.5+pulse,0,1));
-            alpha[i]=(float)((.70+.12*t.power)*fade*(1+pulse*.10));
-            hotAlpha[i]=(float)((.34+.14*t.power)*fade*(1+pulse*.35));
-            hazeAlpha[i]=(float)((.22+.08*t.power)*fade);
+            alpha[i]=(float)((.92+.06*t.power)*fade*(1+pulse*.04));
+            hotAlpha[i]=(float)((.46+.16*t.power)*fade*(1+pulse*.25));
+            hazeAlpha[i]=(float)((.34+.10*t.power)*fade);
         }
         int sides=far?6:(t.power>.6f?12:9);
         Vec3 u=BranchVfx.perpendicular(t.direction),v=u.cross(t.direction).normalize();
@@ -454,7 +459,7 @@ public final class TimeBranchRenderer {
         // torrent is buried in, the body of the haze, and the lit inner shell the branches show through.
         double[] outer=new double[rings+1];
         float[] outerAlpha=new float[rings+1];
-        for(int i=0;i<=rings;i++){outer[i]=haze[i]*1.55;outerAlpha[i]=hazeAlpha[i]*.62f;}
+        for(int i=0;i<=rings;i++){outer[i]=haze[i]*1.42;outerAlpha[i]=hazeAlpha[i]*.72f;}
         BranchVfx.tube(painter,shadow,centres,outer,colour,outerAlpha,Math.max(5,sides-4),-.04);
         BranchVfx.tube(painter,shadow,centres,haze,colour,hazeAlpha,Math.max(5,sides-3),.06);
         BranchVfx.tube(painter,shadow,centres,wide,colour,alpha,sides,.11);
@@ -471,9 +476,9 @@ public final class TimeBranchRenderer {
             Vec3 at=t.origin.add(t.direction.scale(distance))
                 .add(u.scale(Math.cos(a)*ring)).add(v.scale(Math.sin(a)*ring))
                 .add(t.direction.scale(BranchVfx.wobble(b,age*.09,t01*4)*1.4));
-            BranchVfx.billboard(painter,shadow,at,core*(1.9+2.1*TemporalLightning.rand(b,5)),a*.6+age*.02,
+            BranchVfx.billboard(painter,shadow,at,core*(1.65+1.55*TemporalLightning.rand(b,5)),a*.6+age*.02,
                 TimeBranchPalette.shadow((float)(time*.017+TemporalPalette.offset(b))),
-                (.24f+.09f*t.power)*fade);
+                (.42f+.12f*t.power)*fade);
             if((b&2)==0)BranchVfx.billboard(painter,cloud,at,core*(.65+.45*TemporalLightning.rand(b,8)),a,
                 TimeBranchPalette.shade((float)(time*.027+b*.09)),.055f*fade);
         }
@@ -516,14 +521,14 @@ public final class TimeBranchRenderer {
         // --- the muzzle ----------------------------------------------------------------
         Vec3 muzzle=t.origin.add(t.direction.scale(BranchCharge.SAFE*.55));
         BranchVfx.billboard(painter,shadow,muzzle,core*(1.45+.18*Math.sin(time*.4)),time*.08,
-            TimeBranchPalette.shadow((float)(time*.03)),.74f*fade);
+            TimeBranchPalette.shadow((float)(time*.03)),.96f*fade);
         BranchVfx.billboard(painter,glow,muzzle,core*(.48+.08*Math.sin(time*.55)),-time*.1,
             TimeBranchPalette.hot((float)(time*.08),.82f),.42f*fade);
         if(front<t.length-.02) {
             Vec3 head=t.origin.add(t.direction.scale(front));
             double beat=1+.09*Math.sin(time*.42);
-            BranchVfx.billboard(painter,shadow,head,core*1.55*beat,time*.035,
-                TimeBranchPalette.shadow((float)(time*.025)),.86f*fade);
+            BranchVfx.billboard(painter,shadow,head,core*1.68*beat,time*.035,
+                TimeBranchPalette.shadow((float)(time*.025)),.98f*fade);
             BranchVfx.billboard(painter,glow,head,core*.66*beat,-time*.07,
                 TimeBranchPalette.hot((float)(time*.055),.78f),.48f*fade);
         }
