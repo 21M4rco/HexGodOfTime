@@ -27,7 +27,7 @@ public final class WorldEffects {
     public static final ResourceLocation WHITE=HexGodOfStories.id("textures/white.png");
     private record Echo(int entity,Vec3 pos,long end) {}
     private record Projection(BlockPos origin,long until,boolean preview,long shown,List<IllusoryWall.Placement> blocks) {}
-    private record Field(Vec3 centre,double radius,boolean stop,long started,long expires) {}
+    static record Field(Vec3 centre,double radius,boolean stop,long started,long expires) {}
 
     private static final List<Echo> ECHOES=new ArrayList<>();
     private static final Map<Integer,Projection> PROJECTIONS=new HashMap<>();
@@ -74,6 +74,7 @@ public final class WorldEffects {
         if(!n.getBoolean("active")){FIELDS.remove(caster);return;}
         FIELDS.put(caster,new Field(new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z")),n.getDouble("radius"),n.getBoolean("stop"),n.getLong("started"),n.getLong("expires")));
     }
+    static Collection<Field> fields() {return FIELDS.values();}
     /** The grasp is drawn as a construct rather than as a ring of motes; {@link GripRenderer} owns it. */
     public static void grip(int caster,CompoundTag n) {GripRenderer.set(caster,n);}
     /**
@@ -134,18 +135,6 @@ public final class WorldEffects {
             if(e==null||e.position().distanceToSqr(eye)>1024||now%3!=0)continue;
             Vec3 at=e.position().add((mc.level.random.nextDouble()-.5)*(e.getBbWidth()+.6),e.getBbHeight()*mc.level.random.nextDouble(),(mc.level.random.nextDouble()-.5)*(e.getBbWidth()+.6));
             Vfx.spark(HexGodOfStories.MOTE.get(),at,Vec3.ZERO);
-        }
-        for(Field f:FIELDS.values()) {
-            if(f.centre.distanceToSqr(eye)>6400)continue;
-            // The held edge keeps breathing so a long suspension never settles into a static shell.
-            double edgeRadius=f.stop&&f.expires==Long.MAX_VALUE
-                ?f.radius*Math.min(1,Math.max(0,(now-f.started)/(double)com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION)):f.radius;
-            if(now%2==0&&edgeRadius>0) {
-                double a=mc.level.random.nextDouble()*Math.PI*2,tilt=(mc.level.random.nextDouble()-.5)*Math.PI;
-                Vec3 edge=new Vec3(Math.cos(a)*Math.cos(tilt),Math.sin(tilt)*.55,Math.sin(a)*Math.cos(tilt));
-                Vfx.spark(f.stop?HexGodOfStories.NEBULA.get():HexGodOfStories.EMBER.get(),f.centre.add(edge.scale(edgeRadius)),edge.scale(.012));
-            }
-            if(f.stop&&now%3==0&&edgeRadius>0)Vfx.dome(HexGodOfStories.NEBULA.get(),f.centre,edgeRadius,3,.009);
         }
         GripRenderer.tick(now);
         // One pass: blade trails, rift breath, and the embedded steel each wound bleeds from.
@@ -261,19 +250,8 @@ public final class WorldEffects {
             });
             // A stopped moment arrives slowly on purpose: the edge of the field walks outward and the
             // suspended dust thickens behind it, so the world looks like it is being held, not switched.
-            case "stop" -> Vfx.bloom(entity,pos,look,26,(at,aim,t)->{
-                double elapsed=t*26-com.hexgodofstories.server.TemporalEngine.STOP_WINDUP;
-                if(elapsed<0)return;
-                double radius=10*Math.min(1,elapsed/com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION);
-                Vfx.dome(nebula,at,radius,Vfx.count(7),.014);
-                Vfx.cloud(nebula,at.add(0,1.1,0),1.2,Vfx.count(2),.005);
-            });
-            case "dilate" -> Vfx.bloom(entity,pos,look,34,(at,aim,t)->{
-                float swell=Vfx.swell(t);
-                double radius=1+7*Vfx.ease(Math.min(1,t*1.7f));
-                Vfx.ring(gold,at.add(0,.1,0),radius,Vfx.count(swell*5f),.02,.005);
-                Vfx.cloud(veil,at.add(0,1,0),1.3,Vfx.count(swell*1.3f),.005);
-            });
+            // The stopped and dilated fields use Cosmic Flight's layered cloud renderer.
+            case "stop","dilate" -> { }
             case "resume" -> Vfx.bloom(entity,pos,look,18,(at,aim,t)->{
                 float swell=Vfx.swell(t);
                 Vfx.gather(gold,at.add(0,.9,0),3.2*(1-Vfx.ease(t))+.3,Vfx.count(swell*6f),.22);
@@ -304,6 +282,24 @@ public final class WorldEffects {
             });
             case "slash" -> Vfx.bloom(entity,palm,look,7,(at,aim,t)->
                 Vfx.cone(green,at,aim,Vfx.count(Vfx.swell(t)*3f),.22,.09));
+            case "sovereign_sever" -> Vfx.bloom(-1,pos.add(0,1.62,0),look,19,(at,aim,t)->{
+                double age=t*19;
+                if(age<3||age>17)return;
+                double distance=(age-2)*.9,width=1.05+distance*.085;
+                Vec3 forward=aim.normalize(),right=forward.cross(new Vec3(0,1,0)).normalize();
+                if(right.lengthSqr()<.01)right=new Vec3(1,0,0);
+                Vec3 up=right.cross(forward).normalize(),front=at.add(forward.scale(distance));
+                if(mc.level.clip(new net.minecraft.world.level.ClipContext(at,front,
+                    net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,mc.player))
+                    .getType()!=net.minecraft.world.phys.HitResult.Type.MISS)return;
+                for(int i=0;i<=14;i++) {
+                    double angle=(i/14.0-.5)*2.5;
+                    Vec3 point=front.add(right.scale(Math.sin(angle)*width))
+                        .add(up.scale((Math.cos(angle)-.65)*width*.52));
+                    Vfx.spark(i%4==0?gold:green,point,forward.scale(.028));
+                }
+                Vfx.cloud(nebula,front,.44,2,.016);
+            });
             case "throw" -> Vfx.bloom(entity,palm,look,8,(at,aim,t)->{
                 Vfx.cone(green,at,aim,Vfx.count(Vfx.swell(t)*3f),.3,.05);
                 Vfx.cloud(nebula,at,.25,Vfx.count(Vfx.swell(t)*.7f),.01);

@@ -155,7 +155,7 @@ public final class ServerEvents {
         if(Erasure.erasing(e.getEntity())||TimeBranch.planted(e.getEntity())){e.setCanceled(true);return;}
         if(!(e.getEntity() instanceof ServerPlayer p))return;
         if(e.getTarget() instanceof LivingEntity victim)HexServer.engaged(p,victim);
-        if(p.getMainHandItem().getItem() instanceof ConjuredWeapon){e.setCanceled(true);HexServer.weapon(p,false);}
+        if(p.getMainHandItem().getItem() instanceof ConjuredWeapon weapon&&weapon.kind!=1){e.setCanceled(true);HexServer.weapon(p,false);}
     }
     @SubscribeEvent public static void interact(PlayerInteractEvent e) {
         if(e.getLevel().isClientSide||!e.isCancelable())return;

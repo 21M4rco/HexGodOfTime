@@ -29,6 +29,8 @@ public final class HexServer {
     private static final Map<UUID,ArrayDeque<Moment>> HISTORY=new HashMap<>();
     private static final Map<UUID,Charm> CHARMS=new HashMap<>();
     private static final Map<UUID,Strike> STRIKES=new HashMap<>();
+    private record SwordWave(Vec3 origin,Vec3 direction,long start,Set<UUID> struck) { }
+    private static final Map<UUID,SwordWave> SWORD_WAVES=new HashMap<>();
     private static final Map<UUID,Long> INPUT=new HashMap<>(),TRAINING=new HashMap<>();
     private static final Map<UUID,List<UUID>> ILLUSIONS=new HashMap<>();
     private static final Map<UUID,UUID> RIFTS=new HashMap<>();
@@ -330,6 +332,10 @@ public final class HexServer {
         if(!HexData.access(p)||TemporalEngine.frozen(p)||!p.isAlive()||p.isSpectator()||!(held.getItem() instanceof ConjuredWeapon w))return;
         if(hand==InteractionHand.OFF_HAND&&(!secondary||w.kind!=0))return;
         if(!ConjuredWeapon.belongsTo(held,p)){p.setItemInHand(hand,ItemStack.EMPTY);return;}
+        if(w.kind==1) {
+            if(secondary)sever(p);
+            return;
+        }
         long now=HexData.now(p);Strike prior=STRIKES.get(p.getUUID());
         if(prior!=null&&prior.end>now)return;
         int combo=prior==null||now-prior.end>18?0:(prior.combo+1)%4;
@@ -340,32 +346,53 @@ public final class HexServer {
             HexNetwork.animate(p,"dagger_throw");HexNetwork.fx(p,"throw");
             STRIKES.put(p.getUUID(),new Strike(0,combo,0,now+13));return;
         }
-        if(secondary&&w.kind==1) {
-            // Laevateinn's rising cleave: a wide arc that lifts everything in front of it.
-            boolean hit=false;
-            for(LivingEntity e:p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(4.2),e->validTarget(p,e)&&p.hasLineOfSight(e))) {
-                if(e.getEyePosition().subtract(p.getEyePosition()).normalize().dot(p.getLookAngle())<.1)continue;
-                e.hurt(p.damageSources().playerAttack(p),9);
-                e.setDeltaMovement(e.getDeltaMovement().add(0,.55,0));e.hurtMarked=true;
-                HexNetwork.fx(e,"impact");hit=true;
-            }
-            if(hit)reward(p,Discipline.CONJURATION,70);
-            HexNetwork.animate(p,"sword_3");HexNetwork.fx(p,"slash");
-            p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,1,.78f);
-            STRIKES.put(p.getUUID(),new Strike(1,combo,0,now+26));return;
-        }
         if(secondary&&w.kind==2) {
             Entity t=target(p,4);
             if(t!=null&&validTarget(p,t))TemporalEngine.field(p,true,t,30);
             gesture(p,"time_stop","bind",HexGodOfStories.STOP.get());
             STRIKES.put(p.getUUID(),new Strike(2,combo,0,now+40));return;
         }
-        int windup=w.kind==1?8:4,recovery=w.kind==1?19:10;
+        int windup=4,recovery=10;
         boolean twin=p.getOffhandItem().is(HexGodOfStories.DAGGER.get());
         STRIKES.put(p.getUUID(),new Strike(w.kind,combo,now+windup,now+recovery));
-        HexNetwork.animate(p,(w.kind==1?"sword_":twin?"twin_":"dagger_")+combo);
+        HexNetwork.animate(p,(twin?"twin_":"dagger_")+combo);
         HexNetwork.fx(p,"slash");
-        p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,.85f,(w.kind==1?.82f:1.08f)+combo*.04f);
+        p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,.85f,1.08f+combo*.04f);
+    }
+
+    /** Sovereign Sever: a wide, travelling cut with one server-side hit per target. */
+    private static void sever(ServerPlayer p) {
+        long now=HexData.now(p);
+        if(HexData.get(p).getLong("cd_SWORD_SEVER")>now)return;
+        if(!HexData.spend(p,25)){notice(p,"Sovereign Sever needs 25 Temporal Energy.");return;}
+        HexData.get(p).putLong("cd_SWORD_SEVER",now+160);
+        SWORD_WAVES.put(p.getUUID(),new SwordWave(p.getEyePosition(),p.getLookAngle().normalize(),now,new HashSet<>()));
+        HexNetwork.animate(p,"sword_3");HexNetwork.fx(p,"sovereign_sever");
+        p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,1,.68f);
+        HexNetwork.sync(p);
+    }
+
+    private static void tickSwordWave(ServerPlayer p,long now) {
+        SwordWave wave=SWORD_WAVES.get(p.getUUID());
+        if(wave==null)return;
+        int age=(int)(now-wave.start);
+        if(age<3)return; // the sword is raised before the wave leaves its point
+        if(age>17||!p.isAlive()){SWORD_WAVES.remove(p.getUUID());return;}
+        double distance=(age-2)*.9;
+        Vec3 at=wave.origin.add(wave.direction.scale(distance));
+        BlockHitResult obstacle=p.level().clip(new ClipContext(wave.origin,at,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,p));
+        if(obstacle.getType()!=net.minecraft.world.phys.HitResult.Type.MISS&&obstacle.getLocation().distanceToSqr(wave.origin)<distance*distance-.1){
+            SWORD_WAVES.remove(p.getUUID());return;
+        }
+        double width=1.05+distance*.085;
+        for(LivingEntity victim:p.serverLevel().getEntitiesOfClass(LivingEntity.class,new AABB(at,at).inflate(width),e->validTarget(p,e))) {
+            if(victim.getBoundingBox().getCenter().distanceToSqr(at)>(width+victim.getBbWidth()*.5)*(width+victim.getBbWidth()*.5))continue;
+            if(!wave.struck.add(victim.getUUID()))continue;
+            if(victim.hurt(p.damageSources().playerAttack(p),15)) {
+                if(!TemporalEngine.frozen(victim))victim.push(wave.direction.x*.28,.12,wave.direction.z*.28);
+                HexNetwork.fx(victim,"impact");reward(p,Discipline.CONJURATION,80);
+            }
+        }
     }
 
     public static void tick(ServerPlayer p) {
@@ -373,6 +400,7 @@ public final class HexServer {
         if(!p.isAlive()){Transformation.strip(p);return;}
         if(!HexData.access(p)){Transformation.strip(p);CosmicFlight.revoke(p);dismissWeapons(p);return;}
         PersonalRewind.record(p);
+        tickSwordWave(p,now);
         // The mantle is armour, so it is maintained where the mantle is: every tick, granted and
         // renewed while it is worn and taken off the instant it is not.
         Transformation.sustain(p);
@@ -401,12 +429,12 @@ public final class HexServer {
         Architecture.tick(p);
         Strike strike=STRIKES.get(p.getUUID());
         if(strike!=null&&strike.contact==now) {
-            double reach=strike.weapon==1?4:2.8;
+            double reach=2.8;
             boolean finisher=strike.combo==3;
             for(LivingEntity e:p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(reach),e->validTarget(p,e)&&p.hasLineOfSight(e))) {
                 Vec3 direction=e.getEyePosition().subtract(p.getEyePosition()).normalize();
                 if(direction.dot(p.getLookAngle())<.35||p.distanceToSqr(e)>reach*reach)continue;
-                if(!e.hurt(p.damageSources().playerAttack(p),strike.weapon==1?7:4))continue;
+                if(!e.hurt(p.damageSources().playerAttack(p),4))continue;
                 e.knockback(.25,p.getX()-e.getX(),p.getZ()-e.getZ());
                 if(finisher)Bleed.apply(p,e,1,120);
                 reward(p,Discipline.CONJURATION,55);
@@ -576,12 +604,12 @@ public final class HexServer {
         // The charge, the erasure hold and the granted armour all go together; none of them may outlive
         // a death, a logout or a crossing.
         TimeBranch.forget(p);BranchFist.clear(p);Erasure.forget(p);Transformation.strip(p);
-        HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
+        HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());SWORD_WAVES.remove(p.getUUID());INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         HexData.clearTransient(p,death);
     }
     public static void reset() {
         PersonalRewind.reset();
-        HISTORY.clear();CHARMS.clear();STRIKES.clear();INPUT.clear();TRAINING.clear();ILLUSIONS.clear();WATCHED.clear();RIFTS.clear();
+        HISTORY.clear();CHARMS.clear();STRIKES.clear();SWORD_WAVES.clear();INPUT.clear();TRAINING.clear();ILLUSIONS.clear();WATCHED.clear();RIFTS.clear();
         Warping.reset();
         Telekinesis.reset();Architecture.reset();Bleed.reset();PocketRealm.reset();TemporalEngine.reset();
         Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();

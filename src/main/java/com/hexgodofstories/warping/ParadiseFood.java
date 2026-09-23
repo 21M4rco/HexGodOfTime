@@ -45,12 +45,6 @@ public final class ParadiseFood {
     private ParadiseFood() { }
 
     private static final String TAG = "HexParadise";
-    /** The stack currently being chewed, by identity; weak keys never retain abandoned stacks. */
-    private static final java.util.Map<ItemStack,Boolean> BITES =
-        java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
-    public static void beginBite(ItemStack stack) {BITES.put(stack,Boolean.TRUE);}
-    public static void endBite(ItemStack stack) {BITES.remove(stack);}
-    public static boolean biting(ItemStack stack) {return BITES.containsKey(stack);}
     /** How long a mouthful takes. Vanilla food is thirty-two ticks; terrain is chewier. */
     public static final int CHEW = 34;
 
@@ -113,7 +107,6 @@ public final class ParadiseFood {
      * the server, so the food, the effect and the stat all happen exactly once.
      */
     public static ItemStack eat(ItemStack stack, Level level, LivingEntity eater) {
-        endBite(stack);
         if (eater instanceof Player player) {
             if (!level.isClientSide) {
                 if(player instanceof net.minecraft.server.level.ServerPlayer server)
@@ -146,10 +139,8 @@ public final class ParadiseFood {
         @SubscribeEvent public static void crouched(PlayerInteractEvent.RightClickBlock e) {
             Player player = e.getEntity();
             if (!player.isShiftKeyDown() || !edible(e.getItemStack()) || player.isUsingItem()) return;
-            if (!player.canEat(false)) return;
             e.setCanceled(true);
             e.setCancellationResult(InteractionResult.CONSUME);
-            beginBite(e.getItemStack());
             player.startUsingItem(e.getHand());
         }
     }

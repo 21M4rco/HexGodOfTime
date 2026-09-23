@@ -19,7 +19,7 @@ import java.util.*;
 public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
     /** Grip position inside the item cube and an overall size trim, one entry per weapon kind. */
     private record Fit(float grip,float scale) {}
-    private static final Fit[] FITS={new Fit(.24f,1f),new Fit(.23f,1f),new Fit(.27f,1f)};
+    private static final Fit[] FITS={new Fit(.24f,1f),new Fit(.36f,.72f),new Fit(.27f,1f)};
     private static final float DIAGONAL=(float)(1/Math.sqrt(2));
     private static WeaponRenderer INSTANCE;
     private static final Map<Integer,AuthoredMesh> MODELS=new HashMap<>();
@@ -49,6 +49,8 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
             growth=Math.max(.05f,Math.min(1,(ClientState.now()+Minecraft.getInstance().getFrameTime()-stack.getTag().getLong("formed"))/12f));
 
         pose.pushPose();
+        if(w.kind==1&&(context==ItemDisplayContext.FIRST_PERSON_LEFT_HAND||context==ItemDisplayContext.FIRST_PERSON_RIGHT_HAND))
+            pose.translate(0,.12,0);
         pose.translate(grip,grip,.5f);
         pose.mulPose(Axis.ZP.rotationDegrees(reverse?135:-45));
         if(fit.scale!=1)pose.scale(fit.scale,fit.scale,fit.scale);

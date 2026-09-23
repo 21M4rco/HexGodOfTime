@@ -63,6 +63,7 @@ public final class TemporalEngine {
         return frozen!=null&&frozen.entity==e?frozen.velocity:null;
     }
     public static boolean slowed(Entity e) {return SLOWED.containsKey(e.getUUID());}
+    public static double rateOf(Entity e) {return APPLIED.getOrDefault(e.getUUID(),1.0);}
     public static boolean owns(ServerPlayer p) {return FIELDS.stream().anyMatch(f->f.owner.equals(p.getUUID()));}
     /** Only a true hold withholds a tick; a slowed body keeps ticking, it just changes more slowly. */
     public static boolean skipTick(Entity e) {return frozen(e);}
@@ -191,15 +192,19 @@ public final class TemporalEngine {
             Entity e=SLOWED.get(id);
             if(e==null||e.isRemoved()){SLOWED.remove(id);APPLIED.remove(id);RECOVERING.remove(id);continue;}
             if(e.level()!=level)continue;
-            if(!rates.containsKey(id)||desired.containsKey(id))rate(e,1);
+            if(!rates.containsKey(id)||desired.containsKey(id))
+                rate(e,desired.containsKey(id)?1:Math.min(1,rateOf(e)+.12));
         }
         ROTATION.clear();
         for(var entry:rates.entrySet()) {
             Entity e=entities.get(entry.getKey());
             if(e==null||desired.containsKey(entry.getKey()))continue;
-            rate(e,entry.getValue());
-            drift(e,entry.getValue());
-            remember(e,entry.getValue());
+            double previous=rateOf(e);
+            double target=entry.getValue();
+            double applied=previous+Mth.clamp(target-previous,-.12,.12);
+            rate(e,applied);
+            drift(e,applied);
+            remember(e,applied);
         }
 
         for(var entry:desired.entrySet()) {
