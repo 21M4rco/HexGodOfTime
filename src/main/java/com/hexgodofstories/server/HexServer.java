@@ -153,6 +153,9 @@ public final class HexServer {
             default -> null;
         };
         if(a==null)return;
+        if(a==Ability.TIME_STOP&&TemporalEngine.owns(p)) {
+            TemporalEngine.clear(p);HexNetwork.sync(p);return;
+        }
         if(!HexData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return;}
         if(HexData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return;}
         if(HexData.energy(p)<a.cost){notice(p,"Not enough Temporal Energy.");return;}
@@ -199,13 +202,16 @@ public final class HexServer {
                 n.putInt("count",i);HexNetwork.tracking(p,new HexNetwork.Message(HexNetwork.MEMORY,t.getId(),n));
                 gesture(p,"enchant","memory",HexGodOfStories.ILLUSION_SOUND.get());return true;
             }
-            case TIME_SLIP,REWIND -> {
+            case REWIND -> {
+                if(!PersonalRewind.rewind(p)){notice(p,"Ten safe seconds of personal history and an unchanged inventory (apart from eaten candy) are required.");return false;}
+                gesture(p,"time_slip","slip",HexGodOfStories.SLIP.get());return true;
+            }
+            case TIME_SLIP -> {
                 ArrayDeque<Moment> h=HISTORY.get(p.getUUID());if(h==null||h.size()<10)return false;
                 List<Moment> history=new ArrayList<>(h);int mastery=HexData.mastery(p,Discipline.TEMPORAL);
-                int index=a==Ability.REWIND?0:mastery<160?p.getRandom().nextInt(Math.max(1,history.size()-6)):Math.max(0,history.size()-16);
+                int index=mastery<160?p.getRandom().nextInt(Math.max(1,history.size()-6)):Math.max(0,history.size()-16);
                 Moment m=history.get(index);if(!safe(p,m.position))return false;
                 gesture(p,"time_slip","slip",HexGodOfStories.SLIP.get());teleport(p,m.position);p.setYRot(m.yaw);p.setXRot(m.pitch);
-                if(a==Ability.REWIND)p.setHealth(Math.min(p.getMaxHealth(),Math.min(p.getHealth()+4,Math.max(p.getHealth(),m.health))));
                 HexNetwork.fx(p,"slip");return true;
             }
             case SLOW_FIELD,TIME_STOP -> {boolean stop=a==Ability.TIME_STOP;if(!TemporalEngine.field(p,stop,null,stop?120:180))return false;gesture(p,"time_stop",stop?"stop":"dilate",HexGodOfStories.STOP.get());return true;}
@@ -365,6 +371,7 @@ public final class HexServer {
         long now=HexData.now(p);CompoundTag d=HexData.get(p);
         if(!p.isAlive()){Transformation.strip(p);return;}
         if(!HexData.access(p)){Transformation.strip(p);CosmicFlight.revoke(p);dismissWeapons(p);return;}
+        PersonalRewind.record(p);
         // The mantle is armour, so it is maintained where the mantle is: every tick, granted and
         // renewed while it is worn and taken off the instant it is not.
         Transformation.sustain(p);
@@ -572,6 +579,7 @@ public final class HexServer {
         HexData.clearTransient(p,death);
     }
     public static void reset() {
+        PersonalRewind.reset();
         HISTORY.clear();CHARMS.clear();STRIKES.clear();INPUT.clear();TRAINING.clear();ILLUSIONS.clear();WATCHED.clear();RIFTS.clear();
         Warping.reset();
         Telekinesis.reset();Architecture.reset();Bleed.reset();PocketRealm.reset();TemporalEngine.reset();

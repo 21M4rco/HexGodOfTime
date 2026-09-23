@@ -85,8 +85,12 @@ public final class WorldEffects {
         for(Field f:FIELDS.values()) {
             if(!f.stop)continue;
             double dx=f.centre.x-x,dy=f.centre.y-y,dz=f.centre.z-z;
-            if(dx*dx+dy*dy+dz*dz>f.radius*f.radius)continue;
-            best=Math.max(best,f.started);
+            double distance=Math.sqrt(dx*dx+dy*dy+dz*dz);
+            if(distance>f.radius)continue;
+            long reached=f.expires==Long.MAX_VALUE
+                ?f.started+(long)Math.ceil(distance/f.radius*com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION):f.started;
+            if(ClientState.now()<reached)continue;
+            best=Math.max(best,reached);
         }
         return best;
     }
@@ -134,12 +138,14 @@ public final class WorldEffects {
         for(Field f:FIELDS.values()) {
             if(f.centre.distanceToSqr(eye)>6400)continue;
             // The held edge keeps breathing so a long suspension never settles into a static shell.
-            if(now%2==0) {
+            double edgeRadius=f.stop&&f.expires==Long.MAX_VALUE
+                ?f.radius*Math.min(1,Math.max(0,(now-f.started)/(double)com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION)):f.radius;
+            if(now%2==0&&edgeRadius>0) {
                 double a=mc.level.random.nextDouble()*Math.PI*2,tilt=(mc.level.random.nextDouble()-.5)*Math.PI;
                 Vec3 edge=new Vec3(Math.cos(a)*Math.cos(tilt),Math.sin(tilt)*.55,Math.sin(a)*Math.cos(tilt));
-                Vfx.spark(f.stop?HexGodOfStories.GOLD_EMBER.get():HexGodOfStories.EMBER.get(),f.centre.add(edge.scale(f.radius)),edge.scale(-.01));
+                Vfx.spark(f.stop?HexGodOfStories.NEBULA.get():HexGodOfStories.EMBER.get(),f.centre.add(edge.scale(edgeRadius)),edge.scale(.012));
             }
-            if(f.stop&&now%3==0)Vfx.cloud(HexGodOfStories.VEIL.get(),f.centre.add(0,1,0),f.radius*.75,1,.002);
+            if(f.stop&&now%3==0&&edgeRadius>0)Vfx.dome(HexGodOfStories.NEBULA.get(),f.centre,edgeRadius,3,.009);
         }
         GripRenderer.tick(now);
         // One pass: blade trails, rift breath, and the embedded steel each wound bleeds from.
@@ -255,13 +261,10 @@ public final class WorldEffects {
             });
             // A stopped moment arrives slowly on purpose: the edge of the field walks outward and the
             // suspended dust thickens behind it, so the world looks like it is being held, not switched.
-            case "stop" -> Vfx.bloom(entity,pos,look,46,(at,aim,t)->{
-                float swell=Vfx.swell(t);
-                double radius=1+10*Vfx.ease(Math.min(1,t*1.6f));
-                Vfx.ring(gold,at.add(0,.1,0),radius,Vfx.count(swell*7f),.03,.006);
-                Vfx.dome(veil,at.add(0,1,0),radius*.82,Vfx.count(swell*3f),.004);
-                Vfx.cloud(nebula,at.add(0,1.1,0),1.6,Vfx.count(swell*1.6f),.004);
-                Vfx.ring(HexGodOfStories.MOTE.get(),at.add(0,1.1,0),radius*.55,Vfx.count(swell*4f),.004,.002);
+            case "stop" -> Vfx.bloom(entity,pos,look,20,(at,aim,t)->{
+                double radius=10*Math.min(1,t*20/com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION);
+                Vfx.dome(nebula,at,radius,Vfx.count(7),.014);
+                Vfx.cloud(nebula,at.add(0,1.1,0),1.2,Vfx.count(2),.005);
             });
             case "dilate" -> Vfx.bloom(entity,pos,look,34,(at,aim,t)->{
                 float swell=Vfx.swell(t);

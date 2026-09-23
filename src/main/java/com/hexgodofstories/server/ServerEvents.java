@@ -96,7 +96,7 @@ public final class ServerEvents {
         // A borrowed shape is sent once, not every second, so a new viewer has to be told separately.
         Masquerade.resend(p,q);
     }
-    @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p)HexServer.clear(p,false);}
+    @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p){PersonalRewind.clear(p);HexServer.clear(p,false);}}
     @SubscribeEvent public static void dimension(PlayerEvent.PlayerChangedDimensionEvent e) {if(e.getEntity() instanceof ServerPlayer p){HexServer.clear(p,false);HexNetwork.sync(p);com.hexgodofstories.warping.WarpRealms.greet(p,e.getTo());}}
     @SubscribeEvent public static void leaving(net.minecraftforge.event.entity.EntityLeaveLevelEvent e){
         if(e.getLevel() instanceof ServerLevel level){
@@ -124,7 +124,7 @@ public final class ServerEvents {
         Decoy.release(e.getEntity());
         Starfall.forget(e.getEntity());
         SanctumWard.forget(e.getEntity());
-        if(e.getEntity() instanceof ServerPlayer p){com.hexgodofstories.warping.CandyCorruption.reset(p);HexServer.clear(p,true);}
+        if(e.getEntity() instanceof ServerPlayer p){PersonalRewind.clear(p);com.hexgodofstories.warping.CandyCorruption.reset(p);HexServer.clear(p,true);}
     }
     @SubscribeEvent public static void clone(PlayerEvent.Clone e) {e.getEntity().getPersistentData().put(HexData.TAG,HexData.get(e.getOriginal()).copy());HexData.clearTransient(e.getEntity(),e.isWasDeath());}
     @SubscribeEvent public static void respawn(PlayerEvent.PlayerRespawnEvent e) {if(e.getEntity() instanceof ServerPlayer p){HexNetwork.sync(p);com.hexgodofstories.warping.CandyCorruption.sync(p,-1);}}

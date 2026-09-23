@@ -48,6 +48,7 @@ public final class TemporalEngine {
     private static final UUID DILATION_ATTACK=UUID.fromString("0c6c27e9-1f7d-4c58-9d0a-5b2f6ba0a4c1");
     private static final UUID DILATION_FLIGHT=UUID.fromString("a7d1f3b2-90c5-4a8e-bd41-2f9c8e1d7a30");
     private static final int MAX_FIELDS=64,MAX_ENTITIES_PER_FIELD=192;
+    public static final int STOP_RADIUS=10,STOP_EXPANSION=12;
     /** Ticks spent decelerating into, and accelerating out of, a full stop. */
     public static final int RAMP=7;
     /** How much of normal time a dilated body experiences. */
@@ -64,12 +65,14 @@ public final class TemporalEngine {
 
     public static boolean field(ServerPlayer p,boolean stop,Entity target,int ticks) {
         if(FIELDS.size()>=MAX_FIELDS)return false;
+        if(stop&&target==null&&FIELDS.stream().anyMatch(f->f.owner.equals(p.getUUID())&&f.stop&&f.target==null))return false;
         if(p.isPassenger()||target!=null&&target.isPassenger())return false;
         UUID ally=HexData.get(p).hasUUID("ally")?HexData.get(p).getUUID("ally"):null;
         long now=p.level().getGameTime();
-        double radius=HexData.get(p).getBoolean("ascended")?18:12;
-        FIELDS.add(new Field(p.getUUID(),p.serverLevel(),p.position(),radius,now,now+ticks,stop,target==null?null:target.getUUID(),ally));
-        broadcastField(p,p.position(),radius,stop,now,now+ticks,target==null);
+        double radius=stop&&target==null?STOP_RADIUS:HexData.get(p).getBoolean("ascended")?18:12;
+        long expires=stop&&target==null?Long.MAX_VALUE:now+ticks;
+        FIELDS.add(new Field(p.getUUID(),p.serverLevel(),p.position(),radius,now,expires,stop,target==null?null:target.getUUID(),ally));
+        broadcastField(p,p.position(),radius,stop,now,expires,target==null);
         HexNetwork.fx(p,stop?"stop":"dilate");
         return true;
     }
@@ -110,23 +113,36 @@ public final class TemporalEngine {
         FIELDS.removeIf(f->{
             if(f.level!=level)return false;
             ServerPlayer owner=level.getServer().getPlayerList().getPlayer(f.owner);
-            return f.expires<=now||owner==null||owner.level()!=level||!owner.isAlive();
+            boolean sustained=f.stop&&f.target==null&&f.expires==Long.MAX_VALUE;
+            boolean expired=f.expires<=now||owner==null||owner.level()!=level||!owner.isAlive()
+                ||sustained&&(HexData.energy(owner)<5||now-f.started>=STOP_EXPANSION&&
+                    (now-f.started-STOP_EXPANSION)%20==0&&!HexData.spend(owner,5));
+            if(expired&&owner!=null) {
+                CompoundTag n=new CompoundTag();n.putBoolean("active",false);
+                HexNetwork.tracking(owner,new HexNetwork.Message(HexNetwork.FIELD,owner.getId(),n));
+                HexNetwork.sync(owner);
+            }
+            return expired;
         });
+        PLAYER_GRACE.entrySet().removeIf(e->e.getValue()<=now);
         Map<UUID,Long> desired=new HashMap<>();
         Map<UUID,Entity> entities=new HashMap<>();
         Map<UUID,Double> rates=new HashMap<>();
         for(Field f:FIELDS) {
             if(f.level!=level)continue;
+            double range=f.stop&&f.target==null&&f.expires==Long.MAX_VALUE
+                ?f.radius*Math.min(1,Math.max(0,(now-f.started)/(double)STOP_EXPANSION)):f.radius;
+            if(range<=0&&f.target==null)continue;
             List<Entity> affected=f.target==null
-                ?level.getEntities((Entity)null,new AABB(f.center.subtract(f.radius,f.radius,f.radius),f.center.add(f.radius,f.radius,f.radius)),e->eligible(e,f))
+                ?level.getEntities((Entity)null,new AABB(f.center.subtract(range,range,range),f.center.add(range,range,range)),e->eligible(e,f,range))
                 :Optional.ofNullable(level.getEntity(f.target)).filter(e->eligible(e,f)).map(List::of).orElse(List.of());
             long age=now-f.started;
             int count=0;
             for(Entity e:affected) {
-                if(++count>MAX_ENTITIES_PER_FIELD)break;
+                if(++count>MAX_ENTITIES_PER_FIELD&&f.expires!=Long.MAX_VALUE)break;
                 entities.put(e.getUUID(),e);
                 if(!f.stop){rates.merge(e.getUUID(),DILATION,Math::min);continue;}
-                if(age<RAMP) {
+                if(f.expires!=Long.MAX_VALUE&&age<RAMP) {
                     // Winding down: a smoothly shrinking rate, never a withheld tick.
                     rates.merge(e.getUUID(),Math.max(.04,1-age/(double)RAMP),Math::min);
                 } else desired.merge(e.getUUID(),f.expires,Math::max);
@@ -148,7 +164,7 @@ public final class TemporalEngine {
             var entry=it.next();Frozen s=entry.getValue();
             if(s.entity.level()!=level)continue;
             if(!desired.containsKey(entry.getKey())||s.entity.isRemoved()||s.entity instanceof ServerPlayer&&now>=s.expires) {
-                if(s.entity instanceof ServerPlayer){PLAYER_GRACE.put(entry.getKey(),now+100);desired.remove(entry.getKey());}
+                if(s.entity instanceof ServerPlayer&&s.expires!=Long.MAX_VALUE){PLAYER_GRACE.put(entry.getKey(),now+100);desired.remove(entry.getKey());}
                 it.remove();releasing.add(s);
             }
         }
@@ -175,7 +191,7 @@ public final class TemporalEngine {
             Frozen s=FROZEN.get(entry.getKey());
             if(s==null) {
                 rate(e,1);
-                s=new Frozen(e,e.position(),e.getDeltaMovement(),e.getYRot(),e.getXRot(),e instanceof ServerPlayer?Math.min(entry.getValue(),now+60):entry.getValue());
+                s=new Frozen(e,e.position(),e.getDeltaMovement(),e.getYRot(),e.getXRot(),e instanceof ServerPlayer&&entry.getValue()!=Long.MAX_VALUE?Math.min(entry.getValue(),now+60):entry.getValue());
                 FROZEN.put(entry.getKey(),s);sync(s,true);
             }
             hold(e,s,now);
@@ -276,11 +292,12 @@ public final class TemporalEngine {
         return 0;
     }
 
-    private static boolean eligible(Entity e,Field f) {
+    private static boolean eligible(Entity e,Field f) {return eligible(e,f,f.radius);}
+    private static boolean eligible(Entity e,Field f,double range) {
         if(PLAYER_GRACE.getOrDefault(e.getUUID(),0L)>e.level().getGameTime())return false;
         if(e.isRemoved()||e.isSpectator()||e.isPassenger()||e.isVehicle()||e.getUUID().equals(f.owner)||e.getUUID().equals(f.exempt))return false;
         if(e instanceof ServerPlayer p&&p.isCreative())return false;
-        if(e.position().distanceToSqr(f.center)>f.radius*f.radius&&f.target==null)return false;
+        if(e.position().distanceToSqr(f.center)>range*range&&f.target==null)return false;
         return affectable(e);
     }
     /** Everything in the local world that visibly moves under its own steam. */
@@ -290,13 +307,13 @@ public final class TemporalEngine {
     }
 
     private static void restore(Frozen s,long now) {
-        if(s.entity.isRemoved())return;
+        if(s.entity.isRemoved()){BANKED.remove(s.entity.getUUID());RECOVERING.remove(s.entity.getUUID());return;}
         // Spin back up rather than snapping to full speed, mirroring the way the field took hold. The
         // speed handed back has to match the rate the body is marked as running at, or the ramp's
         // proportional correction inflates it instead of easing it.
-        s.entity.setDeltaMovement(s.velocity.scale(RESUME_RATE));s.entity.hurtMarked=true;
-        APPLIED.put(s.entity.getUUID(),RESUME_RATE);
-        RECOVERING.put(s.entity.getUUID(),now+RAMP);
+        boolean direct=s.expires==Long.MAX_VALUE;
+        s.entity.setDeltaMovement(direct?s.velocity:s.velocity.scale(RESUME_RATE));s.entity.hurtMarked=true;
+        if(!direct) {APPLIED.put(s.entity.getUUID(),RESUME_RATE);RECOVERING.put(s.entity.getUUID(),now+RAMP);}
         sync(s,false);
         Banked banked=BANKED.remove(s.entity.getUUID());
         if(banked!=null&&banked.damage>0&&s.entity instanceof LivingEntity living) {
@@ -306,6 +323,8 @@ public final class TemporalEngine {
                 ?living.damageSources().playerAttack(player)
                 :living.damageSources().magic();
             living.hurt(source,banked.damage);
+            living.setDeltaMovement(direct?s.velocity:s.velocity.scale(RESUME_RATE));
+            living.hurtMarked=true;
             HexNetwork.fx(living,"release");
         }
     }
