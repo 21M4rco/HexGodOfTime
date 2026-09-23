@@ -76,7 +76,8 @@ public final class WarpRenderer {
         // A little below the pool's own height rather than exactly at it: a camera sinking into
         // one reaches the surface on the tick it crosses, and culling on the nose would blink the
         // other world out for the frame before the crossing rather than showing it arriving.
-        if(camera.distanceToSqr(at)>96*96||camera.y<at.y-.3)return;
+        boolean arrival=n.getBoolean("arrival");
+        if(camera.distanceToSqr(at)>96*96||camera.y<at.y-(arrival?3.0:.3))return;
         Destination d=Destination.at(n.getInt("destination"));boolean open=n.getLong("opened")>=0;
         int held=open?n.getInt("held"):(int)(time-n.getLong("start"));
         double age=open?Math.max(0,time-n.getLong("opened")):0;
@@ -232,9 +233,11 @@ public final class WarpRenderer {
                 double lx=Math.cos(a)*r,lz=Math.sin(a)*r;
                 int index=ring*brk.steps+step,o=index*3;
                 brk.v[o]=lx;brk.v[o+2]=lz;
-                double y=column(level,columns,at.x+lx,at.z+lz,at.y,r);
+                // Destination-side emergence is a presentation puddle at the realm's existing
+                // arrival coordinate. Source-side portals still follow real terrain exactly.
+                double y=n.getBoolean("arrival")?at.y:column(level,columns,at.x+lx,at.z+lz,at.y,r);
                 if(Double.isNaN(y))continue;
-                tint(level,tints,at.x+lx,at.z+lz,y);
+                if(!n.getBoolean("arrival"))tint(level,tints,at.x+lx,at.z+lz,y);
                 brk.v[o+1]=y-at.y+FILM;
                 brk.there[index]=true;
             }

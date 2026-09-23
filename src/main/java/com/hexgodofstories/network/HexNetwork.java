@@ -16,7 +16,7 @@ public final class HexNetwork {
     /** Highest accepted client action id; see {@link HexServer#input}. */
     public static final int MAX_ACTION=16;
     public static final int SYNC=0,ANIMATE=1,FX=2,FROZEN=3,GRIP=4,MEMORY=5,THREADS=6,SLOWED=7,ARCHITECTURE=8,BLEED=9,FIELD=10,DISGUISE=11,
-        BRANCH=12,TORRENT=13,ERASURE=14,WARP=15,WARP_REALM=16,PILGRIM=17,PILGRIM_PATH=18,MOON_FRAME=19,WARP_PHASE=20,WARP_SHADOWS=21;
+        BRANCH=12,TORRENT=13,ERASURE=14,WARP=15,WARP_REALM=16,PILGRIM=17,PILGRIM_PATH=18,MOON_FRAME=19,WARP_PHASE=20,WARP_SHADOWS=21,WARP_EMERGE=22;
     public record Input(int action,int value) {}
     /** A deliberate Fracture selection: a catalogue index and, where the mode needs one, a target. */
     public record Choice(int mode,java.util.UUID target) {}
