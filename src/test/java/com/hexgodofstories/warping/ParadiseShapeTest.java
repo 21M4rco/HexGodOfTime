@@ -234,7 +234,7 @@ public final class ParadiseShapeTest {
             narrowest=Math.min(narrowest,Paradise.inland(Paradise.heart(),x,z));
         }
         check(narrowest>4,"the relocated lagoon has a shore all around it");
-        check(Paradise.SPRING_DEPTH >= 2 && Paradise.SPRING_DEPTH <= 4, "the spring is deep enough to swim and shallow enough to stand up in");
+        check(Paradise.SPRING_DEPTH == 2, "the Paradise ponds are deliberately shallow at two blocks deep");
     }
 
     // ------------------------------------------------------------------ the rules

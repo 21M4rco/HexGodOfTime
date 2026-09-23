@@ -36,6 +36,14 @@ public final class ParadiseServerRegression {
         for(int y=161;y<=192;y++)check(!blueprint.containsKey(new BlockPos(0,y,28)),"entry stays clear");
         check(blueprint.get(new BlockPos(0,160,28)).is(Blocks.SMOOTH_QUARTZ),"arrival has a solid foundation");
         check(blueprint.values().stream().filter(s->s.is(Blocks.LANTERN)).count()>20,"bridges and buildings have lanterns");
+        check(Paradise.SPRING_DEPTH==2,"ponds stay shallow");
+        check(blueprint.values().stream().filter(s->s.is(Blocks.SPRUCE_FENCE)).count()<=48,
+            "bridge rails use solid block edges rather than spruce fences");
+        long flowers=blueprint.values().stream().filter(s->s.is(Blocks.PINK_TULIP)||s.is(Blocks.WHITE_TULIP)
+            ||s.is(Blocks.ALLIUM)||s.is(Blocks.LILY_OF_THE_VALLEY)||s.is(Blocks.OXEYE_DAISY)
+            ||s.is(Blocks.CORNFLOWER)||s.is(Blocks.AZURE_BLUET)||s.is(Blocks.PINK_PETALS)
+            ||s.is(Blocks.FLOWERING_AZALEA)).count();
+        check(flowers>180,"the islands have dense garden detail");
         // Dump a reproducible overview for visual inspection of the actual generated blueprint.
         try {
             var lines=new ArrayList<String>();

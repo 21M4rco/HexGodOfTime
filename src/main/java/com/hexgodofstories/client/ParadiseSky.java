@@ -219,17 +219,24 @@ public final class ParadiseSky {
 
     /** Sweets drifting through the far sky, large enough to be read as sweets from an island. */
     private static void drifting(BufferBuilder b, Matrix4f m, double time) {
+        // Keep the one unmistakable candy-planet motif, then use a small hand-composed set of
+        // readable sweets. No procedural "mystery satellites" or winged orange blobs.
         Vec3 planet=DOME.add(-175,142,-136);
         WarpMesh.sphere(b,m,planet,22,22,22,0xe6a0db,1,32,0,false);
         WarpMesh.ring(b,m,planet,29,5,0xffd5f0,.70f,.35,time*.0004);
         WarpMesh.ring(b,m,planet,36,1.2,0xc28eed,.65f,.35,time*.0004);
-        Random r = new Random(0x5EE7);
-        for (int i = 0; i < 32; i++) {
-            double a = r.nextDouble() * Math.PI * 2 + time * (0.00012 + r.nextDouble() * 0.00022);
-            double radius = SHELL * (0.66 + r.nextDouble() * 0.18);
-            double lift = r.nextDouble() * 210 - 70 + Math.sin(time * 0.006 + i) * 9;
-            Vec3 at = DOME.add(Math.cos(a) * radius, lift, Math.sin(a) * radius);
-            sweet(b, m, at, 4 + r.nextDouble() * 7, i, time);
+
+        double[][] candy={
+            {.32,214,94,7.5,.00013,0},{1.10,230,38,6.0,-.00010,1},
+            {1.92,205,132,8.0,.00011,2},{2.72,238,70,6.6,-.00014,3},
+            {3.55,218,18,7.2,.00009,4},{4.32,226,116,5.8,-.00012,5},
+            {5.06,208,58,7.8,.00010,6},{5.72,236,148,6.2,-.00008,7}
+        };
+        for(int i=0;i<candy.length;i++) {
+            double[] c=candy[i];
+            double a=c[0]+time*c[4];
+            Vec3 at=DOME.add(Math.cos(a)*c[1],c[2]-DOME.y,Math.sin(a)*c[1]);
+            sweet(b,m,at,c[3],i,time);
         }
     }
 
@@ -245,52 +252,36 @@ public final class ParadiseSky {
         int a = SUGAR[Math.floorMod(seed * 7 + 1, SUGAR.length)], c = SUGAR[Math.floorMod(seed * 5 + 4, SUGAR.length)];
         double bob = Math.sin(time * 0.013 + seed * 1.7) * s * 0.16;
         Vec3 p = at.add(0, bob, 0);
-        switch (Math.floorMod(seed, 6)) {
-            case 0 -> {   // lollipop: a swirled disc on a paper stick
-                WarpMesh.sphere(b, m, p, s, s, s * 0.22, a, 1, 14, 0, false);
-                WarpMesh.sphere(b, m, p.add(0, 0, s * 0.14), s * 0.66, s * 0.66, s * 0.17, c, 1, 12, 0, false);
-                WarpMesh.sphere(b, m, p.add(0, 0, s * 0.24), s * 0.30, s * 0.30, s * 0.14, a, 1, 10, 0, false);
-                WarpMesh.box(b, m, p.x - s * 0.09, p.y - s * 2.6, p.z - s * 0.09, s * 0.18, s * 1.7, s * 0.18, 0xfff6e6, 1);
+        switch (Math.floorMod(seed, 4)) {
+            case 0 -> {   // unmistakable swirled lollipop
+                WarpMesh.sphere(b, m, p, s, s, s * 0.20, a, 1, 16, 0, false);
+                WarpMesh.sphere(b, m, p.add(0, 0, s * 0.13), s * 0.66, s * 0.66, s * 0.16, 0xfff7f0, 1, 14, 0, false);
+                WarpMesh.sphere(b, m, p.add(0, 0, s * 0.23), s * 0.31, s * 0.31, s * 0.12, c, 1, 12, 0, false);
+                WarpMesh.box(b, m, p.x - s * 0.08, p.y - s * 2.55, p.z - s * 0.08, s * 0.16, s * 1.65, s * 0.16, 0xfff6e6, 1);
             }
-            case 1 -> {   // a wrapped sweet, pinched and twisted at both ends
-                WarpMesh.sphere(b, m, p, s * 0.92, s * 0.66, s * 0.66, a, 1, 12, 0, false);
-                for (int side = -1; side <= 1; side += 2) {
-                    WarpMesh.box(b, m, p.x + side * s * 0.85 - (side < 0 ? s * 0.5 : 0), p.y - s * 0.30, p.z - s * 0.30,
-                        s * 0.5, s * 0.6, s * 0.6, c, 1);
-                    WarpMesh.box(b, m, p.x + side * s * 1.35 - (side < 0 ? s * 0.42 : 0), p.y - s * 0.46, p.z - s * 0.46,
-                        s * 0.42, s * 0.92, s * 0.92, c, 0.92f);
-                }
-            }
-            case 2 -> {   // a candy cane, striped up its length and hooked over at the top
+            case 1 -> {   // candy cane: tall striped stem and a clean hook
                 Vec3 foot = p.add(0, -s * 1.9, 0);
-                for (int i = 0; i < 7; i++) {
-                    Vec3 next = foot.add(0, s * 0.54, 0);
-                    WarpMesh.ribbon(b, m, foot, next, s * 0.2, i % 2 == 0 ? 0xfffaf4 : 0xff4f62, 1);
+                for (int i = 0; i < 8; i++) {
+                    Vec3 next = foot.add(0, s * 0.48, 0);
+                    WarpMesh.ribbon(b, m, foot, next, s * 0.19, i % 2 == 0 ? 0xfffaf4 : 0xff4f62, 1);
                     foot = next;
                 }
-                for (int i = 0; i < 7; i++) {
-                    double t0 = Math.PI + i * Math.PI / 7, t1 = Math.PI + (i + 1) * Math.PI / 7;
-                    Vec3 hub = foot.add(s * 0.6, 0, 0);
-                    WarpMesh.ribbon(b, m, hub.add(Math.cos(t0) * s * 0.6, Math.sin(t0) * s * 0.6, 0),
-                        hub.add(Math.cos(t1) * s * 0.6, Math.sin(t1) * s * 0.6, 0),
-                        s * 0.2, i % 2 == 0 ? 0xff4f62 : 0xfffaf4, 1);
+                for (int i = 0; i < 8; i++) {
+                    double t0 = Math.PI + i * Math.PI / 8, t1 = Math.PI + (i + 1) * Math.PI / 8;
+                    Vec3 hub = foot.add(s * 0.58, 0, 0);
+                    WarpMesh.ribbon(b, m, hub.add(Math.cos(t0) * s * 0.58, Math.sin(t0) * s * 0.58, 0),
+                        hub.add(Math.cos(t1) * s * 0.58, Math.sin(t1) * s * 0.58, 0),
+                        s * 0.19, i % 2 == 0 ? 0xff4f62 : 0xfffaf4, 1);
                 }
             }
-            case 3 -> {   // a gumdrop, sugared on top
-                WarpMesh.sphere(b, m, p, s * 0.95, s * 0.82, s * 0.95, a, 1, 12, 0, false);
-                WarpMesh.sphere(b, m, p.add(0, s * 0.62, 0), s * 0.34, s * 0.24, s * 0.34, 0xffffff, 0.85f, 8, 0, false);
+            case 2 -> {   // donut / candy ring, deliberately simple from a distance
+                WarpMesh.ring(b,m,p,s*.82,s*.25,a,1,.18,time*.00025+seed*.4);
+                WarpMesh.ring(b,m,p,s*.52,s*.08,0xfff1dc,.82f,.18,time*.00025+seed*.4);
             }
-            case 4 -> {   // a sugar star
-                for (int i = 0; i < 5; i++) {
-                    double t = i * Math.PI * 2 / 5 + 0.35;
-                    WarpMesh.ribbon(b, m, p, p.add(Math.cos(t) * s * 1.45, Math.sin(t) * s * 1.45, 0), s * 0.32, a, 1);
-                }
-                WarpMesh.sphere(b, m, p, s * 0.58, s * 0.58, s * 0.34, c, 1, 10, 0, false);
-            }
-            default -> {  // a macaron: two shells with the cream showing between them
-                WarpMesh.sphere(b, m, p.add(0, s * 0.34, 0), s, s * 0.36, s, a, 1, 12, 0, false);
-                WarpMesh.sphere(b, m, p.add(0, -s * 0.34, 0), s, s * 0.36, s, a, 1, 12, 0, false);
-                WarpMesh.sphere(b, m, p, s * 0.92, s * 0.26, s * 0.92, c, 1, 10, 0, false);
+            default -> {  // macaron, two obvious shells and a cream layer
+                WarpMesh.sphere(b, m, p.add(0, s * 0.34, 0), s, s * 0.36, s, a, 1, 14, 0, false);
+                WarpMesh.sphere(b, m, p.add(0, -s * 0.34, 0), s, s * 0.36, s, a, 1, 14, 0, false);
+                WarpMesh.sphere(b, m, p, s * 0.92, s * 0.22, s * 0.92, 0xfff6ec, 1, 12, 0, false);
             }
         }
     }
@@ -311,31 +302,31 @@ public final class ParadiseSky {
     public static void scene(BufferBuilder b, Matrix4f m, double time, boolean preview) {
         for (Paradise.Fall fall : Paradise.falls()) {
             double ax=Math.cos(fall.angle()),az=Math.sin(fall.angle());
-            double length=fall.length()+30;
-            for(int i=0;i<48;i++) {
-                double down=i*length/48,next=(i+1)*length/48;
-                double fade=Math.min(1,(length-down)/24);
-                double width=2.65*(1-down/length*.38);
-                double sway=Math.sin(time*.025-down*.11)*.13;
-                Vec3 from=new Vec3(fall.x()+ax*.55+ax*sway,fall.y()+.7-down,fall.z()+az*.55+az*sway);
-                Vec3 to=new Vec3(fall.x()+ax*.55+ax*Math.sin(time*.025-next*.11)*.13,fall.y()+.7-next,fall.z()+az*.55+az*Math.sin(time*.025-next*.11)*.13);
+            double length=fall.length()+20;
+            // One broad translucent ribbon laid directly over the real water. It widens the
+            // Minecraft sheet visually and fades into the cloud sea instead of ending as a rod.
+            for(int i=0;i<56;i++) {
+                double down=i*length/56,next=(i+1)*length/56;
+                double fade=Math.min(1,(length-down)/18);
+                double width=3.35-down/length*.85;
+                double sway=Math.sin(time*.018-down*.08)*.10;
+                Vec3 from=new Vec3(fall.x()+ax*.35+ax*sway,fall.y()+.65-down,fall.z()+az*.35+az*sway);
+                Vec3 to=new Vec3(fall.x()+ax*.35+ax*Math.sin(time*.018-next*.08)*.10,fall.y()+.65-next,
+                    fall.z()+az*.35+az*Math.sin(time*.018-next*.08)*.10);
                 Vec3 side=new Vec3(-az*width,0,ax*width);
-                WarpMesh.quad(b,m,from.subtract(side),from.add(side),to.add(side.scale(.995)),to.subtract(side.scale(.995)),
-                    i%3==0?0xff8ad8:0xf969c5,(float)(.30*fade));
+                WarpMesh.quad(b,m,from.subtract(side),from.add(side),to.add(side.scale(.99)),to.subtract(side.scale(.99)),
+                    i%4==0?0xffa1e1:0xf66bc8,(float)(.36*fade));
             }
-            // Falling highlights travel down the sheet; small ballistic droplets peel away at its foot.
-            for(int strand=0;strand<22;strand++) {
-                double down=(time*(.17+strand%3*.04)+strand*8.37)%length;
-                double side=Math.sin(strand*7.1)*2.1;
-                Vec3 at=new Vec3(fall.x()-az*side+ax*.7,fall.y()-down,fall.z()+ax*side+az*.7);
-                WarpMesh.ribbon(b,m,at,at.add(ax*.06,-2.0-strand%4,az*.06),.025+strand%3*.018,0xffe7f9,
-                    (float)(.55*Math.min(1,(length-down)/22)));
-            }
-            for(int spray=0;spray<14;spray++) {
-                double age=(time*.023+spray*.173)%1,angle=spray*2.399;
-                Vec3 at=new Vec3(fall.x()+Math.cos(angle)*age*4,fall.y()-length+6*age-9*age*age,
-                    fall.z()+Math.sin(angle)*age*4);
-                WarpMesh.ribbon(b,m,at,at.add(.02,-.35,0),.045,0xffd8f5,(float)((1-age)*.5));
+            // Fine mist at the lip and the cloud-end only; no long strings of waterfall particles.
+            for(int mist=0;mist<9;mist++) {
+                double side=(mist-4)*.55;
+                double pulse=.45+.20*Math.sin(time*.025+mist);
+                Vec3 top=new Vec3(fall.x()-az*side,fall.y()+.4+Math.sin(mist)*.22,fall.z()+ax*side);
+                WarpMesh.sphere(b,m,top,1.15+pulse,.22,1.15+pulse,0xffd8f3,.13f,8,0,false);
+                double age=(time*.018+mist*.127)%1;
+                Vec3 foot=new Vec3(fall.x()-az*side*(1-age*.35),fall.y()-length+age*3.5,
+                    fall.z()+ax*side*(1-age*.35));
+                WarpMesh.sphere(b,m,foot,1.35+age*2.2,.28,1.35+age*2.2,0xffc9ed,(float)((1-age)*.14),8,0,false);
             }
         }
         // Low cloud banks under the archipelago, leaving the bridges and castle unobstructed.
@@ -345,13 +336,14 @@ public final class ParadiseSky {
             WarpMesh.sphere(b,m,at,23,5,18,i%2==0?0xfbc9ec:0xe4b0e7,.16f,12,0,false);
         }
 
-        // Sweets close in, drifting between the islands rather than across the far sky.
-        Random r = new Random(0x0A11E);
-        for (int i = 0; i < 20; i++) {
-            double a = r.nextDouble() * Math.PI * 2 + time * 0.00035;
-            double radius = 95 + r.nextDouble() * 43;
-            double y = Paradise.SURFACE - 26 + r.nextDouble() * 58 + Math.sin(time * 0.009 + i * 2.1) * 3.5;
-            sweet(b, m, new Vec3(Math.cos(a) * radius, y, Math.sin(a) * radius), 1.5 + r.nextDouble() * 2.3, i + 3, time);
+        // A few close, readable sweets. Their locations are composed rather than randomized so
+        // the skyline stays clean and the objects never turn into unexplained clutter.
+        int[] closeTypes={0,1,3,2,0,3,1,2};
+        for (int i = 0; i < closeTypes.length; i++) {
+            double a = i * 2.399 + .35 + time * (i%2==0?.00022:-.00018);
+            double radius = 100 + (i%4) * 9;
+            double y = Paradise.SURFACE - 8 + (i%5) * 11 + Math.sin(time * 0.008 + i * 1.7) * 2.2;
+            sweet(b, m, new Vec3(Math.cos(a) * radius, y, Math.sin(a) * radius), 1.8 + (i%3)*.45, closeTypes[i], time);
         }
 
         // Glitter hanging over the whole composition. Cheap, and it is what sells "dreamlike".

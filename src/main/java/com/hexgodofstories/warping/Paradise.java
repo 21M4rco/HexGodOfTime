@@ -15,7 +15,7 @@ public final class Paradise {
     public static final int SURFACE = 160;
     /** The hot spring's middle, its radius, and how deep the water in it stands. */
     public static final double SPRING_RADIUS = 8.5;
-    public static final int SPRING_DEPTH = 3;
+    public static final int SPRING_DEPTH = 2;
     /** Below this there is nothing left to fall past, and a faller is put back at {@link #CEILING}. */
     public static final int FLOOR = 48, CEILING = 286;
     public static final double BOUNDARY = 152, FOLD_INSET = 12;

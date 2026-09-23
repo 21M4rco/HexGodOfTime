@@ -45,7 +45,7 @@ public final class WarpRealms {
      * other Warping destinations. The ledger is per ServerLevel, so clearing ready here is scoped
      * to Paradise's dimension only.
      */
-    private static final int PARADISE_LAYOUT=2;
+    private static final int PARADISE_LAYOUT=3;
     private record Job(ServerLevel level,Destination d,double cell,Iterator<RealmLayout.Voxel> blocks){}
     private static final List<Job> JOBS=new ArrayList<>();
     private static final Map<UUID,ArrayDeque<Vec3>> HISTORY=new HashMap<>();

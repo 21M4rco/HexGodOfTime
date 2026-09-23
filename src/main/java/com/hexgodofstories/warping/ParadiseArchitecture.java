@@ -76,24 +76,61 @@ public final class ParadiseArchitecture {
         Collections.shuffle(meadow,random);
         for(BlockPos ground:meadow) {
             int x=ground.getX(),z=ground.getZ(),y=top+1;
-            if(!b.get(ground).is(Blocks.GRASS_BLOCK)||reserved(index,x-cx,z-cz))continue;
-            boolean spaced=planted.stream().noneMatch(p->p.distSqr(ground)<64);
-            if(spaced&&random.nextDouble()<.075) {
-                int kind=random.nextInt(5);
+            BlockState groundState=b.get(ground);
+            if(groundState==null||!groundState.is(Blocks.GRASS_BLOCK)||reserved(index,x-cx,z-cz))continue;
+            boolean spaced=planted.stream().noneMatch(p->p.distSqr(ground)<36);
+            double roll=random.nextDouble();
+            if(spaced&&roll<.11) {
+                int kind=random.nextInt(7);
                 if(kind<2)cherry(b,x,y,z,5+random.nextInt(3));
                 else if(kind==2)cane(b,x,y,z,5+random.nextInt(4));
                 else if(kind==3)lollipop(b,x,y,z,3,SWEETS[random.nextInt(SWEETS.length)]);
-                else gumdrop(b,x,y,z,SWEETS[random.nextInt(SWEETS.length)]);
+                else if(kind==4)gumdrop(b,x,y,z,SWEETS[random.nextInt(SWEETS.length)]);
+                else put(b,x,y,z,kind==5?Blocks.FLOWERING_AZALEA:Blocks.AZALEA);
                 planted.add(ground);
-            } else if(!b.containsKey(ground.above())&&random.nextDouble()<.15) {
-                put(b,x,y,z,switch(random.nextInt(5)) {
-                    case 0->Blocks.PINK_TULIP;case 1->Blocks.ALLIUM;case 2->Blocks.LILY_OF_THE_VALLEY;
-                    case 3->Blocks.PINK_PETALS;default->Blocks.GRASS;
+            } else if(!b.containsKey(ground.above())&&roll<.55) {
+                put(b,x,y,z,switch(random.nextInt(14)) {
+                    case 0,1,2->Blocks.PINK_TULIP;
+                    case 3->Blocks.WHITE_TULIP;
+                    case 4->Blocks.ALLIUM;
+                    case 5->Blocks.LILY_OF_THE_VALLEY;
+                    case 6->Blocks.OXEYE_DAISY;
+                    case 7->Blocks.CORNFLOWER;
+                    case 8->Blocks.AZURE_BLUET;
+                    case 9,10->Blocks.PINK_PETALS;
+                    case 11->Blocks.FLOWERING_AZALEA;
+                    case 12->Blocks.MOSS_CARPET;
+                    default->Blocks.GRASS;
                 });
             }
         }
+        flowerPatches(b,isle,index,random);
     }
-    private static boolean reserved(int isle,int x,int z) {
+
+    /** Dense little flower beds make every island read as a garden rather than bare turf. */
+    private static void flowerPatches(Map<BlockPos,BlockState>b,Paradise.Isle isle,int index,Random random) {
+        int cx=(int)Math.round(isle.x()),cz=(int)Math.round(isle.z()),top=(int)isle.y();
+        int patches=Math.max(2,(int)Math.round(isle.radius()/8.0));
+        Block[] flowers={Blocks.PINK_TULIP,Blocks.WHITE_TULIP,Blocks.ALLIUM,Blocks.LILY_OF_THE_VALLEY,
+            Blocks.OXEYE_DAISY,Blocks.CORNFLOWER,Blocks.AZURE_BLUET,Blocks.FLOWERING_AZALEA};
+        for(int patch=0;patch<patches;patch++) {
+            double angle=random.nextDouble()*Math.PI*2;
+            double distance=isle.radius()*(.28+random.nextDouble()*.38);
+            int px=(int)Math.round(isle.x()+Math.cos(angle)*distance);
+            int pz=(int)Math.round(isle.z()+Math.sin(angle)*distance);
+            Block flower=flowers[random.nextInt(flowers.length)];
+            for(int dx=-2;dx<=2;dx++)for(int dz=-2;dz<=2;dz++) {
+                if(dx*dx+dz*dz>5||random.nextDouble()<.28)continue;
+                int x=px+dx,z=pz+dz;
+                BlockPos ground=new BlockPos(x,top,z);
+                BlockState state=b.get(ground);
+                if(state==null||!state.is(Blocks.GRASS_BLOCK)||reserved(index,x-cx,z-cz)||b.containsKey(ground.above()))continue;
+                put(b,x,top+1,z,(dx+dz+patch)%4==0?Blocks.PINK_PETALS:flower);
+            }
+        }
+    }
+
+    private static boolean reserved    private static boolean reserved(int isle,int x,int z) {
         if(isle==0)return (Math.abs(x)<20&&z<5)||(Math.abs(x)<8&&z>20)
             ||Math.abs(Math.abs(x)-13)<3||Math.abs(z-27)<3;
         if(isle==1||isle==2)return Math.abs(x)<15&&Math.abs(z)<12;
@@ -106,23 +143,43 @@ public final class ParadiseArchitecture {
             double dist=Math.hypot(dx+.5,dz+.5);
             double rim=radius*(.91+.09*Math.sin(Math.atan2(dz+.5,dx+.5)*3+.8));
             if(dist>rim+1.3)continue;
-            if(dist>rim){put(b,cx+dx,y,cz+dz,Blocks.SMOOTH_QUARTZ);continue;}
+            if(dist>rim){
+                put(b,cx+dx,y,cz+dz,Blocks.SMOOTH_QUARTZ);
+                if(Math.floorMod(dx*17+dz*31,11)==0)put(b,cx+dx,y+1,cz+dz,Blocks.PINK_PETALS);
+                continue;
+            }
             for(int d=0;d<Paradise.SPRING_DEPTH;d++)put(b,cx+dx,y-d,cz+dz,Blocks.WATER);
             put(b,cx+dx,y-Paradise.SPRING_DEPTH,cz+dz,(dx*dx+dz*dz)%5==0?Blocks.SEA_LANTERN:Blocks.PINK_CONCRETE);
+            if(dist<rim-1.6&&Math.floorMod(dx*23+dz*19,17)==0)
+                put(b,cx+dx,y+1,cz+dz,Blocks.LILY_PAD);
         }
     }
     private static void waterfall(Map<BlockPos,BlockState>b,Paradise.Fall f) {
         double ax=Math.cos(f.angle()),az=Math.sin(f.angle());
-        // Five-block liquid curtains, connected back into a source pool on the island.
-        for(int side=-2;side<=2;side++)for(int back=-7;back<=0;back++) {
-            int x=(int)Math.floor(f.x()+ax*back-az*side),z=(int)Math.floor(f.z()+az*back+ax*side),y=(int)f.y();
-            for(int clear=1;clear<=12;clear++)b.remove(new BlockPos(x,y+clear,z));
-            put(b,x,y,z,Blocks.WATER);
-            if(back<-1)put(b,x,y-1,z,Blocks.PINK_CONCRETE);
+        int y=(int)f.y();
+        // A broad, built spillway keeps every fall visibly attached to the island. The old version
+        // started as a skinny source strip in open air, which is what produced detached purple
+        // columns and little orphan blocks when the irregular rim changed under it.
+        for(int side=-3;side<=3;side++)for(int back=-9;back<=0;back++) {
+            int x=(int)Math.floor(f.x()+ax*back-az*side),z=(int)Math.floor(f.z()+az*back+ax*side);
+            for(int clear=1;clear<=10;clear++)b.remove(new BlockPos(x,y+clear,z));
+            if(Math.abs(side)==3) {
+                put(b,x,y,z,Blocks.SMOOTH_QUARTZ);
+                put(b,x,y-1,z,Blocks.PINK_CONCRETE);
+            } else {
+                put(b,x,y,z,Blocks.WATER);
+                if(back<-1)put(b,x,y-1,z,Blocks.PINK_CONCRETE);
+            }
         }
-        for(int down=1;down<=f.length();down++)for(int side=-2;side<=2;side++) {
-            int x=(int)Math.floor(f.x()-az*side),z=(int)Math.floor(f.z()+ax*side);
-            put(b,x,(int)f.y()-down,z,Blocks.WATER);
+        // The curtain stays broad and continuous, then ends on a stagger rather than a perfectly
+        // flat five-block cut. The client-side translucent continuation carries it into the clouds.
+        for(int side=-2;side<=2;side++) {
+            int trim=Math.abs(side)*4;
+            int max=Math.max(16,f.length()-trim);
+            for(int down=1;down<=max;down++) {
+                int x=(int)Math.floor(f.x()-az*side),z=(int)Math.floor(f.z()+ax*side);
+                put(b,x,y-down,z,Blocks.WATER);
+            }
         }
     }
     private static void castle(Map<BlockPos,BlockState>b,int x,int y,int z) {
@@ -216,11 +273,9 @@ public final class ParadiseArchitecture {
                 b.put(new BlockPos(x,by,z),deck);
                 for(int clear=1;clear<=4;clear++)b.remove(new BlockPos(x,by+clear,z));
                 if(Math.abs(width)==2) {
-                    put(b,x,by+1,z,Blocks.SPRUCE_FENCE.defaultBlockState()
-                        .setValue(net.minecraft.world.level.block.FenceBlock.NORTH,true)
-                        .setValue(net.minecraft.world.level.block.FenceBlock.SOUTH,true)
-                        .setValue(net.minecraft.world.level.block.FenceBlock.EAST,true)
-                        .setValue(net.minecraft.world.level.block.FenceBlock.WEST,true));
+                    // Solid timber curbs, never fence rails. They give the bridge a clean block
+                    // silhouette like the reference and still leave the whole middle open.
+                    put(b,x,by,z,Blocks.SPRUCE_PLANKS);
                     if(i%16==0) {
                         put(b,x,by-1,z,Blocks.CHAIN);
                         put(b,x,by-2,z,Blocks.LANTERN.defaultBlockState().setValue(net.minecraft.world.level.block.LanternBlock.HANGING,true));
