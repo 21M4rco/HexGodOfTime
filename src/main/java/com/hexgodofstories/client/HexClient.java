@@ -130,13 +130,14 @@ public final class HexClient {
             if(!branchInput&&!primary&&primaryDown&&primaryWasHold)HexNetwork.send(HexServer.HOLD_END,0);
             primaryDown=primary;
 
-            // The alternate key configures the Fracture, but only inside the sanctum, which is the
-            // only place the break has a choice to make. Outside it there is one destination and the
-            // cast key is the whole control. Every other spell keeps its ordinary alternate action.
+            // G belongs to Warping. Outside the World Tree it chooses a destination. Inside that
+            // one dimension alone it opens the preserved Fracture destination/exit selector.
             while(SECONDARY.consumeClick()) {
-                if(Ability.at(ClientState.self().getInt("selected"))==Ability.WARPING)mc.setScreen(new WarpScreen());
-                else if(Ability.at(ClientState.self().getInt("selected"))!=Ability.RIFT)HexNetwork.send(HexServer.ALTERNATE,0);
-                else FractureScreen.open();
+                Ability live=Ability.at(ClientState.self().getInt("selected"));
+                if(live==Ability.WARPING) {
+                    if(com.hexgodofstories.server.PocketRealm.inside(mc.player.level()))FractureScreen.open();
+                    else mc.setScreen(new WarpScreen());
+                } else HexNetwork.send(HexServer.ALTERNATE,0);
             }
             while(TRANSFORM.consumeClick())HexNetwork.send(HexServer.TRANSFORM,0);
             while(RELEASE.consumeClick())HexNetwork.send(HexServer.UTILITY,0);
@@ -219,6 +220,7 @@ public final class HexClient {
             if(e.phase!=TickEvent.Phase.START)return;
             Minecraft mc=Minecraft.getInstance();
             if(mc.level==null||e.player!=mc.player)return;
+            if(WarpEmergenceClient.tickLocal(mc.player))return;
             WarpCrossingClient.sink(mc.player);
         }
         /**

@@ -34,7 +34,7 @@ public final class FractureScreen extends Screen {
     private List<PlayerInfo> candidates=List.of();
     private int left,top,panel,scroll;
 
-    public FractureScreen() {super(Component.literal("Fracture"));}
+    public FractureScreen() {super(Component.literal("Warping / World Tree Exit"));}
 
     @Override public boolean isPauseScreen() {return false;}
 
@@ -118,12 +118,12 @@ public final class FractureScreen extends Screen {
         g.fill(left,top,left+WIDTH,top+panel,PANEL);
         motes(g,time);
 
-        g.drawString(font,"F R A C T U R E",left+PAD,top+12,GOLD,false);
+        g.drawString(font,"W O R L D   T R E E   E X I T",left+PAD,top+12,GOLD,false);
         FractureMode live=active();
-        g.drawString(font,picking==null?"Choose where the break leads":"Choose who to open beside",left+PAD,top+26,DIM,false);
+        g.drawString(font,picking==null?"Choose where Warping sends you back out":"Choose who to emerge beside",left+PAD,top+26,DIM,false);
         String current=live.label(activeTarget());
         g.drawString(font,"NOW: "+current,left+WIDTH-PAD-font.width("NOW: "+current),top+12,ACCENT,false);
-        g.drawString(font,picking==null?"The cast key keeps this until you change it":"Escape to go back",
+        g.drawString(font,picking==null?"R uses this route until you change it":"Escape to go back",
             left+WIDTH-PAD-font.width(picking==null?"The cast key keeps this until you change it":"Escape to go back"),top+26,DIM,false);
         g.fill(left+PAD,top+42,left+WIDTH-PAD,top+43,0xff20382e);
 

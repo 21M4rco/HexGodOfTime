@@ -52,7 +52,7 @@ public final class MasteryScreen extends Screen {
             addRenderableWidget(Button.builder(Component.literal(d.title),b->{chapter=d;rebuildWidgets();})
                 .bounds(left+12,top+69+d.ordinal()*29,nav-20,23).build());
 
-        var list=Arrays.stream(Ability.values()).filter(a->a.discipline==chapter).toList();
+        var list=Arrays.stream(Ability.values()).filter(a->a.discipline==chapter&&a!=Ability.RIFT).toList();
         int card=cardHeight(list.size());
         int i=0;
         for(Ability a:list) {

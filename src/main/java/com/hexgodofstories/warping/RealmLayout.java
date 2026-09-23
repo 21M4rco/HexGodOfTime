@@ -25,7 +25,7 @@ public final class RealmLayout {
                 for(int x=-9;x<=9;x++)for(int z=-9;z<=9;z++)if(x*x+z*z<81)
                     put(b,x,116,z,Blocks.LAVA.defaultBlockState());
             }
-            case VOID_SEA -> {}
+            case VOID_SEA,SANCTUM -> {}
             case PARADISE -> ParadiseArchitecture.build(b);
             // The singularity and moon use spatial meshes and radial physics, never block platforms.
             case GRAVITY_WELL,CRUSHING_REALM -> {}

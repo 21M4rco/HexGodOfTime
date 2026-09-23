@@ -17,7 +17,8 @@ public enum Ability {
     TELEKINESIS(SORCERY,140,0,25,false,"Invisible Hand","Aim to hold an entity; cast again to add another. Scroll to push or pull. Secondary: throw. Utility: release."),
     BLINK(SORCERY,220,0,70,false,"Veilstep","Dissolve and reform at a safe position in your sightline."),
     WARD(SORCERY,330,0,220,false,"Runic Ward","Raise a brief defensive veil while remaining mobile."),
-    RIFT(SORCERY,520,40,160,true,"Fracture","Tap: open a seven-second doorway. Hold for 0.6 seconds: pull every entity within five blocks through, then close instantly. Works both ways; visitors enter your world tree realm. Eight-second recovery; leaving is always free."),
+    // Save-compatible tombstone. Fracture's dimension now lives under Warping; never reorder/remove.
+    RIFT(SORCERY,520,0,0,false,true,"Fracture (legacy)","The World Tree is now a Warping destination."),
     DAGGERS(CONJURATION,0,0,35,false,"Conjure Daggers","Manifest a dagger into an empty hand. Secondary: dismiss conjurations."),
     TWIN_DAGGERS(CONJURATION,160,0,55,false,"Twin Deceivers","Manifest two daggers, the off hand reversed. Attack: combinations. Use: throw."),
     LAEVATEINN(CONJURATION,380,0,70,false,"Laevateinn","Manifest the Void sword with its own choreography."),
@@ -31,7 +32,7 @@ public enum Ability {
     THREADS(PURPOSE,0,25,80,false,"Temporal Threads","Bind a target in time. Secondary: pull it along the strand."),
     ASCENSION(PURPOSE,700,100,400,false,"Glorious Purpose","Weave the final mantle, living cloak and dark crown. Inside your own fracture world, toggle Cosmic Flight with its key; Space rises and crouch descends. No other dimension grants flight."),
     TIME_BRANCH(PURPOSE,900,120,700,true,"Time Branch Unleashing","Transformed only. Hold to plant yourself and compress the Time Branches between both hands; release to open them through reality. Ten seconds is the hard limit, full power at five and a half. A hundred blocks of torrent that nothing stops: everything it passes through becomes Nothingness and is put back about half a minute later, exactly as it was. Anything living caught inside is erased from the timeline."),
-    WARPING(SORCERY,800,80,400,true,"Warping","Hold R on solid ground to shatter reality there, up to 28 blocks across. The point is locked when the hold begins; look anywhere. A wider tear costs more energy. G: destination. Release R to open the break for 10 seconds. Step into it to follow your victims. Y: reach the other way \u2014 crack the ground where you are looking and pull the chosen realm\u0027s living creatures up through it, without going anywhere yourself. Crouch + X: follow your last trap. Inside a realm, R: leave freely; X: realm control.");
+    WARPING(SORCERY,800,80,400,true,"Warping","Hold R on solid ground to spread a black Warping pool, up to 28 blocks across. G chooses a destination, including your World Tree sanctum. Release R to open it, then sink through. Y reaches into normal Warping realms. Inside the World Tree, G opens the preserved exit selector and R leaves through that saved route. Every Warping arrival rises slowly out of a black puddle.");
     public final Discipline discipline; public final int level,cost,cooldown; public final boolean hold,dedicated; public final String title,description;
     Ability(Discipline d,int l,int cost,int cd,boolean hold,String title,String description) {this(d,l,cost,cd,hold,false,title,description);}
     Ability(Discipline d,int l,int cost,int cd,boolean hold,boolean dedicated,String title,String description) {
