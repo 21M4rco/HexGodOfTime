@@ -66,8 +66,10 @@ public final class CandyCorruptionClient {
     }
 
     @SubscribeEvent public static void pre(RenderPlayerEvent.Pre e){
-        AbstractClientPlayer p=e.getEntity();State s=STATES.get(p.getId());if(s==null||s.mask==0)return;
-        PlayerModel<AbstractClientPlayer> m=e.getRenderer().getModel();
+        if(!(e.getEntity() instanceof AbstractClientPlayer p))return;
+        State s=STATES.get(p.getId());if(s==null||s.mask==0)return;
+        @SuppressWarnings("unchecked")
+        PlayerModel<AbstractClientPlayer> m=(PlayerModel<AbstractClientPlayer>)e.getRenderer().getModel();
         HIDDEN.put(p.getId(),new Visibility(m.rightArm.visible,m.rightSleeve.visible,m.leftArm.visible,m.leftSleeve.visible,m.rightLeg.visible,m.rightPants.visible,m.leftLeg.visible,m.leftPants.visible));
         if((s.mask&1<<CandyCorruption.RIGHT_ARM)!=0){m.rightArm.visible=false;m.rightSleeve.visible=false;}
         if((s.mask&1<<CandyCorruption.LEFT_ARM)!=0){m.leftArm.visible=false;m.leftSleeve.visible=false;}
@@ -75,8 +77,10 @@ public final class CandyCorruptionClient {
         if((s.mask&1<<CandyCorruption.LEFT_LEG)!=0){m.leftLeg.visible=false;m.leftPants.visible=false;}
     }
     @SubscribeEvent public static void post(RenderPlayerEvent.Post e){
-        Visibility v=HIDDEN.remove(e.getEntity().getId());if(v==null)return;
-        PlayerModel<AbstractClientPlayer> m=e.getRenderer().getModel();
+        if(!(e.getEntity() instanceof AbstractClientPlayer p))return;
+        Visibility v=HIDDEN.remove(p.getId());if(v==null)return;
+        @SuppressWarnings("unchecked")
+        PlayerModel<AbstractClientPlayer> m=(PlayerModel<AbstractClientPlayer>)e.getRenderer().getModel();
         m.rightArm.visible=v.ra;m.rightSleeve.visible=v.ras;m.leftArm.visible=v.la;m.leftSleeve.visible=v.las;
         m.rightLeg.visible=v.rl;m.rightPants.visible=v.rp;m.leftLeg.visible=v.ll;m.leftPants.visible=v.lp;
     }
