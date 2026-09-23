@@ -130,7 +130,7 @@ public final class ParadiseRestoration extends SavedData {
     // ------------------------------------------------------------------ placed edible blocks
 
     @SubscribeEvent public static void placed(BlockEvent.EntityPlaceEvent e) {
-        if (!(e.getLevel() instanceof ServerLevel level) || Destination.from(level) != Destination.PARADISE) return;
+        if (!(e.getLevel() instanceof ServerLevel level)) return;
         if (!(e.getEntity() instanceof net.minecraft.world.entity.player.Player player)) return;
         BlockState state = e.getPlacedBlock();
         if (!heldEdibleBlock(player.getMainHandItem(), state) && !heldEdibleBlock(player.getOffhandItem(), state)) return;
@@ -148,13 +148,14 @@ public final class ParadiseRestoration extends SavedData {
     // ------------------------------------------------------------------ being broken
 
     @SubscribeEvent public static void broken(BlockEvent.BreakEvent e) {
-        if (!(e.getLevel() instanceof ServerLevel level) || Destination.from(level) != Destination.PARADISE) return;
+        if (!(e.getLevel() instanceof ServerLevel level)) return;
         ParadiseRestoration data = of(level);
         if (data.placedEdible.remove(e.getPos().asLong())) {
             data.setDirty();
             expect(level, e.getPos());
             return;
         }
+        if (Destination.from(level) != Destination.PARADISE) return;
         BlockState original = natural(e.getPos(), e.getState());
         if (original == null) return;
         long due = level.getGameTime() + DELAY + level.random.nextInt(SCATTER);
@@ -176,14 +177,16 @@ public final class ParadiseRestoration extends SavedData {
 
     /** A blast in Paradise is still only a hole with a delay on it. */
     @SubscribeEvent public static void blast(ExplosionEvent.Detonate e) {
-        if (!(e.getLevel() instanceof ServerLevel level) || Destination.from(level) != Destination.PARADISE) return;
+        if (!(e.getLevel() instanceof ServerLevel level)) return;
         ParadiseRestoration data = of(level);
+        boolean paradise = Destination.from(level) == Destination.PARADISE;
         for (BlockPos pos : e.getAffectedBlocks()) {
             if (data.placedEdible.remove(pos.asLong())) {
                 data.setDirty();
                 expect(level, pos);
                 continue;
             }
+            if (!paradise) continue;
             BlockState original = natural(pos, level.getBlockState(pos));
             if (original == null) continue;
             record(level, pos, original, level.getGameTime() + DELAY + level.random.nextInt(SCATTER));
@@ -212,18 +215,34 @@ public final class ParadiseRestoration extends SavedData {
      * known to have come out of Paradise's own ground rather than out of somebody's backpack, and
      * it means neither the break nor the drop has to be intercepted and re-implemented.
      */
-    private static final Map<Long, Long> EXPECTED = new HashMap<>();
+    /**
+     * Drop expectations are kept per dimension. Paradise blocks are allowed to be carried home,
+     * placed there and broken there without accidentally matching an unrelated break at the same
+     * coordinates in another world.
+     */
+    private static final Map<net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>, Map<Long, Long>> EXPECTED = new HashMap<>();
 
-    private static void expect(ServerLevel level, BlockPos pos) { EXPECTED.put(pos.asLong(), level.getGameTime()); }
+    private static Map<Long, Long> expected(ServerLevel level) {
+        return EXPECTED.computeIfAbsent(level.dimension(), key -> new HashMap<>());
+    }
+
+    private static void expect(ServerLevel level, BlockPos pos) {
+        expected(level).put(pos.asLong(), level.getGameTime());
+    }
 
     @SubscribeEvent public static void dropped(EntityJoinLevelEvent e) {
-        if (EXPECTED.isEmpty() || !(e.getEntity() instanceof ItemEntity item)) return;
-        if (!(e.getLevel() instanceof ServerLevel level) || Destination.from(level) != Destination.PARADISE) return;
+        if (!(e.getEntity() instanceof ItemEntity item) || !(e.getLevel() instanceof ServerLevel level)) return;
+        Map<Long, Long> expected = EXPECTED.get(level.dimension());
+        if (expected == null || expected.isEmpty()) return;
         long now = level.getGameTime();
-        EXPECTED.values().removeIf(when -> now - when > 4);
+        expected.values().removeIf(when -> now - when > 4);
+        if (expected.isEmpty()) {
+            EXPECTED.remove(level.dimension());
+            return;
+        }
         BlockPos at = item.blockPosition();
         for (int dx = -1; dx <= 1; dx++) for (int dy = -1; dy <= 1; dy++) for (int dz = -1; dz <= 1; dz++) {
-            if (!EXPECTED.containsKey(at.offset(dx, dy, dz).asLong())) continue;
+            if (!expected.containsKey(at.offset(dx, dy, dz).asLong())) continue;
             ParadiseFood.mark(item.getItem());
             return;
         }
