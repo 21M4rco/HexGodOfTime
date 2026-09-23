@@ -55,6 +55,12 @@ public final class ParadiseFood {
         return !stack.isEmpty() && stack.hasTag() && stack.getTag().getBoolean(TAG);
     }
 
+    /** Pink provenance prefix used everywhere Minecraft asks for this stack's visible name. */
+    public static Component candyName(ItemStack stack,Component original) {
+        if(!edible(stack))return original;
+        return Component.literal("Candy ").withStyle(ChatFormatting.LIGHT_PURPLE).append(original.copy());
+    }
+
     /**
      * How rich a mouthful of this is, from one to five.
      *
@@ -104,6 +110,7 @@ public final class ParadiseFood {
             if (!level.isClientSide) {
                 player.getFoodData().eat(nutrition(stack), saturation(stack));
                 reward(player, stack);
+                CandyCorruption.consume(player,1);
                 player.awardStat(Stats.ITEM_USED.get(stack.getItem()));
                 level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.PLAYER_BURP,
                     SoundSource.PLAYERS, .45f, 1.2f + level.random.nextFloat() * .3f);
