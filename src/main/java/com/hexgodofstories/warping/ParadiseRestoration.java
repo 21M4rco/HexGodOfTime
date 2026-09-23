@@ -237,20 +237,33 @@ public final class ParadiseRestoration extends SavedData {
 
     @SubscribeEvent public static void dropped(EntityJoinLevelEvent e) {
         if (!(e.getEntity() instanceof ItemEntity item) || !(e.getLevel() instanceof ServerLevel level)) return;
-        Map<Long, Long> expected = EXPECTED.get(level.dimension());
-        if (expected == null || expected.isEmpty()) return;
-        long now = level.getGameTime();
-        expected.values().removeIf(when -> now - when > 4);
-        if (expected.isEmpty()) {
-            EXPECTED.remove(level.dimension());
-            return;
+        BlockPos at=item.blockPosition();
+        long now=level.getGameTime();
+
+        // Ordinary direct breaks normally match this short-lived expectation immediately. Keep it
+        // around long enough for support-sensitive decorations (lily pads, azaleas, petals, grass,
+        // flowers, etc.) whose item entity can be spawned by a neighbour update a few ticks later.
+        Map<Long, Long> expected=EXPECTED.get(level.dimension());
+        if(expected!=null&&!expected.isEmpty()) {
+            expected.values().removeIf(when->now-when>20);
+            for(int dx=-2;dx<=2;dx++)for(int dy=-2;dy<=2;dy++)for(int dz=-2;dz<=2;dz++)
+                if(expected.containsKey(at.offset(dx,dy,dz).asLong())) {
+                    ParadiseFood.mark(item.getItem());
+                    return;
+                }
+            if(expected.isEmpty())EXPECTED.remove(level.dimension());
         }
-        BlockPos at = item.blockPosition();
-        for (int dx = -1; dx <= 1; dx++) for (int dy = -1; dy <= 1; dy++) for (int dz = -1; dz <= 1; dz++) {
-            if (!expected.containsKey(at.offset(dx, dy, dz).asLong())) continue;
-            ParadiseFood.mark(item.getItem());
-            return;
-        }
+
+        // Native Paradise blocks also leave a restoration wound before they disappear. That wound
+        // is a stronger provenance record than timing alone and catches every fragile/decorative
+        // block even when vanilla destroys it indirectly instead of giving it its own BreakEvent.
+        if(Destination.from(level)!=Destination.PARADISE)return;
+        ParadiseRestoration data=of(level);
+        for(int dx=-2;dx<=2;dx++)for(int dy=-2;dy<=2;dy++)for(int dz=-2;dz<=2;dz++)
+            if(data.wounds.containsKey(at.offset(dx,dy,dz).asLong())) {
+                ParadiseFood.mark(item.getItem());
+                return;
+            }
     }
 
     // ------------------------------------------------------------------ growing back
