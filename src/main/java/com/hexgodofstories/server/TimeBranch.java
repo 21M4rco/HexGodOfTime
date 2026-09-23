@@ -27,9 +27,10 @@ import java.util.*;
  *
  * <p>Nothing stops it. The torrent does not collide with the world, is not slowed by it and is not shortened
  * by it: it runs its full hundred blocks through stone, ore, a wall, a vault door or a modded machine alike.
- * Everything it passes through is replaced with {@link com.hexgodofstories.block.NothingnessBlock} — absolute black,
- * unbreakable, no drops — and every one of those positions is written down first, completely, so that about
- * half a minute later {@link Nothingness} puts the world back exactly as it was, down to a chest's
+ * Solid terrain in the centre is temporarily removed while only the outer beam-shaped skin becomes
+ * {@link com.hexgodofstories.block.NothingnessBlock}. Free-standing fluids are left untouched. Every changed
+ * position is written down first, completely, so a few seconds after the front passes {@link Nothingness}
+ * puts the world back exactly as it was, down to a chest's
  * inventory and a sign's text. The destruction is theatre; the record is the real work.
  */
 public final class TimeBranch {
@@ -43,14 +44,13 @@ public final class TimeBranch {
     /** An opened torrent, sweeping forward: what it has already caught and what it has yet to reach. */
     private static final class Torrent {
         final UUID caster;final Vec3 origin,direction;final double length;final float power;
-        final long start;final int life;final List<BlockPos> volume;final double[] distances;final long restoreAt;
+        final long start;final int life;final List<BlockPos> volume;final double[] distances;
         final Set<UUID> caught=new HashSet<>();
         int cursor;
         Torrent(UUID caster,Vec3 origin,Vec3 direction,double length,float power,long start,int life,
-                List<BlockPos> volume,double[] distances,long restoreAt) {
+                List<BlockPos> volume,double[] distances) {
             this.caster=caster;this.origin=origin;this.direction=direction;this.length=length;
             this.power=power;this.start=start;this.life=life;this.volume=volume;this.distances=distances;
-            this.restoreAt=restoreAt;
         }
     }
     private static final Map<UUID,Cast> CASTS=new HashMap<>();
@@ -155,8 +155,7 @@ public final class TimeBranch {
         long now=level.getGameTime();
         int life=BranchCharge.life(length,power);
         if(TORRENTS.size()>=MAX_TORRENTS)TORRENTS.remove(0);
-        TORRENTS.add(new Torrent(p.getUUID(),origin,direction,length,power,now,life,volume,distances,
-            now+life+BranchCharge.RESTORE));
+        TORRENTS.add(new Torrent(p.getUUID(),origin,direction,length,power,now,life,volume,distances));
 
         CompoundTag n=new CompoundTag();
         n.putDouble("x",origin.x);n.putDouble("y",origin.y);n.putDouble("z",origin.z);
@@ -214,15 +213,20 @@ public final class TimeBranch {
 
     /**
      * The world coming apart as the front reaches it, capped per tick so even a hundred-block bore cannot
-     * spike the server. Each position is recorded before it is replaced and is owed a restore from that
-     * moment, so an interrupted or overlapping cast can still only ever add to the record.
+     * spike the server. The centre is truly removed to air; only the outer ring becomes Nothingness.
+     * Every changed position carries its own snapshot and restores a few seconds after THIS part of the
+     * beam passed, so the world closes behind the slow-moving front instead of waiting for the whole cast.
      */
     private static void carve(ServerLevel level,Torrent t,long age) {
         int taken=0;
+        double inner=BranchCharge.nothingnessInnerRadius(t.power);
         while(t.cursor<t.volume.size()&&taken<BLOCKS_PER_TICK) {
             if(BranchCharge.reaches(t.distances[t.cursor])+BranchCharge.DISSOLVE>age)break;
             BlockPos pos=t.volume.get(t.cursor++);
-            if(Nothingness.take(level,pos,t.restoreAt))taken++;
+            double radial=BeamPath.radial(t.origin,t.direction,Vec3.atCenterOf(pos));
+            boolean shell=radial>=inner;
+            long restoreAt=level.getGameTime()+BranchCharge.RESTORE;
+            if(Nothingness.takeBeam(level,pos,restoreAt,shell))taken++;
         }
     }
 

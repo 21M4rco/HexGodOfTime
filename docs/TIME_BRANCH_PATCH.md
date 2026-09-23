@@ -77,3 +77,16 @@ Follow-up presentation patch:
   three subtle head accents in third person.
 - The beam's safe throat is now 0.8 blocks because its authoritative origin is already detached from
   the caster; this keeps the fired wave visually connected to the energy ball.
+
+
+### Hollow Nothingness / exact restoration correction
+- The terrain effect is now a hollow bore. Solid blocks in the beam core are temporarily replaced with
+  AIR; only the roughly one-block-thick outer ring is replaced with Nothingness.
+- Free-standing water, lava and modded fluid cells are ignored by terrain carving, so the beam never leaves
+  black Nothingness cubes floating through a body of water. Waterlogged solid blocks are still treated as
+  terrain and are restored with their waterlogged state.
+- Restoration is now local to the travelling front: every changed position comes back 80 ticks (~4 s)
+  after that part of the beam passed instead of waiting for the entire slow beam plus a 30-second delay.
+- Beam-owned wounds force their original snapshot back even if fluid moved into the cavity or a temporary
+  block appeared during the window. Block entities are snapshotted with full metadata before removal, so
+  chests, inventories, signs, machines, orientation/properties and other saved block data are restored.

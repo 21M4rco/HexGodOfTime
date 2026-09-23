@@ -44,7 +44,14 @@ public final class TimeBranchRegressionTest {
         require(BranchCharge.FOCUS>=2.7,"held focus ball must stay clearly detached from the caster");
         require(BranchCharge.sphere(BranchCharge.LIMIT)<1.2,"held focus ball must not engulf the caster");
         require(BranchCharge.SAFE<=1.0,"beam must visually leave the detached focus ball without a large dead gap");
-        System.out.println("Time Branch input boundaries, slow sweep and fragment invariants passed.");
+        for(float power:new float[]{0,.25f,.5f,.75f,1}) {
+            double outer=BranchCharge.eraseRadius(power),inner=BranchCharge.nothingnessInnerRadius(power);
+            require(inner>0&&inner<outer,"Nothingness must be a shell around a hollow beam core");
+            require(outer-inner>=.6&&outer-inner<=1.05,"Nothingness shell must stay about one block thick");
+        }
+        require(BranchCharge.RESTORE>=60&&BranchCharge.RESTORE<=120,
+            "terrain should restore only a few seconds after the beam passes");
+        System.out.println("Time Branch input, slow sweep, hollow terrain shell and fragment invariants passed.");
     }
     private static void require(boolean condition,String message){if(!condition)throw new AssertionError(message);}
 }

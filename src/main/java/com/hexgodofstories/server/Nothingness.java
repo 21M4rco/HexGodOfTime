@@ -29,7 +29,7 @@ import java.util.*;
  *
  * <ul>
  * <li><b>It is saved with the world, not held in memory.</b> A restart, a crash or a server stopped inside
- *     the half-minute window does not strand a black tunnel: the record is on disk and the restore resumes,
+ *     the short restore window does not strand a black tunnel: the record is on disk and the restore resumes,
  *     overdue, the next time the level ticks.
  * <li><b>A block entity is detached before its block is replaced.</b> A chest's own removal hook throws its
  *     entire inventory onto the floor, which would then be duplicated by the restore. Removing the block
@@ -55,9 +55,11 @@ public final class Nothingness extends SavedData {
     /** One position taken out of the world, and everything needed to put it back. */
     private static final class Wound {
         final BlockPos pos;final CompoundTag state;final CompoundTag blockEntity;
+        /** Beam wounds must restore exactly even if fluid flowed in or something was placed meanwhile. */
+        final boolean beam;
         long due;int waited;
-        Wound(BlockPos pos,CompoundTag state,CompoundTag blockEntity,long due,int waited) {
-            this.pos=pos;this.state=state;this.blockEntity=blockEntity;this.due=due;this.waited=waited;
+        Wound(BlockPos pos,CompoundTag state,CompoundTag blockEntity,long due,int waited,boolean beam) {
+            this.pos=pos;this.state=state;this.blockEntity=blockEntity;this.due=due;this.waited=waited;this.beam=beam;
         }
     }
     /** Insertion ordered, so a tunnel knits back the way it was carved. */
@@ -75,33 +77,54 @@ public final class Nothingness extends SavedData {
     }
 
     /**
-     * Takes one position out of the world, recording it first.
-     *
-     * @return true when this call is what replaced it.
+     * Legacy/full Nothingness replacement used by callers that genuinely want the whole position black.
      */
     public static boolean take(ServerLevel level,BlockPos pos,long due) {
+        return takeInternal(level,pos,due,true,false);
+    }
+
+    /**
+     * Time Branch terrain surgery.
+     *
+     * @param shell true for the outer black Nothingness skin; false for the hollow AIR core.
+     * @return true when this call recorded and replaced the original position.
+     */
+    public static boolean takeBeam(ServerLevel level,BlockPos pos,long due,boolean shell) {
+        return takeInternal(level,pos,due,shell,true);
+    }
+
+    private static boolean takeInternal(ServerLevel level,BlockPos pos,long due,boolean black,boolean beam) {
         if(!level.hasChunkAt(pos))return false;
-        BlockState state=level.getBlockState(pos);
-        if(state.isAir())return false;
         Nothingness data=of(level);
-        if(state.is(HexGodOfStories.NOTHINGNESS.get())) {
-            // A second torrent through the same wall. Recording the void as the original is how a build
-            // would be lost for good, so the existing record simply waits longer instead.
-            Wound held=data.wounds.get(pos.asLong());
-            if(held!=null&&due>held.due){held.due=due;data.setDirty();}
+        Wound existing=data.wounds.get(pos.asLong());
+        if(existing!=null) {
+            // Overlapping beams never record an already-temporary state as the original. They only keep
+            // the one real snapshot alive long enough for the newest pass to finish.
+            if(due>existing.due){existing.due=due;data.setDirty();}
             return false;
         }
+
+        BlockState state=level.getBlockState(pos);
+        if(state.isAir()||state.is(HexGodOfStories.NOTHINGNESS.get()))return false;
+
+        // Free-standing fluids are not terrain for this effect. In particular, never create a row of
+        // Nothingness cubes through water; the beam simply travels through the fluid untouched.
+        if(beam&&!state.getFluidState().isEmpty()&&state.getCollisionShape(level,pos).isEmpty())return false;
+
         CompoundTag saved=NbtUtils.writeBlockState(state);
         CompoundTag entity=null;
         BlockEntity attached=level.getBlockEntity(pos);
         if(attached!=null) {
             entity=attached.saveWithFullMetadata();
-            // Detached before the block goes. Otherwise the block's own removal hook empties a chest onto
-            // the floor, and the restore below would hand the same items back a second time.
+            // Detach before replacement so a chest/machine cannot dump or duplicate its inventory.
             level.removeBlockEntity(pos);
         }
-        level.setBlock(pos,HexGodOfStories.NOTHINGNESS.get().defaultBlockState(),FLAGS);
-        data.wounds.put(pos.asLong(),new Wound(pos.immutable(),saved,entity,due,0));
+
+        BlockState replacement=black
+            ?HexGodOfStories.NOTHINGNESS.get().defaultBlockState()
+            :net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+        level.setBlock(pos,replacement,FLAGS);
+        data.wounds.put(pos.asLong(),new Wound(pos.immutable(),saved,entity,due,0,beam));
         data.setDirty();
         return true;
     }
@@ -169,10 +192,14 @@ public final class Nothingness extends SavedData {
 
     private void restore(ServerLevel level,Wound w) {
         BlockState current=level.getBlockState(w.pos);
-        // Only ever put something back over the void it left, or over air if something removed that. Any
-        // other block means the world has moved on and overwriting it would be the corruption this whole
-        // class exists to avoid.
-        if(!current.is(HexGodOfStories.NOTHINGNESS.get())&&!current.isAir())return;
+        // Ordinary Nothingness wounds preserve the old conflict-avoidance rule. Time Branch wounds are
+        // explicitly temporary world surgery: they must return the exact original state even if water
+        // flowed into the cavity or somebody placed a block during the four-second window.
+        if(!w.beam&&!current.is(HexGodOfStories.NOTHINGNESS.get())&&!current.isAir())return;
+        if(w.beam) {
+            BlockEntity displaced=level.getBlockEntity(w.pos);
+            if(displaced!=null)level.removeBlockEntity(w.pos);
+        }
         BlockState original;
         try {
             HolderGetter<Block> blocks=level.holderLookup(Registries.BLOCK);
@@ -209,7 +236,7 @@ public final class Nothingness extends SavedData {
             BlockPos pos=BlockPos.of(entry.getLong("pos"));
             data.wounds.put(pos.asLong(),new Wound(pos,entry.getCompound("state"),
                 entry.contains("entity")?entry.getCompound("entity"):null,
-                entry.getLong("due"),entry.getInt("waited")));
+                entry.getLong("due"),entry.getInt("waited"),entry.getBoolean("beam")));
         }
         return data;
     }
@@ -223,6 +250,7 @@ public final class Nothingness extends SavedData {
             if(w.blockEntity!=null)entry.put("entity",w.blockEntity);
             entry.putLong("due",w.due);
             entry.putInt("waited",w.waited);
+            entry.putBoolean("beam",w.beam);
             list.add(entry);
         }
         tag.put("wounds",list);

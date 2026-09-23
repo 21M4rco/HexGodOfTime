@@ -28,10 +28,10 @@ public final class BeamPath {
     /**
      * Every position inside the cylinder that currently holds a block.
      *
-     * <p>Air is skipped and nothing else is. The torrent passes through everything — stone, ore, a wall, a
-     * chest, a modded machine — so there is no allow list here and no hardness test; what comes back is
-     * simply what is in the way. Air is left alone because filling the open part of the beam with a solid
-     * black tube would wall the world off rather than show a hole through it.
+     * <p>Air and free-standing fluids are skipped. The torrent passes through every solid block — stone,
+     * ore, a wall, a chest, a waterlogged block, a modded machine — with no hardness allow list. Plain
+     * water/lava/modded fluid cells are left as fluid instead of being replaced by black cubes. Air is also
+     * left alone because filling open space with a solid black tube would wall the world off.
      */
     public static List<BlockPos> occupied(BlockGetter level,Vec3 origin,Vec3 direction,
                                          double from,double to,double radius,int cap) {
@@ -52,7 +52,10 @@ public final class BeamPath {
                 BlockPos pos=BlockPos.containing(centre.add(side.scale(a)).add(up.scale(b)));
                 if(!seen.add(pos))continue;
                 BlockState state=level.getBlockState(pos);
-                if(!state.isAir())found.add(pos);
+                // A waterlogged solid still has collision and is real terrain. A plain fluid cell does
+                // not: leave it alone so Time Branch never leaves Nothingness blocks floating in water.
+                boolean freeFluid=!state.getFluidState().isEmpty()&&state.getCollisionShape(level,pos).isEmpty();
+                if(!state.isAir()&&!freeFluid)found.add(pos);
                 if(found.size()>=cap)return found;
             }
         }
@@ -61,4 +64,12 @@ public final class BeamPath {
 
     /** How far along the axis a point sits, for scheduling the front's arrival. */
     public static double along(Vec3 origin,Vec3 direction,Vec3 point) {return point.subtract(origin).dot(direction);}
+
+    /** Perpendicular distance from a point to the infinite beam axis. */
+    public static double radial(Vec3 origin,Vec3 direction,Vec3 point) {
+        Vec3 axis=direction.normalize();
+        double t=point.subtract(origin).dot(axis);
+        Vec3 nearest=origin.add(axis.scale(t));
+        return Math.sqrt(point.distanceToSqr(nearest));
+    }
 }

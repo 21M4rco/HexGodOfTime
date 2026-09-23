@@ -36,8 +36,12 @@ public final class BranchCharge {
     public static final int OPEN=16,FADE=16;
     /** Ticks a block spends coming apart before it is taken out of the world. */
     public static final int DISSOLVE=7;
-    /** Ticks after the torrent has fully ended before the world is put back: about thirty seconds. */
-    public static final int RESTORE=600;
+    /**
+     * Ticks after EACH carved position is touched before that exact position is restored.
+     * Four seconds is long enough to read the wound while the slow beam keeps travelling, but short
+     * enough that the world visibly knits itself back together behind the attack.
+     */
+    public static final int RESTORE=80;
     /** The held breath: the sphere collapses inward for this long before anything leaves the hands. */
     public static final double COMPRESS=1.5;
 
@@ -72,8 +76,16 @@ public final class BranchCharge {
     }
     /** How far from the axis a body is still caught. */
     public static double catchRadius(float power) {return 1.15+2.35*power;}
-    /** How far from the axis soft ground leaves the timeline. Always inside the visible torrent. */
+    /** How far from the axis terrain is temporarily removed. Always inside the visible torrent. */
     public static double eraseRadius(float power) {return .85+1.95*power;}
+    /**
+     * Inner edge of the Nothingness shell. Solid blocks nearer the axis become temporary air; only
+     * the outer skin becomes Nothingness, so a wall is bored out with a black outline instead of
+     * turning the entire cylinder into black blocks.
+     */
+    public static double nothingnessInnerRadius(float power) {
+        return Math.max(.20,eraseRadius(power)-(.65+.30*power));
+    }
     /** The drawn core half-width, which the two radii above sit inside. */
     public static double beamRadius(float power) {return .55+1.55*power;}
 
