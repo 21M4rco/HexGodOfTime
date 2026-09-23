@@ -110,16 +110,18 @@ public final class WarpRenderer {
             RenderSystem.disableCull();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
             // Restore the floor depth after drawing the remote scene, so it cannot occlude unrelated world effects.
             RenderSystem.colorMask(false,false,false,false);GL11.glDepthFunc(GL11.GL_ALWAYS);aperture(pose.last().pose(),brk);GL11.glDepthFunc(GL11.GL_LEQUAL);RenderSystem.colorMask(true,true,true,true);
-            GL11.glDisable(GL11.GL_STENCIL_TEST);RenderSystem.depthMask(false);
-            // Tall grass and other cutout plants have no collision surface, so the pool correctly
-            // lies on the block beneath them. Their pixels are nevertheless already in the depth
-            // buffer by this stage. Draw only the cosmetic liquid film without a depth rejection:
-            // the authoritative aperture/crossing remains exactly where it was, while vegetation
-            // inside the footprint reads as submerged under the portal instead of punching through.
+            RenderSystem.depthMask(false);
+            // Keep the visibility stencil active for the cosmetic film. The old path disabled the
+            // stencil and then drew this pass with GL_ALWAYS, which made the black puddle an x-ray
+            // overlay: walls, trunks, leaves and any other foreground block could not occlude it.
+            // The stencil was written with the normal world depth test, so it contains only pixels
+            // where the aperture is genuinely visible from the camera. Drawing the film through
+            // that same mask preserves the submerged look without letting it show through blocks.
             GL11.glDepthFunc(GL11.GL_ALWAYS);
             groundFilm(pose.last().pose(),brk,open);
-            // The flat opaque skin is allowed to cover cutout vegetation. The actual goo volume is
-            // depth-tested normally so its raised lip, walls and bulges occupy honest 3D space.
+            GL11.glDisable(GL11.GL_STENCIL_TEST);
+            // The actual goo volume is depth-tested normally so its raised lip, walls and bulges
+            // occupy honest 3D space and are hidden by foreground geometry.
             GL11.glDepthFunc(GL11.GL_LEQUAL);
             int window=n.contains("window")?n.getInt("window"):WarpMath.OPEN_TICKS;
             surface(pose.last().pose(),brk,open,age,held,time,window);
