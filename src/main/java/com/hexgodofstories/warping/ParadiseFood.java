@@ -17,6 +17,7 @@ import net.minecraft.world.level.Level;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.entity.player.ItemTooltipEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -140,6 +141,26 @@ public final class ParadiseFood {
             e.setCanceled(true);
             e.setCancellationResult(InteractionResult.CONSUME);
             player.startUsingItem(e.getHand());
+        }
+    }
+
+    /**
+     * Candy provenance propagates through crafting.
+     *
+     * <p>If a recipe is made in Paradise, its result is candy. Outside Paradise, a single candy
+     * ingredient is enough to pass the provenance forward. That means Paradise logs -> candy planks
+     * -> candy sticks -> candy tools/weapons/anything else built from those sticks, with no recipe
+     * allow-list and no special cases for modded crafting-grid recipes.
+     */
+    @Mod.EventBusSubscriber(modid = HexGodOfStories.ID)
+    public static final class Crafting {
+        @SubscribeEvent public static void crafted(PlayerEvent.ItemCraftedEvent e) {
+            ItemStack out=e.getCrafting();
+            if(out.isEmpty())return;
+            boolean candy=Destination.from(e.getEntity().level())==Destination.PARADISE;
+            var grid=e.getInventory();
+            if(!candy)for(int i=0;i<grid.getContainerSize();i++)if(edible(grid.getItem(i))){candy=true;break;}
+            if(candy)mark(out);
         }
     }
 
