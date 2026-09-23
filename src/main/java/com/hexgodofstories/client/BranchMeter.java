@@ -38,7 +38,7 @@ public final class BranchMeter {
         for(int side=-1;side<=1;side+=2) {
             for(int i=0;i<reach;i++) {
                 float t=i/(float)reach;
-                int colour=TemporalPalette.shade((float)(time*.03+t*.5+(side>0?.12:0)));
+                int colour=TimeBranchPalette.shade((float)(time*.03+t*.5+(side>0?.12:0)));
                 int alpha=(int)(255*Mth.clamp(.35f+.55f*power,0,1)*(1-t*.25f));
                 int wobble=(int)(Math.sin(t*9+time*.22*side)*(1+power*2.2));
                 g.fill(centre+side*i,top+wobble,centre+side*i+1,top+wobble+1+(power>.6f?1:0),alpha<<24|colour);
@@ -54,7 +54,7 @@ public final class BranchMeter {
             int length=(int)((7+b*4)*grow);
             for(int i=0;i<length;i++) {
                 float t=i/(float)Math.max(1,length);
-                int colour=TemporalPalette.hot((float)(time*.045+b*.17),t*.4f);
+                int colour=TimeBranchPalette.hot((float)(time*.045+b*.17),t*.4f);
                 int alpha=(int)(220*(1-t*.6f)*grow);
                 int x=centre+side*(from+i);
                 int y=top+rise*(int)(i*(.55+b*.12)+Math.sin(t*6+time*.3)*1.4);
@@ -63,24 +63,24 @@ public final class BranchMeter {
         }
         // Instability at the top end shows as the whole figure flickering, not as more of it.
         if(over>0&&Math.sin(time*.9)>.55-over*.5) {
-            int colour=TemporalPalette.hot((float)(time*.2),.8f);
+            int colour=TimeBranchPalette.hot((float)(time*.2),.8f);
             g.fill(centre-reach,top-1,centre+reach,top,(int)(120*over)<<24|colour);
         }
 
         String label=STAGES[Mth.clamp(stage-1,0,STAGES.length-1)];
-        int tint=stage>=5?0xffe9a8:stage>=4?0xf05cc8:stage>=3?0x53f0e6:0x8fe08a;
+        int tint=stage>=5?0x62ff96:stage>=4?0x23df69:stage>=3?0x119f4b:0x65c98d;
         g.drawCenteredString(mc.font,label,centre,top+12,tint);
         if(held>=BranchCharge.FULL) {
             // Called out once and then kept on screen: releasing now is the full move, holding is theatre.
             boolean blink=(ClientState.now()/4)%2==0||over>.25f;
-            if(blink)g.drawCenteredString(mc.font,"FULL POWER AVAILABLE",centre,top+24,0xfff0c2);
+            if(blink)g.drawCenteredString(mc.font,"FULL POWER AVAILABLE",centre,top+24,0x78ffa5);
         } else {
             int seconds=(int)Math.ceil((BranchCharge.FULL-held)/20f);
-            g.drawCenteredString(mc.font,"full power in "+seconds+"s",centre,top+24,0x9cb6a6);
+            g.drawCenteredString(mc.font,"full power in "+seconds+"s",centre,top+24,0x74a889);
         }
         int remaining=(int)Math.ceil((BranchCharge.LIMIT-held)/20f);
         if(held>BranchCharge.FULL)
-            g.drawCenteredString(mc.font,"containment fails in "+remaining+"s",centre,top+36,0xd2a07f);
+            g.drawCenteredString(mc.font,"containment fails in "+remaining+"s",centre,top+36,0x2fcf6b);
     }
 
     /** The tick at which branch {@code index} is earned, matching the documented stage thresholds. */

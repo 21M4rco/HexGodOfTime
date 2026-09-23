@@ -47,7 +47,7 @@ public final class BranchFistLayer extends RenderLayer<AbstractClientPlayer,Play
             double a=side*Math.PI/6+time*(.055+shell*.025)+y*.19,b=a+Math.PI/6;
             ra*=1+.10*Math.sin(a*3+time*1.3);rb*=1+.10*Math.sin(b*4-time*1.1);
             quad(pose,out,ring(a,ya,ra),ring(b,ya,ra),ring(b+.2,yb,rb),ring(a+.2,yb,rb),
-                TemporalPalette.hot((float)(time*.028+side*.05+shell*.2+y*.09),.18f+strike*.65f),
+                TimeBranchPalette.hot((float)(time*.028+side*.05+shell*.2+y*.09),.18f+strike*.65f),
                 strength*(.28f-shell*.05f));
         }
         out=buffers.getBuffer(BranchVfx.strand());
@@ -58,7 +58,7 @@ public final class BranchFistLayer extends RenderLayer<AbstractClientPlayer,Play
             // Two crossed strips keep a strand volumetric even when the arm turns edge-on.
             double half=.010+strike*.012;
             Vec3 side=new Vec3(Math.cos(a)*half,0,Math.sin(a)*half),up=new Vec3(0,half,0);
-            int colour=TemporalPalette.hot((float)(time*.052+strand*.13+step*.02),.55f);
+            int colour=TimeBranchPalette.hot((float)(time*.052+strand*.13+step*.02),.55f);
             quad(pose,out,from.subtract(side),from.add(side),to.add(side),to.subtract(side),colour,strength*.9f);
             quad(pose,out,from.subtract(up),from.add(up),to.add(up),to.subtract(up),colour,strength*.7f);
         }

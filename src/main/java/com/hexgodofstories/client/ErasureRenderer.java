@@ -129,14 +129,14 @@ public final class ErasureRenderer {
         double w=Math.max(.2,e.getBbWidth()),h=Math.max(.3,e.getBbHeight());
         float flash=Math.max(0,1-phase*fading.duration()/6f);
         BranchVfx.billboard(painter,BranchVfx.glow(),centre,Math.max(w,h)*(.6-phase*.25),
-            time*.4,TemporalPalette.hot((float)time*.07f,.9f),flash*.8f);
+            time*.4,TimeBranchPalette.hot((float)time*.07f,.9f),flash*.8f);
         if(phase>.65f)return;
         double radius=phase<.10f?1-phase*1.4:.86+(phase-.10)*.55;
         for(int i=0;i<7;i++) {
             long seed=e.getId()*193L+i+(long)(time/TemporalLightning.FLICKER)*13;
             Vec3 tip=centre.add((TemporalLightning.rand(seed,1)-.5)*w*radius,
                 (TemporalLightning.rand(seed,2)-.5)*h*radius,(TemporalLightning.rand(seed,3)-.5)*w*radius);
-            TemporalLightning.draw(painter,BranchVfx.strand(),TemporalLightning.bolt(seed,centre,tip,5,w*.1,1),
+            TemporalLightning.drawBranch(painter,BranchVfx.strand(),TemporalLightning.bolt(seed,centre,tip,5,w*.1,1),
                 .022,(float)(time*.07+i*.14),(1-phase)*.85f);
         }
     }
@@ -149,7 +149,7 @@ public final class ErasureRenderer {
         double extent=(width*Math.abs(d.x)+height*Math.abs(d.y)+width*Math.abs(d.z))*.5;
         Vec3 at=centre.add(d.scale((phase*1.18-.09-.5)*2*Math.max(.1,extent)));
         double size=Math.max(width,height)*(.55+.25*Math.sin(time*.5))*(1-phase*.35);
-        BranchVfx.billboard(painter,BranchVfx.glow(),at,size,time*.1,TemporalPalette.hot((float)(time*.08),.85f),
+        BranchVfx.billboard(painter,BranchVfx.glow(),at,size,time*.1,TimeBranchPalette.hot((float)(time*.08),.85f),
             (.42f-.2f*phase)*(phase<TAKEOVER?phase/TAKEOVER:1));
     }
 
@@ -164,7 +164,7 @@ public final class ErasureRenderer {
             double surviving=Math.max(.12,1-phase);
             Vec3 from=base.add((TemporalLightning.rand(seed,1)-.5)*width,height*(1-surviving*TemporalLightning.rand(seed,2)),(TemporalLightning.rand(seed,3)-.5)*width);
             Vec3 to=base.add((TemporalLightning.rand(seed,4)-.5)*width,height*(1-surviving*TemporalLightning.rand(seed,5)),(TemporalLightning.rand(seed,6)-.5)*width);
-            TemporalLightning.draw(painter,BranchVfx.strand(),TemporalLightning.bolt(seed,from,to,4,width*.32,1),
+            TemporalLightning.drawBranch(painter,BranchVfx.strand(),TemporalLightning.bolt(seed,from,to,4,width*.32,1),
                 width*.045,(float)(time*.06+i*.3),.55f*(1-phase*.45f));
         }
     }

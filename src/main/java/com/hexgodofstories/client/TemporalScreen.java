@@ -28,8 +28,8 @@ public final class TemporalScreen {
         // A held charge drives the effect continuously rather than decaying from a trigger, and it is
         // kept deliberately mild: the caster still has to be able to aim through it.
         int charge=mc.player==null?-1:ClientState.branchHeld(mc.player.getId(),partial);
-        float sustained=charge<0?0:Mth.clamp(com.hexgodofstories.data.BranchCharge.power(charge)*.62f
-            +com.hexgodofstories.data.BranchCharge.overcharge(charge)*.2f,0,.82f);
+        float sustained=charge<0?0:Mth.clamp(com.hexgodofstories.data.BranchCharge.power(charge)*.42f
+            +com.hexgodofstories.data.BranchCharge.overcharge(charge)*.14f,0,.58f);
         // Phase is driven from the charge itself, so the warp animates with the hold rather than
         // sitting still at whatever a trigger's decay curve happened to leave it on.
         if(sustained>0){mode=BRANCH_CHARGE;start=ClientState.now()-charge;end=ClientState.now()+20;}
