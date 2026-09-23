@@ -57,6 +57,14 @@ public final class WarpLifecycleRegression {
         WarpCrossing.tick(brk,level.getGameTime()+3,e->false);
         check(!WarpCrossing.crossing(pig)&&!pig.noPhysics,"eligibility loss releases grant");
 
+        brk=new WarpCrossing.Break(UUID.randomUUID(),level,new Vec3(.5,251.025,.5),
+            Destination.SANCTUM,0,40,WarpPool.rim(42,5,1),5,new HashSet<>());
+        pig.moveTo(.5,251,.5);WarpCrossing.tick(brk,level.getGameTime()+4,e->e==pig);
+        check(WarpCrossing.crossing(pig),"World Tree passage begins");
+        pig.setPos(.5,250,.5);WarpCrossing.tick(brk,level.getGameTime()+5,e->e==pig);
+        check(!WarpCrossing.crossing(pig)&&!pig.noPhysics&&pig.getY()>=251,
+            "offline World Tree owner returns victim above the source floor");
+
         // Fake players do not join the player list/query; call the same offer the sweep invokes.
         FakePlayer ordinary=new FakePlayer(level,new GameProfile(UUID.randomUUID(),"TrappedOrdinary"));
         HexData.access(ordinary,false);ordinary.moveTo(.5,251,.5);

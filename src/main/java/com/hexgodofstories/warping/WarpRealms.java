@@ -156,15 +156,16 @@ public final class WarpRealms {
      *              what used to put them back inside the ground on the way out.
      * @param sender the Loki player whose break sent this body, used by persistent realm residency
      */
-    public static void fallThrough(Entity e,Destination d,double cell,Vec3 offset,Vec3 momentum,float fall,boolean owner,Vec3 stood,UUID sender){
+    public static boolean fallThrough(Entity e,Destination d,double cell,Vec3 offset,Vec3 momentum,float fall,boolean owner,Vec3 stood,UUID sender){
         ServerLevel old=(ServerLevel)e.level();
         if(d==Destination.SANCTUM){
             ServerPlayer caster=old.getServer().getPlayerList().getPlayer(sender);
-            if(caster==null||!PocketRealm.crossFromWarp(e,caster,stood,momentum,fall))e.noPhysics=false;
-            return;
+            boolean moved=caster!=null&&PocketRealm.crossFromWarp(e,caster,stood,momentum,fall);
+            if(!moved)e.noPhysics=false;
+            return moved;
         }
         ServerLevel to=old.getServer().getLevel(d.key);
-        if(to==null){e.noPhysics=false;return;}
+        if(to==null){e.noPhysics=false;return false;}
         double spreadX=net.minecraft.util.Mth.clamp(offset.x,-ENTRY_SPREAD,ENTRY_SPREAD);
         double spreadZ=net.minecraft.util.Mth.clamp(offset.z,-ENTRY_SPREAD,ENTRY_SPREAD);
         Vec3 pos=landing(to,e,d.arrival.add(cell,owner?8:0,0),spreadX,spreadZ);
@@ -173,6 +174,7 @@ public final class WarpRealms {
             if(Destination.from(old)==null)HexData.get(p).put("warpReturn",new FractureAnchor(old.dimension(),stood==null?p.position():stood,yaw,pitch).save());
             p.stopRiding();
             p.teleportTo(to,pos.x,pos.y,pos.z,yaw,pitch);
+            if(p.serverLevel()!=to)return false;
             p.noPhysics=false;
             // The mantle carries flight everywhere; nothing else does, and arriving grants nothing.
             if(!com.hexgodofstories.server.CosmicFlight.mantled(p)){
@@ -186,18 +188,19 @@ public final class WarpRealms {
             p.hurtMarked=true;
             WarpResidency.track(p,sender);
             p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(p));
-            return;
+            return true;
         }
         e.stopRiding();
         Entity moved=e.changeDimension(to,new ITeleporter(){public Entity placeEntity(Entity entity,ServerLevel current,ServerLevel dest,float ignored,java.util.function.Function<Boolean,Entity> reposition){
             Entity copy=reposition.apply(false);
             if(copy!=null){copy.moveTo(pos.x,pos.y,pos.z,yaw,pitch);copy.setDeltaMovement(momentum);copy.fallDistance=fall;copy.noPhysics=false;}
             return copy;}});
-        if(moved==null){e.noPhysics=false;return;}
+        if(moved==null){e.noPhysics=false;return false;}
         moved.setDeltaMovement(momentum);
         moved.fallDistance=fall;
         moved.hurtMarked=true;
         WarpResidency.track(moved,sender);
+        return true;
     }
     /** How far from a realm's entry point a crossing may come out, in blocks. */
     private static final double ENTRY_SPREAD=6;

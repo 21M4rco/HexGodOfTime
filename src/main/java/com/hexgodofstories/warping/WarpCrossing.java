@@ -98,6 +98,7 @@ public final class WarpCrossing {
 
     /** One body on its way through one break. Each is its own; nothing about this is shared. */
     private static final class Passage {
+        final Entity entity;
         final UUID portal; final long began;
         net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension;
         final double strength, centerX, centerZ;
@@ -125,8 +126,8 @@ public final class WarpCrossing {
          * still on top of the plane, before a single tick of sinking has been applied.
          */
         final Vec3 stood;
-        Passage(UUID portal, double plane, long began, Vec3 stood, double strength, double centerX, double centerZ) {
-            this.portal=portal;this.plane=plane;this.began=began;this.stood=stood;
+        Passage(Entity entity, UUID portal, double plane, long began, Vec3 stood, double strength, double centerX, double centerZ) {
+            this.entity=entity;this.portal=portal;this.plane=plane;this.began=began;this.stood=stood;
             this.strength=strength;this.centerX=centerX;this.centerZ=centerZ;
         }
     }
@@ -207,7 +208,12 @@ public final class WarpCrossing {
             Entity e = level.getEntity(entry.getKey());
             if(e!=null&&e.isAlive()&&!e.isRemoved()&&area.intersects(e.getBoundingBox())&&allowed.test(e))continue;
             if(e!=null&&e.isAlive()&&area.intersects(e.getBoundingBox()))abort(e,entry.getValue(),true);
-            else {PASSAGES.remove(entry.getKey());if(e!=null)release(e);}
+            else {
+                PASSAGES.remove(entry.getKey());
+                // An entity moved to an unticking chunk disappears from the level lookup before
+                // its object is removed. Release the original object as well as the map entry.
+                release(e!=null?e:entry.getValue().entity);
+            }
         }
         SETTLING.values().removeIf(until -> until <= now);
         STIRRED.values().removeIf(until -> until <= now);
@@ -225,7 +231,7 @@ public final class WarpCrossing {
         // walking past a metre underneath it.
         if (e.getY() > plane + 0.45 || e.getY() < plane - 0.8) return;
         double strength=WarpMath.gooStrength(brk.held());
-        PASSAGES.put(e.getUUID(), new Passage(brk.portal(), plane, now,
+        PASSAGES.put(e.getUUID(), new Passage(e, brk.portal(), plane, now,
             new Vec3(e.getX(), plane + 0.02, e.getZ()), strength, brk.at().x, brk.at().z));
         PASSAGES.get(e.getUUID()).dimension=brk.level().dimension();
         e.noPhysics = true;
@@ -328,7 +334,12 @@ public final class WarpCrossing {
         membrane(brk, e);
         e.noPhysics = false;
         boolean owner = e.getUUID().equals(brk.portal()) && Warping.sovereign(e);
-        WarpRealms.fallThrough(e, brk.destination(), brk.cell(), offset, momentum, fall, owner, passage.stood, brk.portal());
+        if(!WarpRealms.fallThrough(e,brk.destination(),brk.cell(),offset,momentum,fall,owner,passage.stood,brk.portal())){
+            // A missing World Tree owner or a cancelled Forge transfer must not leave a body
+            // embedded in the source floor after its passage has been removed.
+            brk.crossed().remove(e.getUUID());
+            abort(e,passage,true);
+        }
     }
 
     /**
@@ -348,7 +359,7 @@ public final class WarpCrossing {
             Passage passage = entry.getValue();
             if (!passage.portal.equals(brk.portal())) continue;
             Entity e = brk.level().getEntity(entry.getKey());
-            if (e == null) { PASSAGES.remove(entry.getKey()); continue; }
+            if (e == null) { PASSAGES.remove(entry.getKey()); release(passage.entity); continue; }
             if(!e.isAlive()||e.isRemoved()){PASSAGES.remove(entry.getKey());release(e);continue;}
             if (e.getY() < passage.plane - COMMITTED) cross(brk, passage, e, now);
             else abort(e, passage, true);

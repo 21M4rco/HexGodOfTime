@@ -16,6 +16,8 @@ The base build succeeded; its dedicated-server run 35862373432 failed at
 - Expand crossing detection vertically to include terrain the puddle can reach. Release passages
   when entities leave the query volume or become ineligible. End player passages on lifecycle
   changes and revoke client phasing immediately on abort.
+- Restore victims above the source floor when a World Tree owner is offline or a dimension
+  transfer fails. Keep the entity reference until grant cleanup, including unticking chunks.
 - Accept struggle input from trapped players without requiring unlocked powers. The active
   server-owned passage still determines whether the input has any effect.
 - Restore borrowed emergence gravity, collision and mob AI on interruption/removal/shutdown.
