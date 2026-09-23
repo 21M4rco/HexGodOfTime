@@ -47,3 +47,16 @@ Follow-up presentation patch:
   the physical key/button so terrain loading cannot reopen a portal on arrival.
 - Transformation and de-transformation no longer dispatch the ascend body animation.
   Skin changes, cape, crown/horns, particles, sounds and transformation mechanics remain.
+
+
+## Black/green slow-wave rework
+
+- This update is scoped to Time Branch Unleashing.
+- The held charge and beam no longer use the temporal hue wheel. Their mass is black with emerald
+  pressure edges, and the branch-specific post effect no longer separates the frame into RGB channels.
+- First person uses a compact hand/focus aura instead of enclosing the camera in the large containment
+  membrane. Third person keeps the full charge and adds the same cloud language used by Cosmic Flight
+  around the hands and head.
+- The tap move's mechanics are unchanged; its arm and implosion presentation is now black/green too.
+- The beam front advances at 2.25 blocks/tick instead of 6.5. Damage, erasure, Nothingness conversion,
+  client rendering and restore scheduling continue to use the same authoritative front.

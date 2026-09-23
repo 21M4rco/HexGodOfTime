@@ -39,7 +39,9 @@ void main() {
  warp+=vec2(sin(uv.y*8.0+Phase*16.0),cos(uv.x*6.0+Phase*13.0))*membrane*.0035;
  vec2 at=clamp(uv+warp*Strength,vec2(.002),vec2(.998));
  vec3 rgb=texture(DiffuseSampler,at).rgb;
- float split=Strength*(.0015+.004*onset+slip*.008+charge*.0075+burst*.014+membrane*(.004+ring*.005));
+ // Time Branch charge/release is black/green: no RGB separation in either branch mode.
+ float branchMode=max(charge,burst);
+ float split=Strength*(.0015+.004*onset+slip*.008+membrane*(.004+ring*.005))*(1.0-branchMode);
  rgb.r=texture(DiffuseSampler,clamp(at+c*split,0.001,0.999)).r;
  rgb.b=texture(DiffuseSampler,clamp(at-c*split,0.001,0.999)).b;
  float gray=dot(rgb,vec3(.2126,.7152,.0722));

@@ -37,7 +37,11 @@ public final class TimeBranchRegressionTest {
         require(BranchFistState.WINDOW==200,"charge is no longer ten seconds");
         require(BranchFistState.RECOVERY<700/3,"tap recovery is not substantially shorter");
         require(BranchFistState.IMPLOSION==240,"punch must disintegrate gradually over twelve seconds");
-        System.out.println("Time Branch input boundaries and fragment invariants passed.");
+        require(BranchCharge.SWEEP>=2.0&&BranchCharge.SWEEP<=2.5,
+            "held Time Branch must advance as a slow visible wave, not an instant laser");
+        require(BranchCharge.front(BranchCharge.RANGE,20)<50,
+            "twenty ticks must not already fill most of the hundred-block beam");
+        System.out.println("Time Branch input boundaries, slow sweep and fragment invariants passed.");
     }
     private static void require(boolean condition,String message){if(!condition)throw new AssertionError(message);}
 }
