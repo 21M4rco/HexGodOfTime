@@ -7,16 +7,17 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import software.bernie.geckolib.core.animatable.GeoAnimatable;
-import software.bernie.geckolib.renderer.GeoRenderer;
+import software.bernie.geckolib.renderer.GeoEntityRenderer;
 
 /** GeckoLib draws many modded mobs without LivingEntityRenderer; keep their own GeoModel too. */
-@Mixin(GeoRenderer.class)
-public interface FrostGeoRenderMixin {
-    ResourceLocation HGOS_ICE=new ResourceLocation("minecraft","textures/block/ice.png");
+@Mixin(GeoEntityRenderer.class)
+public abstract class FrostGeoRenderMixin {
+    private static final ResourceLocation HGOS_ICE=new ResourceLocation("minecraft","textures/block/ice.png");
 
-    @Inject(method="getTextureLocation",at=@At("HEAD"),cancellable=true,remap=false)
-    private void hgos$geoIce(GeoAnimatable animatable,CallbackInfoReturnable<ResourceLocation> cir) {
-        if(animatable instanceof Entity entity&&FrostClient.frozen(entity.getId()))cir.setReturnValue(HGOS_ICE);
+    // GeckoLib overrides EntityRenderer#getTextureLocation. Its jar uses the named method in
+    // development and Minecraft's stable 1.20.1 SRG name after Forge reobfuscation.
+    @Inject(method={"getTextureLocation","m_5478_"},at=@At("HEAD"),cancellable=true,remap=false,require=1)
+    private void hgos$geoIce(Entity entity,CallbackInfoReturnable<ResourceLocation> cir) {
+        if(FrostClient.frozen(entity.getId()))cir.setReturnValue(HGOS_ICE);
     }
 }
