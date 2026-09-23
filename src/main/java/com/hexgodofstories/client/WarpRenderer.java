@@ -210,7 +210,8 @@ public final class WarpRenderer {
         for(Patch patch:brk.patches){
             var p=patch.points;
             for(int i=0;i<p.size();i++){
-                var a=p.get(i),b=p.get((i+1)%p.size());
+                WarpTessellation.Point a=p.get(i);
+                WarpTessellation.Point b=p.get((i+1)%p.size());
                 double dx=b.x()-a.x(),dz=b.z()-a.z();
                 boolean xEdge=Math.abs(dx)<1.0E-7, zEdge=Math.abs(dz)<1.0E-7;
                 if(!xEdge&&!zEdge)continue; // radial pool edge, not a terrain riser
