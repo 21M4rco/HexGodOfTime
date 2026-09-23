@@ -54,6 +54,7 @@ public final class ClientState {
             case HexNetwork.WARP_PHASE -> WarpCrossingClient.receive(m.entity(),m.data());
             case HexNetwork.WARP_SHADOWS -> WarpShadows.receive(m.entity(),m.data());
             case HexNetwork.WARP_EMERGE -> WarpEmergenceClient.receive(m.entity(),m.data());
+            case HexNetwork.CANDY_BODY -> CandyCorruptionClient.receive(m.entity(),m.data());
             case HexNetwork.PILGRIM_PATH -> {
                 var world = net.minecraft.client.Minecraft.getInstance().level;
                 if (world != null && world.getEntity(m.entity()) instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity pilgrim)
@@ -95,7 +96,7 @@ public final class ClientState {
     public static void tick() {
         var mc=Minecraft.getInstance();
         if(mc.level!=world) {
-            WarpRenderer.clear();PLAYERS.clear();FROZEN.clear();SLOWED.clear();THREADS.clear();DISGUISES.clear();WarpCrossingClient.clear();WarpEmergenceClient.clear();
+            WarpRenderer.clear();PLAYERS.clear();FROZEN.clear();SLOWED.clear();THREADS.clear();DISGUISES.clear();WarpCrossingClient.clear();WarpEmergenceClient.clear();CandyCorruptionClient.clear();
             WorldEffects.clear();HexSkin.clear();HexLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();
             com.hexgodofstories.client.leviathan.LeviathanEffects.clear();
             TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();GripRenderer.clear();
