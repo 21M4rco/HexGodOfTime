@@ -81,7 +81,12 @@ for side in (-1,1):
         strip("filigree","gold",(-.23,cy-.13),(-.085,cy-.035),.018,side*.065)
         strip("filigree","gold",(.23,cy-.13),(.085,cy-.035),.018,side*.065)
 
-lines=["# Laevateinn: long wrapped hilt, swept gold guard, faceted double-edged blade."]
+# Keep the player's hand at the middle of the wrapped grip (y=0). A greatsword
+# needs most of its length above the guard; a one-unit hilt looked like a club.
+# Scaling the finished profile preserves all of its facets, wraps and runes.
+vertices=[(x*(1.12 if y>=.68 else 1),
+           y*.52 if y<=.68 else .68*.52+(y-.68)*1.65,z) for x,y,z in vertices]
+lines=["# Laevateinn: centered short grip, swept guard, long faceted greatsword blade."]
 lines += ["v %.6f %.6f %.6f"%v for v in vertices]
 lines += ["vt %.6f %.6f"%uv for uv in uvs]
 group=None

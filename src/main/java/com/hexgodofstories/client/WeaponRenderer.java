@@ -19,7 +19,7 @@ import java.util.*;
 public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
     /** Grip position inside the item cube and an overall size trim, one entry per weapon kind. */
     private record Fit(float grip,float scale) {}
-    private static final Fit[] FITS={new Fit(.24f,1f),new Fit(.36f,.72f),new Fit(.27f,1f)};
+    private static final Fit[] FITS={new Fit(.24f,1f),new Fit(.22f,.78f),new Fit(.27f,1f)};
     private static final float DIAGONAL=(float)(1/Math.sqrt(2));
     private static WeaponRenderer INSTANCE;
     private static final Map<Integer,AuthoredMesh> MODELS=new HashMap<>();
