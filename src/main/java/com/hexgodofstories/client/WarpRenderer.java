@@ -51,9 +51,13 @@ public final class WarpRenderer {
         }
         int ticks=(int)(ClientState.now()-n.getLong("start"));
         if(recall)return "Reaching into "+Destination.at(n.getInt("destination")).title+"...";
+        int cap=n.contains("previewCap")?n.getInt("previewCap"):WarpMath.FULL_CHARGE;
+        int effective=Math.min(Math.min(ticks,WarpMath.FULL_CHARGE),cap);
+        double[] preview=WarpPool.rim(n.getLong("seed"),WarpMath.reach(effective),WarpMath.charge(effective));
+        double span=WarpPool.extent(preview)*2;
         return String.format(java.util.Locale.ROOT,"%s  %d%%  /  %.1f blocks  /  %d energy",
-            ticks<WarpMath.MIN_CHARGE?"Spreading":"Release to open",Math.min(100,ticks),WarpMath.width(ticks),
-            Math.round(com.hexgodofstories.data.Ability.WARPING.cost*WarpMath.costScale(Math.min(ticks,WarpMath.FULL_CHARGE))));
+            ticks<WarpMath.MIN_CHARGE?"Spreading":"Release to open",Math.min(100,effective),span,
+            Math.round(com.hexgodofstories.data.Ability.WARPING.cost*WarpMath.costScale(effective)));
     }
     public static void realm(CompoundTag n){realm=n;}
     public static void clear(){WINDOWS.clear();BREAKS.clear();realm=new CompoundTag();WarpScene.clear();}
@@ -90,7 +94,8 @@ public final class WarpRenderer {
         if(camera.distanceToSqr(at)>96*96)return;
         boolean open=n.getLong("opened")>=0,closing=n.getBoolean("closing");
         int held=closing?n.getInt("closeHeld"):(open?n.getInt("held"):(int)(time-n.getLong("start")));
-        held=Math.min(held,WarpMath.FULL_CHARGE);
+        int cap=n.contains("previewCap")?n.getInt("previewCap"):WarpMath.FULL_CHARGE;
+        held=Math.min(Math.min(held,WarpMath.FULL_CHARGE),open||closing?WarpMath.FULL_CHARGE:cap);
         Break brk=shape(id,n,at,held,open,(long)time);
         if(brk==null||brk.patches.isEmpty())return;
         pose.pushPose();pose.translate(at.x-camera.x,at.y-camera.y,at.z-camera.z);
@@ -105,6 +110,10 @@ public final class WarpRenderer {
             BufferBuilder b=Tesselator.getInstance().getBuilder();
             b.begin(VertexFormat.Mode.TRIANGLES,DefaultVertexFormat.POSITION_COLOR);
             double collapse=closing?closeScale(n,time):1;
+            // Coat every exposed vertical collision face that the puddle crosses. These are the
+            // risers between two horizontal portal tiles (full blocks, slabs, stairs and modded
+            // collision shapes), so a one-block step is black on its side as well as its top.
+            for(Wall wall:brk.walls)wall(b,pose.last().pose(),wall,time,collapse);
             for(Patch patch:brk.patches){
                 var points=patch.points;
                 for(int i=1;i<points.size()-1;i++){
@@ -122,9 +131,11 @@ public final class WarpRenderer {
     }
 
     private record Patch(java.util.List<WarpTessellation.Point> points,double y) {}
+    private record Wall(WarpTessellation.Point a,WarpTessellation.Point b,double low,double high,double nx,double nz) {}
     private static final class Break {
         final long seed,sampled;final int held;final boolean open,arrival;final Vec3 origin;
         final java.util.List<Patch> patches=new ArrayList<>();
+        final java.util.List<Wall> walls=new ArrayList<>();
         final Map<Long,java.util.List<WarpSurface.Tile>> columns;
         double[] rim;
         Break(long seed,long sampled,int held,boolean open,boolean arrival,Vec3 origin,
@@ -144,7 +155,9 @@ public final class WarpRenderer {
         ClientLevel level=Minecraft.getInstance().level;if(level==null)return null;
         Break brk=new Break(seed,fresh?cached.sampled:now,held,open,arrival,at,
             fresh?cached.columns:new HashMap<>());
-        brk.rim=WarpPool.rim(seed,WarpMath.reach(held),open?1:WarpMath.charge(held));
+        // Charging and opened portals use the same charge fraction. Opening freezes the current
+        // silhouette instead of replacing it with a larger "fully spread" version.
+        brk.rim=WarpPool.rim(seed,WarpMath.reach(held),WarpMath.charge(held));
         double collapse=closing?closeScale(n,now):1;
         for(int i=0;i<brk.rim.length;i++)brk.rim[i]*=collapse;
         // Each fan sector is clipped at BLOCK/COLLISION boundaries before assigning a height.
@@ -178,7 +191,64 @@ public final class WarpRenderer {
                 }
             }
         }
+        if(!arrival)buildWalls(level,brk,at);
         BREAKS.put(id,brk);return brk;
+    }
+
+    /**
+     * Turn exposed height transitions inside the footprint into portal too.
+     *
+     * <p>Top patches are already clipped to real collision-box boundaries. Their axis-aligned
+     * edges therefore tell us exactly where a block/slab/stair has a vertical riser. Sample the
+     * surface a hair to each side; when the heights differ, coat that exposed face from the lower
+     * portal surface to the upper one. The quad is nudged toward the lower side to avoid z-fighting
+     * the block face while remaining depth-tested against foreground geometry.
+     */
+    private static void buildWalls(ClientLevel level,Break brk,Vec3 at){
+        final double EPS=.018,MIN=.035;
+        Set<String> seen=new HashSet<>();
+        for(Patch patch:brk.patches){
+            var p=patch.points;
+            for(int i=0;i<p.size();i++){
+                var a=p.get(i),b=p.get((i+1)%p.size());
+                double dx=b.x()-a.x(),dz=b.z()-a.z();
+                boolean xEdge=Math.abs(dx)<1.0E-7, zEdge=Math.abs(dz)<1.0E-7;
+                if(!xEdge&&!zEdge)continue; // radial pool edge, not a terrain riser
+                double length=Math.hypot(dx,dz);if(length<1.0E-5)continue;
+                double mx=at.x+(a.x()+b.x())*.5,mz=at.z+(a.z()+b.z())*.5;
+                double sx=xEdge?1:0,sz=zEdge?1:0;
+                double minus=WarpSurface.height(level,mx-sx*EPS,mz-sz*EPS,at.x,at.y,at.z);
+                double plus =WarpSurface.height(level,mx+sx*EPS,mz+sz*EPS,at.x,at.y,at.z);
+                if(!Double.isFinite(minus)||!Double.isFinite(plus)||Math.abs(plus-minus)<MIN)continue;
+                double nx=plus<minus?1:-1,nz=plus<minus?1:-1;
+                if(xEdge)nz=0;else nx=0;
+                double low=Math.min(minus,plus)-at.y+FILM;
+                double high=Math.max(minus,plus)-at.y+FILM;
+                String key=wallKey(a,b,low,high);
+                if(seen.add(key))brk.walls.add(new Wall(a,b,low,high,nx,nz));
+            }
+        }
+    }
+
+    private static String wallKey(WarpTessellation.Point a,WarpTessellation.Point b,double low,double high){
+        long ax=Math.round(a.x()*4096),az=Math.round(a.z()*4096),bx=Math.round(b.x()*4096),bz=Math.round(b.z()*4096);
+        if(ax>bx||(ax==bx&&az>bz)){long t=ax;ax=bx;bx=t;t=az;az=bz;bz=t;}
+        return ax+":"+az+":"+bx+":"+bz+":"+Math.round(low*4096)+":"+Math.round(high*4096);
+    }
+
+    private static void wall(BufferBuilder b,Matrix4f m,Wall w,double time,double collapse){
+        double off=.012*collapse;
+        double ax=w.a.x()+w.nx*off,az=w.a.z()+w.nz*off;
+        double bx=w.b.x()+w.nx*off,bz=w.b.z()+w.nz*off;
+        // Very subtle vertical sheen, but still reads as the same opaque black material as the top.
+        float shine=(float)(.012+.012*Math.max(0,Math.sin((ax+az+time*.025)*1.7)));
+        float r=.010f+shine*.25f,g=.014f+shine*.35f,bl=.016f+shine*.40f;
+        b.vertex(m,(float)ax,(float)w.low,(float)az).color(r,g,bl,1).endVertex();
+        b.vertex(m,(float)bx,(float)w.low,(float)bz).color(r,g,bl,1).endVertex();
+        b.vertex(m,(float)bx,(float)w.high,(float)bz).color(r,g,bl,1).endVertex();
+        b.vertex(m,(float)ax,(float)w.low,(float)az).color(r,g,bl,1).endVertex();
+        b.vertex(m,(float)bx,(float)w.high,(float)bz).color(r,g,bl,1).endVertex();
+        b.vertex(m,(float)ax,(float)w.high,(float)az).color(r,g,bl,1).endVertex();
     }
 
     /** Continuous position-based waves and broad moving reflections, never per-face stripes. */

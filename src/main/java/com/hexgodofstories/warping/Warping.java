@@ -43,7 +43,9 @@ public final class Warping {
         Charge(ServerPlayer p,Vec3 at,Destination d,double cell){level=p.serverLevel();this.at=at;destination=d;start=level.getGameTime();this.cell=cell;ownerId=p.getId();
             seed=start*1000003L^(long)Math.floor(at.x*17)*31L^(long)Math.floor(at.z*7919)^(long)p.getUUID().getLeastSignificantBits();}
         double[] shape(){
-            if(shape==null){shape=WarpPool.rim(seed,WarpMath.reach(held),1);extent=WarpPool.extent(shape);}
+            // Release freezes exactly the footprint that was visible on the final charge frame.
+            // Partial releases no longer jump outward when "open" replaces "charging".
+            if(shape==null){shape=WarpPool.rim(seed,WarpMath.reach(held),WarpMath.charge(held));extent=WarpPool.extent(shape);}
             return shape;
         }
         double extent(){shape();return extent;}
@@ -264,6 +266,11 @@ public final class Warping {
     }
     private static void send(Charge c,boolean clear){
         CompoundTag n=new CompoundTag();n.putBoolean("clear",clear);n.putDouble("x",c.at.x);n.putDouble("y",c.at.y);n.putDouble("z",c.at.z);n.putLong("start",c.start);n.putInt("destination",c.destination.ordinal());n.putLong("opened",c.opened);n.putInt("held",c.held);n.putLong("seed",c.seed);n.putLong("until",c.opened<0?c.level.getGameTime()+12:Math.min(c.opened+c.openTicks(),c.level.getGameTime()+12));n.putBoolean("recall",c.recall);n.putInt("window",c.openTicks());
+        // While charging, do not preview more puddle than the caster can actually afford to open.
+        int previewCap=WarpMath.FULL_CHARGE;
+        if(c.opened<0&&!c.recall&&c.level.getEntity(c.ownerId) instanceof ServerPlayer owner)
+            previewCap=WarpMath.affordable(HexData.energy(owner),Ability.WARPING.cost);
+        n.putInt("previewCap",previewCap);
         n.putString("dimension",c.level.dimension().location().toString());n.putLong("sent",c.level.getGameTime());
         ServerLevel target=c.level.getServer().getLevel(c.destination.key);
         n.putLong("realmAge",c.destination!=Destination.SANCTUM&&c.opened>=0&&target!=null?WarpRealms.age(target,c.cell):0);

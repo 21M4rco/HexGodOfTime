@@ -4,9 +4,9 @@ package com.hexgodofstories.warping;
 public final class WarpMathTest {
     public static void main(String[] args){
         for(int t=-100;t<10000;t++){
-            double width=WarpMath.width(t);check(width>=2&&width<=28,"area cap at "+t);
+            double width=WarpMath.width(t);check(width>=2&&width<=16,"area cap at "+t);
         }
-        check(WarpMath.width(WarpMath.FULL_CHARGE)==28&&WarpMath.width(0)==2,"a full hold is a massive tear and no hold is a crack");
+        check(WarpMath.width(WarpMath.FULL_CHARGE)==16&&WarpMath.width(0)==2,"a full hold is large but bounded and no hold is a crack");
         check(WarpMath.MIN_CHARGE>0&&WarpMath.MIN_CHARGE<WarpMath.FULL_CHARGE,"telegraph before full opening");
         check(WarpMath.OPEN_TICKS==20*10,"portal lasts ten seconds at normal tick rate");
         check(!WarpMath.openAt(-1,0)&&!WarpMath.openAt(500,499),"unreleased portal cannot accept entry");
@@ -47,7 +47,7 @@ public final class WarpMathTest {
         for(long seed=1;seed<=16;seed++){
             double[] rim=WarpPool.rim(seed,reach,1);
             double extent=WarpPool.extent(rim),least=WarpPool.narrowest(rim);
-            check(extent>8&&extent<=reach+1.0E-9,"a full pool runs to what it was paid for and no further ("+extent+")");
+            check(extent>4.5&&extent<=reach+1.0E-9,"a full pool runs to what it was paid for and no further ("+extent+")");
             check(least>extent*.35,"it is a pool everywhere rather than a spur off one side");
             check(extent/least>1.25,"and it never settles on a radius ("+(extent/least)+")");
             double worst=0;
@@ -84,6 +84,7 @@ public final class WarpMathTest {
         for(long seed=1;seed<=6;seed++){
             double[] before=null;
             for(int held=0;held<=WarpMath.FULL_CHARGE;held+=4){
+                // This is both the charge preview and the authoritative shape if released now.
                 double[] rim=WarpPool.rim(seed,WarpMath.reach(held),WarpMath.charge(held));
                 if(before!=null)for(int i=0;i<rim.length;i++)
                     check(rim[i]>=before[i]-1.0E-9,"holding longer only ever adds liquid (direction "+i+" at "+held+")");

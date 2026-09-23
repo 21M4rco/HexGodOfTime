@@ -8,11 +8,11 @@ public final class WarpMath {
     /**
      * How far the break reaches across the floor, corner to corner, at this charge.
      *
-     * <p>A held charge buys a genuinely large opening rather than a ten block one: a full charge is
-     * twenty eight blocks across, and what that width means is how far the pool may run corner to
-     * corner — {@link WarpPool} spends it on a rim that reaches further one way than another.
+     * <p>A full charge is deliberately large without swallowing an entire clearing: sixteen
+     * blocks across at maximum. The irregular rim still decides the exact silhouette inside that
+     * paid-for reach.
      */
-    public static double width(int ticks){return 2+26*charge(ticks);}
+    public static double width(int ticks){return 2+14*charge(ticks);}
     /** Nought at the first tick of a hold, one once the charge is full. */
     public static double charge(int ticks){return Math.min(1,Math.max(0,ticks)/(double)FULL_CHARGE);}
     /** Blocks from the centre that the fracture is allowed to run to at this charge. */
@@ -21,7 +21,7 @@ public final class WarpMath {
      * What a break of this charge costs, as a multiple of the ability's own cost.
      *
      * <p>Size is the thing being paid for: the smallest usable tear is half price and the full
-     * twenty eight block one is twice it, so opening reality wide is a deliberate expense rather
+     * sixteen block one is twice it, so opening reality wide is a deliberate expense rather
      * than the same flat fee as cracking it.
      */
     public static double costScale(int held){return .5+1.5*charge(held);}
