@@ -48,11 +48,10 @@ public final class HexServer {
     public static void input(ServerPlayer p,int action,int value) {
         long now=HexData.now(p);
         if(action==RESYNC){HexNetwork.sync(p);return;}
+        // Escaping a trap is available to ordinary players too; the live passage validates it.
+        if(action==WARP_STRUGGLE){com.hexgodofstories.warping.WarpCrossing.struggle(p);return;}
         if(!HexData.access(p)){notice(p,"Your powers are locked. An operator must use /hgos unlock "+p.getGameProfile().getName()+" on.");return;}
         if(action==WARP_CHOICE){Warping.choose(p,value);return;}
-        // Deliberately ahead of the input rate limiter below. Getting out of a pool is a contest of
-        // how fast the key can be hit, and a three-tick throttle would decide that contest itself.
-        if(action==WARP_STRUGGLE){com.hexgodofstories.warping.WarpCrossing.struggle(p);return;}
         if(action==SELECT) {
             if(Warping.charging(p))Warping.cancel(p);
             if(now-INPUT.getOrDefault(p.getUUID(),-100L)<2)return;
@@ -561,6 +560,8 @@ public final class HexServer {
 
     public static void clear(ServerPlayer p,boolean death) {
         Warping.cancel(p);
+        com.hexgodofstories.warping.WarpCrossing.forget(p);
+        com.hexgodofstories.warping.WarpEmergence.cancel(p);
         Telekinesis.forget(p);Architecture.dismiss(p);clearIllusions(p);dismissRift(p);TemporalEngine.clear(p);
         Masquerade.drop(p);Threat.forget(p);
         CosmicFlight.revoke(p);

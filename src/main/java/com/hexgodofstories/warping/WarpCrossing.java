@@ -99,6 +99,7 @@ public final class WarpCrossing {
     /** One body on its way through one break. Each is its own; nothing about this is shared. */
     private static final class Passage {
         final UUID portal; final long began;
+        net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension;
         final double strength, centerX, centerZ;
         double plane;
         /** Where the body was last tick, and how many ticks it has failed to move from there. */
@@ -190,8 +191,8 @@ public final class WarpCrossing {
     public static void tick(Break brk, long now, java.util.function.Predicate<Entity> allowed) {
         ServerLevel level = brk.level();
         double reach = brk.extent() + 1.5;
-        AABB area = new AABB(brk.at().x - reach, brk.at().y - BAND - 1, brk.at().z - reach,
-            brk.at().x + reach, brk.at().y + 2.4, brk.at().z + reach);
+        AABB area = new AABB(brk.at().x - reach, brk.at().y - reach * 9 - BAND, brk.at().z - reach,
+            brk.at().x + reach, brk.at().y + reach * 1.1 + 2.4, brk.at().z + reach);
         for (Entity e : level.getEntities((Entity) null, area, allowed)) {
             Passage passage = PASSAGES.get(e.getUUID());
             // Somebody already going through a different break is not this break's business.
@@ -199,14 +200,14 @@ public final class WarpCrossing {
             if (passage == null) { offer(brk, e, now); continue; }
             advance(brk, passage, e, now);
         }
-        // A body that left the search volume entirely — thrown clear, killed, removed — still has a
-        // passage to close. This is the only place that can notice, because it is no longer found.
+        // A living body teleported outside the query (or made ineligible) must release its
+        // grant too. Previously only dead/missing entities were cleaned up here.
         for (Map.Entry<UUID, Passage> entry : new ArrayList<>(PASSAGES.entrySet())) {
             if (!entry.getValue().portal.equals(brk.portal())) continue;
             Entity e = level.getEntity(entry.getKey());
-            if (e != null && e.isAlive() && !e.isRemoved()) continue;
+            if(e!=null&&e.isAlive()&&!e.isRemoved()&&area.intersects(e.getBoundingBox())&&allowed.test(e))continue;
             PASSAGES.remove(entry.getKey());
-            if (e != null) release(e);
+            if(e!=null)release(e);
         }
         SETTLING.values().removeIf(until -> until <= now);
         STIRRED.values().removeIf(until -> until <= now);
@@ -226,6 +227,7 @@ public final class WarpCrossing {
         double strength=WarpMath.gooStrength(brk.held());
         PASSAGES.put(e.getUUID(), new Passage(brk.portal(), plane, now,
             new Vec3(e.getX(), plane + 0.02, e.getZ()), strength, brk.at().x, brk.at().z));
+        PASSAGES.get(e.getUUID()).dimension=brk.level().dimension();
         e.noPhysics = true;
         phase(e, plane, now, strength, brk.at().x, brk.at().z);
         entering(brk, e);
@@ -347,6 +349,7 @@ public final class WarpCrossing {
             if (!passage.portal.equals(brk.portal())) continue;
             Entity e = brk.level().getEntity(entry.getKey());
             if (e == null) { PASSAGES.remove(entry.getKey()); continue; }
+            if(!e.isAlive()||e.isRemoved()){PASSAGES.remove(entry.getKey());release(e);continue;}
             if (e.getY() < passage.plane - COMMITTED) cross(brk, passage, e, now);
             else abort(e, passage, true);
         }
@@ -363,9 +366,21 @@ public final class WarpCrossing {
         e.setDeltaMovement(e.getDeltaMovement().x, Math.max(0, e.getDeltaMovement().y), e.getDeltaMovement().z);
     }
 
+    /** Player lifecycle cleanup; never move a player back to a source floor after dimension change. */
+    public static void forget(ServerPlayer p){
+        Passage passage=PASSAGES.remove(p.getUUID());
+        SETTLING.remove(p.getUUID());
+        if(passage==null)return;
+        if(p.isAlive()&&p.level().dimension()==passage.dimension)abort(p,passage,true);
+        else release(p);
+    }
+
     private static void release(Entity e) {
-        if (e.isSpectator()) return;
-        e.noPhysics = false;
+        if(!e.isSpectator())e.noPhysics=false;
+        if(e instanceof ServerPlayer p){
+            CompoundTag n=new CompoundTag();n.putBoolean("clear",true);
+            HexNetwork.to(p,new HexNetwork.Message(HexNetwork.WARP_PHASE,e.getId(),n));
+        }
     }
 
     // ------------------------------------------------------------------ the shape of the hole

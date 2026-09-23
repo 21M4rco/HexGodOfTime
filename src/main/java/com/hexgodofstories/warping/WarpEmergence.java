@@ -21,18 +21,19 @@ public final class WarpEmergence {
     /** 2.6 seconds: deliberately slow enough to watch the body push through the goo. */
     public static final int DURATION=52;
     private static final int VISUAL_HELD=30;
-    private record Rise(ResourceKey<Level> level,UUID id,Vec3 top,double startY,long start,Vec3 after,
+    private record Rise(Entity entity,ResourceKey<Level> level,UUID id,Vec3 top,double startY,long start,Vec3 after,
                         boolean oldNoPhysics,boolean oldNoGravity,Boolean oldNoAi,float yaw,float pitch){}
     private static final Map<UUID,Rise> ACTIVE=new HashMap<>();
 
     public static void begin(Entity e,Vec3 top,Vec3 after,boolean makePuddle){
         if(!(e.level() instanceof ServerLevel level)||e.isRemoved())return;
+        cancel(e);
         // Keep a player's eye near/above the skin while most of the body starts below it; this avoids
         // first-person rendering the inside of the ground while still making the emergence obvious.
         double depth=Math.min(1.35,Math.max(.72,e.getBbHeight()*.70));
         double startY=top.y-depth;
         Boolean noAi=e instanceof Mob mob?mob.isNoAi():null;
-        Rise s=new Rise(level.dimension(),e.getUUID(),top,startY,level.getGameTime(),
+        Rise s=new Rise(e,level.dimension(),e.getUUID(),top,startY,level.getGameTime(),
             after==null?Vec3.ZERO:after,e.noPhysics,e.isNoGravity(),noAi,e.getYRot(),e.getXRot());
         ACTIVE.put(e.getUUID(),s);
 
@@ -72,7 +73,7 @@ public final class WarpEmergence {
             Rise s=entry.getValue();
             if(!s.level().equals(level.dimension()))continue;
             Entity e=level.getEntity(s.id());
-            if(e==null||!e.isAlive()||e.isRemoved()){ACTIVE.remove(entry.getKey());continue;}
+            if(e==null||!e.isAlive()||e.isRemoved()){cancel(s.entity());continue;}
 
             double t=Math.max(0,Math.min(1,(now-s.start())/(double)DURATION));
             double eased=t*t*(3-2*t);
@@ -101,5 +102,21 @@ public final class WarpEmergence {
     }
 
     public static boolean active(Entity e){return e!=null&&ACTIVE.containsKey(e.getUUID());}
-    public static void reset(){ACTIVE.clear();}
+    /** Restore leased physics/AI before logout, removal, death or a different dimension takes over. */
+    public static void cancel(Entity e){
+        Rise s=ACTIVE.remove(e.getUUID());if(s==null)return;
+        if(e.isAlive()&&!e.isRemoved()&&e.level().dimension().equals(s.level()))
+            place(e,s.top().x,s.top().y,s.top().z,e.getYRot(),e.getXRot());
+        e.noPhysics=e.isSpectator()||s.oldNoPhysics();e.setNoGravity(s.oldNoGravity());
+        if(e instanceof Mob mob&&s.oldNoAi()!=null)mob.setNoAi(s.oldNoAi());
+        e.fallDistance=0;
+        if(e instanceof ServerPlayer p){
+            CompoundTag n=new CompoundTag();n.putBoolean("clear",true);
+            HexNetwork.to(p,new HexNetwork.Message(HexNetwork.WARP_EMERGE,p.getId(),n));
+        }
+    }
+    public static void reset(){
+        for(Rise rise:new ArrayList<>(ACTIVE.values()))cancel(rise.entity());
+        ACTIVE.clear();
+    }
 }

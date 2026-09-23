@@ -96,11 +96,26 @@ public final class ServerEvents {
     }
     @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p)HexServer.clear(p,false);}
     @SubscribeEvent public static void dimension(PlayerEvent.PlayerChangedDimensionEvent e) {if(e.getEntity() instanceof ServerPlayer p){HexServer.clear(p,false);HexNetwork.sync(p);com.hexgodofstories.warping.WarpRealms.greet(p,e.getTo());}}
+    @SubscribeEvent public static void leaving(net.minecraftforge.event.entity.EntityLeaveLevelEvent e){
+        if(e.getLevel() instanceof ServerLevel level){
+            com.hexgodofstories.warping.WarpEmergence.cancel(e.getEntity());
+            var reason=e.getEntity().getRemovalReason();
+            // Unloaded chunks still own their saved residents. Confirmed removal or transfer does
+            // not need the ten-second missing-entity grace used during asynchronous chunk loads.
+            if(com.hexgodofstories.warping.Destination.from(level)!=null&&reason!=null
+                    &&reason!=net.minecraft.world.entity.Entity.RemovalReason.UNLOADED_TO_CHUNK)
+                com.hexgodofstories.warping.WarpResidency.untrack(level,e.getEntity().getUUID());
+        }
+    }
+    @SubscribeEvent public static void travelling(net.minecraftforge.event.entity.EntityTravelToDimensionEvent e){
+        if(!e.getEntity().level().isClientSide)com.hexgodofstories.warping.WarpEmergence.cancel(e.getEntity());
+    }
     @SubscribeEvent public static void death(LivingDeathEvent e) {
         // A kill feeds the Pilgrim's patience back, which is what makes it willing to play again.
         if(e.getSource().getEntity() instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity pilgrim&&pilgrim.ai()!=null)pilgrim.ai().noteKill();
         // Whatever it had decided about is dead. Anything that comes back gets its thirty seconds.
         com.hexgodofstories.warping.leviathan.EnoughIsEnough.forget(e.getEntity().getUUID());
+        com.hexgodofstories.warping.WarpEmergence.cancel(e.getEntity());
         Erasure.forget(e.getEntity());
         Bleed.clear(e.getEntity());
         Threat.forget(e.getEntity());

@@ -40,7 +40,7 @@ public final class WarpSurface {
         double current=surfaceNear(level,ox,oz,originY,STEP_DOWN);
         if(Double.isNaN(current))current=originY;
         int lastX=ox,lastZ=oz;
-        if(steps==0)return surfaceNear(level,tx,tz,current,STEP_DOWN);
+        if(steps==0)return surfaceAt(level,x,z,current,STEP_DOWN);
 
         for(int i=1;i<=steps;i++){
             double f=i/(double)steps;
@@ -53,7 +53,7 @@ public final class WarpSurface {
             if(Double.isNaN(next)||next-current>STEP_UP+.001)return Double.NaN;
             current=next;lastX=bx;lastZ=bz;
         }
-        return current;
+        return surfaceAt(level,x,z,current,STEP_DOWN);
     }
 
     /**
@@ -81,6 +81,56 @@ public final class WarpSurface {
             return surface;
         }
         return Double.NaN;
+    }
+
+    /** Exact collision top under a point: a stair tread is not its block's maximum height. */
+    private static double surfaceAt(BlockGetter level,double x,double z,double around,double down){
+        int bx=Mth.floor(x),bz=Mth.floor(z);
+        BlockPos.MutableBlockPos pos=new BlockPos.MutableBlockPos();
+        double fx=x-bx,fz=z-bz;
+        for(int y=Mth.floor(around+STEP_UP);y>=Mth.floor(around-down);y--){
+            pos.set(bx,y,bz);
+            BlockState state=level.getBlockState(pos);
+            if(state.is(BlockTags.LOGS)||state.is(BlockTags.LEAVES))continue;
+            double highest=Double.NaN;
+            for(var box:state.getCollisionShape(level,pos).toAabbs()){
+                if(fx<box.minX||fx>=box.maxX||fz<box.minZ||fz>=box.maxZ)continue;
+                double top=y+box.maxY;
+                if(top<=around+STEP_UP+.001&&(Double.isNaN(highest)||top>highest))highest=top;
+            }
+            if(!Double.isNaN(highest))return highest;
+        }
+        return Double.NaN;
+    }
+
+    public record Tile(double minX,double minZ,double maxX,double maxZ,double y) {}
+
+    /** Split at real collision-box edges, including both treads of stairs and modded shapes. */
+    public static java.util.List<Tile> tiles(BlockGetter level,int bx,int bz,
+                                            double ox,double oy,double oz){
+        double top=height(level,bx+.5,bz+.5,ox,oy,oz);
+        if(Double.isNaN(top))return java.util.List.of();
+        var xs=new java.util.TreeSet<Double>();var zs=new java.util.TreeSet<Double>();
+        // Half-block subdivisions keep the animated liquid shading smooth on full cubes too.
+        xs.add(0.0);xs.add(.5);xs.add(1.0);zs.add(0.0);zs.add(.5);zs.add(1.0);
+        BlockPos.MutableBlockPos pos=new BlockPos.MutableBlockPos();
+        for(int y=Mth.floor(top-STEP_DOWN);y<=Mth.floor(top+STEP_UP);y++){
+            pos.set(bx,y,bz);
+            BlockState state=level.getBlockState(pos);
+            if(state.is(BlockTags.LOGS)||state.is(BlockTags.LEAVES))continue;
+            for(var box:state.getCollisionShape(level,pos).toAabbs()){
+                xs.add(Mth.clamp(box.minX,0,1));xs.add(Mth.clamp(box.maxX,0,1));
+                zs.add(Mth.clamp(box.minZ,0,1));zs.add(Mth.clamp(box.maxZ,0,1));
+            }
+        }
+        var xx=new java.util.ArrayList<>(xs);var zz=new java.util.ArrayList<>(zs);
+        var result=new java.util.ArrayList<Tile>();
+        for(int i=0;i<xx.size()-1;i++)for(int j=0;j<zz.size()-1;j++){
+            double x0=bx+xx.get(i),x1=bx+xx.get(i+1),z0=bz+zz.get(j),z1=bz+zz.get(j+1);
+            double y=height(level,(x0+x1)*.5,(z0+z1)*.5,ox,oy,oz);
+            if(Double.isFinite(y))result.add(new Tile(x0,z0,x1,z1,y));
+        }
+        return result;
     }
 
     /** Compatibility form for callers/tests that only ask the centre column. */

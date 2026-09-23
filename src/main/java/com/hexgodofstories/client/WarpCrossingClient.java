@@ -51,6 +51,15 @@ public final class WarpCrossingClient {
     private static final long MEMBRANE = 260;
 
     public static void receive(int id, CompoundTag n) {
+        if(n.getBoolean("clear")){
+            PHASES.remove(id);
+            var player=Minecraft.getInstance().player;
+            if(player!=null&&player.getId()==id){
+                holding=false;jumpHeld=false;banked=0;phasedAt=0;
+                if(!player.isSpectator())player.noPhysics=false;
+            }
+            return;
+        }
         PHASES.put(id,new Phase(n.getDouble("plane"),n.getDouble("strength"),
             n.getDouble("centerX"),n.getDouble("centerZ"),n.getLong("until")));
         Minecraft mc = Minecraft.getInstance();
