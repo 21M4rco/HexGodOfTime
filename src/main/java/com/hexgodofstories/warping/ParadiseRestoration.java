@@ -235,6 +235,17 @@ public final class ParadiseRestoration extends SavedData {
         expected(level).put(pos.asLong(), level.getGameTime());
     }
 
+    /**
+     * Exact provenance check used before vanilla creates the dropped ItemEntity. This is the reliable
+     * path for fragile blocks such as lily pads and azalea bushes: their loot is tagged while it is
+     * still an ItemStack, before neighbour physics can move the eventual entity away from the source.
+     */
+    public static boolean candyDrop(ServerLevel level,BlockPos pos) {
+        Map<Long,Long> expected=EXPECTED.get(level.dimension());
+        if(expected!=null&&expected.containsKey(pos.asLong()))return true;
+        return Destination.from(level)==Destination.PARADISE&&of(level).wounds.containsKey(pos.asLong());
+    }
+
     @SubscribeEvent public static void dropped(EntityJoinLevelEvent e) {
         if (!(e.getEntity() instanceof ItemEntity item) || !(e.getLevel() instanceof ServerLevel level)) return;
         BlockPos at=item.blockPosition();
