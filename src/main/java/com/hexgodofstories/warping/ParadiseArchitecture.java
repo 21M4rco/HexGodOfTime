@@ -130,7 +130,7 @@ public final class ParadiseArchitecture {
         }
     }
 
-    private static boolean reserved    private static boolean reserved(int isle,int x,int z) {
+    private static boolean reserved(int isle,int x,int z) {
         if(isle==0)return (Math.abs(x)<20&&z<5)||(Math.abs(x)<8&&z>20)
             ||Math.abs(Math.abs(x)-13)<3||Math.abs(z-27)<3;
         if(isle==1||isle==2)return Math.abs(x)<15&&Math.abs(z)<12;
