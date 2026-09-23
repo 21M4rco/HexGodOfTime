@@ -275,8 +275,8 @@ public final class ParadiseSky {
                 }
                 Vec3 hub=top.add(inward.scale(s*.60));
                 for(int i=0;i<=12;i++) {
-                    double a=Math.PI-i*Math.PI/12.0;
-                    Vec3 q=hub.add(inward.scale(Math.cos(a)*s*.60)).add(0,Math.sin(a)*s*.60,0);
+                    double hookAngle=Math.PI-i*Math.PI/12.0;
+                    Vec3 q=hub.add(inward.scale(Math.cos(hookAngle)*s*.60)).add(0,Math.sin(hookAngle)*s*.60,0);
                     int stripe=(i/2)%2==0?0xff4f62:0xfffaf4;
                     WarpMesh.sphere(b,m,q,s*.20,s*.20,s*.20,stripe,1,8,0,false);
                 }
