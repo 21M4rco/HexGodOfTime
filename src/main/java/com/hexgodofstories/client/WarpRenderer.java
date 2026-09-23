@@ -474,7 +474,7 @@ public final class WarpRenderer {
         vertex(b,m,brk.x(ring+1,step),brk.y(ring+1,step)+h10,brk.z(ring+1,step),colour,alpha);
     }
 
-    /** A stable number in nought-to-one    /** A stable number in nought-to-one for one bead and one of its properties. */
+    /** A stable number in nought-to-one for one bead and one of its properties. */
     private static double noise(long seed,int index,int slot){
         long h=seed*0x9E3779B97F4A7C15L+index*0x632BE59BD9B4E019L+slot*0x4F1BBCDDL;
         h^=h>>>29;h*=0x94D049BB133111EBL;h^=h>>>32;
