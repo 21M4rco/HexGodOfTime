@@ -80,6 +80,7 @@ public final class ParadiseServerRegression {
 
         ItemStack water=ParadiseWaters.create();
         check(water.is(Items.POTION)&&water.getHoverName().getString().equals("Paradise Waters"),"bottle name and item");
+        check(ParadiseWaters.isParadiseWaters(water),"Paradise Waters carries consumption provenance");
         check(PotionUtils.getColor(water)==0xff69c8,"bottled water is pink");
         check(PotionUtils.getMobEffects(water).stream().anyMatch(e->e.getEffect()==HexGodOfStories.CANDY_RUSH.get()
             &&e.getDuration()==6000),"bottle supplies five minutes of Candy Rush");
@@ -90,6 +91,10 @@ public final class ParadiseServerRegression {
         level.setBlock(placed,Blocks.AIR.defaultBlockState(),2|16);
         player.moveTo(3,161,28);
         ItemStack food=new ItemStack(Items.PINK_CONCRETE,1);ParadiseFood.mark(food);
+        ItemStack ordinary=new ItemStack(Items.PINK_CONCRETE,1);
+        check(!ItemStack.isSameItemSameTags(food,ordinary),"Paradise candy blocks do not stack with ordinary blocks");
+        check(food.getHoverName().getString().equals("Candy Pink Concrete"),"Paradise block name gets Candy prefix");
+        check(CandyCorruption.DOSES_PER_LIMB==5&&CandyCorruption.BREAK_TICKS>=30,"five mouthfuls start one visible limb failure");
         player.setItemInHand(InteractionHand.MAIN_HAND,food);
         var hit=new BlockHitResult(Vec3.atCenterOf(support).add(0,.5,0),Direction.UP,support,false);
         var result=ForgeHooks.onPlaceItemIntoWorld(new UseOnContext(player,InteractionHand.MAIN_HAND,hit));
