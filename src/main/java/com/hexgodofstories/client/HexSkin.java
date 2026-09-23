@@ -62,7 +62,8 @@ public final class HexSkin {
             }
 
             float var3 = progress(var0);
-            if (var3 <= 0.0F) {
+            boolean candySkin=CandyCorruptionClient.skinActive(var0.getId());
+            if (var3 <= 0.0F && !candySkin) {
                return var1;
             } else {
                UUID var4 = var0.getUUID();
@@ -85,7 +86,7 @@ public final class HexSkin {
                   boolean var14 = false;
                   boolean var15 = false;
                   int var16 = Math.min(96, Math.round(var3 * 96.0F));
-                  int var17 = var16 | (var14 ? 128 : 0) | (var15 ? 256 : 0);
+                  int var17 = var16 | (var14 ? 128 : 0) | (var15 ? 256 : 0) | (CandyCorruptionClient.skinState(var0.getId()) << 10);
                   if (var11 != null && var11.state == var17) {
                      var11.lastUse = var5;
                      return var11.location;
@@ -111,7 +112,7 @@ public final class HexSkin {
 
                         var11.lastUse = var5;
                         if (var11.state != var17) {
-                           compose(var11, (float)var16 / 96.0F, var14, var15);
+                           compose(var11, (float)var16 / 96.0F, var14, var15, var0.getId());
                            var11.texture.upload();
                            var11.state = var17;
                         }
@@ -177,14 +178,16 @@ public final class HexSkin {
       }
    }
 
-   private static void compose(HexSkin.Entry var0, float var1, boolean var2, boolean var3) {
+   private static void compose(HexSkin.Entry var0, float var1, boolean var2, boolean var3, int entityId) {
       NativeImage var4 = var0.texture.getPixels();
       OutfitPattern var5 = var0.slim ? OutfitPattern.SLIM : OutfitPattern.CLASSIC;
       int var6 = var0.base.getWidth();
 
       for (int var7 = 0; var7 < var6; var7++) {
          for (int var8 = 0; var8 < var6; var8++) {
-            var4.setPixelRGBA(var8, var7, var5.pixel(var0.base.getPixelRGBA(var8, var7), var8 * 64 / var6, var7 * 64 / var6, var1, var2, var3));
+            int sx=var8 * 64 / var6,sy=var7 * 64 / var6;
+            int dressed=var5.pixel(var0.base.getPixelRGBA(var8,var7),sx,sy,var1,var2,var3);
+            var4.setPixelRGBA(var8,var7,CandyCorruptionClient.tint(entityId,dressed,sx,sy));
          }
       }
    }
