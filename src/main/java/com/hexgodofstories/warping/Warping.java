@@ -67,11 +67,12 @@ public final class Warping {
         Destination d=Destination.at(HexData.get(p).getInt("warpDestination"));
         ServerLevel target=p.server.getLevel(d.key);
         if(target==null){notice(p,"Warping dimensions are unavailable. Restart the server after installing the update.");return;}
-        // Fixed, shared and identical on every opening. Saves from before this change may carry a
-        // private slice; it is ignored rather than honoured, so everyone converges on the one realm.
+        // Normal Warping realms are shared. The World Tree keeps the exact existing PocketRealm
+        // plot/terrain; Warping only owns the route and portal presentation.
         double cell=WarpRealms.CELL;
         HexData.get(p).putDouble("warpPrepared_"+d.name(),cell);
-        WarpRealms.prepare(target,d,cell);
+        if(d==Destination.SANCTUM){if(!PocketRealm.prepareForWarp(p)){notice(p,"Your World Tree is unavailable.");return;}}
+        else WarpRealms.prepare(target,d,cell);
         Charge c=new Charge(p,new Vec3(hit.getBlockPos().getX()+.5,hit.getLocation().y+.025,hit.getBlockPos().getZ()+.5),d,cell);
         CHARGES.put(p.getUUID(),c);HexNetwork.animate(p,"threads");send(c,false);
         c.level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.RIFT_OPEN.get(),SoundSource.PLAYERS,1,.65f);
@@ -82,7 +83,8 @@ public final class Warping {
         // The tear is as wide as it was paid for. A caster who held past what their energy covers
         // opens the largest break that energy buys rather than being told it did not stabilize.
         held=Math.min(held,WarpMath.affordable(HexData.energy(p),Ability.WARPING.cost));
-        if(held<WarpMath.MIN_CHARGE||!valid(p,c)||!WarpRealms.ready(p.server.getLevel(c.destination.key),c.cell)){cancel(p);notice(p,"The fracture did not stabilize.");return;}
+        boolean ready=c.destination==Destination.SANCTUM||WarpRealms.ready(p.server.getLevel(c.destination.key),c.cell);
+        if(held<WarpMath.MIN_CHARGE||!valid(p,c)||!ready){cancel(p);notice(p,"The fracture did not stabilize.");return;}
         c.held=held;c.opened=c.level.getGameTime();
         CHARGES.remove(p.getUUID());PORTALS.put(p.getUUID(),c);
         HexData.spend(p,(float)(Ability.WARPING.cost*WarpMath.costScale(c.held)));HexData.get(p).putLong("cd_WARPING",HexData.now(p)+Ability.WARPING.cooldown);
@@ -90,7 +92,7 @@ public final class Warping {
         // The black surface and glass share a sub-block polygon on the client. Do not voxelize it
         // into Nothingness cubes: their square tops protrude past the cracks and cannot match the rim.
         // Ground collision stays intact until an entity's feet enter the authoritative polygon.
-        WarpRealms.start(p.server.getLevel(c.destination.key),c.cell);
+        if(c.destination!=Destination.SANCTUM)WarpRealms.start(p.server.getLevel(c.destination.key),c.cell);
         HexData.get(p).putDouble("warpCell_"+c.destination.name(),c.cell);
         c.level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.RIFT_OPEN.get(),SoundSource.PLAYERS,1.25f,1.15f);
         send(c,false);
@@ -231,17 +233,31 @@ public final class Warping {
         }
     }
     public static boolean leave(ServerPlayer p){
-        if(Destination.from(p.level())==null||!sovereign(p))return false;
+        if(!sovereign(p))return false;
+        if(PocketRealm.inside(p.level())){
+            FractureAnchor a=FractureTravel.exit(p);
+            ServerLevel to=a==null?null:a.level(p.server);
+            if(to==null)return false;
+            Vec3 back=WarpRealms.daylight(to,p,a.at());
+            cancel(p);
+            p.teleportTo(to,back.x,back.y,back.z,a.yaw(),a.pitch());
+            p.setDeltaMovement(Vec3.ZERO);p.fallDistance=0;
+            HexData.get(p).remove("realmPlot");
+            WarpEmergence.begin(p,back,Vec3.ZERO,true);
+            return true;
+        }
+        if(Destination.from(p.level())==null)return false;
         FractureAnchor a=FractureAnchor.load(HexData.get(p).getCompound("warpReturn"));
         ServerLevel to=a==null?null:a.level(p.server);
         if(to==null){to=p.server.overworld();a=new FractureAnchor(to.dimension(),Vec3.atBottomCenterOf(to.getSharedSpawnPos()),p.getYRot(),p.getXRot());}
-        // Where they went in is not necessarily somewhere they fit coming back: a crossing falls
-        // through the floor with collision off, so the recorded point is usually a little under the
-        // surface, and the ground there may have changed since in any case.
         Vec3 back=WarpRealms.daylight(to,p,a.at());
-        cancel(p);HexNetwork.fx(p,"depart");p.teleportTo(to,back.x,back.y,back.z,a.yaw(),a.pitch());p.setDeltaMovement(Vec3.ZERO);p.fallDistance=0;
-        HexNetwork.arrival(p);return true;
+        cancel(p);
+        p.teleportTo(to,back.x,back.y,back.z,a.yaw(),a.pitch());
+        p.setDeltaMovement(Vec3.ZERO);p.fallDistance=0;
+        WarpEmergence.begin(p,back,Vec3.ZERO,true);
+        return true;
     }
+
     /** This break, as much of it as a crossing needs. Cheap: the shape behind it is already built. */
     private static WarpCrossing.Break brk(UUID owner,Charge c){
         return new WarpCrossing.Break(owner,c.level,c.at,c.destination,c.cell,c.held,c.shape(),c.extent(),c.moved);
@@ -250,7 +266,7 @@ public final class Warping {
         CompoundTag n=new CompoundTag();n.putBoolean("clear",clear);n.putDouble("x",c.at.x);n.putDouble("y",c.at.y);n.putDouble("z",c.at.z);n.putLong("start",c.start);n.putInt("destination",c.destination.ordinal());n.putLong("opened",c.opened);n.putInt("held",c.held);n.putLong("seed",c.seed);n.putLong("until",c.opened<0?c.level.getGameTime()+12:Math.min(c.opened+c.openTicks(),c.level.getGameTime()+12));n.putBoolean("recall",c.recall);n.putInt("window",c.openTicks());
         n.putString("dimension",c.level.dimension().location().toString());n.putLong("sent",c.level.getGameTime());
         ServerLevel target=c.level.getServer().getLevel(c.destination.key);
-        n.putLong("realmAge",c.opened>=0&&target!=null?WarpRealms.age(target,c.cell):0);
+        n.putLong("realmAge",c.destination!=Destination.SANCTUM&&c.opened>=0&&target!=null?WarpRealms.age(target,c.cell):0);
         HexNetwork.near(c.level,c.at,96,new HexNetwork.Message(HexNetwork.WARP,c.ownerId,n));
     }
     public static void cancel(ServerPlayer p){Charge c=CHARGES.remove(p.getUUID());if(c!=null){forget(c);send(c,true);c.level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.RIFT_CLOSE.get(),SoundSource.PLAYERS,.8f,.7f);}}
@@ -308,6 +324,7 @@ public final class Warping {
         if(recovered>now){notice(p,"Warping is still recovering. "+((recovered-now+19)/20)+"s");return;}
         if(HexData.energy(p)<RECALL_COST){notice(p,"Not enough Temporal Energy.");return;}
         Destination d=Destination.at(HexData.get(p).getInt("warpDestination"));
+        if(d==Destination.SANCTUM){notice(p,"The World Tree is entered through R; Y does not reach into personal sanctums.");return;}
         if(Destination.from(p.level())==d){notice(p,"You are standing in it.");return;}
         ServerLevel target=p.server.getLevel(d.key);
         if(target==null){notice(p,"Warping dimensions are unavailable. Restart the server after installing the update.");return;}
@@ -494,12 +511,10 @@ public final class Warping {
             player.stopRiding();
             player.teleportTo(level,spot.x,spot.y,spot.z,player.getYRot(),player.getXRot());
             restoreRecallState(player,transportState);
-            player.setDeltaMovement(Math.cos(spread)*.09,RECALL_LAUNCH,Math.sin(spread)*.09);
+            player.setDeltaMovement(Vec3.ZERO);
             player.hurtMarked=true;player.fallDistance=0;
-            player.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(player));
             WarpResidency.untrack(source,id);
-            HexNetwork.arrival(player);
-            emergence(level,c.destination,player);
+            WarpEmergence.begin(player,spot,Vec3.ZERO,false);
             return;
         }
 
@@ -512,14 +527,11 @@ public final class Warping {
         });
         if(arrived==null)return;
         restoreRecallState(arrived,transportState);
-        // Thrown up and slightly outward, so it reads as having climbed out of the break rather
-        // than as having been placed beside it.
-        arrived.setDeltaMovement(Math.cos(spread)*.09,RECALL_LAUNCH,Math.sin(spread)*.09);
+        arrived.setDeltaMovement(Vec3.ZERO);
         arrived.hurtMarked=true;arrived.fallDistance=0;
         if(arrived instanceof Mob mob)mob.setPersistenceRequired();
         WarpResidency.untrack(source,id);
-        HexNetwork.arrival(arrived);
-        emergence(level,c.destination,arrived);
+        WarpEmergence.begin(arrived,spot,Vec3.ZERO,false);
     }
 
     /**
@@ -584,25 +596,6 @@ public final class Warping {
      * its hunter moves in, the Sun brings embers. The white rod on top of it is the dimensional
      * part, and is the same for every realm.
      */
-    private static void emergence(ServerLevel level,Destination d,Entity arrived){
-        net.minecraft.core.particles.ParticleOptions sign=switch(d){
-            case PARADISE -> HexGodOfStories.CANDY.get();
-            case VOID_SEA -> HexGodOfStories.SPECTRAL.get();
-            case SUN -> HexGodOfStories.GOLD_EMBER.get();
-            case TIME_STORM -> HexGodOfStories.TEMPORAL_DUST.get();
-            case GRAVITY_WELL -> HexGodOfStories.VEIL.get();
-            case CRUSHING_REALM -> HexGodOfStories.ASH.get();
-            case FROZEN_MOMENT -> HexGodOfStories.MOTE.get();
-            case SHATTERED_WORLD -> HexGodOfStories.SHARD.get();
-            case END_OF_TIME -> HexGodOfStories.SMOKE.get();
-        };
-        double height=Math.max(.6,arrived.getBbHeight());
-        level.sendParticles(sign,arrived.getX(),arrived.getY()+height*.5,arrived.getZ(),26,
-            arrived.getBbWidth()*.6,height*.45,arrived.getBbWidth()*.6,.06);
-        level.sendParticles(net.minecraft.core.particles.ParticleTypes.END_ROD,arrived.getX(),arrived.getY()+.1,arrived.getZ(),
-            10,.28,.06,.28,.09);
-        level.playSound(null,arrived.blockPosition(),HexGodOfStories.RIFT_OPEN.get(),SoundSource.HOSTILE,.55f,1.4f);
-    }
 
     /** Lets go of whatever a break was still going to pull through, so nothing is left reserved. */
     private static void forget(Charge c){

@@ -67,7 +67,7 @@ public final class FractureTravel {
         } else HexData.fractureTarget(owner,null,null);
         HexData.fractureMode(owner,mode);
         HexNetwork.sync(owner);
-        owner.displayClientMessage(Component.literal("Fracture set to "+mode.label(HexData.fractureTargetName(owner))+"."),true);
+        owner.displayClientMessage(Component.literal("World Tree exit set to "+mode.label(HexData.fractureTargetName(owner))+"."),true);
     }
 
     /**
@@ -117,7 +117,7 @@ public final class FractureTravel {
             // A stale coordinate from somebody who logged out is exactly what must never be used.
             HexData.fractureTarget(owner,null,null);
             HexNetwork.sync(owner);
-            notice(owner,"That one has left. Choose another with the Fracture menu.");
+            notice(owner,"That one has left. Choose another with the World Tree exit menu.");
             return null;
         }
         FractureAnchor anchor=beside(target);

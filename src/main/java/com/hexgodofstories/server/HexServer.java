@@ -95,14 +95,6 @@ public final class HexServer {
         // Returning home must never depend on energy, mastery or the entry spell's recovery. The way
         // out follows whatever the owner's saved mode currently points at.
         if(a==Ability.WARPING&&(action==CAST||action==HOLD_BEGIN)&&Warping.leave(p))return;
-        if(a==Ability.RIFT&&PocketRealm.inside(p.level())&&(action==CAST||action==HOLD_BEGIN)) {
-            UUID active=RIFTS.get(p.getUUID());
-            if(active==null||!(p.serverLevel().getEntity(active) instanceof RiftEntity))openFracture(p,FractureTravel.exit(p));
-            // Holding drags everything nearby out with the owner, whatever the destination is: that
-            // is how a captive taken in at one place is released somewhere else entirely.
-            if(action==HOLD_BEGIN)armFracture(p);
-            return;
-        }
         if(action==ALTERNATE&&secondary(p,a)){HexNetwork.sync(p);return;}
         if(!HexData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return;}
         if(HexData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return;}
@@ -110,15 +102,6 @@ public final class HexServer {
         if(a==Ability.WARPING){if(action==HOLD_BEGIN||action==CAST)Warping.begin(p);return;}
         if(action==HOLD_BEGIN) {
             if(!a.hold)return;
-            if(a==Ability.RIFT) {
-                // The cast key always runs whatever the selector last saved; only that mode decides
-                // what a press means, and the pull keeps its own tap-versus-hold distinction.
-                if(FractureTravel.act(p,RiftEntity.HOLD)) {
-                    HexData.spend(p,a.cost);HexData.get(p).putLong("cd_"+a.name(),now+a.cooldown);
-                    reward(p,a.discipline,90);HexNetwork.sync(p);
-                }
-                return;
-            }
             if(a==Ability.TIME_BRANCH) {
                 if(TimeBranch.begin(p))HexData.spend(p,a.cost);
                 HexNetwork.sync(p);return;
@@ -133,7 +116,7 @@ public final class HexServer {
             if(action==CAST&&TimeBranch.begin(p))HexData.spend(p,a.cost);
             HexNetwork.sync(p);return;
         }
-        if(a.hold&&a!=Ability.RIFT){Architecture.begin(p);return;}
+        if(a.hold){Architecture.begin(p);return;}
         if(cast(p,a,action==ALTERNATE)) {
             HexData.spend(p,a.cost);HexData.get(p).putLong("cd_"+a.name(),now+a.cooldown);
             reward(p,a.discipline,90);HexNetwork.sync(p);
@@ -146,7 +129,6 @@ public final class HexServer {
         if(a==Ability.ARCHITECTURE){Architecture.dismiss(p);return true;}
         if(a==Ability.MASQUERADE){Masquerade.drop(p);return true;}
         if(a==Ability.TELEKINESIS&&Telekinesis.holding(p)){Telekinesis.release(p,true);return true;}
-        if(a==Ability.RIFT){return dismissRift(p);}
         if(a==Ability.ENCHANT){direct(p);return true;}
         if(a==Ability.SELECTIVE_STOP&&HexData.unlocked(p,a)){Entity t=target(p,20);if(t!=null){TemporalEngine.exempt(p,t);notice(p,"Your chosen companion may walk through your stopped time.");}return true;}
         if(a==Ability.DAGGERS||a==Ability.TWIN_DAGGERS||a==Ability.LAEVATEINN){dismissWeapons(p);return true;}
@@ -194,7 +176,7 @@ public final class HexServer {
                 if(!Masquerade.assume(p,t)){notice(p,"That shape refuses to be read.");return false;}
                 gesture(p,"illusion","disguise",HexGodOfStories.ILLUSION_SOUND.get());return true;
             }
-            case RIFT -> {return FractureTravel.act(p,RiftEntity.TAP);}
+            case RIFT -> {return false;} // legacy tombstone; Fracture moved into Warping
             case BOLT -> {SpellProjectile.cast(p,p.getEyePosition().add(look.scale(.5)),look,secondary?1:0,false);gesture(p,"bolt","cast",HexGodOfStories.SORCERY.get());return true;}
             case PUSH -> {for(Entity e:p.level().getEntities(p,p.getBoundingBox().inflate(5),e->validTarget(p,e))){Vec3 away=e.position().subtract(p.position()).normalize();e.setDeltaMovement(away.scale(1.1).add(0,.25,0));e.hurtMarked=true;}gesture(p,"push","push",HexGodOfStories.SORCERY.get());return true;}
             case BLINK -> {Vec3 destination=safeAim(p,8+HexData.mastery(p,Discipline.SORCERY)/90.0);if(destination==null)return false;gesture(p,"blink","depart",HexGodOfStories.TELEPORT.get());teleport(p,destination);HexNetwork.arrival(p);return true;}
@@ -449,6 +431,7 @@ public final class HexServer {
         Nothingness.tick(level);
         IllusoryWalls.tick(level);
         PocketRealm.tick(level);
+        WarpEmergence.tick(level);
         Warping.tick(level);WarpRealms.tick(level);
         if(now%200==0)WATCHED.entrySet().removeIf(e->level.getEntity(e.getKey())==null);
     }

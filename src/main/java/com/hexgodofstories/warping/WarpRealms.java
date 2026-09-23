@@ -60,6 +60,7 @@ public final class WarpRealms {
     public static double allocate(ServerLevel l){return CELL;}
     public static double latest(ServerLevel l){return CELL;}
     public static void prepare(ServerLevel l,Destination d,double x){
+        if(d==Destination.SANCTUM)return;
         Ledger state=ledger(l);
         if(d==Destination.PARADISE&&state.paradiseLayout<PARADISE_LAYOUT){
             state.ready.clear();
@@ -89,25 +90,36 @@ public final class WarpRealms {
     public static void start(ServerLevel l,double x){Ledger a=ledger(l);a.clocks.put((long)x,l.getGameTime());a.setDirty();}
     public static long age(ServerLevel l,double x){return Math.max(0,l.getGameTime()-ledger(l).clocks.getOrDefault((long)x,l.getGameTime()));}
     public static void transfer(Entity e,Destination d,double cell,boolean owner){
+        if(d==Destination.SANCTUM){
+            if(e instanceof ServerPlayer p)PocketRealm.crossFromWarp(p,p,p.position());
+            return;
+        }
         ServerLevel old=(ServerLevel)e.level(),to=old.getServer().getLevel(d.key);if(to==null)return;
         Vec3 pos=d.arrival.add(cell,owner?8:0,0);
         if(e instanceof ServerPlayer p){
             if(Destination.from(old)==null)HexData.get(p).put("warpReturn",new FractureAnchor(old.dimension(),p.position(),p.getYRot(),p.getXRot()).save());
             p.stopRiding();p.teleportTo(to,pos.x,pos.y,pos.z,p.getYRot(),p.getXRot());
             WarpResidency.track(p,p.getUUID());
-            // A destination still hands out nothing: arriving does not grant flight, and a caster
-            // without the mantle crosses on foot. What the mantle carries, it carries everywhere,
-            // so a transformed keeper is left alone here rather than being stripped on arrival.
             if(!com.hexgodofstories.server.CosmicFlight.mantled(p)){
                 com.hexgodofstories.server.CosmicFlight.revoke(p);
                 if(!p.isCreative()&&!p.isSpectator()){p.getAbilities().flying=false;p.onUpdateAbilities();}
             }
-        }else{
-            e.stopRiding();e.changeDimension(to,new ITeleporter(){public Entity placeEntity(Entity entity,ServerLevel current,ServerLevel dest,float yaw,java.util.function.Function<Boolean,Entity> reposition){Entity moved=reposition.apply(false);if(moved!=null){moved.moveTo(pos.x,pos.y,pos.z,yaw,0);moved.setDeltaMovement(0,-.3,0);moved.fallDistance=0;WarpResidency.track(moved,e.getUUID());}return moved;}});
+            WarpEmergence.begin(p,pos,Vec3.ZERO,true);
+            return;
         }
-        e.setDeltaMovement(0,owner?0:-.3,0);e.fallDistance=0;HexNetwork.arrival(e);
+        UUID original=e.getUUID();
+        e.stopRiding();
+        Entity moved=e.changeDimension(to,new ITeleporter(){
+            public Entity placeEntity(Entity entity,ServerLevel current,ServerLevel dest,float yaw,java.util.function.Function<Boolean,Entity> reposition){
+                Entity copy=reposition.apply(false);
+                if(copy!=null){copy.moveTo(pos.x,pos.y,pos.z,yaw,0);copy.setDeltaMovement(Vec3.ZERO);copy.fallDistance=0;}
+                return copy;
+            }
+        });
+        if(moved!=null){WarpResidency.track(moved,original);WarpEmergence.begin(moved,pos,Vec3.ZERO,true);}
     }
     /**
+     * A crossing that carries its motion with it.    /**
      * A crossing that carries its motion with it.
      *
      * <p>{@link #transfer} puts a body at a destination. This puts it <em>through</em> one: it is
@@ -144,7 +156,13 @@ public final class WarpRealms {
      * @param sender the Loki player whose break sent this body, used by persistent realm residency
      */
     public static void fallThrough(Entity e,Destination d,double cell,Vec3 offset,Vec3 momentum,float fall,boolean owner,Vec3 stood,UUID sender){
-        ServerLevel old=(ServerLevel)e.level(),to=old.getServer().getLevel(d.key);
+        ServerLevel old=(ServerLevel)e.level();
+        if(d==Destination.SANCTUM){
+            ServerPlayer caster=old.getServer().getPlayerList().getPlayer(sender);
+            if(caster==null||!PocketRealm.crossFromWarp(e,caster,stood))e.noPhysics=false;
+            return;
+        }
+        ServerLevel to=old.getServer().getLevel(d.key);
         if(to==null){e.noPhysics=false;return;}
         double spreadX=net.minecraft.util.Mth.clamp(offset.x,-ENTRY_SPREAD,ENTRY_SPREAD);
         double spreadZ=net.minecraft.util.Mth.clamp(offset.z,-ENTRY_SPREAD,ENTRY_SPREAD);
@@ -160,12 +178,11 @@ public final class WarpRealms {
                 com.hexgodofstories.server.CosmicFlight.revoke(p);
                 if(!p.isCreative()&&!p.isSpectator()){p.getAbilities().flying=false;p.onUpdateAbilities();}
             }
-            p.setDeltaMovement(momentum);
-            p.fallDistance=fall;
+            p.setDeltaMovement(Vec3.ZERO);
+            p.fallDistance=0;
             p.hurtMarked=true;
             WarpResidency.track(p,sender);
-            p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(p));
-            emerging(to,p);
+            WarpEmergence.begin(p,pos,momentum,true);
             return;
         }
         e.stopRiding();
@@ -174,11 +191,11 @@ public final class WarpRealms {
             if(copy!=null){copy.moveTo(pos.x,pos.y,pos.z,yaw,pitch);copy.setDeltaMovement(momentum);copy.fallDistance=fall;copy.noPhysics=false;}
             return copy;}});
         if(moved==null){e.noPhysics=false;return;}
-        moved.setDeltaMovement(momentum);
-        moved.fallDistance=fall;
+        moved.setDeltaMovement(Vec3.ZERO);
+        moved.fallDistance=0;
         moved.hurtMarked=true;
         WarpResidency.track(moved,sender);
-        emerging(to,moved);
+        WarpEmergence.begin(moved,pos,momentum,true);
     }
     /** How far from a realm's entry point a crossing may come out, in blocks. */
     private static final double ENTRY_SPREAD=6;
@@ -246,11 +263,6 @@ public final class WarpRealms {
      * Coming out of the other side. A little of the liquid trailing the body rather than the
      * arrival nebula, because a nebula around somebody still falling reads as having been put there.
      */
-    private static void emerging(ServerLevel to,Entity e){
-        to.sendParticles(HexGodOfStories.MOTE.get(),e.getX(),e.getY()+e.getBbHeight()*.6,e.getZ(),
-            9,e.getBbWidth()*.5,e.getBbHeight()*.4,e.getBbWidth()*.5,.03);
-    }
-
     /** The title's colour: a dark blue with the green and the violet either side of it in it. */
     private static final int COSMIC=0x354B8D;
     /**

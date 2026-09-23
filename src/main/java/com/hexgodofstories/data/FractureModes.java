@@ -21,9 +21,9 @@ public final class FractureModes {
         ORDER.add(mode);BY_ID.put(mode.id,mode);return mode;
     }
 
-    public static final FractureMode PULL=register(new FractureMode("pull","Pull Into Fracture",
-        "Tap to open a doorway into your sanctum. Hold to drag everything within five blocks through with you.",
-        Items.ENDER_EYE,false,true));
+    public static final FractureMode PULL=register(new FractureMode("pull","Return Where You Entered",
+        "Leave the World Tree at the place where you entered it.",
+        Items.ENDER_EYE,false,false));
     public static final FractureMode NEAR_PLAYER=register(new FractureMode("near_player","Travel Near Player",
         "Open onto a safe spot a short walk from one chosen player. The choice is kept until you change it.",
         Items.PLAYER_HEAD,true,false));

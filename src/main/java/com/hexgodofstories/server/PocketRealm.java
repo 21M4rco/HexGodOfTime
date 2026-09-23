@@ -133,6 +133,15 @@ public final class PocketRealm {
 
     public static ServerLevel level(MinecraftServer server) {return server.getLevel(KEY);}
 
+    /** Prepare the caster's existing personal plot without moving them there yet. */
+    public static boolean prepareForWarp(ServerPlayer p) {
+        ServerLevel realm=level(p.server);
+        if(realm==null)return false;
+        int plot=realms(realm).plot(p.getUUID());
+        prepare(realm,plot);
+        return true;
+    }
+
     /** @return true when the caster was actually moved, so the rift only reports success on a real crossing. */
     public static boolean enter(ServerPlayer p) {
         if(!HexData.access(p)){p.displayClientMessage(Component.literal("Your powers are locked."),true);return false;}
@@ -149,10 +158,8 @@ public final class PocketRealm {
         prepare(realm,plot);
         Vec3 spawn=centre(plot);
         if(!move(p,realm,spawn,180,0))return false;
-        // Arriving in the sanctum is quiet: a small bloom of nebula where the body reforms, and no
-        // second break hanging in the air beside it.
-        HexNetwork.arrival(p);
-        p.displayClientMessage(Component.literal("Your world tree. Fracture to leave, or crouch on the arrival sigil."),true);
+        com.hexgodofstories.warping.WarpEmergence.begin(p,spawn,Vec3.ZERO,true);
+        p.displayClientMessage(Component.literal("Your world tree. G chooses the exit route; R leaves through it."),true);
         return true;
     }
 
@@ -180,7 +187,7 @@ public final class PocketRealm {
         if(home==null)return false;
         if(!move(p,destination,home,d.getFloat("returnYaw"),d.getFloat("returnPitch")))return false;
         d.remove("realmPlot");
-        HexNetwork.arrival(p);
+        com.hexgodofstories.warping.WarpEmergence.begin(p,home,Vec3.ZERO,true);
         return true;
     }
 
@@ -197,9 +204,10 @@ public final class PocketRealm {
             parent.put(HexData.RETURN_TAG,parent.contains(HexData.LEGACY_RETURN_TAG)?parent.getCompound(HexData.LEGACY_RETURN_TAG).copy():new CompoundTag());
         return parent.getCompound(HexData.RETURN_TAG);
     }
-    private static void remember(net.minecraft.world.entity.Entity e,CompoundTag d) {
+    private static void remember(net.minecraft.world.entity.Entity e,CompoundTag d,Vec3 stood) {
+        Vec3 at=stood==null?e.position():stood;
         d.putString("returnDim",e.level().dimension().location().toString());
-        d.putDouble("returnX",e.getX());d.putDouble("returnY",e.getY());d.putDouble("returnZ",e.getZ());
+        d.putDouble("returnX",at.x);d.putDouble("returnY",at.y);d.putDouble("returnZ",at.z);
         d.putFloat("returnYaw",e.getYRot());d.putFloat("returnPitch",e.getXRot());
     }
 
@@ -215,8 +223,13 @@ public final class PocketRealm {
      * @param spread index within a travelling group, so a crowd fans out around the arrival instead
      *               of piling into one column
      */
-    public static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster) {return cross(e,caster,null,0);}
-    public static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster,FractureAnchor anchor,int spread) {
+    public static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster) {return cross(e,caster,null,0,null);}
+    public static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster,FractureAnchor anchor,int spread) {return cross(e,caster,anchor,spread,null);}
+    /** Warping sinks below the source floor; remember where the body first stood instead. */
+    public static boolean crossFromWarp(net.minecraft.world.entity.Entity e,ServerPlayer caster,Vec3 stood) {
+        return cross(e,caster,null,0,stood);
+    }
+    private static boolean cross(net.minecraft.world.entity.Entity e,ServerPlayer caster,FractureAnchor anchor,int spread,Vec3 stood) {
         if(!e.isAlive()||e.isRemoved()||e.isSpectator())return false;
         boolean homeward=inside(e.level());
         CompoundTag d=travelData(e);
@@ -233,7 +246,7 @@ public final class PocketRealm {
         } else {
             destination=level(caster.server);if(destination==null)return false;
             plot=realms(destination).plot(caster.getUUID());prepare(destination,plot);
-            target=centre(plot);remember(e,d);
+            target=centre(plot);remember(e,d,stood);
             yaw=180;pitch=0;
         }
         Vec3 at=safeArrival(e,destination,scatter(target,spread));
@@ -243,7 +256,7 @@ public final class PocketRealm {
             if(!homeward&&anchor==null)d.putInt("realmPlot",plot);
             if(!move(p,destination,at,yaw,pitch))return false;
             if(homeward||anchor!=null)d.remove("realmPlot");
-            HexNetwork.arrival(p);return true;
+            com.hexgodofstories.warping.WarpEmergence.begin(p,at,Vec3.ZERO,true);return true;
         }
         e.stopRiding();e.ejectPassengers();
         Vec3 landing=at;
@@ -262,7 +275,7 @@ public final class PocketRealm {
         });
         if(moved==null)return false;
         travelData(moved).putLong("riftGraceUntil",caster.server.overworld().getGameTime()+com.hexgodofstories.entity.RiftEntity.DURATION+20);
-        HexNetwork.arrival(moved);
+        com.hexgodofstories.warping.WarpEmergence.begin(moved,landing,Vec3.ZERO,true);
         return true;
     }
 
