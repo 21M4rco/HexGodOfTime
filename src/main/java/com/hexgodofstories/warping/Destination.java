@@ -25,7 +25,8 @@ public enum Destination {
     public final ResourceKey<Level> key;
     public final boolean managed;
     Destination(String title,String description,int color,Vec3 arrival) {
-        this(title,description,color,arrival,ResourceKey.create(Registries.DIMENSION,HexGodOfStories.id("warping_"+name().toLowerCase(java.util.Locale.ROOT))),true);
+        this.title=title;this.description=description;this.color=color;this.arrival=arrival;this.managed=true;
+        this.key=ResourceKey.create(Registries.DIMENSION,HexGodOfStories.id("warping_"+name().toLowerCase(java.util.Locale.ROOT)));
     }
     Destination(String title,String description,int color,Vec3 arrival,ResourceKey<Level> key,boolean managed) {
         this.title=title;this.description=description;this.color=color;this.arrival=arrival;this.key=key;this.managed=managed;
