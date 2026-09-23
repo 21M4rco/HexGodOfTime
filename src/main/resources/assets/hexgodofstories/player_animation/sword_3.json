@@ -2,7 +2,7 @@
   "version": 3,
   "name": "sword_3",
   "author": "HexGodOfStories",
-  "description": "Sovereign Sever: raise the greatsword, cut once, then recover without locking the legs.",
+  "description": "Frost burst: draw the blade back, aim the tip forward along the look vector, then discharge and recover.",
   "emote": {
     "beginTick": 0,
     "endTick": 26,
@@ -11,12 +11,120 @@
     "returnTick": 9,
     "degrees": true,
     "moves": [
-      {"tick": 0, "easing": "inoutquad", "rightArm": {"pitch": -28, "yaw": -8, "roll": -12}, "leftArm": {"pitch": -32, "yaw": 18, "roll": 12}, "torso": {"pitch": 0, "yaw": 0, "roll": 0}},
-      {"tick": 5, "easing": "inoutquad", "rightArm": {"pitch": -158, "yaw": 20, "roll": 12}, "leftArm": {"pitch": -95, "yaw": -18, "roll": -12}, "torso": {"pitch": -8, "yaw": -18, "roll": 3}},
-      {"tick": 8, "easing": "inoutquad", "rightArm": {"pitch": -143, "yaw": 50, "roll": 23}, "leftArm": {"pitch": -86, "yaw": -22, "roll": -20}, "torso": {"pitch": -6, "yaw": 20, "roll": -2}},
-      {"tick": 11, "easing": "inoutquad", "rightArm": {"pitch": -45, "yaw": -72, "roll": -34}, "leftArm": {"pitch": -60, "yaw": 35, "roll": 16}, "torso": {"pitch": 9, "yaw": 28, "roll": -3}},
-      {"tick": 17, "easing": "inoutquad", "rightArm": {"pitch": -66, "yaw": -33, "roll": -16}, "leftArm": {"pitch": -32, "yaw": 14, "roll": 9}, "torso": {"pitch": 2, "yaw": 7, "roll": 0}},
-      {"tick": 26, "easing": "inoutquad", "rightArm": {"pitch": -28, "yaw": -8, "roll": -12}, "leftArm": {"pitch": -32, "yaw": 18, "roll": 12}, "torso": {"pitch": 0, "yaw": 0, "roll": 0}}
+      {
+        "tick": 0,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -28,
+          "yaw": -8,
+          "roll": -12
+        },
+        "leftArm": {
+          "pitch": -32,
+          "yaw": 18,
+          "roll": 12
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 4,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -122,
+          "yaw": 10,
+          "roll": 8
+        },
+        "leftArm": {
+          "pitch": -78,
+          "yaw": -14,
+          "roll": -7
+        },
+        "torso": {
+          "pitch": -5,
+          "yaw": -7,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 6,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -90,
+          "yaw": 0,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": -83,
+          "yaw": 17,
+          "roll": 6
+        },
+        "torso": {
+          "pitch": -4,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 11,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -91,
+          "yaw": 0,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": -80,
+          "yaw": 17,
+          "roll": 6
+        },
+        "torso": {
+          "pitch": -4,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 17,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -65,
+          "yaw": -18,
+          "roll": -9
+        },
+        "leftArm": {
+          "pitch": -48,
+          "yaw": 12,
+          "roll": 8
+        },
+        "torso": {
+          "pitch": 1,
+          "yaw": 5,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 26,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -28,
+          "yaw": -8,
+          "roll": -12
+        },
+        "leftArm": {
+          "pitch": -32,
+          "yaw": 18,
+          "roll": 12
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
     ]
   }
 }

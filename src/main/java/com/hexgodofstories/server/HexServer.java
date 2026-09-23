@@ -29,8 +29,8 @@ public final class HexServer {
     private static final Map<UUID,ArrayDeque<Moment>> HISTORY=new HashMap<>();
     private static final Map<UUID,Charm> CHARMS=new HashMap<>();
     private static final Map<UUID,Strike> STRIKES=new HashMap<>();
-    private record SwordWave(Vec3 origin,Vec3 direction,long start,Set<UUID> struck) { }
-    private static final Map<UUID,SwordWave> SWORD_WAVES=new HashMap<>();
+    private record FrostCast(long start) { }
+    private static final Map<UUID,FrostCast> FROST_CASTS=new HashMap<>();
     private static final Map<UUID,Long> INPUT=new HashMap<>(),TRAINING=new HashMap<>();
     private static final Map<UUID,List<UUID>> ILLUSIONS=new HashMap<>();
     private static final Map<UUID,UUID> RIFTS=new HashMap<>();
@@ -333,7 +333,7 @@ public final class HexServer {
         if(hand==InteractionHand.OFF_HAND&&(!secondary||w.kind!=0))return;
         if(!ConjuredWeapon.belongsTo(held,p)){p.setItemInHand(hand,ItemStack.EMPTY);return;}
         if(w.kind==1) {
-            if(secondary)sever(p);
+            if(secondary)frostCast(p);
             return;
         }
         long now=HexData.now(p);Strike prior=STRIKES.get(p.getUUID());
@@ -360,47 +360,33 @@ public final class HexServer {
         p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,.85f,1.08f+combo*.04f);
     }
 
-    /** Sovereign Sever: a wide, travelling cut with one server-side hit per target. */
-    private static void sever(ServerPlayer p) {
+    /** A short windup gives the sword time to point down the player's live aim before discharge. */
+    private static void frostCast(ServerPlayer p) {
         long now=HexData.now(p);
-        if(HexData.get(p).getLong("cd_SWORD_SEVER")>now)return;
-        if(!HexData.spend(p,25)){notice(p,"Sovereign Sever needs 25 Temporal Energy.");return;}
-        HexData.get(p).putLong("cd_SWORD_SEVER",now+160);
-        SWORD_WAVES.put(p.getUUID(),new SwordWave(p.getEyePosition(),p.getLookAngle().normalize(),now,new HashSet<>()));
-        HexNetwork.animate(p,"sword_3");HexNetwork.fx(p,"sovereign_sever");
-        p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,1,.68f);
+        if(HexData.get(p).getLong("cd_SWORD_FROST")>now||FROST_CASTS.containsKey(p.getUUID()))return;
+        if(!HexData.spend(p,25)){notice(p,"Frost burst needs 25 Temporal Energy.");return;}
+        HexData.get(p).putLong("cd_SWORD_FROST",now+160);
+        FROST_CASTS.put(p.getUUID(),new FrostCast(now));
+        HexNetwork.animate(p,"sword_3");HexNetwork.fx(p,"frost_burst");
+        p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,.8f,.85f);
         HexNetwork.sync(p);
     }
 
-    private static void tickSwordWave(ServerPlayer p,long now) {
-        SwordWave wave=SWORD_WAVES.get(p.getUUID());
-        if(wave==null)return;
-        int age=(int)(now-wave.start);
-        if(age<3)return; // the sword is raised before the wave leaves its point
-        if(age>17||!p.isAlive()){SWORD_WAVES.remove(p.getUUID());return;}
-        double distance=(age-2)*.9;
-        Vec3 at=wave.origin.add(wave.direction.scale(distance));
-        BlockHitResult obstacle=p.level().clip(new ClipContext(wave.origin,at,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,p));
-        if(obstacle.getType()!=net.minecraft.world.phys.HitResult.Type.MISS&&obstacle.getLocation().distanceToSqr(wave.origin)<distance*distance-.1){
-            SWORD_WAVES.remove(p.getUUID());return;
-        }
-        double width=1.05+distance*.085;
-        for(LivingEntity victim:p.serverLevel().getEntitiesOfClass(LivingEntity.class,new AABB(at,at).inflate(width),e->validTarget(p,e))) {
-            if(victim.getBoundingBox().getCenter().distanceToSqr(at)>(width+victim.getBbWidth()*.5)*(width+victim.getBbWidth()*.5))continue;
-            if(!wave.struck.add(victim.getUUID()))continue;
-            if(victim.hurt(p.damageSources().playerAttack(p),15)) {
-                if(!TemporalEngine.frozen(victim))victim.push(wave.direction.x*.28,.12,wave.direction.z*.28);
-                HexNetwork.fx(victim,"impact");reward(p,Discipline.CONJURATION,80);
-            }
-        }
+    private static void tickFrostCast(ServerPlayer p,long now) {
+        FrostCast cast=FROST_CASTS.get(p.getUUID());
+        if(cast==null)return;
+        if(!p.isAlive()||!p.getMainHandItem().is(HexGodOfStories.LAEVATEINN.get())){FROST_CASTS.remove(p.getUUID());return;}
+        if(now-cast.start<6)return;
+        FROST_CASTS.remove(p.getUUID());
+        Frostbite.burst(p);
     }
 
     public static void tick(ServerPlayer p) {
         long now=HexData.now(p);CompoundTag d=HexData.get(p);
-        if(!p.isAlive()){Transformation.strip(p);return;}
-        if(!HexData.access(p)){Transformation.strip(p);CosmicFlight.revoke(p);dismissWeapons(p);return;}
+        if(!p.isAlive()){FROST_CASTS.remove(p.getUUID());Transformation.strip(p);return;}
+        if(!HexData.access(p)){FROST_CASTS.remove(p.getUUID());Transformation.strip(p);CosmicFlight.revoke(p);dismissWeapons(p);return;}
         PersonalRewind.record(p);
-        tickSwordWave(p,now);
+        tickFrostCast(p,now);
         // The mantle is armour, so it is maintained where the mantle is: every tick, granted and
         // renewed while it is worn and taken off the instant it is not.
         Transformation.sustain(p);
@@ -458,6 +444,7 @@ public final class HexServer {
             if(now%10==0){if(c.mob.getTarget()==owner)c.mob.setTarget(null);if(c.mob.getTarget()==null&&c.mob.distanceToSqr(owner)>9)c.mob.getNavigation().moveTo(owner,1.05);}
         }
         Bleed.tick(level);
+        Frostbite.tick(level);
         Threat.tick(now);
         Decoy.tick(now);
         Telekinesis.tickSlams(level);
@@ -604,14 +591,14 @@ public final class HexServer {
         // The charge, the erasure hold and the granted armour all go together; none of them may outlive
         // a death, a logout or a crossing.
         TimeBranch.forget(p);BranchFist.clear(p);Erasure.forget(p);Transformation.strip(p);
-        HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());SWORD_WAVES.remove(p.getUUID());INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
+        HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());FROST_CASTS.remove(p.getUUID());INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         HexData.clearTransient(p,death);
     }
     public static void reset() {
         PersonalRewind.reset();
-        HISTORY.clear();CHARMS.clear();STRIKES.clear();SWORD_WAVES.clear();INPUT.clear();TRAINING.clear();ILLUSIONS.clear();WATCHED.clear();RIFTS.clear();
+        HISTORY.clear();CHARMS.clear();STRIKES.clear();FROST_CASTS.clear();INPUT.clear();TRAINING.clear();ILLUSIONS.clear();WATCHED.clear();RIFTS.clear();
         Warping.reset();
-        Telekinesis.reset();Architecture.reset();Bleed.reset();PocketRealm.reset();TemporalEngine.reset();
+        Telekinesis.reset();Architecture.reset();Bleed.reset();Frostbite.reset();PocketRealm.reset();TemporalEngine.reset();
         Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();
     }
 }
