@@ -51,7 +51,7 @@ public final class ServerEvents {
             e.setCanceled(true);e.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
         }
     }
-    @SubscribeEvent public static void player(TickEvent.PlayerTickEvent e) {if(e.phase==TickEvent.Phase.END&&e.player instanceof ServerPlayer p)HexServer.tick(p);}
+    @SubscribeEvent public static void player(TickEvent.PlayerTickEvent e) {if(e.phase==TickEvent.Phase.END&&e.player instanceof ServerPlayer p){com.hexgodofstories.warping.CandyCorruption.tick(p);HexServer.tick(p);}}
     @SubscribeEvent public static void level(TickEvent.LevelTickEvent e) {
         if(!(e.level instanceof ServerLevel s))return;
         if(e.phase==TickEvent.Phase.START){
@@ -71,6 +71,7 @@ public final class ServerEvents {
     }
     @SubscribeEvent public static void login(PlayerEvent.PlayerLoggedInEvent e) {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
+        com.hexgodofstories.warping.CandyCorruption.sync(p,-1);
         if(!HexData.access(p)){HexServer.access(p,false);return;}
         HexData.get(p).remove("transformStart");
         HexData.get(p).remove("branchStart");
@@ -91,6 +92,7 @@ public final class ServerEvents {
         Erasure.track(p,e.getTarget());
         if(!(e.getTarget() instanceof ServerPlayer q))return;
         HexNetwork.syncTo(p,q);
+        com.hexgodofstories.warping.CandyCorruption.syncTo(p,q);
         // A borrowed shape is sent once, not every second, so a new viewer has to be told separately.
         Masquerade.resend(p,q);
     }
@@ -122,10 +124,10 @@ public final class ServerEvents {
         Decoy.release(e.getEntity());
         Starfall.forget(e.getEntity());
         SanctumWard.forget(e.getEntity());
-        if(e.getEntity() instanceof ServerPlayer p)HexServer.clear(p,true);
+        if(e.getEntity() instanceof ServerPlayer p){com.hexgodofstories.warping.CandyCorruption.reset(p);HexServer.clear(p,true);}
     }
     @SubscribeEvent public static void clone(PlayerEvent.Clone e) {e.getEntity().getPersistentData().put(HexData.TAG,HexData.get(e.getOriginal()).copy());HexData.clearTransient(e.getEntity(),e.isWasDeath());}
-    @SubscribeEvent public static void respawn(PlayerEvent.PlayerRespawnEvent e) {if(e.getEntity() instanceof ServerPlayer p)HexNetwork.sync(p);}
+    @SubscribeEvent public static void respawn(PlayerEvent.PlayerRespawnEvent e) {if(e.getEntity() instanceof ServerPlayer p){HexNetwork.sync(p);com.hexgodofstories.warping.CandyCorruption.sync(p,-1);}}
     /**
      * The sanctum's owner cannot be struck inside it. Refusing the attack here, before any damage is
      * worked out, is what makes it a dodge rather than a cancelled hit: by the time anything could
@@ -147,6 +149,7 @@ public final class ServerEvents {
         if(SanctumWard.evade(hit.getEntity()))e.setCanceled(true);
     }
     @SubscribeEvent public static void attack(AttackEntityEvent e) {
+        if(com.hexgodofstories.warping.CandyCorruption.noArms(e.getEntity())){e.setCanceled(true);return;}
         if(TemporalEngine.frozen(e.getEntity())){e.setCanceled(true);return;}
         // Nothing swings while it is being erased, and nothing swings while it is holding the torrent.
         if(Erasure.erasing(e.getEntity())||TimeBranch.planted(e.getEntity())){e.setCanceled(true);return;}
@@ -156,6 +159,7 @@ public final class ServerEvents {
     }
     @SubscribeEvent public static void interact(PlayerInteractEvent e) {
         if(e.getLevel().isClientSide||!e.isCancelable())return;
+        if(com.hexgodofstories.warping.CandyCorruption.handMissing(e.getEntity(),e.getHand())){e.setCanceled(true);return;}
         if(TemporalEngine.frozen(e.getEntity())||Erasure.erasing(e.getEntity())||TimeBranch.planted(e.getEntity()))e.setCanceled(true);
     }
     @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
@@ -198,7 +202,9 @@ public final class ServerEvents {
         if(p.getAbilities().flying&&HexData.get(p).getBoolean("ascended")||HexData.get(p).getLong("flightLandingGrace")>HexData.now(p)){e.setCanceled(true);return;}
         if(HexData.access(p)&&HexData.mastery(p,Discipline.SORCERY)>0)e.setDistance(Math.max(0,e.getDistance()-3));
     }}
-    @SubscribeEvent public static void breakBlock(net.minecraftforge.event.level.BlockEvent.BreakEvent e) {if(TemporalEngine.frozen(e.getPlayer()))e.setCanceled(true);}
+    @SubscribeEvent public static void breakBlock(net.minecraftforge.event.level.BlockEvent.BreakEvent e) {
+        if(com.hexgodofstories.warping.CandyCorruption.noArms(e.getPlayer())||TemporalEngine.frozen(e.getPlayer()))e.setCanceled(true);
+    }
     @SubscribeEvent public static void stopping(ServerStoppingEvent e) {
         for(ServerPlayer p:e.getServer().getPlayerList().getPlayers())HexServer.clear(p,false);
         // Put the world back while its chunks are still loaded. The record is saved either way, but a world
