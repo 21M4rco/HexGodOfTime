@@ -34,12 +34,18 @@ public final class WarpRealms {
          * that the realms were built, and the next portal rebuilds them over the top.
          */
         static final int LAYOUT=3;
-        int next;final Map<Long,Long> clocks=new HashMap<>();final Set<Long> ready=new HashSet<>();
-        static Ledger load(CompoundTag n){Ledger l=new Ledger();l.next=n.getInt("next");
+        int next,paradiseLayout;final Map<Long,Long> clocks=new HashMap<>();final Set<Long> ready=new HashSet<>();
+        static Ledger load(CompoundTag n){Ledger l=new Ledger();l.next=n.getInt("next");l.paradiseLayout=n.getInt("paradise_layout");
             if(n.getInt("layout")==LAYOUT)for(long x:n.getLongArray("ready"))l.ready.add(x);
             ListTag a=n.getList("clocks",10);for(int i=0;i<a.size();i++){var c=a.getCompound(i);l.clocks.put(c.getLong("cell"),c.getLong("time"));}return l;}
-        public CompoundTag save(CompoundTag n){n.putInt("next",next);n.putInt("layout",LAYOUT);n.putLongArray("ready",ready.stream().mapToLong(Long::longValue).toArray());ListTag a=new ListTag();clocks.forEach((x,t)->{CompoundTag c=new CompoundTag();c.putLong("cell",x);c.putLong("time",t);a.add(c);});n.put("clocks",a);return n;}
+        public CompoundTag save(CompoundTag n){n.putInt("next",next);n.putInt("layout",LAYOUT);n.putInt("paradise_layout",paradiseLayout);n.putLongArray("ready",ready.stream().mapToLong(Long::longValue).toArray());ListTag a=new ListTag();clocks.forEach((x,t)->{CompoundTag c=new CompoundTag();c.putLong("cell",x);c.putLong("time",t);a.add(c);});n.put("clocks",a);return n;}
     }
+    /**
+     * Paradise has its own blueprint revision so improving its islands never rebuilds any of the
+     * other Warping destinations. The ledger is per ServerLevel, so clearing ready here is scoped
+     * to Paradise's dimension only.
+     */
+    private static final int PARADISE_LAYOUT=1;
     private record Job(ServerLevel level,Destination d,double cell,Iterator<RealmLayout.Voxel> blocks){}
     private static final List<Job> JOBS=new ArrayList<>();
     private static final Map<UUID,ArrayDeque<Vec3>> HISTORY=new HashMap<>();
@@ -53,7 +59,16 @@ public final class WarpRealms {
     public static final double CELL = 0.0;
     public static double allocate(ServerLevel l){return CELL;}
     public static double latest(ServerLevel l){return CELL;}
-    public static void prepare(ServerLevel l,Destination d,double x){if(!ready(l,x)&&JOBS.stream().noneMatch(j->j.level==l&&j.cell==x))JOBS.add(new Job(l,d,x,RealmLayout.blocks(d).iterator()));}
+    public static void prepare(ServerLevel l,Destination d,double x){
+        Ledger state=ledger(l);
+        if(d==Destination.PARADISE&&state.paradiseLayout<PARADISE_LAYOUT){
+            state.ready.clear();
+            state.paradiseLayout=PARADISE_LAYOUT;
+            state.setDirty();
+        }
+        if(!state.ready.contains((long)x)&&JOBS.stream().noneMatch(j->j.level==l&&j.cell==x))
+            JOBS.add(new Job(l,d,x,RealmLayout.blocks(d).iterator()));
+    }
     public static boolean ready(ServerLevel l,double x){return l!=null&&ledger(l).ready.contains((long)x);}
     public static void start(ServerLevel l,double x){Ledger a=ledger(l);a.clocks.put((long)x,l.getGameTime());a.setDirty();}
     public static long age(ServerLevel l,double x){return Math.max(0,l.getGameTime()-ledger(l).clocks.getOrDefault((long)x,l.getGameTime()));}
@@ -358,18 +373,19 @@ public final class WarpRealms {
             default -> 0;
         };
         if(e.getY()>=bottom)return;
+        // Paradise folds the void straight back onto the heart meadow. This is a safe landing,
+        // not another fall from the top of the dimension, and applies to every entity in the realm.
+        if(d==Destination.PARADISE){
+            place(e,cell+Paradise.RESCUE.x,Paradise.RESCUE.y,Paradise.RESCUE.z);
+            e.setDeltaMovement(Vec3.ZERO);
+            return;
+        }
         double back=switch(d){
             case VOID_SEA -> VoidSea.SURFACE-24;
-            case PARADISE -> (double)Paradise.CEILING;
             case CRUSHING_REALM -> 120;
             default -> 200;
         };
-        // Paradise folds back on itself. Everywhere else it is enough to put a faller back at the
-        // top of the column they fell down, but there is nothing under an island's edge here, so
-        // the same column would simply be fallen down again. A faller reappears over the heart and
-        // drifts back onto it, which is the only way out of the void that is not a death.
-        if(d==Destination.PARADISE)place(e,Destination.PARADISE.arrival.x+cell,back,Destination.PARADISE.arrival.z);
-        else place(e,e.getX(),back,e.getZ());
+        place(e,e.getX(),back,e.getZ());
         e.setDeltaMovement(Vec3.ZERO);
     }
 
@@ -454,7 +470,7 @@ public final class WarpRealms {
         if(now%20!=0||!(e instanceof LivingEntity living)||!Paradise.bathing(living))return;
         living.addEffect(new MobEffectInstance(MobEffects.REGENERATION,Paradise.BATHE_TICKS,1,true,true,true));
         living.addEffect(new MobEffectInstance(MobEffects.HEALTH_BOOST,Paradise.BATHE_TICKS,1,true,true,true));
-        living.addEffect(new MobEffectInstance(HexGodOfStories.CANDY_RUSH.get(),Paradise.BATHE_TICKS,0,true,true,true));
+        living.addEffect(new MobEffectInstance(HexGodOfStories.CANDY_RUSH.get(),Paradise.CANDY_RUSH_TICKS,0,true,true,true));
     }
 
     /**

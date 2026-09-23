@@ -49,6 +49,13 @@ public final class Paradise {
      * from here, exactly as it reads the Void Sea's waterline from {@link VoidSea}.
      */
     public static final Vec3 ARRIVAL = new Vec3(0, SURFACE + 16, 16);
+    /**
+     * Safe return point for anything that misses an island.
+     *
+     * <p>This is deliberately on the heart meadow instead of at the old ceiling loop. Falling out
+     * of Paradise now folds the body back onto solid ground rather than making it repeat the fall.
+     */
+    public static final Vec3 RESCUE = new Vec3(ARRIVAL.x, SURFACE + 3.0, ARRIVAL.z);
 
     // ------------------------------------------------------------------ gravity
 
@@ -282,8 +289,10 @@ public final class Paradise {
 
     // ------------------------------------------------------------------ what the water does
 
-    /** How long the spring's gifts outlast leaving it, in ticks. Long enough to jump on, and no more. */
+    /** How long the spring's regeneration and health boost linger after leaving the water. */
     public static final int BATHE_TICKS = 220;
+    /** Candy Rush is the lasting gift: touching Paradise water gives a full five minutes. */
+    public static final int CANDY_RUSH_TICKS = 20 * 60 * 5;
 
     /**
      * Whether this body is in Paradise's water, which is the only thing that hands the buffs out.

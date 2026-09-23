@@ -110,9 +110,17 @@ public final class RealmLayout {
             for(int y=top;y>top-depth;y--){
                 int down=top-y;
                 BlockState state;
-                if(down==0)state=(r.nextDouble()<.22?Blocks.MOSS_BLOCK:Blocks.GRASS_BLOCK).defaultBlockState();
-                else if(down<=2)state=(r.nextDouble()<.3?Blocks.ROOTED_DIRT:Blocks.DIRT).defaultBlockState();
-                else if(down>=depth-2)state=Blocks.CALCITE.defaultBlockState();
+                if(down==0){
+                    // The rim is iced in alternating strawberry/vanilla stone. Farther in, the
+                    // island stays a meadow so Paradise remains playable rather than becoming a
+                    // solid concrete prop.
+                    if(inland<1.35)state=(r.nextDouble()<.58?Blocks.PINK_TERRACOTTA:Blocks.SMOOTH_QUARTZ).defaultBlockState();
+                    else if(inland<2.4&&r.nextDouble()<.45)state=Blocks.PINK_TERRACOTTA.defaultBlockState();
+                    else state=(r.nextDouble()<.25?Blocks.MOSS_BLOCK:Blocks.GRASS_BLOCK).defaultBlockState();
+                }else if(down<=2){
+                    if(inland<2.1)state=(down==1?Blocks.WHITE_CONCRETE:Blocks.PINK_TERRACOTTA).defaultBlockState();
+                    else state=(r.nextDouble()<.3?Blocks.ROOTED_DIRT:Blocks.DIRT).defaultBlockState();
+                }else if(down>=depth-2)state=Blocks.CALCITE.defaultBlockState();
                 else state=paradiseRock(r);
                 put(b,x,y,z,state);
             }
@@ -131,9 +139,9 @@ public final class RealmLayout {
      */
     private static BlockState paradiseRock(Random r){
         double roll=r.nextDouble();
-        return (roll<.40?Blocks.CALCITE:roll<.62?Blocks.DIORITE:roll<.78?Blocks.TUFF
-            :roll<.86?Blocks.PINK_TERRACOTTA:roll<.92?Blocks.SMOOTH_QUARTZ
-            :roll<.97?Blocks.AMETHYST_BLOCK:Blocks.PEARLESCENT_FROGLIGHT).defaultBlockState();
+        return (roll<.28?Blocks.CALCITE:roll<.46?Blocks.DIORITE:roll<.60?Blocks.PINK_TERRACOTTA
+            :roll<.72?Blocks.SMOOTH_QUARTZ:roll<.82?Blocks.TUFF
+            :roll<.93?Blocks.AMETHYST_BLOCK:Blocks.PEARLESCENT_FROGLIGHT).defaultBlockState();
     }
 
     /**
@@ -200,7 +208,7 @@ public final class RealmLayout {
             double inland=Paradise.inland(isle,x+.5,z+.5),roll=r.nextDouble();
             if(grass&&inland>3.5&&roll<.030&&paradiseClear(standing,x,z,7)){paradiseCherry(b,x,y,z,r);standing.add(new int[]{x,z});continue;}
             if(inland>3&&roll<.042&&paradiseClear(standing,x,z,9)){paradiseCrystals(b,x,y,z,r);standing.add(new int[]{x,z});continue;}
-            if(grass&&inland>4&&roll<.050&&paradiseClear(standing,x,z,13)){paradiseCandy(b,x,y,z,r);standing.add(new int[]{x,z});continue;}
+            if(grass&&inland>4&&roll<.078&&paradiseClear(standing,x,z,11)){paradiseCandy(b,x,y,z,r);standing.add(new int[]{x,z});continue;}
             if(!grass){
                 // Polished stone keeps a little moss and the occasional crystal, and nothing else.
                 if(roll<.10)put(b,x,y,z,Blocks.AMETHYST_CLUSTER.defaultBlockState());
@@ -262,9 +270,9 @@ public final class RealmLayout {
      * the ground they stand on is still grass.
      */
     private static void paradiseCandy(Map<BlockPos,BlockState>b,int x,int y,int z,Random r){
-        int kind=r.nextInt(3);
+        int kind=r.nextInt(6);
         if(kind==0){
-            // A candy cane: a striped column with a hook bent over the top of it.
+            // Candy cane.
             int height=5+r.nextInt(3);
             for(int i=0;i<height;i++)put(b,x,y+i,z,(i%2==0?Blocks.WHITE_CONCRETE:Blocks.RED_CONCRETE).defaultBlockState());
             int dir=r.nextBoolean()?1:-1;
@@ -273,7 +281,7 @@ public final class RealmLayout {
             put(b,x+dir*2,y+height,z,Blocks.WHITE_CONCRETE.defaultBlockState());
             put(b,x+dir*2,y+height-1,z,Blocks.RED_CONCRETE.defaultBlockState());
         }else if(kind==1){
-            // A lollipop: a quartz stick and a glazed swirl turned face out on top of it.
+            // Lollipop.
             int height=4+r.nextInt(3);
             for(int i=0;i<height;i++)put(b,x,y+i,z,Blocks.QUARTZ_PILLAR.defaultBlockState());
             BlockState swirl=(r.nextBoolean()?Blocks.PINK_GLAZED_TERRACOTTA:Blocks.MAGENTA_GLAZED_TERRACOTTA).defaultBlockState();
@@ -281,8 +289,8 @@ public final class RealmLayout {
                 if(dx*dx+(dy-1)*(dy-1)>2)continue;
                 put(b,x+dx,y+height+dy,z,swirl);
             }
-        }else{
-            // A gumdrop: a soft dome of colour sitting in the grass.
+        }else if(kind==2){
+            // Gumdrop.
             BlockState skin=switch(r.nextInt(4)){
                 case 0 -> Blocks.PINK_CONCRETE.defaultBlockState();
                 case 1 -> Blocks.LIGHT_BLUE_CONCRETE.defaultBlockState();
@@ -294,6 +302,30 @@ public final class RealmLayout {
                 put(b,x+dx,y+dy,z+dz,skin);
             }
             put(b,x,y+3,z,Blocks.WHITE_CONCRETE.defaultBlockState());
+        }else if(kind==3){
+            // Cupcake: chocolate wrapper, frosting dome, cherry.
+            for(int dx=-1;dx<=1;dx++)for(int dz=-1;dz<=1;dz++)
+                if(Math.abs(dx)+Math.abs(dz)<3)put(b,x+dx,y,z+dz,Blocks.BROWN_CONCRETE.defaultBlockState());
+            for(int dx=-2;dx<=2;dx++)for(int dz=-2;dz<=2;dz++)for(int dy=1;dy<=3;dy++){
+                if(dx*dx+dz*dz+(dy-1.5)*(dy-1.5)*2.2>5.8)continue;
+                put(b,x+dx,y+dy,z+dz,(dy==1?Blocks.PINK_CONCRETE:Blocks.WHITE_CONCRETE).defaultBlockState());
+            }
+            put(b,x,y+4,z,Blocks.RED_CONCRETE.defaultBlockState());
+        }else if(kind==4){
+            // Macaron sandwich standing upright.
+            BlockState shell=(r.nextBoolean()?Blocks.PINK_CONCRETE:Blocks.LIGHT_BLUE_CONCRETE).defaultBlockState();
+            for(int dx=-2;dx<=2;dx++)for(int dy=0;dy<=4;dy++){
+                if(dx*dx+(dy-2)*(dy-2)>5)continue;
+                BlockState layer=dy==2?Blocks.WHITE_CONCRETE.defaultBlockState():shell;
+                put(b,x+dx,y+dy,z,layer);
+                if(Math.abs(dx)<=1)put(b,x+dx,y+dy,z+1,layer);
+            }
+        }else{
+            // Chocolate bar with strawberry icing squares.
+            for(int dx=-2;dx<=2;dx++)for(int dy=0;dy<=4;dy++)
+                put(b,x+dx,y+dy,z,Blocks.BROWN_CONCRETE.defaultBlockState());
+            for(int dx=-1;dx<=1;dx++)for(int dy=1;dy<=3;dy++)
+                if((dx+dy&1)==0)put(b,x+dx,y+dy,z+1,Blocks.PINK_CONCRETE.defaultBlockState());
         }
     }
 

@@ -78,6 +78,14 @@ public final class ParadiseRestoration extends SavedData {
     }
     /** Insertion ordered, so the realm closes its wounds roughly in the order they were made. */
     private final Map<Long, Wound> wounds = new LinkedHashMap<>();
+    /**
+     * Paradise-food blocks deliberately placed back into the realm.
+     *
+     * <p>The item NBT cannot live on an ordinary placed block, so provenance moves into the
+     * dimension's SavedData while the block is standing. Breaking it transfers that provenance
+     * back to the drop. This is what makes "break -> place -> break -> eat" stable across restarts.
+     */
+    private final Set<Long> placedEdible = new HashSet<>();
 
     public static ParadiseRestoration of(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(ParadiseRestoration::load, ParadiseRestoration::new, NAME);
@@ -119,10 +127,34 @@ public final class ParadiseRestoration extends SavedData {
     /** Whether this position belongs to the realm at all, whatever is currently standing in it. */
     public static boolean terrain(BlockPos pos) { return blueprint().containsKey(pos.asLong()); }
 
+    // ------------------------------------------------------------------ placed edible blocks
+
+    @SubscribeEvent public static void placed(BlockEvent.EntityPlaceEvent e) {
+        if (!(e.getLevel() instanceof ServerLevel level) || Destination.from(level) != Destination.PARADISE) return;
+        if (!(e.getEntity() instanceof net.minecraft.world.entity.player.Player player)) return;
+        BlockState state = e.getPlacedBlock();
+        if (!heldEdibleBlock(player.getMainHandItem(), state) && !heldEdibleBlock(player.getOffhandItem(), state)) return;
+        ParadiseRestoration data = of(level);
+        data.placedEdible.add(e.getPos().asLong());
+        data.setDirty();
+    }
+
+    private static boolean heldEdibleBlock(net.minecraft.world.item.ItemStack stack, BlockState state) {
+        return ParadiseFood.edible(stack)
+            && stack.getItem() instanceof net.minecraft.world.item.BlockItem blockItem
+            && blockItem.getBlock() == state.getBlock();
+    }
+
     // ------------------------------------------------------------------ being broken
 
     @SubscribeEvent public static void broken(BlockEvent.BreakEvent e) {
         if (!(e.getLevel() instanceof ServerLevel level) || Destination.from(level) != Destination.PARADISE) return;
+        ParadiseRestoration data = of(level);
+        if (data.placedEdible.remove(e.getPos().asLong())) {
+            data.setDirty();
+            expect(level, e.getPos());
+            return;
+        }
         BlockState original = natural(e.getPos(), e.getState());
         if (original == null) return;
         long due = level.getGameTime() + DELAY + level.random.nextInt(SCATTER);
@@ -145,7 +177,13 @@ public final class ParadiseRestoration extends SavedData {
     /** A blast in Paradise is still only a hole with a delay on it. */
     @SubscribeEvent public static void blast(ExplosionEvent.Detonate e) {
         if (!(e.getLevel() instanceof ServerLevel level) || Destination.from(level) != Destination.PARADISE) return;
+        ParadiseRestoration data = of(level);
         for (BlockPos pos : e.getAffectedBlocks()) {
+            if (data.placedEdible.remove(pos.asLong())) {
+                data.setDirty();
+                expect(level, pos);
+                continue;
+            }
             BlockState original = natural(pos, level.getBlockState(pos));
             if (original == null) continue;
             record(level, pos, original, level.getGameTime() + DELAY + level.random.nextInt(SCATTER));
@@ -273,6 +311,7 @@ public final class ParadiseRestoration extends SavedData {
             data.wounds.put(pos.asLong(), new Wound(pos, entry.getCompound("state"),
                 entry.getLong("due"), entry.getInt("waited"), false));
         }
+        for (long pos : n.getLongArray("placed_edible")) data.placedEdible.add(pos);
         return data;
     }
 
@@ -287,6 +326,7 @@ public final class ParadiseRestoration extends SavedData {
             list.add(entry);
         }
         n.put("wounds", list);
+        n.putLongArray("placed_edible", placedEdible.stream().mapToLong(Long::longValue).toArray());
         return n;
     }
 }
