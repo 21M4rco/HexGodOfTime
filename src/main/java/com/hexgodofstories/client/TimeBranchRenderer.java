@@ -120,15 +120,12 @@ public final class TimeBranchRenderer {
             Vec3 focus=BranchCharge.focus(caster,1);
             double radius=BranchCharge.sphere((int)(now-entry.getValue()));
             // Loose material pulled in rather than thrown out: the sphere is taking, not giving.
-            Vfx.gather(HexGodOfStories.NEBULA.get(),focus,radius*2.4,Vfx.count(stage*.45f),.09+stage*.02);
-            if(stage>=2)Vfx.gather(HexGodOfStories.SMOKE.get(),focus,radius*3.2,Vfx.count(stage*.5f),.14);
-            if(stage>=3&&now%2==0)Vfx.spark(HexGodOfStories.EMBER.get(),focus.add(
-                (mc.level.random.nextDouble()-.5)*radius*2,(mc.level.random.nextDouble()-.5)*radius*2,
-                (mc.level.random.nextDouble()-.5)*radius*2),Vec3.ZERO);
-            if(stage>=4&&now%3==0)Vfx.spark(HexGodOfStories.STAR.get(),focus,Vec3.ZERO);
-            // Dust lifted off the ground underneath, so the world reacts rather than just the caster.
-            if(stage>=3&&now%4==0)Vfx.ring(HexGodOfStories.EMBER.get(),caster.position().add(0,.05,0),
-                1.4+stage*.35,Vfx.count(stage*.8f),.01,.07);
+            Vfx.gather(HexGodOfStories.NEBULA.get(),focus,radius*1.55,Vfx.count(stage*.24f),.055+stage*.009);
+            if(stage>=2)Vfx.gather(HexGodOfStories.SMOKE.get(),focus,radius*1.85,Vfx.count(stage*.26f),.075);
+            if(stage>=3&&now%3==0)Vfx.spark(HexGodOfStories.EMBER.get(),focus.add(
+                (mc.level.random.nextDouble()-.5)*radius*1.45,(mc.level.random.nextDouble()-.5)*radius*1.45,
+                (mc.level.random.nextDouble()-.5)*radius*1.45),Vec3.ZERO);
+            if(stage>=5&&now%6==0)Vfx.spark(HexGodOfStories.STAR.get(),focus,Vec3.ZERO);
         }
 
         for(Torrent t:TORRENTS) {
@@ -227,12 +224,11 @@ public final class TimeBranchRenderer {
         float over=BranchCharge.overcharge(held);
         double base=radius*scale;
         if(base<=.02)return;
-        // Instability by stage, exactly as the charge is documented: calm, then obvious, then struggling.
-        double chaos=switch(stage) {case 1->.05;case 2->.12;case 3->.23;case 4->.36;case 5->.47;default->.47+over*.26;};
+        // Stay recognisably spherical. Pressure deforms the bubble without turning it into a cloud wall.
+        double chaos=switch(stage) {case 1->.025;case 2->.055;case 3->.10;case 4->.15;case 5->.20;default->.22+over*.10;};
         double surge=1+.10*Math.sin(time*.31)+(stage>=4?.09*Math.sin(time*.83+1.4):0)+over*.08*Math.sin(time*1.7);
         Vec3 centre=BranchCharge.focus(caster,partial);
-        // Kept ahead of the caster's own eye as it grows, so their view is never inside the membrane.
-        if(visibility<1)centre=centre.add(BranchCharge.aim(caster,partial).scale(Math.max(0,base*1.25-.9)));
+        // Same detached ball position for every camera; first person and third person aim at one point.
         // The centre of mass shifts: an overfilled membrane does not stay concentric with its contents.
         Vec3 drift=new Vec3(BranchVfx.wobble(time*.07,1.3,2.7),BranchVfx.wobble(2.1,time*.06,.4),
                             BranchVfx.wobble(.9,3.3,time*.08)).scale(base*chaos*.42);
@@ -357,33 +353,41 @@ public final class TimeBranchRenderer {
         }
     }
 
-    /** Flight-nebula language around the head and hands while the held attack charges. */
+    /**
+     * Small hand wisps feed the detached ball. The player body stays readable instead of being
+     * swallowed by the charge VFX.
+     */
     private static void chargeAura(BranchVfx.Painter painter,Entity caster,Vec3 focus,double base,double time,
                                    float partial,boolean localFirst,float visibility) {
-        RenderType shadow=BranchVfx.shadow(),cloud=BranchVfx.cloud(),glow=BranchVfx.glow();
+        RenderType shadow=BranchVfx.shadow(),cloud=BranchVfx.cloud(),glow=BranchVfx.glow(),strand=BranchVfx.strand();
         Vec3 look=BranchCharge.aim(caster,partial);
         Vec3 side=BranchVfx.perpendicular(look);
-        Vec3 hands=focus.add(0,-.10,0);
+        Vec3 eye=caster.getEyePosition(partial);
+        Vec3 handRoot=eye.add(look.scale(.62)).add(0,-.38,0);
         for(int hand=-1;hand<=1;hand+=2) {
-            Vec3 handAt=hands.add(side.scale(hand*.24));
-            for(int i=0;i<3;i++) {
-                double a=time*.035*(i%2==0?1:-1)+i*2.1+hand;
-                Vec3 at=handAt.add(Math.cos(a)*(.12+i*.035),Math.sin(a*1.3)*.08,Math.sin(a)*(.12+i*.035));
-                BranchVfx.billboard(painter,shadow,at,.24+i*.055,a,
-                    TimeBranchPalette.shadow((float)(time*.025+i*.17)),localFirst?.34f:.54f*visibility);
-            }
-            BranchVfx.billboard(painter,glow,handAt,.075+base*.018,time*.08*hand,
-                TimeBranchPalette.hot((float)(time*.045+hand*.12),.62f),localFirst?.30f:.42f*visibility);
+            Vec3 handAt=handRoot.add(side.scale(hand*.23));
+            double a=time*.045+hand*1.4;
+            Vec3 wisp=handAt.add(side.scale(Math.sin(a)*.07)).add(0,Math.cos(a*1.3)*.055,0);
+            BranchVfx.billboard(painter,shadow,wisp,.16,a,
+                TimeBranchPalette.shadow((float)(time*.026+hand*.11)),localFirst?.22f:.34f*visibility);
+            BranchVfx.billboard(painter,glow,handAt,.050+base*.010,time*.08*hand,
+                TimeBranchPalette.hot((float)(time*.045+hand*.12),.58f),localFirst?.26f:.34f*visibility);
+            Vec3[] tether={handAt,
+                handAt.lerp(focus,.34).add(side.scale(hand*.07)),
+                handAt.lerp(focus,.70).add(0,.035*Math.sin(time*.11+hand),0),
+                focus.add(side.scale(hand*base*.12))};
+            BranchVfx.branchPolyline(painter,strand,tether,.026+base*.014,
+                (float)(time*.045+hand*.18),.30f,localFirst?.28f:.42f*visibility);
         }
         if(localFirst)return;
-        Vec3 head=caster.getEyePosition(partial).add(0,.10,0);
-        for(int i=0;i<7;i++) {
-            double a=i*2.399963+time*.022*(i%2==0?1:-.7);
-            Vec3 at=head.add(Math.cos(a)*(.28+i*.018),(i-3)*.085+Math.sin(a)*.05,Math.sin(a)*(.28+i*.018));
-            BranchVfx.billboard(painter,shadow,at,.34+i*.025,a*.5,
-                TimeBranchPalette.shadow((float)(time*.018+i*.11)),.42f*visibility);
-            if((i&2)==0)BranchVfx.billboard(painter,cloud,at,.16,a,
-                TimeBranchPalette.shade((float)(time*.026+i*.13)),.055f*visibility);
+        Vec3 head=eye.add(0,.07,0);
+        for(int i=0;i<3;i++) {
+            double a=i*Math.PI*2/3+time*.018*(i==1?-1:1);
+            Vec3 at=head.add(Math.cos(a)*.22,(i-1)*.10,Math.sin(a)*.22);
+            BranchVfx.billboard(painter,shadow,at,.14+i*.018,a*.4,
+                TimeBranchPalette.shadow((float)(time*.018+i*.17)),.22f*visibility);
+            if(i==1)BranchVfx.billboard(painter,cloud,at,.09,a,
+                TimeBranchPalette.shade((float)(time*.024+i*.11)),.035f*visibility);
         }
     }
 

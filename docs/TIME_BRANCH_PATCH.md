@@ -68,3 +68,12 @@ Follow-up presentation patch:
 - The black body now uses a dedicated near-solid alpha texture rather than the noisy nebula sheet, so it
   reads as a dense mass instead of transparent smoke.
 - Sweep speed is now 0.65 blocks/tick; the 100-block front takes roughly 7.7 seconds to travel.
+
+
+### Detached focus ball correction
+- Charge centre moved from 1.15 to 2.85 blocks in front of the eyes.
+- Maximum charge radius is now about 1.12 blocks, keeping a distinct energy bubble in front of the player.
+- Body-covering charge clouds were reduced to small hand wisps, thin tethers into the bubble, and only
+  three subtle head accents in third person.
+- The beam's safe throat is now 0.8 blocks because its authoritative origin is already detached from
+  the caster; this keeps the fired wave visually connected to the energy ball.

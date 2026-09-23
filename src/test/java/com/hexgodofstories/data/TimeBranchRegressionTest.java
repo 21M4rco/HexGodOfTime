@@ -41,6 +41,9 @@ public final class TimeBranchRegressionTest {
             "held Time Branch must advance as a genuinely slow visible wave");
         require(BranchCharge.front(BranchCharge.RANGE,100)<70,
             "five seconds must not already fill most of the hundred-block beam");
+        require(BranchCharge.FOCUS>=2.7,"held focus ball must stay clearly detached from the caster");
+        require(BranchCharge.sphere(BranchCharge.LIMIT)<1.2,"held focus ball must not engulf the caster");
+        require(BranchCharge.SAFE<=1.0,"beam must visually leave the detached focus ball without a large dead gap");
         System.out.println("Time Branch input boundaries, slow sweep and fragment invariants passed.");
     }
     private static void require(boolean condition,String message){if(!condition)throw new AssertionError(message);}

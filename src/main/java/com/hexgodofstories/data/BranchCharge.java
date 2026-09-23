@@ -20,8 +20,13 @@ public final class BranchCharge {
     public static final int FORMATION=20,STABLE=50,PRESSURE=80,CRITICAL=110,FULL=140,LIMIT=200;
     /** Reach, in blocks. Charge never extends it; charge widens the torrent instead. */
     public static final double RANGE=100;
-    /** The caster's own hitbox ends well short of this, which is what keeps them out of their own beam. */
-    public static final double SAFE=2.4;
+    /**
+     * The beam now begins from a detached focus ball well in front of the caster, so only a short
+     * no-hit throat is needed to keep the owner safe while visually connecting the ball to the wave.
+     */
+    public static final double SAFE=.80;
+    /** Distance from the eyes to the centre of the held energy ball. */
+    public static final double FOCUS=2.85;
     /**
      * Blocks per tick the leading front travels. This is deliberately very slow: the full hundred-block
      * front takes roughly eight seconds to travel, so the player actually watches the wave push forward.
@@ -50,20 +55,20 @@ public final class BranchCharge {
     /** How far past full power the hold has gone, 0 to 1, for instability that no longer buys power. */
     public static float overcharge(int held) {return Mth.clamp((held-FULL)/(float)(LIMIT-FULL),0,1);}
 
-    /** Where the sphere sits and where the torrent leaves: just past both extended hands. */
+    /** Detached energy ball in front of the caster; the torrent leaves from this exact point. */
     public static Vec3 focus(Entity e,float partial) {
         Vec3 look=aim(e,partial);
-        return e.getEyePosition(partial).add(look.scale(1.15)).add(0,-.2,0);
+        return e.getEyePosition(partial).add(look.scale(FOCUS)).add(0,-.10,0);
     }
     public static Vec3 aim(Entity e,float partial) {
         float yaw=e.getViewYRot(partial),pitch=e.getViewXRot(partial);
         return Vec3.directionFromRotation(pitch,yaw);
     }
 
-    /** The contained sphere's radius. It keeps swelling through overcharge without buying reach. */
+    /** Compact focus ball: overcharge makes it angrier, not large enough to engulf the caster. */
     public static double sphere(int held) {
         float t=power(held);
-        return .28+1.62*t+.30*overcharge(held);
+        return .30+.68*t+.14*overcharge(held);
     }
     /** How far from the axis a body is still caught. */
     public static double catchRadius(float power) {return 1.15+2.35*power;}
