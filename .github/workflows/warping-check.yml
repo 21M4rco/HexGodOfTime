@@ -29,3 +29,9 @@ jobs:
           name: warping-smoke-log
           path: warping-server-smoke.log
           if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: paradise-blueprint
+          path: run/paradise-blueprint.csv
+          if-no-files-found: ignore

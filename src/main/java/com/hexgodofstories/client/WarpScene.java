@@ -193,7 +193,7 @@ public final class WarpScene {
         var blocks=RealmLayout.blocks(d);Set<BlockPos> occupied=new HashSet<>();blocks.forEach(v->occupied.add(v.pos()));
         BufferBuilder b=new BufferBuilder(1024*1024);b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);Matrix4f m=new Matrix4f();
         for(var v:blocks){boolean exposed=false;for(var dir:net.minecraft.core.Direction.values())if(!occupied.contains(v.pos().relative(dir))){exposed=true;break;}if(!exposed)continue;
-            int color=v.state().getMapColor(net.minecraft.world.level.EmptyBlockGetter.INSTANCE,v.pos()).col;WarpMesh.box(b,m,v.pos().getX(),v.pos().getY(),v.pos().getZ(),1,1,1,color,1);
+            int color=d==Destination.PARADISE&&!v.state().getFluidState().isEmpty()?0xff69c8:v.state().getMapColor(net.minecraft.world.level.EmptyBlockGetter.INSTANCE,v.pos()).col;WarpMesh.box(b,m,v.pos().getX(),v.pos().getY(),v.pos().getZ(),1,1,1,color,1);
         }
         VertexBuffer mesh=new VertexBuffer(VertexBuffer.Usage.STATIC);mesh.bind();mesh.upload(b.end());VertexBuffer.unbind();return mesh;
     }

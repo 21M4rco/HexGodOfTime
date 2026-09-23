@@ -27,6 +27,7 @@ end = time.monotonic() + 240
 ready = False
 regressions = False
 pilgrim = False
+paradise = False
 with open('warping-server-smoke.log', 'w') as log:
     try:
         while time.monotonic() < end and proc.poll() is None:
@@ -43,7 +44,9 @@ with open('warping-server-smoke.log', 'w') as log:
                 regressions = True
             if 'PILGRIM_SERVER_REGRESSIONS_PASSED' in line:
                 pilgrim = True
-            if ready and regressions and pilgrim:
+            if 'PARADISE_SERVER_REGRESSIONS_PASSED' in line:
+                paradise = True
+            if ready and regressions and pilgrim and paradise:
                 break
     finally:
         if proc.poll() is None:
@@ -53,6 +56,6 @@ with open('warping-server-smoke.log', 'w') as log:
             except subprocess.TimeoutExpired:
                 os.killpg(proc.pid, signal.SIGKILL)
                 proc.wait()
-if not ready or not regressions or not pilgrim:
+if not ready or not regressions or not pilgrim or not paradise:
     sys.exit('Dedicated server startup or Warping regression checks failed; see warping-server-smoke.log')
 print('Dedicated-server startup, datapack load, solar damage and kill regression checks passed.')

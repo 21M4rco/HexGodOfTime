@@ -35,7 +35,8 @@ public final class ParadiseShapeTest {
 
         contained();
         distinct();
-        reachable(leap[0], leap[1]);
+        bridgesConnect();
+        boundaryFolds();
         cascadesLand();
         cascadesClearTheIslands();
         theSpringHasAShore();
@@ -43,7 +44,7 @@ public final class ParadiseShapeTest {
         arrivalIsOnLand();
         affordable();
         theWaterIsTemporary();
-        System.out.println("ParadiseShapeTest: the islands are jumpable, the water lands where it was aimed, and the realm is bounded.");
+        System.out.println("ParadiseShapeTest: the kingdom is connected, water clears the islands, and flight folds within bounds.");
     }
 
     // ------------------------------------------------------------------ movement
@@ -94,7 +95,7 @@ public final class ParadiseShapeTest {
             high = Math.max(high, isle.y());
         }
         System.out.printf("  %d islands inside %.0f blocks, from y=%.0f to y=%.0f%n", Paradise.isles().size(), far, low, high);
-        check(far < 110, "the whole realm is inside a hundred and ten blocks of its middle");
+        check(far < Paradise.BOUNDARY - 8, "the full archipelago sits comfortably inside the folding boundary");
         check(Paradise.isles().size() >= 10, "there are enough islands for the place to be a composition");
         check(low < Paradise.SURFACE - 8 && high > Paradise.SURFACE + 8,
             "islands sit both well above and well below the central one");
@@ -134,40 +135,33 @@ public final class ParadiseShapeTest {
      * jumped back up to — leaving one is a dive into the void and a return from the top of the
      * sky, and that is what they are for.
      */
-    private static void reachable(double height, double distance) {
-        List<Paradise.Isle> isles = Paradise.isles();
-        java.util.Set<Integer> shelves = new java.util.HashSet<>();
-        for (Paradise.Fall fall : Paradise.falls()) if (fall.onto() >= 0) shelves.add(fall.onto());
-        for (int i = 0; i < isles.size(); i++) for (int j = i + 1; j < isles.size(); j++) {
-            Paradise.Isle a = isles.get(i), b = isles.get(j);
-            quiet(gap(a, b) > 1.5 || Math.abs(a.y() - b.y()) >= 10,
-                "islands " + i + " and " + j + " merge into one (" + String.format("%.1f", gap(a, b)) + " apart)");
+    private static void bridgesConnect() {
+        java.util.Set<Integer> visited=new java.util.HashSet<>();visited.add(0);
+        for(int pass=0;pass<Paradise.INHABITED_ISLES;pass++)for(var bridge:Paradise.BRIDGES) {
+            if(visited.contains(bridge.from()))visited.add(bridge.to());
+            if(visited.contains(bridge.to()))visited.add(bridge.from());
+            var a=Paradise.isles().get(bridge.from());var c=Paradise.isles().get(bridge.to());
+            var start=Paradise.bridgeEnd(a,c);var end=Paradise.bridgeEnd(c,a);
+            double distance=Math.hypot(start.x-end.x,start.z-end.z);
+            quiet(distance>8&&distance<110,"bridge has an invalid span");
+            quiet(Math.abs(start.y-end.y)/distance<.45,"bridge rises too steeply for slab steps");
+            quiet(Paradise.inland(a,start.x,start.z)>5,"bridge start has no solid anchorage");
+            quiet(Paradise.inland(c,end.x,end.z)>5,"bridge end has no solid anchorage");
         }
-        System.out.println("  ok: no two islands merge into one another");
-        double worst = 0;
-        int worstIsland = -1;
-        for (int i = 1; i < isles.size(); i++) {
-            if (shelves.contains(i)) continue;
-            double best = Double.MAX_VALUE;
-            for (int j = 0; j < isles.size(); j++) {
-                if (i == j || shelves.contains(j)) continue;
-                // Climbing is bounded by the jump; dropping is not bounded at all.
-                if (isles.get(j).y() - isles.get(i).y() > height) continue;
-                best = Math.min(best, gap(isles.get(i), isles.get(j)));
-            }
-            if (best > worst) { worst = best; worstIsland = i; }
+        check(visited.size()==Paradise.INHABITED_ISLES,"every inhabited island is reachable from the castle by bridges");
+    }
+
+    private static void boundaryFolds() {
+        for(int i=0;i<100;i++) {
+            double a=i*.391;
+            var p=new net.minecraft.world.phys.Vec3(Math.cos(a)*(153+i*20),170,Math.sin(a)*(153+i*20));
+            var q=Paradise.fold(p);
+            quiet(Math.hypot(q.x,q.z)<Paradise.BOUNDARY,"fold leaves the entity beyond the boundary");
+            quiet(q.x*p.x+q.z*p.z>0,"fold changes which side of the islands the entity occupies");
+            quiet(Paradise.fold(q).equals(q),"fold immediately retriggers");
         }
-        System.out.printf("  worst crossing: %.1f blocks (island %d), against a %.1f block jump%n", worst, worstIsland, distance);
-        check(worst < distance * 0.75, "every island on the spiral is comfortably inside one jump of another");
-        // The shelves are not on the spiral and are not meant to be: each one hangs well under the
-        // rim it catches water from, so it is arrived at by dropping and left by diving.
-        for (int shelf : shelves) {
-            double drop = Double.MAX_VALUE;
-            for (int j = 0; j < isles.size(); j++)
-                if (!shelves.contains(j) && gap(isles.get(shelf), isles.get(j)) < 6)
-                    drop = Math.min(drop, isles.get(j).y() - isles.get(shelf).y());
-            check(drop > height, "cascade shelf " + shelf + " hangs below what feeds it rather than beside it");
-        }
+        check(Paradise.fold(new net.minecraft.world.phys.Vec3(0,400,0)).y<Paradise.CEILING,"vertical flight is bounded too");
+        check(Paradise.fold(Paradise.RESCUE).equals(Paradise.RESCUE),"rescue lies within the stable playable region");
     }
 
     /** Rim to rim, in the direction one island actually lies from the other. */
@@ -232,14 +226,14 @@ public final class ParadiseShapeTest {
 
     /** A spring with no bank around it is a lake, and the island around it is the point. */
     private static void theSpringHasAShore() {
-        double spring = 0, narrowest = Double.MAX_VALUE;
-        for (int k = 0; k < 64; k++) {
-            double t = k * Math.PI / 32;
-            spring = Math.max(spring, Paradise.springRim(t));
-            narrowest = Math.min(narrowest, Paradise.rim(Paradise.heart(), t));
+        double narrowest=Double.MAX_VALUE;
+        for(int k=0;k<128;k++) {
+            double angle=k*Math.PI/64;
+            double x=Paradise.SPRING_X+Math.cos(angle)*Paradise.springRim(angle);
+            double z=Paradise.SPRING_Z+Math.sin(angle)*Paradise.springRim(angle);
+            narrowest=Math.min(narrowest,Paradise.inland(Paradise.heart(),x,z));
         }
-        System.out.printf("  spring reaches %.1f inside a rim that pinches to %.1f%n", spring, narrowest);
-        check(narrowest - spring > 5, "there is a shore all the way around the hot spring");
+        check(narrowest>4,"the relocated lagoon has a shore all around it");
         check(Paradise.SPRING_DEPTH >= 2 && Paradise.SPRING_DEPTH <= 4, "the spring is deep enough to swim and shallow enough to stand up in");
     }
 
@@ -266,6 +260,7 @@ public final class ParadiseShapeTest {
         check(Paradise.inland(Paradise.heart(), x, z) > 3, "arrivals land well inside the central island");
         check(!Paradise.spring(x, z), "arrivals do not land in the hot spring");
         check(y > Paradise.SURFACE + 8, "arrivals have air under them on the way in");
+        check(Paradise.CANDY_RUSH_TICKS == 6000, "Candy Rush lasts exactly five minutes");
     }
 
     /** The realm has to be placeable inside the block budget the realm builder runs on. */
@@ -284,7 +279,7 @@ public final class ParadiseShapeTest {
         for (Paradise.Fall fall : Paradise.falls()) voxels += fall.length() * 2L;
         System.out.printf("  about %d blocks, roughly %d ticks of the realm builder's budget%n", voxels, voxels / 4096 + 1);
         check(voxels > 12000, "the islands have enough body to look like land rather than plates");
-        check(voxels < 140000, "the realm builds inside a couple of seconds at its own budget");
+        check(voxels < 180000, "the larger kingdom fits a bounded incremental generation budget");
     }
 
     /** What the water gives has to run out, or the realm hands out a permanent buff. */

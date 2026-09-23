@@ -45,7 +45,7 @@ public final class WarpRealms {
      * other Warping destinations. The ledger is per ServerLevel, so clearing ready here is scoped
      * to Paradise's dimension only.
      */
-    private static final int PARADISE_LAYOUT=1;
+    private static final int PARADISE_LAYOUT=2;
     private record Job(ServerLevel level,Destination d,double cell,Iterator<RealmLayout.Voxel> blocks){}
     private static final List<Job> JOBS=new ArrayList<>();
     private static final Map<UUID,ArrayDeque<Vec3>> HISTORY=new HashMap<>();
@@ -67,7 +67,23 @@ public final class WarpRealms {
             state.setDirty();
         }
         if(!state.ready.contains((long)x)&&JOBS.stream().noneMatch(j->j.level==l&&j.cell==x))
-            JOBS.add(new Job(l,d,x,RealmLayout.blocks(d).iterator()));
+            JOBS.add(new Job(l,d,x,d==Destination.PARADISE?paradiseRebuild(l):RealmLayout.blocks(d).iterator()));
+    }
+    private static Iterator<RealmLayout.Voxel> paradiseRebuild(ServerLevel level) {
+        ParadiseRestoration.clearOldWounds(level);
+        // Compare when each removal executes, so migration cannot erase a changed/player block.
+        Iterator<RealmLayout.Voxel> old=RealmLayout.legacyParadise().iterator();
+        Iterator<RealmLayout.Voxel> fresh=RealmLayout.blocks(Destination.PARADISE).iterator();
+        return new Iterator<>() {
+            public boolean hasNext(){return old.hasNext()||fresh.hasNext();}
+            public RealmLayout.Voxel next(){
+                if(!old.hasNext())return fresh.next();
+                RealmLayout.Voxel v=old.next();
+                var current=level.getBlockState(v.pos());
+                boolean original=current.getBlock()==v.state().getBlock()&&level.getBlockEntity(v.pos())==null;
+                return new RealmLayout.Voxel(v.pos(),original?net.minecraft.world.level.block.Blocks.AIR.defaultBlockState():current);
+            }
+        };
     }
     public static boolean ready(ServerLevel l,double x){return l!=null&&ledger(l).ready.contains((long)x);}
     public static void start(ServerLevel l,double x){Ledger a=ledger(l);a.clocks.put((long)x,l.getGameTime());a.setDirty();}
@@ -258,7 +274,7 @@ public final class WarpRealms {
         RadialRealmRules.clean(l);
         int budget=4096;
         for(var it=JOBS.iterator();it.hasNext()&&budget>0;){Job j=it.next();if(j.level!=l)continue;
-            while(j.blocks.hasNext()&&budget-->0){var v=j.blocks.next();l.setBlock(v.pos().offset((int)j.cell,0,0),v.state(),2|16);}
+            while(j.blocks.hasNext()&&budget-->0){var v=j.blocks.next();if(j.d!=Destination.PARADISE||l.getBlockEntity(v.pos().offset((int)j.cell,0,0))==null)l.setBlock(v.pos().offset((int)j.cell,0,0),v.state(),2|16);}
             if(!j.blocks.hasNext()){ledger(l).ready.add((long)j.cell);ledger(l).setDirty();populate(l,d,j.cell);it.remove();}
         }
         long now=l.getGameTime();
@@ -270,12 +286,14 @@ public final class WarpRealms {
             // Preserve player prediction; mobs receive the same swell in the existing loop below.
             VoidSeaWaves.tick(l,now);}
         if(d==Destination.PARADISE){
-            ParadiseRestoration.tick(l);
+            // Rebuild even when residents were saved inside Paradise and no new portal is opened.
+            if(ledger(l).paradiseLayout<PARADISE_LAYOUT)prepare(l,d,CELL);
+            if(ready(l,CELL))ParadiseRestoration.tick(l);
             if(now%4==0&&!l.players().isEmpty())steam(l,now);
         }
         List<Entity> active=new ArrayList<>();l.getAllEntities().forEach(active::add);
         for(Entity e:active){
-            if(!e.isAlive()||e.isSpectator()||(d!=Destination.GRAVITY_WELL&&(e instanceof WarpHazard||e instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity)))continue;
+            if(!e.isAlive()||e.isSpectator()||(d!=Destination.GRAVITY_WELL&&d!=Destination.PARADISE&&(e instanceof WarpHazard||e instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity)))continue;
             double cell=WarpMath.cellX(e.getX());long age=age(l,cell);
             if(e instanceof ServerPlayer p&&now%10==0){CompoundTag n=new CompoundTag();n.putLong("age",age);n.putLong("time",now);n.putDouble("cell",cell);HexNetwork.to(p,new HexNetwork.Message(HexNetwork.WARP_REALM,0,n));}
             if(e instanceof ServerPlayer listener&&now%140==0){
@@ -288,6 +306,10 @@ public final class WarpRealms {
                     default -> null;
                 };
                 if(ambience!=null)listener.playNotifySound(ambience,net.minecraft.sounds.SoundSource.AMBIENT,.14f,.65f);
+            }
+            if(d==Destination.PARADISE) {
+                ParadiseRules.enforce(l,e);
+                paradiseWater(l,e,now);
             }
             // The realm acts on everyone in it, the caster included. It used to exempt any player
             // with Warping unlocked from every hazard but the Sun, which meant the one person most
@@ -318,7 +340,7 @@ public final class WarpRealms {
                         if(age>60&&age%100<5&&h.size()>10){Vec3 back=h.getFirst();place(e,back.x,back.y,back.z);e.setDeltaMovement(Vec3.ZERO);e.hurtMarked=true;HexNetwork.fx(e,"slip");h.clear();}}
                     if(age%100>85&&e instanceof LivingEntity living)living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,8,3,false,false));
                 }
-                case PARADISE -> {Paradise.gravity(e);paradiseWater(l,e,now);}
+                case PARADISE -> Paradise.gravity(e);
                 case FROZEN_MOMENT -> freeze(l,e,now);
                 case CRUSHING_REALM -> {
                     MoonGravity.enforce(e);
@@ -366,20 +388,13 @@ public final class WarpRealms {
 
     /** Nothing is ever lost out of the bottom of a realm; it is put back at the top of one. */
     private static void rescue(ServerLevel l,Destination d,Entity e,double cell){
-        if(d==Destination.GRAVITY_WELL||d==Destination.CRUSHING_REALM)return;
+        if(d==Destination.GRAVITY_WELL||d==Destination.CRUSHING_REALM||d==Destination.PARADISE)return;
         double bottom=switch(d){
             case VOID_SEA -> VoidSea.FLOOR-8;
             case PARADISE -> (double)Paradise.FLOOR;
             default -> 0;
         };
         if(e.getY()>=bottom)return;
-        // Paradise folds the void straight back onto the heart meadow. This is a safe landing,
-        // not another fall from the top of the dimension, and applies to every entity in the realm.
-        if(d==Destination.PARADISE){
-            place(e,cell+Paradise.RESCUE.x,Paradise.RESCUE.y,Paradise.RESCUE.z);
-            e.setDeltaMovement(Vec3.ZERO);
-            return;
-        }
         double back=switch(d){
             case VOID_SEA -> VoidSea.SURFACE-24;
             case CRUSHING_REALM -> 120;
@@ -467,10 +482,13 @@ public final class WarpRealms {
      * hearts to hold it — and the third is this realm's own.
      */
     private static void paradiseWater(ServerLevel l,Entity e,long now){
-        if(now%20!=0||!(e instanceof LivingEntity living)||!Paradise.bathing(living))return;
+        if(!(e instanceof LivingEntity living)||!Paradise.bathing(living))return;
+        // Even a brief touch starts Candy Rush; standing in water refreshes it once a second.
+        if(!living.hasEffect(HexGodOfStories.CANDY_RUSH.get())||now%20==0)
+            living.addEffect(new MobEffectInstance(HexGodOfStories.CANDY_RUSH.get(),Paradise.CANDY_RUSH_TICKS,0,true,true,true));
+        if(now%20!=0)return;
         living.addEffect(new MobEffectInstance(MobEffects.REGENERATION,Paradise.BATHE_TICKS,1,true,true,true));
         living.addEffect(new MobEffectInstance(MobEffects.HEALTH_BOOST,Paradise.BATHE_TICKS,1,true,true,true));
-        living.addEffect(new MobEffectInstance(HexGodOfStories.CANDY_RUSH.get(),Paradise.CANDY_RUSH_TICKS,0,true,true,true));
     }
 
     /**
@@ -485,8 +503,8 @@ public final class WarpRealms {
         Random r=new Random(now*2654435761L);
         for(int i=0;i<3;i++){
             double a=r.nextDouble()*Math.PI*2,reach=Math.sqrt(r.nextDouble())*Paradise.springRim(a);
-            double x=heart.x()+Math.cos(a)*reach,z=heart.z()+Math.sin(a)*reach;
-            l.sendParticles(net.minecraft.core.particles.ParticleTypes.CLOUD,x,Paradise.SURFACE+1.15,z,1,.12,.01,.12,.008);
+            double x=Paradise.SPRING_X+Math.cos(a)*reach,z=Paradise.SPRING_Z+Math.sin(a)*reach;
+            l.sendParticles(net.minecraft.core.particles.ParticleTypes.END_ROD,x,Paradise.SURFACE+1.15,z,1,.12,.01,.12,.002);
             if(i==0)l.sendParticles(HexGodOfStories.CANDY.get(),x,Paradise.SURFACE+1.6+r.nextDouble()*2.2,z,1,.5,.35,.5,.01);
         }
     }

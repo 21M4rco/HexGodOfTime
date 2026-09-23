@@ -129,13 +129,18 @@ public final class ParadiseRestoration extends SavedData {
 
     // ------------------------------------------------------------------ placed edible blocks
 
-    @SubscribeEvent public static void placed(BlockEvent.EntityPlaceEvent e) {
+    @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST) public static void placed(BlockEvent.EntityPlaceEvent e) {
         if (!(e.getLevel() instanceof ServerLevel level)) return;
         if (!(e.getEntity() instanceof net.minecraft.world.entity.player.Player player)) return;
         BlockState state = e.getPlacedBlock();
-        if (!heldEdibleBlock(player.getMainHandItem(), state) && !heldEdibleBlock(player.getOffhandItem(), state)) return;
-        ParadiseRestoration data = of(level);
-        data.placedEdible.add(e.getPos().asLong());
+        boolean edible=heldEdibleBlock(player.getMainHandItem(),state)||heldEdibleBlock(player.getOffhandItem(),state);
+        ParadiseRestoration data=of(level);
+        if(edible)data.placedEdible.add(e.getPos().asLong());
+        else data.placedEdible.remove(e.getPos().asLong());
+        if(e instanceof BlockEvent.EntityMultiPlaceEvent multi)for(var snapshot:multi.getReplacedBlockSnapshots()) {
+            if(edible)data.placedEdible.add(snapshot.getPos().asLong());
+            else data.placedEdible.remove(snapshot.getPos().asLong());
+        }
         data.setDirty();
     }
 
@@ -147,7 +152,7 @@ public final class ParadiseRestoration extends SavedData {
 
     // ------------------------------------------------------------------ being broken
 
-    @SubscribeEvent public static void broken(BlockEvent.BreakEvent e) {
+    @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST) public static void broken(BlockEvent.BreakEvent e) {
         if (!(e.getLevel() instanceof ServerLevel level)) return;
         ParadiseRestoration data = of(level);
         if (data.placedEdible.remove(e.getPos().asLong())) {
@@ -314,6 +319,12 @@ public final class ParadiseRestoration extends SavedData {
 
     /** How many positions the realm still owes itself, for diagnostics and commands. */
     public static int pending(ServerLevel level) { return of(level).wounds.size(); }
+
+    public static void clearOldWounds(ServerLevel level) {
+        ParadiseRestoration data=of(level);
+        data.wounds.clear();
+        data.setDirty();
+    }
 
     public static void reset() { EXPECTED.clear(); }
 

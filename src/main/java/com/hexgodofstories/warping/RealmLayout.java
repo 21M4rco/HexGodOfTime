@@ -26,7 +26,7 @@ public final class RealmLayout {
                     put(b,x,116,z,Blocks.LAVA.defaultBlockState());
             }
             case VOID_SEA -> {}
-            case PARADISE -> paradise(b,r);
+            case PARADISE -> ParadiseArchitecture.build(b);
             // The singularity and moon use spatial meshes and radial physics, never block platforms.
             case GRAVITY_WELL,CRUSHING_REALM -> {}
             case SHATTERED_WORLD -> {
@@ -66,7 +66,14 @@ public final class RealmLayout {
         return b.entrySet().stream().map(e->new Voxel(e.getKey(),e.getValue())).toList();
     }
 
-    // ------------------------------------------------------------------ Paradise
+    /** Used only during Paradise's migration, never by other destinations. */
+    static List<Voxel> legacyParadise() {
+        Map<BlockPos,BlockState> blocks = new LinkedHashMap<>();
+        paradise(blocks, new Random(73019 + Destination.PARADISE.ordinal()));
+        return blocks.entrySet().stream().map(e -> new Voxel(e.getKey(),e.getValue())).toList();
+    }
+
+    // ------------------------------------------------------------------ Legacy Paradise (migration only)
 
     /**
      * Paradise, grown from the island table in {@link Paradise}.
@@ -83,14 +90,14 @@ public final class RealmLayout {
      * island below had already grown there.
      */
     private static void paradise(Map<BlockPos,BlockState> b,Random r){
-        List<Paradise.Isle> isles=Paradise.isles();
+        List<Paradise.Isle> isles=Paradise.legacyIsles();
         for(int i=0;i<isles.size();i++)paradiseIsle(b,isles.get(i),i==0,r);
-        for(Paradise.Fall fall:Paradise.falls())paradiseFall(b,fall,r);
+        for(Paradise.Fall fall:Paradise.legacyFalls())paradiseFall(b,fall,r);
     }
 
     /** Where the traveller arrives. Nothing tall is grown here, so nobody lands inside a tree. */
     private static boolean paradiseArrival(int x,int z){
-        return Math.abs(x-(int)Paradise.ARRIVAL.x)<=5&&Math.abs(z-(int)Paradise.ARRIVAL.z)<=5;
+        return Math.abs(x)<=5&&Math.abs(z-16)<=5;
     }
 
     private static void paradiseIsle(Map<BlockPos,BlockState>b,Paradise.Isle isle,boolean heart,Random r){
@@ -353,7 +360,7 @@ public final class RealmLayout {
             if(i<=sheet&&(px!=0||pz!=0))put(b,x+px,y-i,z+pz,water);
         }
         if(fall.onto()<0)return;
-        Paradise.Isle shelf=Paradise.isles().get(fall.onto());
+        Paradise.Isle shelf=Paradise.legacyIsles().get(fall.onto());
         int sy=(int)Math.round(shelf.y());
         for(int dx=-2;dx<=2;dx++)for(int dz=-2;dz<=2;dz++){
             if(dx*dx+dz*dz>5)continue;

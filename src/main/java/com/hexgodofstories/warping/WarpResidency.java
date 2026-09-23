@@ -136,6 +136,11 @@ public final class WarpResidency extends SavedData {
      * hazards, projections and decorative living helpers likewise do not count as inhabitants.
      */
     private static boolean inhabitant(Entity entity){
+        // Paradise is a sanctuary. Items, vehicles, placed entities and creative visitors count
+        // there too; keep the existing eligibility rules of every other destination unchanged.
+        if(Destination.from(entity.level())==Destination.PARADISE)
+            return entity.isAlive()&&!entity.isRemoved()&&!entity.isSpectator()
+                &&!(entity instanceof WarpHazard)&&!(entity instanceof com.hexgodofstories.entity.IllusionEntity);
         if(!(entity instanceof LivingEntity living)||!living.isAlive()||living.isRemoved()||living.isSpectator())return false;
         if(living instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity)return false;
         if(living.getType()==com.hexgodofstories.HexGodOfStories.PILGRIM.get())return false;

@@ -7,29 +7,7 @@ import net.minecraft.world.phys.Vec3;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Paradise: the shape of a pocket dimension, and the two rules that make standing in it feel
- * different from standing anywhere else.
- *
- * <p>Everything here is pure arithmetic with no world in it, because three separate things have to
- * agree on the same place. The server builds the islands out of blocks from this table, the client
- * hangs its waterfalls, mist and drifting candy off the same table so the decoration lands exactly
- * on the terrain rather than near it, and the portal preview draws the identical composition from
- * ninety blocks away. A number that lived in only one of those three would be a seam.
- *
- * <p><b>It is small on purpose.</b> A realm reached by tearing a hole in the floor is a place you
- * are inside of, not a world you set out across: everything is within about ninety blocks of the
- * middle, and the whole composition is meant to be read at once from any island in it. The central
- * island is moderate — twenty six blocks of radius, which is a clearing rather than a continent —
- * and every other island is close enough to the one beside it that the low gravity carries you
- * there.
- *
- * <p><b>No two islands are the same island.</b> A radius is a circle, and a dozen circles at
- * different heights is a diagram. Each one's outline is its own sum of four harmonics driven by its
- * own seed, so one is drawn out into a long spur, another is bitten into on one side, and none of
- * them is symmetrical. The underside is a keel that tapers to a point rather than a flat slab, so
- * the silhouette works from below as well as from above.
- */
+/** Shared terrain and visual coordinates for the bounded candy archipelago. */
 public final class Paradise {
     private Paradise() { }
 
@@ -39,7 +17,9 @@ public final class Paradise {
     public static final double SPRING_RADIUS = 8.5;
     public static final int SPRING_DEPTH = 3;
     /** Below this there is nothing left to fall past, and a faller is put back at {@link #CEILING}. */
-    public static final int FLOOR = 86, CEILING = 214;
+    public static final int FLOOR = 48, CEILING = 286;
+    public static final double BOUNDARY = 152, FOLD_INSET = 12;
+    public static final double SPRING_X = 0, SPRING_Z = 13;
     /**
      * Where a traveller comes in: sixteen blocks of air over the meadow beside the spring.
      *
@@ -48,14 +28,14 @@ public final class Paradise {
      * layout, the planting and the build's own checks all need it. The destination table reads it
      * from here, exactly as it reads the Void Sea's waterline from {@link VoidSea}.
      */
-    public static final Vec3 ARRIVAL = new Vec3(0, SURFACE + 16, 16);
+    public static final Vec3 ARRIVAL = new Vec3(0.5, SURFACE + 16, 28.5);
     /**
      * Safe return point for anything that misses an island.
      *
      * <p>This is deliberately on the heart meadow instead of at the old ceiling loop. Falling out
      * of Paradise now folds the body back onto solid ground rather than making it repeat the fall.
      */
-    public static final Vec3 RESCUE = new Vec3(ARRIVAL.x, SURFACE + 3.0, ARRIVAL.z);
+    public static final Vec3 RESCUE = new Vec3(ARRIVAL.x, SURFACE + 1.0, ARRIVAL.z);
 
     // ------------------------------------------------------------------ gravity
 
@@ -147,6 +127,29 @@ public final class Paradise {
 
     private static final List<Isle> ISLES = new ArrayList<>();
     private static final List<Fall> FALLS = new ArrayList<>();
+    private static final List<Isle> LEGACY_ISLES;
+    private static final List<Fall> LEGACY_FALLS;
+    public static List<Isle> legacyIsles() { return LEGACY_ISLES; }
+    public static List<Fall> legacyFalls() { return LEGACY_FALLS; }
+    public record Bridge(int from, int to) { }
+    public static final List<Bridge> BRIDGES = List.of(
+        new Bridge(0,1), new Bridge(0,2), new Bridge(0,3),
+        new Bridge(1,3), new Bridge(2,3), new Bridge(0,4), new Bridge(0,5));
+    public static final int INHABITED_ISLES = 6;
+
+    /** Return toward the same island without crossing into another realm cell. */
+    public static Vec3 fold(Vec3 position) {
+        double radius = Math.hypot(position.x, position.z);
+        if (radius <= BOUNDARY && position.y <= CEILING) return position;
+        double scale = radius > BOUNDARY ? (BOUNDARY - FOLD_INSET) / radius : 1;
+        return new Vec3(position.x * scale, Math.min(position.y, CEILING - FOLD_INSET), position.z * scale);
+    }
+
+    public static Vec3 bridgeEnd(Isle from, Isle toward) {
+        double angle = Math.atan2(toward.z - from.z, toward.x - from.x);
+        double reach = rim(from, angle) - 7;
+        return new Vec3(from.x + Math.cos(angle) * reach, from.y + 1, from.z + Math.sin(angle) * reach);
+    }
 
     public static List<Isle> isles() { return ISLES; }
     public static List<Fall> falls() { return FALLS; }
@@ -187,6 +190,30 @@ public final class Paradise {
         endless(4, Math.PI * 1.78, 70);
         endless(5, Math.PI * 0.62, 62);
         endless(7, Math.PI * 1.05, 58);
+        // Keep the exact previous blueprint available for a one-time, state-matched migration.
+        LEGACY_ISLES = List.copyOf(ISLES);
+        LEGACY_FALLS = List.copyOf(FALLS);
+        ISLES.clear(); FALLS.clear();
+        isle(0, SURFACE, 0, 42, 1.0, 0x51A7);           // castle and arrival garden
+        isle(-70, 154, 10, 25, 1.05, 0x2C13);          // gingerbread village
+        isle(70, 158, 12, 25, 1.05, 0x7761);           // windmill
+        isle(0, 150, 76, 25, 1.1, 0x1AF5);            // foreground lagoon
+        isle(-54, 174, -66, 17, 1.15, 0x63B2);        // castle satellite
+        isle(56, 178, -66, 16, 1.15, 0x4D20);
+        isle(-104, 182, -35, 9, 1.1, 0x0E9C);
+        isle(106, 169, -37, 10, 1.2, 0x35D8);
+        isle(-62, 128, 83, 10, 1.1, 0x6A41);
+        isle(67, 133, 88, 9, 1.0, 0x1204);
+        isle(-24, 191, -111, 8, 1.2, 0x58EE);
+        isle(28, 197, -112, 7, 1.3, 0x7C37);
+        endless(0, 0.66, 86);
+        endless(0, 2.35, 78);
+        endless(1, 1.6, 78);
+        endless(2, 0.9, 86);
+        endless(3, 1.35, 82);
+        endless(4, 3.4, 74);
+        endless(5, -0.35, 82);
+
     }
 
     /** An island placed by bearing and distance, which is how the spiral is actually laid out. */
@@ -277,7 +304,7 @@ public final class Paradise {
     /** True where the central island's surface is standing water rather than ground. */
     public static boolean spring(double px, double pz) {
         Isle heart = heart();
-        double dx = px - heart.x, dz = pz - heart.z, distance = Math.hypot(dx, dz);
+        double dx = px - SPRING_X, dz = pz - SPRING_Z, distance = Math.hypot(dx, dz);
         return distance <= springRim(Math.atan2(dz, dx));
     }
 

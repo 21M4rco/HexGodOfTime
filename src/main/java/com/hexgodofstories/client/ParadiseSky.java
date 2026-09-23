@@ -71,6 +71,13 @@ public final class ParadiseSky {
         BufferBuilder b = Tesselator.getInstance().getBuilder();
         b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
         drifting(b, pose.last().pose(), time);
+        for(int i=0;i<6;i++) {
+            double phase=(time+i*153)%940;
+            if(phase>48)continue;
+            Vec3 at=DOME.add(-190+phase*2.2,150-i*14-phase*.35,-175+i*52);
+            float fade=(float)Math.sin(phase/48*Math.PI);
+            WarpMesh.ribbon(b,pose.last().pose(),at,at.add(-19,3,0),.15,0xffe7fb,fade);
+        }
         BufferUploader.drawWithShader(b.end());
     }
 
@@ -80,30 +87,21 @@ public final class ParadiseSky {
         Matrix4f m = new Matrix4f();
         Random r = new Random(0x9A11CE);
 
-        // The shell. Lilac rather than black: nothing in this realm is allowed to be dark.
-        WarpMesh.sphere(b, m, DOME, SHELL, SHELL, SHELL, 0x54155f, 1, 32, 0, false);
-
-        // Nebulae, wound into a few broad bands rather than scattered. A scatter is fog; a band
-        // that climbs across the dome and thins at its ends is a structure the eye can follow.
-        for (int band = 0; band < 5; band++) {
-            double tilt = band * 0.7 + 0.35, twist = band * 2.1;
-            int colour = switch (band) {
-                case 0 -> 0xff5fb4;
-                case 1 -> 0xc061ff;
-                case 2 -> 0xff9ad8;
-                case 3 -> 0x7fb4ff;
-                default -> 0xffc2ea;
-            };
-            for (int i = 0; i < 46; i++) {
-                double t = i / 45.0, a = twist + t * Math.PI * 1.9;
-                double radius = SHELL * (0.72 + 0.13 * Math.sin(t * 5 + band));
-                Vec3 p = DOME.add(Math.cos(a) * radius * Math.cos(tilt),
-                    Math.sin(tilt) * radius * 0.55 + Math.sin(t * 3.1 + band) * 38,
-                    Math.sin(a) * radius * Math.cos(tilt));
-                double size = 16 + r.nextDouble() * 34;
-                // Two coats: a wide soft one for the colour, a tighter bright one for the core.
-                WarpMesh.sphere(b, m, p, size, size * 0.62, size, colour, 0.045f, 10, 0, false);
-                if (i % 3 == 0) WarpMesh.sphere(b, m, p, size * 0.45, size * 0.3, size * 0.45, 0xffffff, 0.035f, 8, 0, false);
+        // Vertex-coloured, continuous nebula dome: no floating sphere/puff silhouettes.
+        final int around = 192, rows = 96;
+        for (int row=0; row<rows; row++) for (int col=0; col<around; col++) {
+            for (int[] corner : new int[][]{{0,0},{1,0},{1,1},{0,1}}) {
+                double longitude=(col+corner[0])*Math.PI*2/around;
+                double latitude=(row+corner[1])*Math.PI/rows;
+                Vec3 n=new Vec3(Math.sin(latitude)*Math.cos(longitude),Math.cos(latitude),Math.sin(latitude)*Math.sin(longitude));
+                double cloud=RealmSky.fbm(n.x*4.6+13,n.y*4.6,n.z*4.6);
+                double dust=RealmSky.fbm(n.x*16,n.y*16+9,n.z*16);
+                double ribbon=Math.exp(-Math.pow((n.y-.28-Math.sin(longitude*2.0)*.24)*3.2,2));
+                double glow=Math.max(0,Math.min(1,(cloud-.26)*1.7*ribbon));
+                int base=mix(0xf5a8d6,0x302044,Math.max(0,Math.min(1,(n.y+.18)*1.3)));
+                int color=mix(base,0xed58c6,glow);
+                color=mix(color,0xffc4f0,Math.max(0,(dust-.52)*glow*2.8));
+                WarpMesh.vertex(b,m,DOME.add(n.scale(SHELL)),color,1);
             }
         }
 
@@ -125,41 +123,11 @@ public final class ParadiseSky {
             }
         }
 
-        // Galaxies, with arms that wind and a core that is brighter than they are.
-        for (int g = 0; g < 4; g++) {
-            double gx = Math.cos(g * 1.7 + 0.4), gz = Math.sin(g * 1.7 + 0.4);
-            Vec3 centre = DOME.add(gx * SHELL * 0.74, 60 + g * 46 - (g == 3 ? 190 : 0), gz * SHELL * 0.74);
-            double lean = 0.32 + g * 0.16;
-            int arm = g % 2 == 0 ? 0xff8ed6 : 0x9bb4ff, core = 0xfff0ff;
-            for (int i = 0; i < 300; i++) {
-                double a = i * 0.155 + g * 2.3, radius = Math.pow(i / 300.0, 0.62) * (20 + g * 4);
-                Vec3 p = centre.add(Math.cos(a) * radius, Math.sin(a) * radius * lean, Math.sin(a) * radius * 0.72);
-                double size = i < 34 ? 0.9 : 0.34;
-                WarpMesh.box(b, m, p.x, p.y, p.z, size, size, size, i < 34 ? core : arm, i < 34 ? 0.85f : 0.55f);
-            }
-            WarpMesh.sphere(b, m, centre, 5.5, 2.2, 4, core, 0.10f, 12, 0, false);
-        }
-
-        // One large readable spiral, deliberately much bigger than the background galaxies. It is
-        // the visual anchor above the heart island: four luminous arms, a white core, and a pink
-        // halo instead of another small knot of stars.
-        Vec3 hero = DOME.add(0, 126, -SHELL * 0.70);
-        for (int armIndex = 0; armIndex < 4; armIndex++) {
-            double offset = armIndex * Math.PI * 0.5;
-            for (int i = 0; i < 280; i++) {
-                double t = i / 279.0;
-                double a = offset + t * Math.PI * 4.9;
-                double radius = 3.0 + Math.pow(t, 0.72) * 58.0;
-                Vec3 p = hero.add(Math.cos(a) * radius,
-                    Math.sin(a * 1.65 + armIndex) * radius * 0.10,
-                    Math.sin(a) * radius * 0.43);
-                double size = 0.28 + (1.0 - t) * 0.72;
-                int colour = (armIndex & 1) == 0 ? 0xff80d8 : 0xc49dff;
-                WarpMesh.box(b, m, p.x, p.y, p.z, size, size, size, colour, 0.58f);
-            }
-        }
-        WarpMesh.sphere(b, m, hero, 12, 4.6, 9, 0xffffff, 0.18f, 16, 0, false);
-        WarpMesh.sphere(b, m, hero, 24, 8.5, 18, 0xff8fd8, 0.055f, 16, 0, false);
+        // A large face-on spiral over the castle, plus three smaller distant galaxies.
+        galaxy(b,m,DOME.add(40,148,-225),66,0x91A7);
+        galaxy(b,m,DOME.add(-215,132,90),30,0x711B);
+        galaxy(b,m,DOME.add(180,184,132),35,0x432A);
+        galaxy(b,m,DOME.add(-100,223,-120),22,0x854F);
 
         // The bows. Five of them, at five orientations, two of them carrying a second.
         bow(b, m, new Vec3(0.20, 0.95, 0.24), 196, -0.95, 0.95, 3.0, 0.62f, true);
@@ -168,18 +136,46 @@ public final class ParadiseSky {
         bow(b, m, new Vec3(-0.25, 0.30, -0.92), 150, -1.05, 0.45, 2.1, 0.38f, false);
         bow(b, m, new Vec3(0.88, 0.22, 0.42), 240, -0.55, 0.60, 3.4, 0.30f, false);
 
-        // A rainbow wash lying low around the whole dome, so the light itself has colour in it.
-        for (int i = 0; i < 7; i++) {
-            double a = i * Math.PI * 2 / 7;
-            Vec3 p = DOME.add(Math.cos(a) * SHELL * 0.66, -46 + Math.sin(a * 2) * 26, Math.sin(a) * SHELL * 0.66);
-            WarpMesh.sphere(b, m, p, 108, 52, 108, BOW[i], 0.030f, 12, 0, false);
-        }
-
         VertexBuffer mesh = new VertexBuffer(VertexBuffer.Usage.STATIC);
         mesh.bind();
         mesh.upload(b.end());
         VertexBuffer.unbind();
         return mesh;
+    }
+
+    private static int mix(int a,int c,double f) {
+        f=Math.max(0,Math.min(1,f));
+        return ((int)((a>>16&255)*(1-f)+(c>>16&255)*f)<<16)
+            |((int)((a>>8&255)*(1-f)+(c>>8&255)*f)<<8)
+            |(int)((a&255)*(1-f)+(c&255)*f);
+    }
+
+    private static void galaxy(BufferBuilder b,Matrix4f m,Vec3 centre,double radius,long seed) {
+        Random r=new Random(seed);
+        Vec3 normal=DOME.subtract(centre).normalize();
+        Vec3 right=normal.cross(new Vec3(0,1,0)).normalize(), up=right.cross(normal).normalize();
+        for(int i=0;i<7200;i++) {
+            double t=Math.pow(r.nextDouble(),.68), arm=i%4*Math.PI*.5;
+            double angle=arm+t*6.4+r.nextGaussian()*(.085+t*.1);
+            double reach=t*radius+r.nextGaussian()*radius*.022;
+            Vec3 at=centre.add(right.scale(Math.cos(angle)*reach)).add(up.scale(Math.sin(angle)*reach*.63));
+            double size=.14+r.nextDouble()*.42+(1-t)*.34;
+            int color=t<.17?0xfff5dc:i%3==0?0xd9b4ff:0xff8cd7;
+            float alpha=(float)(.25+(1-t)*.4);
+            WarpMesh.quad(b,m,at.subtract(right.scale(size)).subtract(up.scale(size)),
+                at.add(right.scale(size)).subtract(up.scale(size)),at.add(right.scale(size)).add(up.scale(size)),
+                at.subtract(right.scale(size)).add(up.scale(size)),color,alpha);
+        }
+        // Soft concentric core, all on the same plane facing the observer.
+        for(int ring=14;ring>=1;ring--) {
+            double outer=radius*.17*ring/14.0;
+            for(int k=0;k<48;k++) {
+                double a=k*Math.PI/24,c=(k+1)*Math.PI/24;
+                WarpMesh.quad(b,m,centre,centre.add(right.scale(Math.cos(a)*outer)).add(up.scale(Math.sin(a)*outer*.65)),
+                    centre.add(right.scale(Math.cos(c)*outer)).add(up.scale(Math.sin(c)*outer*.65)),centre,
+                    ring<5?0xffffe8:0xffb8e8,.075f);
+            }
+        }
     }
 
     /**
@@ -223,13 +219,17 @@ public final class ParadiseSky {
 
     /** Sweets drifting through the far sky, large enough to be read as sweets from an island. */
     private static void drifting(BufferBuilder b, Matrix4f m, double time) {
+        Vec3 planet=DOME.add(-175,142,-136);
+        WarpMesh.sphere(b,m,planet,22,22,22,0xe6a0db,1,32,0,false);
+        WarpMesh.ring(b,m,planet,29,5,0xffd5f0,.70f,.35,time*.0004);
+        WarpMesh.ring(b,m,planet,36,1.2,0xc28eed,.65f,.35,time*.0004);
         Random r = new Random(0x5EE7);
         for (int i = 0; i < 32; i++) {
             double a = r.nextDouble() * Math.PI * 2 + time * (0.00012 + r.nextDouble() * 0.00022);
-            double radius = SHELL * (0.42 + r.nextDouble() * 0.36);
+            double radius = SHELL * (0.66 + r.nextDouble() * 0.18);
             double lift = r.nextDouble() * 210 - 70 + Math.sin(time * 0.006 + i) * 9;
             Vec3 at = DOME.add(Math.cos(a) * radius, lift, Math.sin(a) * radius);
-            sweet(b, m, at, 7 + r.nextDouble() * 13, i, time);
+            sweet(b, m, at, 4 + r.nextDouble() * 7, i, time);
         }
     }
 
@@ -310,65 +310,46 @@ public final class ParadiseSky {
      */
     public static void scene(BufferBuilder b, Matrix4f m, double time, boolean preview) {
         for (Paradise.Fall fall : Paradise.falls()) {
-            double headY = fall.y() - fall.length();
-            double ax = Math.cos(fall.angle()), az = Math.sin(fall.angle());
-            if (fall.onto() < 0) {
-                // The drawn continuation, narrowing and fading as it goes.
-                for (int i = 0; i < 26; i++) {
-                    double y0 = headY - i * 3.1, y1 = y0 - 3.1;
-                    float alpha = (float) (0.5 * (1 - i / 26.0) * (1 - i / 26.0));
-                    double width = 0.46 * (1 - i / 34.0);
-                    // A slight lean, so the water is falling through moving air rather than down a pipe.
-                    double drift = i * i * 0.012;
-                    Vec3 from = new Vec3(fall.x() + ax * drift, y0, fall.z() + az * drift);
-                    Vec3 to = new Vec3(fall.x() + ax * (drift + 0.35), y1, fall.z() + az * (drift + 0.35));
-                    WarpMesh.ribbon(b, m, from, to, width, 0xff69c8, alpha);
-                    // A narrow white-hot strand gives the sheet a glossy liquid centre without the
-                    // old floating puff/sphere particles.
-                    if (i % 2 == 0) WarpMesh.ribbon(b, m,
-                        from.add(-az * 0.08, 0, ax * 0.08), to.add(-az * 0.08, 0, ax * 0.08),
-                        width * 0.24, 0xfffff8, alpha * 0.48f);
-                }
+            double ax=Math.cos(fall.angle()),az=Math.sin(fall.angle());
+            double length=fall.length()+30;
+            for(int i=0;i<48;i++) {
+                double down=i*length/48,next=(i+1)*length/48;
+                double fade=Math.min(1,(length-down)/24);
+                double width=2.65*(1-down/length*.38);
+                double sway=Math.sin(time*.025-down*.11)*.13;
+                Vec3 from=new Vec3(fall.x()+ax*.55+ax*sway,fall.y()+.7-down,fall.z()+az*.55+az*sway);
+                Vec3 to=new Vec3(fall.x()+ax*.55+ax*Math.sin(time*.025-next*.11)*.13,fall.y()+.7-next,fall.z()+az*.55+az*Math.sin(time*.025-next*.11)*.13);
+                Vec3 side=new Vec3(-az*width,0,ax*width);
+                WarpMesh.quad(b,m,from.subtract(side),from.add(side),to.add(side.scale(.995)),to.subtract(side.scale(.995)),
+                    i%3==0?0xff8ad8:0xf969c5,(float)(.30*fade));
             }
-            // The old waterfall puffs were disconnected translucent spheres. Replace them with
-            // short animated liquid streaks that visibly peel from the stream and fan out on impact.
-            for (int i = 0; i < 8; i++) {
-                double phase = (time * 0.038 + i * 0.79) % (Math.PI * 2);
-                double side = Math.sin(phase * 1.7 + i) * 1.15;
-                double lift = 0.7 + Math.abs(Math.sin(phase)) * 1.25;
-                Vec3 head = new Vec3(fall.x() + ax * 0.55 - az * side, fall.y() + 0.15,
-                    fall.z() + az * 0.55 + ax * side);
-                Vec3 headEnd = head.add(ax * (0.45 + (i % 3) * 0.12), lift, az * (0.45 + (i % 3) * 0.12));
-                WarpMesh.ribbon(b, m, head, headEnd, 0.065 + (i % 3) * 0.018,
-                    (i & 1) == 0 ? 0xffd7f1 : 0xffffff, 0.23f);
-
-                if (fall.onto() >= 0) {
-                    double burst = phase * 2.2 + i;
-                    Vec3 land = new Vec3(fall.x(), headY + 0.18, fall.z());
-                    Vec3 landEnd = land.add(Math.cos(burst) * (1.25 + (i % 3) * 0.35),
-                        0.65 + Math.abs(Math.sin(burst)) * 0.85,
-                        Math.sin(burst) * (1.25 + (i % 3) * 0.35));
-                    WarpMesh.ribbon(b, m, land, landEnd, 0.075 + (i % 2) * 0.025,
-                        (i & 1) == 0 ? 0xffb4e5 : 0xffffff, 0.20f);
-                }
+            // Falling highlights travel down the sheet; small ballistic droplets peel away at its foot.
+            for(int strand=0;strand<22;strand++) {
+                double down=(time*(.17+strand%3*.04)+strand*8.37)%length;
+                double side=Math.sin(strand*7.1)*2.1;
+                Vec3 at=new Vec3(fall.x()-az*side+ax*.7,fall.y()-down,fall.z()+ax*side+az*.7);
+                WarpMesh.ribbon(b,m,at,at.add(ax*.06,-2.0-strand%4,az*.06),.025+strand%3*.018,0xffe7f9,
+                    (float)(.55*Math.min(1,(length-down)/22)));
+            }
+            for(int spray=0;spray<14;spray++) {
+                double age=(time*.023+spray*.173)%1,angle=spray*2.399;
+                Vec3 at=new Vec3(fall.x()+Math.cos(angle)*age*4,fall.y()-length+6*age-9*age*age,
+                    fall.z()+Math.sin(angle)*age*4);
+                WarpMesh.ribbon(b,m,at,at.add(.02,-.35,0),.045,0xffd8f5,(float)((1-age)*.5));
             }
         }
-
-        // Steam standing over the hot spring, which is the one place in the realm the eye returns to.
-        Paradise.Isle heart = Paradise.heart();
-        for (int i = 0; i < 16; i++) {
-            double a = i * 2.399 + time * 0.0016;
-            double reach = Paradise.springRim(a) * (0.25 + (i % 5) * 0.16);
-            double rise = ((time * 0.045 + i * 7) % 26);
-            WarpMesh.sphere(b, m, new Vec3(heart.x() + Math.cos(a) * reach, Paradise.SURFACE + 1 + rise, heart.z() + Math.sin(a) * reach),
-                1.8 + rise * 0.16, 1.1 + rise * 0.1, 1.8 + rise * 0.16, 0xffffff, (float) (0.085 * (1 - rise / 26.0)), 8, 0, false);
+        // Low cloud banks under the archipelago, leaving the bridges and castle unobstructed.
+        for(int i=0;i<32;i++) {
+            double angle=i*2.399, radius=45+i%8*12;
+            Vec3 at=new Vec3(Math.cos(angle)*radius,39+Math.sin(i*1.7+time*.002)*4,Math.sin(angle)*radius);
+            WarpMesh.sphere(b,m,at,23,5,18,i%2==0?0xfbc9ec:0xe4b0e7,.16f,12,0,false);
         }
 
         // Sweets close in, drifting between the islands rather than across the far sky.
         Random r = new Random(0x0A11E);
         for (int i = 0; i < 20; i++) {
             double a = r.nextDouble() * Math.PI * 2 + time * 0.00035;
-            double radius = 34 + r.nextDouble() * 70;
+            double radius = 95 + r.nextDouble() * 43;
             double y = Paradise.SURFACE - 26 + r.nextDouble() * 58 + Math.sin(time * 0.009 + i * 2.1) * 3.5;
             sweet(b, m, new Vec3(Math.cos(a) * radius, y, Math.sin(a) * radius), 1.5 + r.nextDouble() * 2.3, i + 3, time);
         }

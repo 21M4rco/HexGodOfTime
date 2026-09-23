@@ -46,7 +46,7 @@ public final class ParadiseWaters {
         HitResult result = e.getLevel().clip(new ClipContext(
             eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.SOURCE_ONLY, player
         ));
-        if (!(result instanceof BlockHitResult hit)) return;
+        if (!(result instanceof BlockHitResult hit) || hit.getType()!=HitResult.Type.BLOCK) return;
 
         BlockPos pos = hit.getBlockPos();
         var fluid = e.getLevel().getFluidState(pos);
