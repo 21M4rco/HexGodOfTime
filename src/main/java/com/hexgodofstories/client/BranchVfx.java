@@ -34,7 +34,7 @@ public final class BranchVfx {
     private BranchVfx() {}
 
     private static ResourceLocation glowSheet,strandSheet,cloudSheet;
-    private static RenderType glowType,strandType,cloudType;
+    private static RenderType glowType,strandType,cloudType,shadowType;
 
     public static void clear() {
         var textures=Minecraft.getInstance().getTextureManager();
@@ -42,7 +42,7 @@ public final class BranchVfx {
         if(strandSheet!=null)textures.release(strandSheet);
         if(cloudSheet!=null)textures.release(cloudSheet);
         glowSheet=null;strandSheet=null;cloudSheet=null;
-        glowType=null;strandType=null;cloudType=null;
+        glowType=null;strandType=null;cloudType=null;shadowType=null;
     }
 
     /** Additive and full-bright, for cores, membranes and anything that should read as light. */
@@ -59,6 +59,11 @@ public final class BranchVfx {
     public static RenderType cloud() {
         if(cloudType==null)cloudType=RenderType.energySwirl(cloudSheet(),0,0);
         return cloudType;
+    }
+    /** Dark alpha-blended volume. Additive black is invisible, so the beam's mass uses this pass. */
+    public static RenderType shadow() {
+        if(shadowType==null)shadowType=RenderType.entityTranslucentEmissive(cloudSheet());
+        return shadowType;
     }
 
     private static ResourceLocation glowSheet() {
@@ -226,6 +231,13 @@ public final class BranchVfx {
             float t=i/(float)Math.max(1,points.length-2);
             double taper=Math.sin(Mth.clamp(t,0,1)*Math.PI)*.75+.25;
             ribbon(painter,type,points[i],points[i+1],width*taper,TemporalPalette.shade(phase+t*spread),alpha);
+        }
+    }
+    public static void branchPolyline(Painter painter,RenderType type,Vec3[] points,double width,float phase,float spread,float alpha) {
+        for(int i=0;i<points.length-1;i++) {
+            float t=i/(float)Math.max(1,points.length-2);
+            double taper=Math.sin(Mth.clamp(t,0,1)*Math.PI)*.75+.25;
+            ribbon(painter,type,points[i],points[i+1],width*taper,TimeBranchPalette.shade(phase+t*spread),alpha);
         }
     }
 

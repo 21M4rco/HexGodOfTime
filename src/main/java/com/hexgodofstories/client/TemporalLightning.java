@@ -81,6 +81,14 @@ public final class TemporalLightning {
             trace(painter,type,fork,width*.62,phase+.14f,.3f,alpha*.78f);
         }
     }
+    public static void drawBranch(BranchVfx.Painter painter,RenderType type,Arc arc,double width,float phase,float alpha) {
+        traceBranch(painter,type,arc.spine(),width*2.6,phase,.22f,alpha*.24f);
+        traceBranch(painter,type,arc.spine(),width,phase,.22f,alpha);
+        for(Vec3[] fork:arc.forks()) {
+            traceBranch(painter,type,fork,width*1.7,phase+.14f,.3f,alpha*.18f);
+            traceBranch(painter,type,fork,width*.62,phase+.14f,.3f,alpha*.78f);
+        }
+    }
     private static void trace(BranchVfx.Painter painter,RenderType type,Vec3[] points,double width,float phase,float spread,float alpha) {
         for(int i=0;i<points.length-1;i++) {
             float t=i/(float)Math.max(1,points.length-1);
@@ -88,6 +96,15 @@ public final class TemporalLightning {
             float heat=Mth.clamp(1-Math.abs(t-.5f)*1.6f,0,1);
             BranchVfx.ribbon(painter,type,points[i],points[i+1],width,
                 TemporalPalette.hot(phase+t*spread,heat*.55f),alpha);
+        }
+    }
+
+    private static void traceBranch(BranchVfx.Painter painter,RenderType type,Vec3[] points,double width,float phase,float spread,float alpha) {
+        for(int i=0;i<points.length-1;i++) {
+            float t=i/(float)Math.max(1,points.length-1);
+            float heat=Mth.clamp(1-Math.abs(t-.5f)*1.6f,0,1);
+            BranchVfx.ribbon(painter,type,points[i],points[i+1],width,
+                TimeBranchPalette.hot(phase+t*spread,heat*.72f),alpha);
         }
     }
 
