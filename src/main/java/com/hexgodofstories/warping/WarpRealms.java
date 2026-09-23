@@ -92,7 +92,7 @@ public final class WarpRealms {
     public static long age(ServerLevel l,double x){return Math.max(0,l.getGameTime()-ledger(l).clocks.getOrDefault((long)x,l.getGameTime()));}
     public static void transfer(Entity e,Destination d,double cell,boolean owner){
         if(d==Destination.SANCTUM){
-            if(e instanceof ServerPlayer p)PocketRealm.crossFromWarp(p,p,p.position());
+            if(e instanceof ServerPlayer p)PocketRealm.crossFromWarp(p,p,p.position(),new Vec3(0,-.30,0),0);
             return;
         }
         ServerLevel old=(ServerLevel)e.level(),to=old.getServer().getLevel(d.key);if(to==null)return;
