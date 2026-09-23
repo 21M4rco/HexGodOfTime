@@ -117,9 +117,11 @@ public final class WarpRenderer {
             // inside the footprint reads as submerged under the portal instead of punching through.
             GL11.glDepthFunc(GL11.GL_ALWAYS);
             groundFilm(pose.last().pose(),brk,open);
+            // The flat opaque skin is allowed to cover cutout vegetation. The actual goo volume is
+            // depth-tested normally so its raised lip, walls and bulges occupy honest 3D space.
+            GL11.glDepthFunc(GL11.GL_LEQUAL);
             int window=n.contains("window")?n.getInt("window"):WarpMath.OPEN_TICKS;
             surface(pose.last().pose(),brk,open,age,held,time,window);
-            GL11.glDepthFunc(GL11.GL_LEQUAL);
         }finally{
             pose.popPose();GL11.glStencilMask(255);GL11.glDisable(GL11.GL_STENCIL_TEST);GL11.glDepthRange(0,1);GL11.glDepthFunc(GL11.GL_LEQUAL);
             RenderSystem.colorMask(true,true,true,true);RenderSystem.depthMask(true);RenderSystem.enableDepthTest();RenderSystem.enableCull();RenderSystem.disableBlend();RenderSystem.setShaderColor(1,1,1,1);
@@ -304,75 +306,150 @@ public final class WarpRenderer {
     }
 
     /**
-     * What the liquid looks like: a sheen on the surface, rings travelling out through it, a bright
-     * meniscus at the rim and beads thrown up where it is still running.
+     * The visible body of the goo.
      *
-     * <p>All of it is deliberately thin. The point of the pool is that another world is visible
-     * through it, so the film is a few percent of alpha and the colour comes from the destination
-     * rather than from the liquid; what carries the reading is movement — concentric waves crossing
-     * the surface, a rim that wobbles and brightens on the side currently advancing, and drops that
-     * rise and fall back in. A thicker, prettier surface would be a mirror again.
+     * <p>The aperture remains exactly on the floor because crossing physics are not presentation.
+     * Everything drawn here sits above that authoritative plane: a low breathing body in the
+     * middle, a steep shoulder over the outer third, a genuinely vertical outer wall, and a thick
+     * rolled lip around the silhouette. The edge is intentionally the boldest part of the portal.
      */
     private static void surface(Matrix4f m,Break brk,boolean open,double age,int held,double time,int window){
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
         BufferBuilder b=Tesselator.getInstance().getBuilder();
         b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);
         double progress=open?1:WarpMath.charge(held);
-        double settle=open?Math.min(1,age/26.0):0;
+        double settle=open?Math.min(1,age/28.0):0;
         double closing=open?Math.max(0,(age-(Math.max(18,window)-18))/18.0):0;
 
-        for(int ring=0;ring<brk.rings;ring++){
-            double f=(ring+.5)/brk.rings;
-            double fold=Math.sin(f*10.5-time*.115+brk.seed%17)
-                +.55*Math.sin(f*21+time*.065+(brk.seed&7));
-            float alpha=(float)(.10+.055*(fold*.5+.75)+closing*.16);
-            int tone=fold>.45?0x111315:fold<-.65?0x030404:0x090a0b;
-            for(int step=0;step<brk.steps;step++){
-                if(!brk.face(ring,step))continue;
-                face(b,m,brk,ring,step,tone,alpha);
-            }
+        // One continuous raised shell. The middle barely lifts; the last third swells rapidly so the
+        // outline reads as a heavy bank of tar from every camera angle rather than a painted decal.
+        for(int ring=0;ring<brk.rings;ring++)for(int step=0;step<brk.steps;step++){
+            if(!brk.face(ring,step))continue;
+            double h00=gooHeight(brk,ring,step,time,progress,settle,closing);
+            double h01=gooHeight(brk,ring,step+1,time,progress,settle,closing);
+            double h11=gooHeight(brk,ring+1,step+1,time,progress,settle,closing);
+            double h10=gooHeight(brk,ring+1,step,time,progress,settle,closing);
+            double average=(h00+h01+h11+h10)*.25;
+            int tone=average>.30?0x111315:average>.14?0x0a0c0d:0x050607;
+            raisedFace(b,m,brk,ring,step,h00,h01,h11,h10,tone,1.0f);
         }
 
+        // A real vertical side around the whole portal. This is the strongest depth cue and is why
+        // the border reads as a mass sitting ON the ground instead of a black shape on the ground.
         int edge=brk.rings;
+        for(int step=0;step<brk.steps;step++){
+            if(!brk.whole(edge,step)||!brk.whole(edge,step+1))continue;
+            double h0=gooHeight(brk,edge,step,time,progress,settle,closing);
+            double h1=gooHeight(brk,edge,step+1,time,progress,settle,closing);
+            Vec3 p0=new Vec3(brk.x(edge,step),brk.y(edge,step)+.006,brk.z(edge,step));
+            Vec3 p1=new Vec3(brk.x(edge,step+1),brk.y(edge,step+1)+.006,brk.z(edge,step+1));
+            Vec3 t1=new Vec3(p1.x,brk.y(edge,step+1)+h1,p1.z);
+            Vec3 t0=new Vec3(p0.x,brk.y(edge,step)+h0,p0.z);
+            WarpMesh.quad(b,m,p0,p1,t1,t0,0x010202,1.0f);
+        }
+
+        // Thick rolled lip. Unlike the old ribbon this is a four-sided tube with vertical thickness.
+        // It deliberately sits proud of the rest of the puddle and gets even bolder at an advancing
+        // front, making the edge the first thing the eye reads.
         for(int step=0;step<brk.steps;step++){
             if(!brk.whole(edge,step)||!brk.whole(edge,step+1))continue;
             double a=step*Math.PI*2/brk.steps;
             float lead=(float)WarpPool.advancing(brk.seed,a,progress);
-            double pulse=.014+.018*Math.sin(time*.12+step*.43)*(1-settle*.55);
-            Vec3 p=new Vec3(brk.x(edge,step),brk.y(edge,step)+pulse,brk.z(edge,step));
-            Vec3 q=new Vec3(brk.x(edge,step+1),brk.y(edge,step+1)+pulse,brk.z(edge,step+1));
+            double h0=gooHeight(brk,edge,step,time,progress,settle,closing);
+            double h1=gooHeight(brk,edge,step+1,time,progress,settle,closing);
+            Vec3 p=new Vec3(brk.x(edge,step),brk.y(edge,step)+h0-.035,brk.z(edge,step));
+            Vec3 q=new Vec3(brk.x(edge,step+1),brk.y(edge,step+1)+h1-.035,brk.z(edge,step+1));
             if(p.distanceToSqr(q)<1.0E-7)continue;
-            WarpMesh.ribbon(b,m,p,q,.28+.16*lead,0x030405,.96f);
-            WarpMesh.ribbon(b,m,p,q,.085+.035*lead,0x24272a,.28f+.28f*lead);
+            double halfWidth=.20+.08*progress+.07*lead;
+            double halfHeight=.105+.055*progress+.045*lead;
+            gooTube(b,m,p,q,halfWidth,halfHeight,lead);
         }
 
-        int bubbles=Math.max(8,Math.min(26,brk.steps/4));
+        // Broad low blisters make the body itself three-dimensional too. They are deliberately
+        // flatter and quieter than the border so nothing competes with the heavy outer lip.
+        int mounds=Math.max(7,Math.min(14,brk.rings+3));
+        for(int i=0;i<mounds;i++){
+            int step=Math.floorMod(i*29+(int)(brk.seed&63),brk.steps);
+            int ring=1+Math.floorMod(i*7+(int)(brk.seed>>>10),Math.max(1,brk.rings-2));
+            if(!brk.whole(ring,step))continue;
+            double cycle=(time*(.006+.001*(i%3))+noise(brk.seed,i,7))%1.0;
+            double breathe=.65+.35*Math.sin(cycle*Math.PI*2);
+            double base=gooHeight(brk,ring,step,time,progress,settle,closing);
+            double radius=.24+.34*noise(brk.seed,i,8);
+            double height=.055+.075*noise(brk.seed,i,9);
+            WarpMesh.sphere(b,m,new Vec3(brk.x(ring,step),brk.y(ring,step)+base+height*.20,brk.z(ring,step)),
+                radius,height*breathe,radius,0x101214,.34f,10,0,false);
+        }
+
+        // Smaller bubbles slowly rise and collapse on top of the shell.
+        int bubbles=Math.max(8,Math.min(22,brk.steps/5));
         for(int i=0;i<bubbles;i++){
             int step=Math.floorMod(i*37+(int)(brk.seed&31),brk.steps);
             int ring=1+Math.floorMod(i*11+(int)(brk.seed>>>8),Math.max(1,brk.rings-1));
             if(!brk.whole(ring,step))continue;
-            double cycle=(time*(.012+.002*(i%4))+noise(brk.seed,i,1))%1.0;
-            double dome=Math.max(0,Math.sin((cycle-.18)/.70*Math.PI));
-            if(cycle<.18||cycle>.88||dome<=0)continue;
-            double size=.10+.17*noise(brk.seed,i,2);
-            double y=brk.y(ring,step)+.018+dome*(.035+.055*noise(brk.seed,i,3));
-            int tone=i%5==0?0x202326:0x0b0d0e;
+            double cycle=(time*(.010+.002*(i%4))+noise(brk.seed,i,1))%1.0;
+            if(cycle<.16||cycle>.90)continue;
+            double dome=Math.max(0,Math.sin((cycle-.16)/.74*Math.PI));
+            if(dome<=0)continue;
+            double size=.09+.15*noise(brk.seed,i,2);
+            double base=gooHeight(brk,ring,step,time,progress,settle,closing);
+            double y=brk.y(ring,step)+base+dome*(.025+.055*noise(brk.seed,i,3));
             WarpMesh.sphere(b,m,new Vec3(brk.x(ring,step),y,brk.z(ring,step)),
-                size,size*.30*dome,size,tone,(float)(.28+.30*dome),10,0,false);
+                size,size*.38*dome,size,i%5==0?0x25282b:0x0b0d0e,(float)(.30+.30*dome),8,0,false);
         }
 
-        if(!open){
-            for(int step=0;step<brk.steps;step+=6){
-                if(!brk.whole(edge,step))continue;
-                double a=step*Math.PI*2/brk.steps;
-                float lead=(float)WarpPool.advancing(brk.seed,a,progress);
-                if(lead<.08f)continue;
-                Vec3 p=new Vec3(brk.x(edge,step),brk.y(edge,step)+.02,brk.z(edge,step));
-                Vec3 q=new Vec3(p.x*.90,p.y+.005,p.z*.90);
-                WarpMesh.ribbon(b,m,p,q,.06+.07*lead,0x2d3033,.18f+.34f*lead);
-            }
-        }
         BufferUploader.drawWithShader(b.end());
+    }
+
+    /** Height above the authoritative floor plane. The last third deliberately swells hardest. */
+    private static double gooHeight(Break brk,int ring,int step,double time,double progress,double settle,double closing){
+        double f=Math.max(0,Math.min(1,ring/(double)Math.max(1,brk.rings)));
+        double a=step*Math.PI*2/brk.steps;
+        double lead=WarpPool.advancing(brk.seed,a,progress);
+        double slow=Math.sin(a*2.0+time*.035+(brk.seed&15))*.5
+            +Math.sin(a*5.0-time*.021+(brk.seed>>>4&15))*.28;
+        double body=.035+.022*(slow+.78)+.025*Math.sin(f*9-time*.055);
+        double shoulder=smooth((f-.58)/.42);
+        double rim=smooth((f-.79)/.21);
+        // Opening settles the tiny surface wobble, never the mass of the edge itself.
+        double breathing=(1-settle*.55)*(.018*Math.sin(time*.09+step*.31));
+        return Math.max(.018,body
+            +shoulder*(.095+.105*progress)
+            +rim*(.115+.075*progress+.080*lead)
+            +breathing*rim
+            +closing*.055*rim);
+    }
+
+    private static double smooth(double x){
+        x=Math.max(0,Math.min(1,x));
+        return x*x*(3-2*x);
+    }
+
+    /** Raised counterpart of {@link #face}; the base geometry stays untouched for crossing/stencil. */
+    private static void raisedFace(BufferBuilder b,Matrix4f m,Break brk,int ring,int step,
+                                   double h00,double h01,double h11,double h10,int colour,float alpha){
+        vertex(b,m,brk.x(ring,step),brk.y(ring,step)+h00,brk.z(ring,step),colour,alpha);
+        vertex(b,m,brk.x(ring,step+1),brk.y(ring,step+1)+h01,brk.z(ring,step+1),colour,alpha);
+        vertex(b,m,brk.x(ring+1,step+1),brk.y(ring+1,step+1)+h11,brk.z(ring+1,step+1),colour,alpha);
+        vertex(b,m,brk.x(ring+1,step),brk.y(ring+1,step)+h10,brk.z(ring+1,step),colour,alpha);
+    }
+
+    /** Four-sided tar roll following one outer-edge segment. */
+    private static void gooTube(BufferBuilder b,Matrix4f m,Vec3 p,Vec3 q,double halfWidth,double halfHeight,float lead){
+        Vec3 flat=new Vec3(q.x-p.x,0,q.z-p.z);
+        double length=flat.length();
+        if(length<1.0E-6)return;
+        Vec3 side=new Vec3(-flat.z/length,0,flat.x/length).scale(halfWidth);
+        Vec3 up=new Vec3(0,halfHeight,0);
+        Vec3 down=new Vec3(0,-halfHeight,0);
+
+        Vec3 po=p.add(side),pi=p.subtract(side),qo=q.add(side),qi=q.subtract(side);
+        int top=lead>.35f?0x1c1f21:0x111315;
+        int wall=lead>.35f?0x090b0c:0x040506;
+        WarpMesh.quad(b,m,po.add(up),qo.add(up),qi.add(up),pi.add(up),top,.98f);
+        WarpMesh.quad(b,m,po.add(down),po.add(up),qo.add(up),qo.add(down),wall,1.0f);
+        WarpMesh.quad(b,m,qi.add(down),qi.add(up),pi.add(up),pi.add(down),0x020303,1.0f);
+        WarpMesh.quad(b,m,po.add(down),qo.add(down),qi.add(down),pi.add(down),0x000101,1.0f);
     }
 
     /** A stable number in nought-to-one for one bead and one of its properties. */
