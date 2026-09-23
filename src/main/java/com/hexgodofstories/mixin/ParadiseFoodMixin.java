@@ -50,6 +50,9 @@ public abstract class ParadiseFoodMixin {
     @Inject(method="finishUsingItem",at=@At("HEAD"),cancellable=true)
     private void hgos$swallow(Level level,LivingEntity eater,CallbackInfoReturnable<ItemStack> cir) {
         ItemStack stack=hgos$self();
+        if(!level.isClientSide&&eater instanceof net.minecraft.server.level.ServerPlayer player
+            &&!ParadiseFood.edible(stack)&&stack.getItem().isEdible())
+            com.hexgodofstories.server.PersonalRewind.eaten(player,stack);
         if(ParadiseFood.edible(stack)&&ParadiseFood.biting(stack))cir.setReturnValue(ParadiseFood.eat(stack,level,eater));
     }
 }

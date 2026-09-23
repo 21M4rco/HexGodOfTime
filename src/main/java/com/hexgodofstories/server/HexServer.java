@@ -204,7 +204,7 @@ public final class HexServer {
                 gesture(p,"enchant","memory",HexGodOfStories.ILLUSION_SOUND.get());return true;
             }
             case REWIND -> {
-                if(!PersonalRewind.rewind(p)){notice(p,"Ten safe seconds of personal history and an unchanged inventory (apart from eaten candy) are required.");return false;}
+                if(!PersonalRewind.rewind(p)){notice(p,"Ten safe seconds of personal history and an unchanged inventory (apart from eaten food) are required.");return false;}
                 gesture(p,"time_slip","slip",HexGodOfStories.SLIP.get());return true;
             }
             case TIME_SLIP -> {

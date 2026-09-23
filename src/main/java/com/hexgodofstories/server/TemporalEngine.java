@@ -58,6 +58,10 @@ public final class TemporalEngine {
     private static final float MAX_BANKED=60;
 
     public static boolean frozen(Entity e) {return FROZEN.containsKey(e.getUUID());}
+    public static Vec3 savedVelocity(Entity e) {
+        Frozen frozen=FROZEN.get(e.getUUID());
+        return frozen!=null&&frozen.entity==e?frozen.velocity:null;
+    }
     public static boolean slowed(Entity e) {return SLOWED.containsKey(e.getUUID());}
     public static boolean owns(ServerPlayer p) {return FIELDS.stream().anyMatch(f->f.owner.equals(p.getUUID()));}
     /** Only a true hold withholds a tick; a slowed body keeps ticking, it just changes more slowly. */
