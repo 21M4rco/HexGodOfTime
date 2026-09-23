@@ -43,10 +43,14 @@ public final class CandyCorruption {
     private static void startNext(ServerPlayer p){
         CompoundTag d=HexData.get(p);
         if(d.getInt(DOSES)<DOSES_PER_LIMB||Integer.bitCount(mask(p)&15)>=4)return;
-        List<Integer> choices=new ArrayList<>(4);
-        for(int part=0;part<4;part++)if(!missing(p,part))choices.add(part);
-        if(choices.isEmpty())return;
-        int part=choices.get(p.getRandom().nextInt(choices.size()));
+        List<Integer> choices=new ArrayList<>(3);
+        // The right arm is deliberately the last limb Paradise may take. It is the player's final
+        // feeding/interaction arm, so they can keep consuming candy until every other limb is gone.
+        for(int part:new int[]{LEFT_ARM,RIGHT_LEG,LEFT_LEG})if(!missing(p,part))choices.add(part);
+        int part;
+        if(!choices.isEmpty())part=choices.get(p.getRandom().nextInt(choices.size()));
+        else if(!missing(p,RIGHT_ARM))part=RIGHT_ARM;
+        else return;
         d.putInt(DOSES,d.getInt(DOSES)-DOSES_PER_LIMB);
         d.putInt(BREAKING,part);
         d.putLong(BREAK_START,p.level().getGameTime());
