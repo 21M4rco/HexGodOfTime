@@ -149,7 +149,7 @@ public final class ServerEvents {
         if(SanctumWard.evade(hit.getEntity()))e.setCanceled(true);
     }
     @SubscribeEvent public static void attack(AttackEntityEvent e) {
-        if(com.hexgodofstories.warping.CandyCorruption.noArms(e.getEntity())){e.setCanceled(true);return;}
+        if(com.hexgodofstories.warping.CandyCorruption.handMissing(e.getEntity(),net.minecraft.world.InteractionHand.MAIN_HAND)){e.setCanceled(true);return;}
         if(TemporalEngine.frozen(e.getEntity())){e.setCanceled(true);return;}
         // Nothing swings while it is being erased, and nothing swings while it is holding the torrent.
         if(Erasure.erasing(e.getEntity())||TimeBranch.planted(e.getEntity())){e.setCanceled(true);return;}
@@ -203,7 +203,7 @@ public final class ServerEvents {
         if(HexData.access(p)&&HexData.mastery(p,Discipline.SORCERY)>0)e.setDistance(Math.max(0,e.getDistance()-3));
     }}
     @SubscribeEvent public static void breakBlock(net.minecraftforge.event.level.BlockEvent.BreakEvent e) {
-        if(com.hexgodofstories.warping.CandyCorruption.noArms(e.getPlayer())||TemporalEngine.frozen(e.getPlayer()))e.setCanceled(true);
+        if(com.hexgodofstories.warping.CandyCorruption.handMissing(e.getPlayer(),net.minecraft.world.InteractionHand.MAIN_HAND)||TemporalEngine.frozen(e.getPlayer()))e.setCanceled(true);
     }
     @SubscribeEvent public static void stopping(ServerStoppingEvent e) {
         for(ServerPlayer p:e.getServer().getPlayerList().getPlayers())HexServer.clear(p,false);
