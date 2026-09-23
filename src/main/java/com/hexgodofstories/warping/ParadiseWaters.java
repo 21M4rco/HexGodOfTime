@@ -35,7 +35,12 @@ import java.util.List;
 @Mod.EventBusSubscriber(modid = HexGodOfStories.ID)
 public final class ParadiseWaters {
     private static final int PINK = 0xff69c8;
+    private static final String TAG="HexParadiseWaters";
     private ParadiseWaters() { }
+
+    public static boolean isParadiseWaters(ItemStack stack) {
+        return !stack.isEmpty()&&stack.hasTag()&&stack.getTag().getBoolean(TAG);
+    }
 
     @SubscribeEvent public static void bottle(PlayerInteractEvent.RightClickItem e) {
         if (!e.getItemStack().is(Items.GLASS_BOTTLE) || Destination.from(e.getLevel()) != Destination.PARADISE) return;
@@ -78,6 +83,7 @@ public final class ParadiseWaters {
             new MobEffectInstance(HexGodOfStories.CANDY_RUSH.get(), Paradise.CANDY_RUSH_TICKS, 0, false, true, true)
         ));
         potion.getOrCreateTag().putInt("CustomPotionColor", PINK);
+        potion.getOrCreateTag().putBoolean(TAG,true);
         potion.setHoverName(Component.literal("Paradise Waters").withStyle(ChatFormatting.LIGHT_PURPLE));
         return potion;
     }
