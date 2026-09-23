@@ -156,6 +156,7 @@ public final class HexServer {
         if(a==Ability.TIME_STOP&&TemporalEngine.owns(p)) {
             TemporalEngine.clear(p);HexNetwork.sync(p);return;
         }
+        if(a==Ability.TIME_STOP&&HexData.energy(p)<5){notice(p,"Five Temporal Energy is needed to hold time.");return;}
         if(!HexData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return;}
         if(HexData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return;}
         if(HexData.energy(p)<a.cost){notice(p,"Not enough Temporal Energy.");return;}

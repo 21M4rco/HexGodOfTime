@@ -48,7 +48,7 @@ public final class TemporalEngine {
     private static final UUID DILATION_ATTACK=UUID.fromString("0c6c27e9-1f7d-4c58-9d0a-5b2f6ba0a4c1");
     private static final UUID DILATION_FLIGHT=UUID.fromString("a7d1f3b2-90c5-4a8e-bd41-2f9c8e1d7a30");
     private static final int MAX_FIELDS=64,MAX_ENTITIES_PER_FIELD=192;
-    public static final int STOP_RADIUS=10,STOP_EXPANSION=12;
+    public static final int STOP_RADIUS=10,STOP_EXPANSION=12,STOP_WINDUP=6;
     /** Ticks spent decelerating into, and accelerating out of, a full stop. */
     public static final int RAMP=7;
     /** How much of normal time a dilated body experiences. */
@@ -69,6 +69,7 @@ public final class TemporalEngine {
         if(p.isPassenger()||target!=null&&target.isPassenger())return false;
         UUID ally=HexData.get(p).hasUUID("ally")?HexData.get(p).getUUID("ally"):null;
         long now=p.level().getGameTime();
+        if(stop&&target==null)now+=STOP_WINDUP;
         double radius=stop&&target==null?STOP_RADIUS:HexData.get(p).getBoolean("ascended")?18:12;
         long expires=stop&&target==null?Long.MAX_VALUE:now+ticks;
         FIELDS.add(new Field(p.getUUID(),p.serverLevel(),p.position(),radius,now,expires,stop,target==null?null:target.getUUID(),ally));
@@ -108,6 +109,18 @@ public final class TemporalEngine {
         try {run(level);} finally {ticking=false;}
     }
 
+    /** Called only for ticking block entities; a small fixed list, never a world scan. */
+    public static boolean stopped(ServerLevel level,net.minecraft.core.BlockPos pos) {
+        long now=level.getGameTime();
+        for(Field field:FIELDS) {
+            if(field.level!=level||!field.stop||field.target!=null||now<field.started)continue;
+            double radius=field.expires==Long.MAX_VALUE
+                ?field.radius*Math.min(1,(now-field.started)/(double)STOP_EXPANSION):field.radius;
+            if(pos.distToCenterSqr(field.center.x,field.center.y,field.center.z)<=radius*radius)return true;
+        }
+        return false;
+    }
+
     private static void run(ServerLevel level) {
         long now=level.getGameTime();
         FIELDS.removeIf(f->{
@@ -132,7 +145,7 @@ public final class TemporalEngine {
             if(f.level!=level)continue;
             double range=f.stop&&f.target==null&&f.expires==Long.MAX_VALUE
                 ?f.radius*Math.min(1,Math.max(0,(now-f.started)/(double)STOP_EXPANSION)):f.radius;
-            if(range<=0&&f.target==null)continue;
+            if((range<=0||now<f.started)&&f.target==null)continue;
             List<Entity> affected=f.target==null
                 ?level.getEntities((Entity)null,new AABB(f.center.subtract(range,range,range),f.center.add(range,range,range)),e->eligible(e,f,range))
                 :Optional.ofNullable(level.getEntity(f.target)).filter(e->eligible(e,f)).map(List::of).orElse(List.of());
@@ -303,7 +316,8 @@ public final class TemporalEngine {
     /** Everything in the local world that visibly moves under its own steam. */
     private static boolean affectable(Entity e) {
         return e instanceof LivingEntity||e instanceof Projectile||e instanceof ItemEntity
-            ||e instanceof FallingBlockEntity||e instanceof PrimedTnt||e instanceof ExperienceOrb;
+            ||e instanceof FallingBlockEntity||e instanceof PrimedTnt||e instanceof ExperienceOrb
+            ||e.getDeltaMovement().lengthSqr()>1.0E-8;
     }
 
     private static void restore(Frozen s,long now) {

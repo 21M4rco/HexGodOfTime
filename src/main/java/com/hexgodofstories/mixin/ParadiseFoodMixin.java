@@ -27,12 +27,12 @@ public abstract class ParadiseFoodMixin {
 
     @Inject(method="getUseAnimation",at=@At("HEAD"),cancellable=true)
     private void hgos$chew(CallbackInfoReturnable<UseAnim> cir) {
-        if(ParadiseFood.edible(hgos$self()))cir.setReturnValue(UseAnim.EAT);
+        if(ParadiseFood.edible(hgos$self())&&ParadiseFood.biting(hgos$self()))cir.setReturnValue(UseAnim.EAT);
     }
 
     @Inject(method="getUseDuration",at=@At("HEAD"),cancellable=true)
     private void hgos$mouthful(CallbackInfoReturnable<Integer> cir) {
-        if(ParadiseFood.edible(hgos$self()))cir.setReturnValue(ParadiseFood.CHEW);
+        if(ParadiseFood.edible(hgos$self())&&ParadiseFood.biting(hgos$self()))cir.setReturnValue(ParadiseFood.CHEW);
     }
 
     @Inject(method="use",at=@At("HEAD"),cancellable=true)
@@ -40,7 +40,9 @@ public abstract class ParadiseFoodMixin {
                            CallbackInfoReturnable<InteractionResultHolder<ItemStack>> cir) {
         ItemStack stack=hgos$self();
         if(!ParadiseFood.edible(stack))return;
-        if(!player.canEat(false)){cir.setReturnValue(InteractionResultHolder.fail(stack));return;}
+        if(!player.isShiftKeyDown()){ParadiseFood.endBite(stack);return;}
+        if(!player.canEat(false)){ParadiseFood.endBite(stack);cir.setReturnValue(InteractionResultHolder.fail(stack));return;}
+        ParadiseFood.beginBite(stack);
         player.startUsingItem(hand);
         cir.setReturnValue(InteractionResultHolder.consume(stack));
     }
@@ -48,6 +50,6 @@ public abstract class ParadiseFoodMixin {
     @Inject(method="finishUsingItem",at=@At("HEAD"),cancellable=true)
     private void hgos$swallow(Level level,LivingEntity eater,CallbackInfoReturnable<ItemStack> cir) {
         ItemStack stack=hgos$self();
-        if(ParadiseFood.edible(stack))cir.setReturnValue(ParadiseFood.eat(stack,level,eater));
+        if(ParadiseFood.edible(stack)&&ParadiseFood.biting(stack))cir.setReturnValue(ParadiseFood.eat(stack,level,eater));
     }
 }

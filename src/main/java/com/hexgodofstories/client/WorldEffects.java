@@ -261,8 +261,10 @@ public final class WorldEffects {
             });
             // A stopped moment arrives slowly on purpose: the edge of the field walks outward and the
             // suspended dust thickens behind it, so the world looks like it is being held, not switched.
-            case "stop" -> Vfx.bloom(entity,pos,look,20,(at,aim,t)->{
-                double radius=10*Math.min(1,t*20/com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION);
+            case "stop" -> Vfx.bloom(entity,pos,look,26,(at,aim,t)->{
+                double elapsed=t*26-com.hexgodofstories.server.TemporalEngine.STOP_WINDUP;
+                if(elapsed<0)return;
+                double radius=10*Math.min(1,elapsed/com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION);
                 Vfx.dome(nebula,at,radius,Vfx.count(7),.014);
                 Vfx.cloud(nebula,at.add(0,1.1,0),1.2,Vfx.count(2),.005);
             });

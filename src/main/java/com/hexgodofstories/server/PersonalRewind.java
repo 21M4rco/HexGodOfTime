@@ -61,7 +61,7 @@ public final class PersonalRewind {
         if(history==null||history.isEmpty())return false;
         long target=clock(player)-TICKS;
         Moment past=null;
-        for(Moment moment:history)if(moment.tick==target){past=moment;break;}
+        for(Moment moment:history)if(moment.tick<=target&&moment.tick>=target-1)past=moment;
         if(past==null)return false;
         ServerLevel destination=player.server.getLevel(past.dimension);
         BlockPos block=BlockPos.containing(past.position);
