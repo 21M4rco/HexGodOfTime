@@ -113,6 +113,7 @@ public final class HexData {
             d.remove(com.hexgodofstories.warping.CandyCorruption.MASK);
             d.remove(com.hexgodofstories.warping.CandyCorruption.BREAKING);
             d.remove(com.hexgodofstories.warping.CandyCorruption.BREAK_START);
+            d.remove(com.hexgodofstories.warping.CandyCorruption.WINDOW_START);
         }
     }
 }
