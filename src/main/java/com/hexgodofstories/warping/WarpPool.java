@@ -34,7 +34,7 @@ public final class WarpPool {
     public static final int STEPS = 96;
 
     /** How much of its reach the pool already covers on the tick it is poured. */
-    private static final double BEAD = 0.15;
+    private static final double BEAD = 0.11;
 
     private static final double TAU = Math.PI * 2;
 
@@ -68,7 +68,8 @@ public final class WarpPool {
         double run = (progress - onset) / Math.max(0.12, 1 - onset);
         if (run <= 0) return 0;
         if (run >= 1) return 1;
-        return run * run * (3 - 2 * run);
+        // Viscous easing: the front heaves into motion and settles without looking scaled.
+        return run * run * run * (run * (run * 6 - 15) + 10);
     }
 
     /**
@@ -91,19 +92,21 @@ public final class WarpPool {
      * under it is what stops a bulge on one side leaving a spur on the other.
      */
     private static double lobe(long seed, double angle) {
-        double n = 0.86
-            + 0.21 * Math.sin(angle * 2 + phase(seed, 1))
-            + 0.12 * Math.sin(angle * 3 + phase(seed, 2))
-            + 0.06 * Math.sin(angle * 5 + phase(seed, 3));
-        return Math.max(0.45, n / 1.25);
+        // Broad asymmetric lobes make a puddle, not a mathematically centred portal disc.
+        double n = 0.89
+            + 0.18 * Math.sin(angle + phase(seed, 1))
+            + 0.13 * Math.sin(angle * 2 + phase(seed, 2))
+            + 0.075 * Math.sin(angle * 4 + phase(seed, 3));
+        return Math.max(0.46, n / 1.275);
     }
 
     /** When this direction starts to run. Smooth in the angle, so the edge is never ragged. */
     private static double onset(long seed, double angle) {
-        double n = 0.26
-            + 0.24 * Math.sin(angle + phase(seed, 4))
-            + 0.13 * Math.sin(angle * 2 + phase(seed, 5));
-        return Math.max(0, Math.min(0.58, n));
+        double n = 0.23
+            + 0.20 * Math.sin(angle + phase(seed, 4))
+            + 0.11 * Math.sin(angle * 2 + phase(seed, 5))
+            + 0.055 * Math.sin(angle * 3 + phase(seed, 6));
+        return Math.max(0, Math.min(0.52, n));
     }
 
     private static double phase(long seed, int k) {

@@ -33,7 +33,7 @@ import java.util.Map;
 public final class WarpCrossingClient {
     private WarpCrossingClient() { }
 
-    private record Phase(double plane, long until) { }
+    private record Phase(double plane,double strength,double centerX,double centerZ,long until) { }
     private static final Map<Integer, Phase> PHASES = new HashMap<>();
 
     /**
@@ -51,7 +51,8 @@ public final class WarpCrossingClient {
     private static final long MEMBRANE = 260;
 
     public static void receive(int id, CompoundTag n) {
-        PHASES.put(id, new Phase(n.getDouble("plane"), n.getLong("until")));
+        PHASES.put(id,new Phase(n.getDouble("plane"),n.getDouble("strength"),
+            n.getDouble("centerX"),n.getDouble("centerZ"),n.getLong("until")));
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null && mc.player.getId() == id) phasedAt = Util.getMillis();
     }
@@ -82,18 +83,26 @@ public final class WarpCrossingClient {
      * copies climb together.
      */
     public static void sink(LocalPlayer player) {
-        if (player == null || !PHASES.containsKey(player.getId())) { jumpHeld = false; banked = 0; return; }
-        player.noPhysics = true;
-        boolean jump = Minecraft.getInstance().options.keyJump.isDown();
-        if (jump && !jumpHeld) {
-            banked = Math.min(banked + WarpMath.STRUGGLE_LIFT, WarpMath.STRUGGLE_LIFT * 3);
-            HexNetwork.send(HexServer.WARP_STRUGGLE, 0);
+        Phase phase=player==null?null:PHASES.get(player.getId());
+        if(player==null||phase==null){jumpHeld=false;banked=0;return;}
+        player.noPhysics=true;
+        boolean jump=Minecraft.getInstance().options.keyJump.isDown();
+        double lift=WarpMath.struggleLift(phase.strength());
+        if(jump&&!jumpHeld&&lift>0){
+            banked=Math.min(banked+lift,lift*3);
+            HexNetwork.send(HexServer.WARP_STRUGGLE,0);
         }
-        jumpHeld = jump;
-        Vec3 v = player.getDeltaMovement();
-        player.setDeltaMovement(v.x * WarpMath.SINK_DRAG, -WarpMath.SINK_RATE + banked, v.z * WarpMath.SINK_DRAG);
-        player.fallDistance = 0;
-        banked = 0;
+        jumpHeld=jump;
+        Vec3 v=player.getDeltaMovement();
+        double dx=phase.centerX()-player.getX(),dz=phase.centerZ()-player.getZ();
+        double distance=Math.sqrt(dx*dx+dz*dz);
+        double pull=WarpMath.gooPull(phase.strength());
+        double px=distance>1.0E-5?dx/distance*pull:0;
+        double pz=distance>1.0E-5?dz/distance*pull:0;
+        double drag=WarpMath.sinkDrag(phase.strength());
+        player.setDeltaMovement(v.x*drag+px,-WarpMath.sinkRate(phase.strength())+banked,v.z*drag+pz);
+        player.fallDistance=0;
+        banked=0;
     }
 
     /** Ticked from the client's own state pass, so it ends with everything else. */

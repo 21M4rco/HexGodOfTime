@@ -31,32 +31,48 @@ public final class WarpMath {
         double f=(energy/cost-.5)/1.5;
         return (int)Math.floor(Math.max(0,Math.min(1,f))*FULL_CHARGE);
     }
-    /**
-     * How fast a body sinks into an open pool, in blocks per tick.
-     *
-     * <p>Quicksand rather than a hole. Whatever a body arrives doing, its descent is taken over by
-     * this the moment it is in the liquid: a running jump into the middle does not carry you
-     * through, it stops you dead and starts you going down. A player's eye is 1.62 blocks up, so a
-     * crossing takes a little under two seconds from the first step onto the surface, which is long
-     * enough to watch the other world come up around you and long enough to regret it.
-     */
-    public static final double SINK_RATE=.042;
-    /** What the liquid does to a body trying to wade across it. Sluggish, but not stuck. */
-    public static final double SINK_DRAG=.82;
-    /**
-     * How far one frantic attempt to get out lifts a body, in blocks.
-     *
-     * <p>The number that decides whether the pool is escapable, and it is set from the sink rate
-     * rather than guessed: at {@link #struggleRate()} presses a second the lift exactly cancels the
-     * sink, so anything slower loses ground and anything faster climbs. Six a second is fast — fast
-     * enough that it is a thing you do in a panic rather than a thing you do casually — and the
-     * deeper somebody already is, the longer they have to keep it up.
-     */
+    /** The goo stays slow, but a longer hold makes it steadily nastier. */
+    public static final double SINK_RATE=.044;
+    public static final double MAX_SINK_RATE=.052;
+    /** Compatibility floor; live portal physics uses sinkDrag(strength). */
+    public static final double SINK_DRAG=.84;
     public static final double STRUGGLE_LIFT=.14;
-    /** Presses a second at which struggling exactly cancels sinking. */
-    public static double struggleRate(){return SINK_RATE/STRUGGLE_LIFT*20;}
-    /** How long a body of this eye height takes to sink far enough to cross, in ticks. */
-    public static double sinkTicks(double eyeHeight){return eyeHeight/SINK_RATE;}
+
+    public static double gooStrength(int held){return charge(held);}
+
+    public static double sinkRate(double strength){
+        double s=Math.min(1,Math.max(0,strength));
+        double eased=s*s*(3-2*s);
+        return SINK_RATE+(MAX_SINK_RATE-SINK_RATE)*eased;
+    }
+
+    public static double sinkDrag(double strength){
+        double s=Math.min(1,Math.max(0,strength));
+        return .84-.13*s;
+    }
+
+    public static double gooPull(double strength){
+        double s=Math.min(1,Math.max(0,strength));
+        return .004+.018*s*s;
+    }
+
+    public static double struggleLift(double strength){
+        double s=Math.min(1,Math.max(0,strength));
+        if(inescapable(s))return 0;
+        return STRUGGLE_LIFT*Math.max(.22,1-.78*s*s);
+    }
+
+    public static boolean inescapable(double strength){return strength>=.999999;}
+
+    public static double struggleRate(int held){
+        double s=gooStrength(held),lift=struggleLift(s);
+        return lift<=0?Double.POSITIVE_INFINITY:sinkRate(s)/lift*20;
+    }
+    public static double struggleRate(){return struggleRate(MIN_CHARGE);}
+
+    public static double sinkTicks(double eyeHeight,int held){return eyeHeight/sinkRate(gooStrength(held));}
+    public static double sinkTicks(double eyeHeight){return eyeHeight/sinkRate(gooStrength(MIN_CHARGE));}
+
     public static boolean openAt(long opened,long now){return opened>=0&&now>=opened&&now-opened<OPEN_TICKS;}
     public static double pull(double distance){return Math.min(.32,.025+2.8/Math.max(10,distance));}
     public static double cellX(double x){return Math.floor((x+512)/1024)*1024;}

@@ -244,7 +244,7 @@ public final class Warping {
     }
     /** This break, as much of it as a crossing needs. Cheap: the shape behind it is already built. */
     private static WarpCrossing.Break brk(UUID owner,Charge c){
-        return new WarpCrossing.Break(owner,c.level,c.at,c.destination,c.cell,c.shape(),c.extent(),c.moved);
+        return new WarpCrossing.Break(owner,c.level,c.at,c.destination,c.cell,c.held,c.shape(),c.extent(),c.moved);
     }
     private static void send(Charge c,boolean clear){
         CompoundTag n=new CompoundTag();n.putBoolean("clear",clear);n.putDouble("x",c.at.x);n.putDouble("y",c.at.y);n.putDouble("z",c.at.z);n.putLong("start",c.start);n.putInt("destination",c.destination.ordinal());n.putLong("opened",c.opened);n.putInt("held",c.held);n.putLong("seed",c.seed);n.putLong("until",c.opened<0?c.level.getGameTime()+12:Math.min(c.opened+c.openTicks(),c.level.getGameTime()+12));n.putBoolean("recall",c.recall);n.putInt("window",c.openTicks());

@@ -104,15 +104,8 @@ public final class WarpRenderer {
             // Reset depth only inside the visible opening. The surrounding terrain and creatures remain occluders.
             RenderSystem.depthMask(true);GL11.glDepthFunc(GL11.GL_ALWAYS);GL11.glDepthRange(1,1);aperture(pose.last().pose(),brk);GL11.glDepthRange(0,1);GL11.glDepthFunc(GL11.GL_LEQUAL);
             RenderSystem.colorMask(true,true,true,true);RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
-            pose.pushPose();pose.translate(-d.arrival.x,-d.arrival.y,-d.arrival.z);
-            long realmAge=open?n.getLong("realmAge")+(long)Math.max(0,time-n.getLong("sent")):0;
-            try{
-                stage("sky",()->WarpScene.sky(pose,d,time));
-                stage("terrain",()->WarpScene.draw(pose,d,time,realmAge,true));
-                // Whatever is on the far side, at its real coordinates there. A body that fell
-                // through this hole is still falling, and this is how it is still watched.
-                stage("far side",()->WarpScene.shadows(pose,id,time,d));
-            }finally{pose.popPose();}
+            // Opaque entrance: no destination scene is drawn through the floor any more.
+            // Stencil/depth remains only to clip submerged body geometry correctly.
             RenderSystem.disableCull();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
             // Restore the floor depth after drawing the remote scene, so it cannot occlude unrelated world effects.
             RenderSystem.colorMask(false,false,false,false);GL11.glDepthFunc(GL11.GL_ALWAYS);aperture(pose.last().pose(),brk);GL11.glDepthFunc(GL11.GL_LEQUAL);RenderSystem.colorMask(true,true,true,true);
@@ -123,8 +116,9 @@ public final class WarpRenderer {
             // the authoritative aperture/crossing remains exactly where it was, while vegetation
             // inside the footprint reads as submerged under the portal instead of punching through.
             GL11.glDepthFunc(GL11.GL_ALWAYS);
-            groundFilm(pose.last().pose(),brk,open,d.color);
-            surface(pose.last().pose(),brk,at,open,age,held,time,d.color);
+            groundFilm(pose.last().pose(),brk,open);
+            int window=n.contains("window")?n.getInt("window"):WarpMath.OPEN_TICKS;
+            surface(pose.last().pose(),brk,open,age,held,time,window);
             GL11.glDepthFunc(GL11.GL_LEQUAL);
         }finally{
             pose.popPose();GL11.glStencilMask(255);GL11.glDisable(GL11.GL_STENCIL_TEST);GL11.glDepthRange(0,1);GL11.glDepthFunc(GL11.GL_LEQUAL);
@@ -297,15 +291,14 @@ public final class WarpRenderer {
      * cutout vegetation is terrain visually but has no collision, so it must look submerged without
      * changing WarpSurface, the stencil aperture or any server-side crossing test.
      */
-    private static void groundFilm(Matrix4f m,Break brk,boolean open,int colour){
+    private static void groundFilm(Matrix4f m,Break brk,boolean open){
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
         BufferBuilder b=Tesselator.getInstance().getBuilder();
         b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);
-        int dark=WarpMesh.shade(colour,.10);
-        float alpha=open?.58f:.46f;
         for(int ring=0;ring<brk.rings;ring++)for(int step=0;step<brk.steps;step++){
             if(!brk.face(ring,step))continue;
-            face(b,m,brk,ring,step,dark,alpha);
+            int tone=((ring+step)&7)==0?0x050607:0x010202;
+            face(b,m,brk,ring,step,tone,1.0f);
         }
         BufferUploader.drawWithShader(b.end());
     }
@@ -320,56 +313,64 @@ public final class WarpRenderer {
      * the surface, a rim that wobbles and brightens on the side currently advancing, and drops that
      * rise and fall back in. A thicker, prettier surface would be a mirror again.
      */
-    private static void surface(Matrix4f m,Break brk,Vec3 at,boolean open,double age,int held,double time,int colour){
+    private static void surface(Matrix4f m,Break brk,boolean open,double age,int held,double time,int window){
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
-        BufferBuilder b=Tesselator.getInstance().getBuilder();b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);
+        BufferBuilder b=Tesselator.getInstance().getBuilder();
+        b.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);
         double progress=open?1:WarpMath.charge(held);
-        // Opening settles the surface; the last second of the portal's life thickens it again as
-        // the liquid draws back in on itself.
-        double settle=open?Math.min(1,age/20.0):0;
-        double closing=open?Math.max(0,(age-(WarpMath.OPEN_TICKS-18))/18.0):0;
-        int pale=WarpMesh.shade(colour,1.5);
+        double settle=open?Math.min(1,age/26.0):0;
+        double closing=open?Math.max(0,(age-(Math.max(18,window)-18))/18.0):0;
+
         for(int ring=0;ring<brk.rings;ring++){
             double f=(ring+.5)/brk.rings;
-            // Rings running outward from where it was poured, and a slower swell under them.
-            double wave=Math.sin(f*15-time*.26+brk.seed%11)*.5+Math.sin(f*7+time*.11)*.5;
-            float alpha=(float)Math.max(0,(.115+.055*wave)*(1-settle*.42)+closing*.45);
-            if(alpha<=.004)continue;
-            int tone=WarpMesh.shade(colour,.72+.55*(wave*.5+.5));
+            double fold=Math.sin(f*10.5-time*.115+brk.seed%17)
+                +.55*Math.sin(f*21+time*.065+(brk.seed&7));
+            float alpha=(float)(.10+.055*(fold*.5+.75)+closing*.16);
+            int tone=fold>.45?0x111315:fold<-.65?0x030404:0x090a0b;
             for(int step=0;step<brk.steps;step++){
                 if(!brk.face(ring,step))continue;
                 face(b,m,brk,ring,step,tone,alpha);
             }
         }
-        // The meniscus. It follows the outline exactly, so it is the outline that reads, and it is
-        // brightest on whichever side the liquid is currently running out toward.
+
         int edge=brk.rings;
         for(int step=0;step<brk.steps;step++){
             if(!brk.whole(edge,step)||!brk.whole(edge,step+1))continue;
             double a=step*Math.PI*2/brk.steps;
             float lead=(float)WarpPool.advancing(brk.seed,a,progress);
-            double lift=.012+.02*Math.sin(time*.2+step*.7)*(1-settle*.6);
-            Vec3 p=new Vec3(brk.x(edge,step),brk.y(edge,step)+lift,brk.z(edge,step));
-            Vec3 q=new Vec3(brk.x(edge,step+1),brk.y(edge,step+1)+lift,brk.z(edge,step+1));
+            double pulse=.014+.018*Math.sin(time*.12+step*.43)*(1-settle*.55);
+            Vec3 p=new Vec3(brk.x(edge,step),brk.y(edge,step)+pulse,brk.z(edge,step));
+            Vec3 q=new Vec3(brk.x(edge,step+1),brk.y(edge,step+1)+pulse,brk.z(edge,step+1));
             if(p.distanceToSqr(q)<1.0E-7)continue;
-            WarpMesh.ribbon(b,m,p,q,.19+.13*lead,colour,.20f+.34f*lead);
-            WarpMesh.ribbon(b,m,p,q,.055,pale,.48f+.42f*lead);
+            WarpMesh.ribbon(b,m,p,q,.28+.16*lead,0x030405,.96f);
+            WarpMesh.ribbon(b,m,p,q,.085+.035*lead,0x24272a,.28f+.28f*lead);
         }
-        // Beads. Thrown up at the leading edge while it is still spreading, and a slow drip around
-        // the rim once it has settled. The colour is the floor's, because that is what it is taking up.
-        for(int step=0;step<brk.steps;step+=3){
-            if(!brk.whole(edge,step))continue;
-            double a=step*Math.PI*2/brk.steps;
-            float lead=(float)WarpPool.advancing(brk.seed,a,progress);
-            double cycle=(time*.05+noise(brk.seed,step,1))%1.0;
-            double height=Math.sin(cycle*Math.PI)*(.09+.42*lead);
-            if(height<.006)continue;
-            double inward=.10+.5*cycle;
-            double bx=brk.x(edge,step)*(1-inward*.06),bz=brk.z(edge,step)*(1-inward*.06);
-            double size=.045+.055*noise(brk.seed,step,2);
-            int ground=brk.tint(brk.x(edge,step),brk.z(edge,step),at);
-            WarpMesh.sphere(b,m,new Vec3(bx,brk.y(edge,step)+height,bz),size,size,size,
-                noise(brk.seed,step,3)<.45?ground:pale,(float)(.85*(1-cycle)),8,0,false);
+
+        int bubbles=Math.max(8,Math.min(26,brk.steps/4));
+        for(int i=0;i<bubbles;i++){
+            int step=Math.floorMod(i*37+(int)(brk.seed&31),brk.steps);
+            int ring=1+Math.floorMod(i*11+(int)(brk.seed>>>8),Math.max(1,brk.rings-1));
+            if(!brk.whole(ring,step))continue;
+            double cycle=(time*(.012+.002*(i%4))+noise(brk.seed,i,1))%1.0;
+            double dome=Math.max(0,Math.sin((cycle-.18)/.70*Math.PI));
+            if(cycle<.18||cycle>.88||dome<=0)continue;
+            double size=.10+.17*noise(brk.seed,i,2);
+            double y=brk.y(ring,step)+.018+dome*(.035+.055*noise(brk.seed,i,3));
+            int tone=i%5==0?0x202326:0x0b0d0e;
+            WarpMesh.sphere(b,m,new Vec3(brk.x(ring,step),y,brk.z(ring,step)),
+                size,size*.30*dome,size,tone,(float)(.28+.30*dome),10,0,false);
+        }
+
+        if(!open){
+            for(int step=0;step<brk.steps;step+=6){
+                if(!brk.whole(edge,step))continue;
+                double a=step*Math.PI*2/brk.steps;
+                float lead=(float)WarpPool.advancing(brk.seed,a,progress);
+                if(lead<.08f)continue;
+                Vec3 p=new Vec3(brk.x(edge,step),brk.y(edge,step)+.02,brk.z(edge,step));
+                Vec3 q=new Vec3(p.x*.90,p.y+.005,p.z*.90);
+                WarpMesh.ribbon(b,m,p,q,.06+.07*lead,0x2d3033,.18f+.34f*lead);
+            }
         }
         BufferUploader.drawWithShader(b.end());
     }

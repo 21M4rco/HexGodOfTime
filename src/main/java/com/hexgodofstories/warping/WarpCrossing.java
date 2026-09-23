@@ -66,7 +66,7 @@ public final class WarpCrossing {
 
     /** The break, as much of it as a passage needs. Built fresh each tick from the live portal. */
     public record Break(UUID portal, ServerLevel level, Vec3 at, Destination destination, double cell,
-                        double[] shape, double extent, Set<UUID> crossed) { }
+                        int held, double[] shape, double extent, Set<UUID> crossed) { }
 
     /** How far under the floor the grant reaches before a body is considered lost rather than falling. */
     private static final double BAND = 7.0;
@@ -99,6 +99,7 @@ public final class WarpCrossing {
     /** One body on its way through one break. Each is its own; nothing about this is shared. */
     private static final class Passage {
         final UUID portal; final long began;
+        final double strength, centerX, centerZ;
         double plane;
         /** Where the body was last tick, and how many ticks it has failed to move from there. */
         double was = Double.NaN; int still;
@@ -123,7 +124,10 @@ public final class WarpCrossing {
          * still on top of the plane, before a single tick of sinking has been applied.
          */
         final Vec3 stood;
-        Passage(UUID portal, double plane, long began, Vec3 stood) { this.portal = portal; this.plane = plane; this.began = began; this.stood = stood; }
+        Passage(UUID portal, double plane, long began, Vec3 stood, double strength, double centerX, double centerZ) {
+            this.portal=portal;this.plane=plane;this.began=began;this.stood=stood;
+            this.strength=strength;this.centerX=centerX;this.centerZ=centerZ;
+        }
     }
 
     private static final Map<UUID, Passage> PASSAGES = new HashMap<>();
@@ -219,9 +223,11 @@ public final class WarpCrossing {
         // Standing on it, or already dropping onto it. Not leaping over it from a height, and not
         // walking past a metre underneath it.
         if (e.getY() > plane + 0.45 || e.getY() < plane - 0.8) return;
-        PASSAGES.put(e.getUUID(), new Passage(brk.portal(), plane, now, new Vec3(e.getX(), plane + 0.02, e.getZ())));
+        double strength=WarpMath.gooStrength(brk.held());
+        PASSAGES.put(e.getUUID(), new Passage(brk.portal(), plane, now,
+            new Vec3(e.getX(), plane + 0.02, e.getZ()), strength, brk.at().x, brk.at().z));
         e.noPhysics = true;
-        phase(e, plane, now);
+        phase(e, plane, now, strength, brk.at().x, brk.at().z);
         entering(brk, e);
     }
 
@@ -231,7 +237,8 @@ public final class WarpCrossing {
         if (!Double.isNaN(plane)) passage.plane = plane;
         // Climbed back out, or waded off the side of the opening while still above it. Both are a
         // body that has changed its mind, and both give the floor back.
-        if (e.getY() > passage.plane + ESCAPE || !open(brk, e)) { abort(e, passage, true); return; }
+        boolean locked=WarpMath.inescapable(passage.strength);
+        if (e.getY() > passage.plane + ESCAPE || (!locked && !open(brk, e))) { abort(e, passage, true); return; }
         // Not moving at all is not the same as fighting: a body being sunk shifts every tick, so
         // anything that has genuinely stood still for three seconds is a client that never let go
         // of the floor rather than somebody holding their own against the liquid.
@@ -245,7 +252,7 @@ public final class WarpCrossing {
 
         e.noPhysics = true;
         sink(e, passage);
-        phase(e, passage.plane, now);
+        phase(e, passage.plane, now, passage.strength, passage.centerX, passage.centerZ);
         if (e.getY() + e.getEyeHeight() <= passage.plane - 0.02) cross(brk, passage, e, now);
     }
 
@@ -268,12 +275,18 @@ public final class WarpCrossing {
      * a player — so the two agree without anybody being corrected.
      */
     private static void sink(Entity e, Passage passage) {
-        double lift = passage.struggle;
-        passage.struggle = 0;
-        Vec3 v = e.getDeltaMovement();
-        e.setDeltaMovement(v.x * WarpMath.SINK_DRAG, -WarpMath.SINK_RATE + lift, v.z * WarpMath.SINK_DRAG);
-        e.fallDistance = 0;
-        if (!(e instanceof ServerPlayer)) e.hurtMarked = true;
+        double lift=passage.struggle;
+        passage.struggle=0;
+        Vec3 v=e.getDeltaMovement();
+        double dx=passage.centerX-e.getX(),dz=passage.centerZ-e.getZ();
+        double distance=Math.sqrt(dx*dx+dz*dz);
+        double pull=WarpMath.gooPull(passage.strength);
+        double px=distance>1.0E-5?dx/distance*pull:0;
+        double pz=distance>1.0E-5?dz/distance*pull:0;
+        double drag=WarpMath.sinkDrag(passage.strength);
+        e.setDeltaMovement(v.x*drag+px,-WarpMath.sinkRate(passage.strength)+lift,v.z*drag+pz);
+        e.fallDistance=0;
+        if(!(e instanceof ServerPlayer))e.hurtMarked=true;
     }
 
     /**
@@ -288,7 +301,9 @@ public final class WarpCrossing {
     public static void struggle(ServerPlayer p) {
         Passage passage = PASSAGES.get(p.getUUID());
         if (passage == null) return;
-        passage.struggle = Math.min(passage.struggle + WarpMath.STRUGGLE_LIFT, WarpMath.STRUGGLE_LIFT * 3);
+        double lift=WarpMath.struggleLift(passage.strength);
+        if(lift<=0)return;
+        passage.struggle=Math.min(passage.struggle+lift,lift*3);
     }
 
     /**
@@ -383,26 +398,30 @@ public final class WarpCrossing {
      * packet, a death, a disconnect or a server that simply stops talking all end the grant by
      * themselves instead of leaving a player permanently able to walk through walls.
      */
-    private static void phase(Entity e, double plane, long now) {
-        // Only a player needs telling. Everything else is moved by the server and drawn by every
-        // client from the positions it is already sent, so the grant is one packet to one machine.
-        if (!(e instanceof ServerPlayer p)) return;
-        CompoundTag n = new CompoundTag();
-        n.putDouble("plane", plane);
-        n.putLong("until", now + 5);
-        HexNetwork.to(p, new HexNetwork.Message(HexNetwork.WARP_PHASE, e.getId(), n));
+    private static void phase(Entity e,double plane,long now,double strength,double centerX,double centerZ) {
+        if(!(e instanceof ServerPlayer p))return;
+        CompoundTag n=new CompoundTag();
+        n.putDouble("plane",plane);
+        n.putDouble("strength",strength);
+        n.putDouble("centerX",centerX);
+        n.putDouble("centerZ",centerZ);
+        n.putLong("until",now+5);
+        HexNetwork.to(p,new HexNetwork.Message(HexNetwork.WARP_PHASE,e.getId(),n));
     }
 
     /** The surface parting as a body starts into it: a small ring of liquid drawn inward. Once. */
-    private static void entering(Break brk, Entity e) {
-        ServerLevel level = brk.level();
-        double y = e.getY() + 0.1;
-        for (int i = 0; i < 6; i++) {
-            double a = i * 1.047 + level.random.nextDouble();
-            double reach = 0.5 + level.random.nextDouble() * Math.max(1, e.getBbWidth());
-            level.sendParticles(HexGodOfStories.MOTE.get(), e.getX() + Math.cos(a) * reach, y, e.getZ() + Math.sin(a) * reach,
-                0, -Math.cos(a) * 0.14, -0.10, -Math.sin(a) * 0.14, 1);
+    private static void entering(Break brk,Entity e) {
+        ServerLevel level=brk.level();
+        double y=e.getY()+.08;
+        for(int i=0;i<9;i++){
+            double a=i*(Math.PI*2/9.0)+level.random.nextDouble()*.45;
+            double reach=.5+level.random.nextDouble()*Math.max(1.1,e.getBbWidth()*1.4);
+            level.sendParticles(net.minecraft.core.particles.ParticleTypes.SQUID_INK,
+                e.getX()+Math.cos(a)*reach,y,e.getZ()+Math.sin(a)*reach,
+                0,-Math.cos(a)*.10,-.055,-Math.sin(a)*.10,1);
         }
+        level.sendParticles(net.minecraft.core.particles.ParticleTypes.LARGE_SMOKE,
+            e.getX(),y+.03,e.getZ(),3,e.getBbWidth()*.3,.02,e.getBbWidth()*.3,.005);
     }
 
     /**
@@ -413,15 +432,18 @@ public final class WarpCrossing {
      * liquid closing over the place it went in. No flash, no column of light, and nothing that
      * reads as an arrival somewhere else.
      */
-    private static void membrane(Break brk, Entity e) {
-        ServerLevel level = brk.level();
-        level.playSound(null, BlockPos.containing(e.position()), net.minecraft.sounds.SoundEvents.AMBIENT_UNDERWATER_ENTER,
-            SoundSource.PLAYERS, .38f, .72f + level.random.nextFloat() * .16f);
-        level.playSound(null, BlockPos.containing(e.position()), HexGodOfStories.RIFT_CLOSE.get(),
-            SoundSource.PLAYERS, .28f, 1.45f);
-        level.sendParticles(HexGodOfStories.MOTE.get(), e.getX(), e.getY() + e.getEyeHeight() * .4, e.getZ(),
-            12, e.getBbWidth() * .55, e.getBbHeight() * .25, e.getBbWidth() * .55, .035);
-        level.sendParticles(HexGodOfStories.NEBULA.get(), e.getX(), e.getY() + .15, e.getZ(),
-            5, e.getBbWidth() * .4, .04, e.getBbWidth() * .4, .01);
+    private static void membrane(Break brk,Entity e) {
+        ServerLevel level=brk.level();
+        level.playSound(null,BlockPos.containing(e.position()),net.minecraft.sounds.SoundEvents.AMBIENT_UNDERWATER_ENTER,
+            SoundSource.PLAYERS,.34f,.58f+level.random.nextFloat()*.10f);
+        level.playSound(null,BlockPos.containing(e.position()),HexGodOfStories.RIFT_CLOSE.get(),
+            SoundSource.PLAYERS,.22f,.62f);
+        level.sendParticles(net.minecraft.core.particles.ParticleTypes.SQUID_INK,
+            e.getX(),e.getY()+e.getEyeHeight()*.35,e.getZ(),
+            13,e.getBbWidth()*.50,e.getBbHeight()*.18,e.getBbWidth()*.50,.018);
+        level.sendParticles(net.minecraft.core.particles.ParticleTypes.LARGE_SMOKE,
+            e.getX(),e.getY()+.10,e.getZ(),
+            5,e.getBbWidth()*.32,.025,e.getBbWidth()*.32,.008);
     }
+
 }

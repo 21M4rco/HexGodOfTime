@@ -176,57 +176,47 @@ public final class WarpMathTest {
      * so both are checkable without a world.
      */
     private static void quicksand(){
-        check(WarpMath.SINK_RATE>0,"a pool a body does not go down in is a floor");
-        // A player's eye is 1.62 blocks up, and the eye going under is what crosses somebody over,
-        // so that depth is what a crossing actually costs in time.
-        double crossing=WarpMath.sinkTicks(1.62);
-        check(crossing>30&&crossing<60,"sinking through takes between a second and a half and three ("+crossing/20+"s)");
-        check(crossing>freeFall(1.62)*4,"and it is nothing like falling the same distance ("+freeFall(1.62)+" ticks)");
-        check(WarpMath.sinkTicks(.9)<crossing&&crossing<WarpMath.sinkTicks(2.6),"something taller has further to go under");
-        check(WarpMath.SINK_DRAG>.6&&WarpMath.SINK_DRAG<.95,"the liquid is sluggish rather than setting solid");
-        check(Math.pow(WarpMath.SINK_DRAG,20)<.05,"a body that runs into a pool has stopped running within the second");
+        double min=WarpMath.gooStrength(WarpMath.MIN_CHARGE);
+        double full=WarpMath.gooStrength(WarpMath.FULL_CHARGE);
+        check(WarpMath.sinkRate(min)>.042,"small goo is slightly faster than the old sink");
+        check(WarpMath.sinkRate(full)>WarpMath.sinkRate(min),"holding longer makes the sink stronger");
+        check(WarpMath.sinkRate(full)<.06,"full charge is still a slow sink rather than a drop");
 
-        // The way out. One press of the jump key buys a fixed lift, so escaping is a rate: the
-        // question is how many a second it takes to out-climb the sink, and whether that number is
-        // high enough to be a panic and low enough to be possible.
-        double rate=WarpMath.struggleRate();
-        check(rate>5&&rate<8,"escape is a contest of speed and the speed is a fast one ("+rate+" a second)");
-        // Ten seconds of it, and a body has drifted less than one press is worth — the rate is the
-        // break-even one by construction, and all that is left in the number is where the presses
-        // happen to land in the ticks.
-        check(Math.abs(sunk(200,rate))<=WarpMath.STRUGGLE_LIFT+1.0E-6,"at exactly that rate a body holds its depth ("+sunk(200,rate)+")");
-        check(sunk(60,0)<-2,"a body that does nothing goes under");
-        check(sunk(200,rate*.6)<-1.5,"and so does one that tries at a comfortable speed");
-        check(sunk(200,rate*2)>1.62,"frantic thrashing climbs clear of a player's own height");
-        for(double slower=0;slower<rate*2;slower+=.5)
-            check(sunk(100,slower)<sunk(100,slower+.5),"hitting it faster is always worth something ("+slower+")");
+        double slow=WarpMath.sinkTicks(1.62,WarpMath.MIN_CHARGE);
+        double hard=WarpMath.sinkTicks(1.62,WarpMath.FULL_CHARGE);
+        check(slow>30&&slow<50,"small pool swallows a player's view slowly ("+slow/20+"s)");
+        check(hard>28&&hard<slow,"full pool is faster but still visible ("+hard/20+"s)");
+        check(slow>freeFall(1.62)*4,"goo is nothing like free-fall");
+        check(WarpMath.sinkDrag(full)<WarpMath.sinkDrag(min),"more charge makes sideways movement heavier");
+        check(WarpMath.sinkDrag(full)>.65,"full goo drags rather than freezing movement");
+        check(WarpMath.gooPull(full)>WarpMath.gooPull(min),"more charge pulls harder toward the middle");
 
-        // And the reason the server's watchdog for a stuck body measures stillness rather than
-        // elapsed time. A body doing nothing goes under in about two seconds; one very nearly
-        // keeping up holds out for the better part of half a minute. Any clock short enough to
-        // catch a client that never let go of the floor would hand that second body a free escape,
-        // which is the one thing the struggle is meant to cost.
-        check(endures(0)<60,"a body that does nothing is under in under three seconds ("+endures(0)+" ticks)");
-        check(endures(rate*.9)>300,"one that nearly keeps up lasts many times longer ("+endures(rate*.9)+" ticks)");
+        double rate=WarpMath.struggleRate(WarpMath.MIN_CHARGE);
+        check(rate>5&&rate<8,"small pools are a frantic but possible escape ("+rate+" presses/s)");
+        check(!Double.isFinite(WarpMath.struggleRate(WarpMath.FULL_CHARGE)),
+            "max charge cannot be jump-spammed out of");
+        check(WarpMath.inescapable(full)&&WarpMath.struggleLift(full)==0,
+            "full charge is the point of no return");
+        check(WarpMath.struggleLift(.8)<WarpMath.struggleLift(.3),
+            "escape leverage worsens with charge");
+
+        check(sunk(80,0,WarpMath.MIN_CHARGE)<-2,"doing nothing sinks through a small pool");
+        check(sunk(80,0,WarpMath.FULL_CHARGE)<sunk(80,0,WarpMath.MIN_CHARGE),
+            "max charge sinks further over the same time");
+        check(sunk(160,rate*1.45,WarpMath.MIN_CHARGE)>0,
+            "frantic thrashing can still climb from a small pool");
+        check(sunk(160,30,WarpMath.FULL_CHARGE)<0,
+            "absurd jump input still cannot reverse max charge");
     }
 
-    /** Ticks before a player's eye goes under, at this many presses a second. */
-    private static int endures(double perSecond){
-        for(int t=1;t<=2000;t++)if(sunk(t,perSecond)<=-1.62)return t;
-        return 2000;
-    }
-
-    /**
-     * Where a body ends up, relative to where it entered, after this long in the pool at this many
-     * frantic presses a second. The arithmetic is the one both sides of the wire run each tick.
-     */
-    private static double sunk(int ticks,double perSecond){
-        double y=0,carry=0;
+    private static double sunk(int ticks,double perSecond,int held){
+        double strength=WarpMath.gooStrength(held),y=0,carry=0;
         for(int t=0;t<ticks;t++){
             carry+=perSecond/20;
             int presses=0;
             while(carry>=1){carry-=1;presses++;}
-            y+=-WarpMath.SINK_RATE+Math.min(presses*WarpMath.STRUGGLE_LIFT,WarpMath.STRUGGLE_LIFT*3);
+            double lift=WarpMath.struggleLift(strength);
+            y+=-WarpMath.sinkRate(strength)+Math.min(presses*lift,lift*3);
         }
         return y;
     }
