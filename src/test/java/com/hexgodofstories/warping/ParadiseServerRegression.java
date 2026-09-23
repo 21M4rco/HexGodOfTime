@@ -86,6 +86,22 @@ public final class ParadiseServerRegression {
             &&e.getDuration()==6000),"bottle supplies five minutes of Candy Rush");
 
         FakePlayer player=new FakePlayer(level,new GameProfile(UUID.randomUUID(),"ParadiseRegression"));
+
+        // Fragile Paradise decoration must carry the same candy provenance as stone/soil. These were
+        // the easy misses because vanilla can drop them through neighbour updates instead of a clean
+        // one-block break path.
+        for(var target:new net.minecraft.world.level.block.Block[]{Blocks.LILY_PAD,Blocks.FLOWERING_AZALEA}) {
+            var nativeEntry=blueprint.entrySet().stream().filter(e->e.getValue().is(target)).findFirst().orElseThrow();
+            BlockPos nativePos=nativeEntry.getKey();
+            level.setBlock(nativePos,nativeEntry.getValue(),2|16);
+            ParadiseRestoration.broken(new BlockEvent.BreakEvent(level,nativePos,nativeEntry.getValue(),player));
+            level.destroyBlock(nativePos,true,player);
+            var nearby=level.getEntitiesOfClass(ItemEntity.class,new net.minecraft.world.phys.AABB(nativePos).inflate(2));
+            check(nearby.stream().anyMatch(e->ParadiseFood.edible(e.getItem())),
+                target.getName().getString()+" from Paradise is edible");
+            nearby.forEach(ItemEntity::discard);
+        }
+
         BlockPos support=new BlockPos(0,160,28),placed=support.above();
         level.setBlock(support,Blocks.SMOOTH_QUARTZ.defaultBlockState(),2|16);
         level.setBlock(placed,Blocks.AIR.defaultBlockState(),2|16);
