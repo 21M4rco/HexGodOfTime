@@ -18,7 +18,6 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 
@@ -29,7 +28,7 @@ public final class Frostbite {
     private record Chill(LivingEntity entity,long expires) { }
     private static final Map<UUID,Ice> ICE=new HashMap<>();
     private static final Map<UUID,Chill> CHILLED=new HashMap<>();
-    private static final int MAX_ICE=128;
+    private static final int MAX_ICE=128,MAX_CHILLED=256;
 
     public static boolean frozen(Entity e) {
         Ice ice=ICE.get(e.getUUID());
@@ -84,7 +83,8 @@ public final class Frostbite {
         if(ice==null||ice.entity!=target||attacker==null)return 0;
         release(ice);
         target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,200,2));
-        CHILLED.put(target.getUUID(),new Chill(target,target.level().getGameTime()+200));
+        if(CHILLED.containsKey(target.getUUID())||CHILLED.size()<MAX_CHILLED)
+            CHILLED.put(target.getUUID(),new Chill(target,target.level().getGameTime()+200));
         CompoundTag n=new CompoundTag();n.putBoolean("shiver",true);n.putLong("until",target.level().getGameTime()+200);
         HexNetwork.tracking(target,new HexNetwork.Message(HexNetwork.FROST,target.getId(),n));
         target.level().playSound(null,target.blockPosition(),SoundEvents.GLASS_BREAK,SoundSource.HOSTILE,1.2f,.68f);
@@ -119,11 +119,12 @@ public final class Frostbite {
             if(e.isRemoved()||!e.isAlive()||now>=ice.expires||TemporalEngine.frozen(e))release(ice);
             else hold(ice);
         }
-        Iterator<Map.Entry<UUID,Chill>> it=CHILLED.entrySet().iterator();
-        while(it.hasNext()) {
-            Chill chill=it.next().getValue();LivingEntity e=chill.entity;
+        // Frostbite damage can kill its victim and fire LivingDeathEvent, which removes it from
+        // CHILLED. Walk a bounded snapshot so that cleanup cannot invalidate this iteration.
+        for(Chill chill:java.util.List.copyOf(CHILLED.values())) {
+            LivingEntity e=chill.entity;
             if(e.level()!=level)continue;
-            if(e.isRemoved()||!e.isAlive()||now>=chill.expires){it.remove();continue;}
+            if(e.isRemoved()||!e.isAlive()||now>=chill.expires){CHILLED.remove(e.getUUID(),chill);continue;}
             if(now%20==0)e.hurt(level.damageSources().freeze(),1);
         }
     }

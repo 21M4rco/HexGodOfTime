@@ -39,14 +39,14 @@ public final class FrostClient {
     /** Blends the sword from its resting diagonal into a tip-first, forward-pointing beam pose. */
     public static float aim(ItemStack sword) {
         if(!sword.hasTag()||!sword.getTag().hasUUID("conjurer"))return 0;
-        Aim aim=AIM.get(sword.getTag().getUUID());
+        Aim aim=AIM.get(sword.getTag().getUUID("conjurer"));
         if(aim==null)return 0;
         long age=ClientState.now()-aim.start;
         return age<0||age>16?0:age<5?Mth.clamp(age/5f,0,1):Mth.clamp((16-age)/10f,0,1);
     }
     public static float pitch(ItemStack sword) {
         if(!sword.hasTag()||!sword.getTag().hasUUID("conjurer"))return 0;
-        Aim aim=AIM.get(sword.getTag().getUUID());
+        Aim aim=AIM.get(sword.getTag().getUUID("conjurer"));
         Entity e=aim==null||Minecraft.getInstance().level==null?null:Minecraft.getInstance().level.getEntity(aim.entity);
         return e==null?0:e.getXRot();
     }

@@ -171,7 +171,8 @@ public final class ServerEvents {
     /** A real vanilla sword hit opens the dagger wound; a direct blow cracks the ice on any mob. */
     @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
     public static void swordDamage(LivingDamageEvent e) {
-        if(e.getAmount()<=0||!(e.getEntity() instanceof LivingEntity victim))return;
+        if(e.getAmount()<=0)return;
+        LivingEntity victim=e.getEntity();
         if(e.getSource().getDirectEntity()!=null)e.setAmount(e.getAmount()+Frostbite.shatter(victim,e.getSource().getDirectEntity()));
         if(e.getSource().getDirectEntity() instanceof ServerPlayer player
             &&e.getSource().is(DamageTypes.PLAYER_ATTACK)
