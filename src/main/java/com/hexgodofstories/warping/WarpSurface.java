@@ -3,6 +3,7 @@ package com.hexgodofstories.warping;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -15,23 +16,27 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * instead, and gets the top of whatever is actually there: the collision shape's own upper face,
  * so a slab is half a block, a stair's lower half is half a block, and a full block is a block.
  *
- * <p>Two rules keep it from becoming a set of square decals. The answer is per column rather than
- * per piece, so two points in the same column agree exactly and a piece that spans a step is drawn
- * as one slanted surface between two heights rather than as two tiles at different levels. And the
- * vertical window widens with distance from the impact, so a fracture is allowed to climb a slope
- * as it travels without being allowed to jump onto a cliff that happens to be nearby.
+ * <p>The portal is a puddle, not ivy. It may cross slabs, stairs and a single-block terrain step,
+ * but it must never discover a tree canopy, wall top or roof several blocks above and then climb
+ * vertically toward it. Upward reach is therefore tightly capped from the original floor plane;
+ * only the downward search widens with distance so the goo may spill down a bank without crawling
+ * up obstacles.
  *
- * <p>A column with no surface inside its window answers {@link Double#NaN}: there is nothing there
- * for reality to crack across, and the caller drops that piece rather than floating it.
+ * <p>Tree logs and leaves are never treated as floor. A candidate surface must also have collision-
+ * free space in the block directly above it. That makes a wall column, trunk column or other solid
+ * vertical obstacle terminate the puddle instead of becoming a staircase for it.
+ *
+ * <p>A column with no valid ground surface answers {@link Double#NaN}: there is nothing there for
+ * the goo to spread across, and the caller drops that piece rather than floating or climbing.
  */
 public final class WarpSurface {
     private WarpSurface() { }
 
-    /** How far above the origin a surface may still be part of the same break. */
-    private static final double RISE = 1.6;
-    /** How far below, which is larger because a fracture falling off a ledge still reads. */
+    /** A puddle may take one normal terrain step upward, but never climb a vertical obstacle. */
+    private static final double RISE = 1.05;
+    /** Downhill spill is more permissive because falling off a bank still reads as liquid. */
     private static final double DROP = 2.6;
-    /** Extra window per block of distance, and the most it may ever grow to. */
+    /** Only the downward search widens with distance; upward reach stays hard-capped. */
     private static final double SPREAD = 0.28, LIMIT = 7.0;
 
     /**
@@ -41,17 +46,33 @@ public final class WarpSurface {
      */
     public static double height(BlockGetter level, double x, double z, double originY, double distance) {
         double window = Math.min(LIMIT, distance * SPREAD);
-        double up = originY + RISE + window, down = originY - DROP - window;
+        // Critical: distance is allowed to increase only the downhill spill. Letting it increase
+        // 'up' is what made a large charged portal discover leaves and roofs and climb them.
+        double up = originY + RISE, down = originY - DROP - window;
         int top = Mth.floor(up), bottom = Mth.floor(down);
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(Mth.floor(x), top, Mth.floor(z));
+        int bx=Mth.floor(x),bz=Mth.floor(z);
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(bx, top, bz);
+        BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos(bx, top+1, bz);
         for (int y = top; y >= bottom; y--) {
             pos.setY(y);
             BlockState state = level.getBlockState(pos);
             if (state.isAir()) continue;
+
+            // Trees are obstacles, not terrain. Skipping them also means a canopy can never become
+            // a false floor several blocks above the real ground.
+            if (state.is(BlockTags.LOGS) || state.is(BlockTags.LEAVES)) continue;
+
             VoxelShape shape = state.getCollisionShape(level, pos);
             if (shape.isEmpty()) continue;
             double surface = y + shape.max(Direction.Axis.Y);
-            if (surface > up) continue;      // the block is there but its top is above the window
+            if (surface > up) continue;
+
+            // A floor surface needs open/non-colliding room directly above it. Solid stacked
+            // columns are walls/trunks/buildings and terminate the puddle instead of lifting it.
+            above.setY(y+1);
+            BlockState over = level.getBlockState(above);
+            if (!over.getCollisionShape(level, above).isEmpty()) continue;
+
             return surface;
         }
         return Double.NaN;
