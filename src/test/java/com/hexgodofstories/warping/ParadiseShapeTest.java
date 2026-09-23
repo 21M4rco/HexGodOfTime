@@ -186,7 +186,7 @@ public final class ParadiseShapeTest {
                 "the cascade onto island " + fall.onto() + " stops at that island's surface");
         }
         System.out.printf("  %d cascades land on an island, %d fall into space%n", landing, endless);
-        check(landing >= 3 && endless >= 4, "the realm has both kinds of waterfall, and several of each");
+        check(endless >= 7, "the castle archipelago has seven long waterfalls into the cloud sea");
         // A lip buried in its own island's rock would be a spring inside a hill rather than a
         // waterfall off a cliff.
         for (Paradise.Fall fall : Paradise.falls())
