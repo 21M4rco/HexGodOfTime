@@ -87,19 +87,14 @@ public final class ParadiseServerRegression {
 
         FakePlayer player=new FakePlayer(level,new GameProfile(UUID.randomUUID(),"ParadiseRegression"));
 
-        // Fragile Paradise decoration must carry the same candy provenance as stone/soil. These were
-        // the easy misses because vanilla can drop them through neighbour updates instead of a clean
-        // one-block break path.
+        // Fragile Paradise decorations are tagged at loot creation, before support physics can move
+        // their eventual ItemEntity away from the source coordinate.
         for(var target:new net.minecraft.world.level.block.Block[]{Blocks.LILY_PAD,Blocks.FLOWERING_AZALEA}) {
             var nativeEntry=blueprint.entrySet().stream().filter(e->e.getValue().is(target)).findFirst().orElseThrow();
             BlockPos nativePos=nativeEntry.getKey();
-            level.setBlock(nativePos,nativeEntry.getValue(),2|16);
-            ParadiseRestoration.broken(new BlockEvent.BreakEvent(level,nativePos,nativeEntry.getValue(),player));
-            level.destroyBlock(nativePos,true,player);
-            var nearby=level.getEntitiesOfClass(ItemEntity.class,new net.minecraft.world.phys.AABB(nativePos).inflate(2));
-            check(nearby.stream().anyMatch(e->ParadiseFood.edible(e.getItem())),
+            var drops=net.minecraft.world.level.block.Block.getDrops(nativeEntry.getValue(),level,nativePos,null,player,ItemStack.EMPTY);
+            check(!drops.isEmpty()&&drops.stream().allMatch(ParadiseFood::edible),
                 target.getName().getString()+" from Paradise is edible");
-            nearby.forEach(ItemEntity::discard);
         }
 
         BlockPos support=new BlockPos(0,160,28),placed=support.above();
@@ -111,6 +106,7 @@ public final class ParadiseServerRegression {
         check(!ItemStack.isSameItemSameTags(food,ordinary),"Paradise candy blocks do not stack with ordinary blocks");
         check(food.getHoverName().getString().equals("Candy Pink Concrete"),"Paradise block name gets Candy prefix");
         check(CandyCorruption.DOSES_PER_LIMB==5&&CandyCorruption.BREAK_TICKS>=30,"five mouthfuls start one visible limb failure");
+        check(CandyCorruption.WINDOW_TICKS==6000,"candy danger window is exactly five minutes");
         player.setItemInHand(InteractionHand.MAIN_HAND,food);
         var hit=new BlockHitResult(Vec3.atCenterOf(support).add(0,.5,0),Direction.UP,support,false);
         var result=ForgeHooks.onPlaceItemIntoWorld(new UseOnContext(player,InteractionHand.MAIN_HAND,hit));
