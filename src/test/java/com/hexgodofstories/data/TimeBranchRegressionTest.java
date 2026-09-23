@@ -41,6 +41,8 @@ public final class TimeBranchRegressionTest {
             "held Time Branch must advance as a genuinely slow visible wave");
         require(BranchCharge.front(BranchCharge.RANGE,100)<70,
             "five seconds must not already fill most of the hundred-block beam");
+        require(BranchCharge.FULL>=240,"true lethal Time Branch must require at least twelve uninterrupted seconds");
+        require(BranchCharge.LIMIT>BranchCharge.FULL,"hard limit must leave a tiny grace window after maximum charge");
         require(BranchCharge.FOCUS>=2.7,"held focus ball must stay clearly detached from the caster");
         require(BranchCharge.sphere(BranchCharge.LIMIT)<1.2,"held focus ball must not engulf the caster");
         require(BranchCharge.SAFE<=1.0,"beam must visually leave the detached focus ball without a large dead gap");

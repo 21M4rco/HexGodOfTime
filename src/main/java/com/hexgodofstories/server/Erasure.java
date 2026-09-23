@@ -1,6 +1,8 @@
 package com.hexgodofstories.server;
 
 import com.hexgodofstories.network.HexNetwork;
+import com.hexgodofstories.warping.Destination;
+import com.hexgodofstories.warping.WarpRealms;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -39,11 +41,13 @@ public final class Erasure {
     private static final class Fading {
         final LivingEntity victim;final UUID caster;final Vec3 direction;
         final long start;final int duration;final boolean gravity,noAi,silent,implosion;final float power;
+        /** null means true erasure/death; otherwise the body is reconstructed in this Warping realm. */
+        final Destination banishTo;
         Fading(LivingEntity victim,UUID caster,Vec3 direction,long start,int duration,
-               boolean gravity,boolean noAi,boolean silent,boolean implosion,float power) {
+               boolean gravity,boolean noAi,boolean silent,boolean implosion,float power,Destination banishTo) {
             this.victim=victim;this.caster=caster;this.direction=direction;
             this.start=start;this.duration=duration;this.gravity=gravity;this.noAi=noAi;this.silent=silent;
-            this.implosion=implosion;this.power=power;
+            this.implosion=implosion;this.power=power;this.banishTo=banishTo;
         }
     }
     /**
@@ -53,6 +57,7 @@ public final class Erasure {
      * the death somebody is watching happen to them.
      */
     private static final int MOB_TICKS=150,PLAYER_TICKS=180,CHARGE_TICKS=90;
+    private static final Destination[] BANISHMENTS={Destination.SUN,Destination.GRAVITY_WELL,Destination.VOID_SEA};
     private static final Map<UUID,Fading> FADING=new LinkedHashMap<>();
     /** A hard ceiling on bodies mid-erasure, so a crowded torrent cannot grow unbounded work. */
     private static final int MAX=48;
@@ -65,13 +70,21 @@ public final class Erasure {
      *
      * @return true when this call is what caught it, so the caster's sweep does not double up.
      */
-    public static boolean begin(ServerPlayer caster,LivingEntity victim,Vec3 direction,float power) {
-        return begin(caster,victim,direction,power,false);
+    /** Fully charged held torrent: the only Time Branch outcome that is allowed to kill. */
+    public static boolean beginFatal(ServerPlayer caster,LivingEntity victim,Vec3 direction,float power) {
+        return begin(caster,victim,direction,power,false,null);
     }
+    /** Partial held torrent: same disappearance animation, but the victim wakes in one danger realm. */
+    public static boolean banish(ServerPlayer caster,LivingEntity victim,Vec3 direction,float power) {
+        Destination destination=BANISHMENTS[caster.getRandom().nextInt(BANISHMENTS.length)];
+        return begin(caster,victim,direction,power,false,destination);
+    }
+    /** Tap fist is never lethal now; it banishes after the same implosion animation. */
     public static boolean implode(ServerPlayer caster,LivingEntity victim,Vec3 direction) {
-        return begin(caster,victim,direction,.8f,true);
+        Destination destination=BANISHMENTS[caster.getRandom().nextInt(BANISHMENTS.length)];
+        return begin(caster,victim,direction,.8f,true,destination);
     }
-    private static boolean begin(ServerPlayer caster,LivingEntity victim,Vec3 direction,float power,boolean implosion) {
+    private static boolean begin(ServerPlayer caster,LivingEntity victim,Vec3 direction,float power,boolean implosion,Destination banishTo) {
         if(victim==null||!victim.isAlive()||erasing(victim)||FADING.size()>=MAX)return false;
         if(victim==caster||!HexServer.validTarget(caster,victim))return false;
         // Somebody's own animal is not what this is for.
@@ -79,8 +92,12 @@ public final class Erasure {
         int duration=implosion?com.hexgodofstories.data.BranchFistState.IMPLOSION
             :(victim instanceof Player?PLAYER_TICKS:MOB_TICKS)+(int)(power*CHARGE_TICKS);
         Fading fading=new Fading(victim,caster.getUUID(),direction.normalize(),victim.level().getGameTime(),
-            duration,victim.isNoGravity(),victim instanceof Mob m&&m.isNoAi(),victim.isSilent(),implosion,power);
+            duration,victim.isNoGravity(),victim instanceof Mob m&&m.isNoAi(),victim.isSilent(),implosion,power,banishTo);
         FADING.put(victim.getUUID(),fading);
+        if(banishTo!=null) {
+            ServerLevel destination=caster.server.getLevel(banishTo.key);
+            if(destination!=null)WarpRealms.prepare(destination,banishTo,WarpRealms.CELL);
+        }
         hold(fading);
         HexNetwork.tracking(victim,message(fading));
         return true;
@@ -107,7 +124,16 @@ public final class Erasure {
             Fading f=it.next().getValue();
             if(f.victim.level()!=level)continue;
             if(!f.victim.isAlive()||f.victim.isRemoved()){release(f);it.remove();continue;}
-            if(now-f.start>=f.duration){done.add(f);it.remove();continue;}
+            if(now-f.start>=f.duration) {
+                if(f.banishTo!=null) {
+                    ServerLevel destination=level.getServer().getLevel(f.banishTo.key);
+                    if(destination==null){release(f);it.remove();continue;}
+                    WarpRealms.prepare(destination,f.banishTo,WarpRealms.CELL);
+                    // Keep the already-vanished body held out of time until its destination blueprint is ready.
+                    if(!WarpRealms.ready(destination,WarpRealms.CELL)){hold(f);continue;}
+                }
+                done.add(f);it.remove();continue;
+            }
             hold(f);
         }
         for(Fading f:done)finish(f,level);
@@ -154,24 +180,29 @@ public final class Erasure {
      * bosses and modded creatures that refuse a damage source outright.
      */
     private static void finish(Fading f,ServerLevel level) {
-        // The mechanical holds go back so the death itself is an ordinary one; the silence stays, because
-        // the death sound would arrive after the body had already finished coming apart.
         unhold(f);
         LivingEntity v=f.victim;
         if(!v.isAlive()||v.isRemoved()){v.setSilent(f.silent);return;}
+
+        // Every non-maximum Time Branch result ends here: same erasure animation, no death. The body is
+        // reconstructed in exactly one of the three hostile Warping destinations.
+        if(f.banishTo!=null) {
+            v.setSilent(f.silent);
+            ServerLevel destination=level.getServer().getLevel(f.banishTo.key);
+            if(destination==null)return;
+            WarpRealms.start(destination,WarpRealms.CELL);
+            WarpRealms.transfer(v,f.banishTo,WarpRealms.CELL,false);
+            return;
+        }
+
+        // Fully charged uninterrupted torrent only: true erasure/death.
         ServerPlayer caster=level.getServer().getPlayerList().getPlayer(f.caster);
+        if(caster!=null)v.setLastHurtByPlayer(caster);
         DamageSource source=erasure(level,v,caster);
         v.invulnerableTime=0;
         v.hurt(source,v.getMaxHealth()*4+1000);
         if(v.isAlive()){v.invulnerableTime=0;v.kill();}
-        if(v instanceof Player) {
-            // A player's body cannot be discarded — the server owns their death and their respawn. Their
-            // corpse is hidden client-side instead, for as long as it lies there.
-            return;
-        }
-        // Everything else loses its shell now. The death above has already handed out drops, experience and
-        // advancements synchronously, so all that is thrown away is the corpse and the twenty ticks of
-        // tipping over that would otherwise undo the entire erasure.
+        if(v instanceof Player)return;
         v.discard();
     }
 

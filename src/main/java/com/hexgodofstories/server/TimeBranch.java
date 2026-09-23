@@ -44,13 +44,13 @@ public final class TimeBranch {
     /** An opened torrent, sweeping forward: what it has already caught and what it has yet to reach. */
     private static final class Torrent {
         final UUID caster;final Vec3 origin,direction;final double length;final float power;
-        final long start;final int life;final List<BlockPos> volume;final double[] distances;
+        final long start;final int life;final List<BlockPos> volume;final double[] distances;final boolean lethal;
         final Set<UUID> caught=new HashSet<>();
         int cursor;
         Torrent(UUID caster,Vec3 origin,Vec3 direction,double length,float power,long start,int life,
-                List<BlockPos> volume,double[] distances) {
+                List<BlockPos> volume,double[] distances,boolean lethal) {
             this.caster=caster;this.origin=origin;this.direction=direction;this.length=length;
-            this.power=power;this.start=start;this.life=life;this.volume=volume;this.distances=distances;
+            this.power=power;this.start=start;this.life=life;this.volume=volume;this.distances=distances;this.lethal=lethal;
         }
     }
     private static final Map<UUID,Cast> CASTS=new HashMap<>();
@@ -114,7 +114,7 @@ public final class TimeBranch {
         HexData.get(p).remove("branchStart");
         int held=Math.min(BranchCharge.LIMIT,(int)(HexData.now(p)-cast.start));
         HexNetwork.animate(p,"__clear__");
-        fire(p,held);
+        fire(p,held,held>=BranchCharge.FULL);
         HexData.get(p).putLong("cd_"+Ability.TIME_BRANCH.name(),HexData.now(p)+Ability.TIME_BRANCH.cooldown);
         HexServer.reward(p,Discipline.PURPOSE,180);
         HexNetwork.sync(p);
@@ -125,7 +125,8 @@ public final class TimeBranch {
         if(CASTS.remove(p.getUUID())==null)return;
         HexData.get(p).remove("branchStart");
         HexData.energy(p,HexData.energy(p)+Ability.TIME_BRANCH.cost);
-        HexData.get(p).putLong("cd_"+Ability.TIME_BRANCH.name(),HexData.now(p)+40);
+        // An interrupted charge is no longer a near-free reset. It spends the move's normal recovery.
+        HexData.get(p).putLong("cd_"+Ability.TIME_BRANCH.name(),HexData.now(p)+Ability.TIME_BRANCH.cooldown);
         HexNetwork.animate(p,"__clear__");
         sync(p,0,true);
         HexNetwork.sync(p);
@@ -140,7 +141,7 @@ public final class TimeBranch {
 
     // ---------------------------------------------------------------------- release ---
 
-    private static void fire(ServerPlayer p,int held) {
+    private static void fire(ServerPlayer p,int held,boolean lethal) {
         ServerLevel level=p.serverLevel();
         float power=BranchCharge.power(held);
         Vec3 origin=BranchCharge.focus(p,1);
@@ -155,7 +156,7 @@ public final class TimeBranch {
         long now=level.getGameTime();
         int life=BranchCharge.life(length,power);
         if(TORRENTS.size()>=MAX_TORRENTS)TORRENTS.remove(0);
-        TORRENTS.add(new Torrent(p.getUUID(),origin,direction,length,power,now,life,volume,distances));
+        TORRENTS.add(new Torrent(p.getUUID(),origin,direction,length,power,now,life,volume,distances,lethal));
 
         CompoundTag n=new CompoundTag();
         n.putDouble("x",origin.x);n.putDouble("y",origin.y);n.putDouble("z",origin.z);
@@ -206,7 +207,8 @@ public final class TimeBranch {
             if(perpendicular>radius+Math.max(victim.getBbWidth(),victim.getBbHeight())*.35)continue;
             // Recorded either way. A refusal here is final for this torrent — the caster's own animal, a
             // player who cannot be harmed, or a full register — so the sweep does not retry it every tick.
-            Erasure.begin(caster,victim,t.direction,t.power);
+            if(t.lethal)Erasure.beginFatal(caster,victim,t.direction,t.power);
+            else Erasure.banish(caster,victim,t.direction,t.power);
             t.caught.add(victim.getUUID());
         }
     }

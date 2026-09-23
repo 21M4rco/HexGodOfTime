@@ -90,3 +90,18 @@ Follow-up presentation patch:
 - Beam-owned wounds force their original snapshot back even if fluid moved into the cavity or a temporary
   block appeared during the window. Block entities are snapshotted with full metadata before removal, so
   chests, inventories, signs, machines, orientation/properties and other saved block data are restored.
+
+
+### Lethal maximum / Warping banishment split
+- FULL charge is now 240 ticks (12 seconds), with a 260-tick hard limit.
+- Only a held torrent released at FULL or later uses true Erasure death. Any earlier release keeps the exact
+  disappearance animation but reconstructs the victim in one randomly selected destination: Sun,
+  Gravity Well, or Void Sea.
+- The tap/right-fist move is also nonlethal now: its implosion sequence ends in the same three-way random
+  Warping banishment.
+- Destination choice is made server-side once when the erasure starts. The target realm is prepared during
+  the disappearance animation; if generation is not ready by the last fragment, the victim remains held
+  out of time until it is safe to transfer rather than spawning into an unbuilt void.
+- Interrupting a held charge now applies the full Time Branch cooldown instead of the old 40-tick recovery.
+- The full-charge kill path explicitly assigns the caster as last-hurt player before the kill source lands,
+  improving kill/advancement attribution for entities that previously failed to credit the caster.

@@ -16,8 +16,12 @@ import net.minecraft.world.phys.Vec3;
 public final class BranchCharge {
     private BranchCharge() {}
 
-    /** Stage thresholds in ticks: formation, stable, pressure, critical, maximum, overcharge. */
-    public static final int FORMATION=20,STABLE=50,PRESSURE=80,CRITICAL=110,FULL=140,LIMIT=200;
+    /**
+     * Stage thresholds in ticks: formation, stable, pressure, critical, maximum, hard limit.
+     * "Maximum" is intentionally twelve uninterrupted seconds now. Releasing even one tick before FULL
+     * still fires the move, but living targets are banished instead of killed.
+     */
+    public static final int FORMATION=30,STABLE=70,PRESSURE=120,CRITICAL=180,FULL=240,LIMIT=260;
     /** Reach, in blocks. Charge never extends it; charge widens the torrent instead. */
     public static final double RANGE=100;
     /**
@@ -45,7 +49,7 @@ public final class BranchCharge {
     /** The held breath: the sphere collapses inward for this long before anything leaves the hands. */
     public static final double COMPRESS=1.5;
 
-    /** 0 at a tap, 1 from five and a half seconds on. Gameplay strength saturates; drama does not. */
+    /** 0 at a tap, 1 only after twelve uninterrupted seconds. Gameplay strength saturates there. */
     public static float power(int held) {return Mth.clamp(held/(float)FULL,0,1);}
     /** 1 to 6, matching the documented presentation stages. */
     public static int stage(int held) {
