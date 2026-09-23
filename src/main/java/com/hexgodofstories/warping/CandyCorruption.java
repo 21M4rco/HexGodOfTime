@@ -3,7 +3,9 @@ package com.hexgodofstories.warping;
 import com.hexgodofstories.HexGodOfStories;
 import com.hexgodofstories.data.HexData;
 import com.hexgodofstories.network.HexNetwork;
+import net.minecraft.ChatFormatting;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -23,35 +25,76 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/** Paradise sugar eventually turns limbs into brittle bubblegum. Death clears the condition. */
+/**
+ * Paradise sugar eventually turns limbs into brittle bubblegum.
+ *
+ * <p>The danger is intentionally hidden. The first candy mouthful opens a five-minute real-time
+ * (server tick-time) window. Five Paradise consumptions inside that window cost one limb. Fewer than
+ * five simply expire when the window ends and the next mouthful starts a fresh five-minute window.
+ * The player sees warning action-bar lines, never the actual counter or timer.
+ */
 @Mod.EventBusSubscriber(modid=HexGodOfStories.ID)
 public final class CandyCorruption {
     private CandyCorruption(){}
 
     public static final int RIGHT_ARM=0,LEFT_ARM=1,RIGHT_LEG=2,LEFT_LEG=3;
     public static final int DOSES_PER_LIMB=5,BREAK_TICKS=36;
-    public static final String DOSES="candyDoses",MASK="candyLimbs",BREAKING="candyBreaking",BREAK_START="candyBreakStart";
+    public static final int WINDOW_TICKS=20*60*5;
+    public static final String DOSES="candyDoses",MASK="candyLimbs",BREAKING="candyBreaking",
+        BREAK_START="candyBreakStart",WINDOW_START="candyWindowStart";
+
     private static final UUID LEG_SLOW_UUID=UUID.fromString("e4c0303d-3c50-4c8c-9534-1f8d4a40611e");
+    private static final String[] WARNINGS={
+        "This tastes good... but something feels weird.",
+        "Way too sweet. Your skin tingles for a second.",
+        "Delicious. Why does your body feel sticky?",
+        "Paradise tastes amazing... your body disagrees.",
+        "That was really good. Something under your skin feels strange.",
+        "You want another bite. That probably is not a good sign.",
+        "A warm sugary feeling crawls through your limbs.",
+        "That tasted perfect. You swear you heard a tiny crack.",
+        "Sweet, soft, perfect... and somehow unsettling.",
+        "For a moment, your fingers feel like bubblegum."
+    };
 
     public static void consume(Player player,int doses){
         if(!(player instanceof ServerPlayer p)||doses<=0)return;
         CompoundTag d=HexData.get(p);
-        d.putInt(DOSES,Math.min(999,d.getInt(DOSES)+doses));
-        if(!d.contains(BREAKING))startNext(p);
+        long now=p.level().getGameTime();
+
+        // A fresh first bite opens the hidden window. Falling short of five before it expires wipes
+        // the count completely; there is no permanent accumulation across leisurely snacking.
+        if(!d.contains(WINDOW_START)||now-d.getLong(WINDOW_START)>=WINDOW_TICKS){
+            d.putInt(DOSES,0);
+            d.putLong(WINDOW_START,now);
+        }
+        d.putInt(DOSES,Math.min(DOSES_PER_LIMB,d.getInt(DOSES)+doses));
+
+        String warning=WARNINGS[p.getRandom().nextInt(WARNINGS.length)];
+        p.displayClientMessage(Component.literal(warning).withStyle(ChatFormatting.LIGHT_PURPLE),true);
+
+        if(d.getInt(DOSES)>=DOSES_PER_LIMB&&!d.contains(BREAKING))startNext(p);
     }
 
     private static void startNext(ServerPlayer p){
         CompoundTag d=HexData.get(p);
         if(d.getInt(DOSES)<DOSES_PER_LIMB||Integer.bitCount(mask(p)&15)>=4)return;
+
         List<Integer> choices=new ArrayList<>(3);
-        // The right arm is deliberately the last limb Paradise may take. It is the player's final
-        // feeding/interaction arm, so they can keep consuming candy until every other limb is gone.
+        // The anatomical right arm is always last. It is the final eating/interaction arm for the
+        // default player handedness, so Paradise cannot accidentally lock the player out of further
+        // candy before the other three limbs have had their turn.
         for(int part:new int[]{LEFT_ARM,RIGHT_LEG,LEFT_LEG})if(!missing(p,part))choices.add(part);
+
         int part;
         if(!choices.isEmpty())part=choices.get(p.getRandom().nextInt(choices.size()));
         else if(!missing(p,RIGHT_ARM))part=RIGHT_ARM;
         else return;
-        d.putInt(DOSES,d.getInt(DOSES)-DOSES_PER_LIMB);
+
+        // One five-mouthful window buys exactly one limb. Any candy eaten while this limb is cracking
+        // starts a brand-new hidden window rather than piggybacking on the one that just triggered.
+        d.putInt(DOSES,0);
+        d.remove(WINDOW_START);
         d.putInt(BREAKING,part);
         d.putLong(BREAK_START,p.level().getGameTime());
         sync(p,-1);
@@ -60,14 +103,29 @@ public final class CandyCorruption {
     public static void tick(ServerPlayer p){
         mobility(p);
         CompoundTag d=HexData.get(p);
-        if(!d.contains(BREAKING)){if(d.getInt(DOSES)>=DOSES_PER_LIMB)startNext(p);return;}
-        if(p.level().getGameTime()-d.getLong(BREAK_START)<BREAK_TICKS)return;
+        long now=p.level().getGameTime();
+
+        // Quietly expire an under-filled window. Do not tell the player the counter was reset.
+        if(d.contains(WINDOW_START)&&now-d.getLong(WINDOW_START)>=WINDOW_TICKS){
+            d.putInt(DOSES,0);
+            d.remove(WINDOW_START);
+        }
+
+        if(!d.contains(BREAKING)){
+            if(d.getInt(DOSES)>=DOSES_PER_LIMB)startNext(p);
+            return;
+        }
+        if(now-d.getLong(BREAK_START)<BREAK_TICKS)return;
+
         int part=d.getInt(BREAKING);
         d.putInt(MASK,mask(p)|(1<<part));
         d.remove(BREAKING);d.remove(BREAK_START);
         mobility(p);
         breakEffect(p,part);
         sync(p,part);
+
+        // The player may have kept eating during the cracking animation. If that second hidden window
+        // already reached five and has not expired, immediately begin the next limb.
         if(d.getInt(DOSES)>=DOSES_PER_LIMB)startNext(p);
     }
 
@@ -124,7 +182,7 @@ public final class CandyCorruption {
 
     public static void reset(ServerPlayer p){
         CompoundTag d=HexData.get(p);
-        d.remove(DOSES);d.remove(MASK);d.remove(BREAKING);d.remove(BREAK_START);
+        d.remove(DOSES);d.remove(MASK);d.remove(BREAKING);d.remove(BREAK_START);d.remove(WINDOW_START);
         AttributeInstance speed=p.getAttribute(Attributes.MOVEMENT_SPEED);
         if(speed!=null&&speed.getModifier(LEG_SLOW_UUID)!=null)speed.removeModifier(LEG_SLOW_UUID);
         sync(p,-1);
