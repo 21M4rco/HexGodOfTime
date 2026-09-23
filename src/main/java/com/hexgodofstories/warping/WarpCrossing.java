@@ -405,8 +405,30 @@ public final class WarpCrossing {
      * through, and that a hairline carries nobody wider than it is.
      */
     private static boolean open(Break brk, Entity e) {
-        return WarpPool.footing(brk.shape(), e.getX() - brk.at().x, e.getZ() - brk.at().z,
-            Math.max(0.3, e.getBbWidth()));
+        if(WarpPool.footing(brk.shape(), e.getX() - brk.at().x, e.getZ() - brk.at().z,
+            Math.max(0.3, e.getBbWidth())))return true;
+        return verticalContact(brk,e);
+    }
+
+    /**
+     * The black riser on a coated step is portal too, not decorative paint.
+     *
+     * <p>If the body's footprint is pressed against a higher portal-coated terrain tile, sample just
+     * beyond its collision edge. A surface that rises through the body's lower half is the vertical
+     * face it is touching. Once that face is inside the same authoritative pool outline, the normal
+     * sink begins from the lower floor under the body.
+     */
+    private static boolean verticalContact(Break brk,Entity e){
+        double half=Math.max(.18,e.getBbWidth()*.5+.045);
+        double[][] sample={{half,0},{-half,0},{0,half},{0,-half},{half,half},{half,-half},{-half,half},{-half,-half}};
+        double feet=e.getY(),max=Math.min(e.getY()+e.getBbHeight(),feet+1.35);
+        for(double[] s:sample){
+            double x=e.getX()+s[0],z=e.getZ()+s[1];
+            if(!WarpPool.inside(brk.shape(),x-brk.at().x,z-brk.at().z))continue;
+            double top=WarpSurface.height(brk.level(),x,z,brk.at().x,brk.at().y,brk.at().z);
+            if(Double.isFinite(top)&&top>feet+.12&&top<max+.08)return true;
+        }
+        return false;
     }
 
     /** The floor this body is going through, taken from the column it is actually standing in. */
