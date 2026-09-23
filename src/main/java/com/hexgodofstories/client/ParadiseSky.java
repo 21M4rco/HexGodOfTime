@@ -259,19 +259,32 @@ public final class ParadiseSky {
                 WarpMesh.sphere(b, m, p.add(0, 0, s * 0.23), s * 0.31, s * 0.31, s * 0.12, c, 1, 12, 0, false);
                 WarpMesh.box(b, m, p.x - s * 0.08, p.y - s * 2.55, p.z - s * 0.08, s * 0.16, s * 1.65, s * 0.16, 0xfff6e6, 1);
             }
-            case 1 -> {   // candy cane: tall striped stem and a clean hook
-                Vec3 foot = p.add(0, -s * 1.9, 0);
-                for (int i = 0; i < 8; i++) {
-                    Vec3 next = foot.add(0, s * 0.48, 0);
-                    WarpMesh.ribbon(b, m, foot, next, s * 0.19, i % 2 == 0 ? 0xfffaf4 : 0xff4f62, 1);
-                    foot = next;
+            case 1 -> {   // candy cane: volumetric and always upright, hook faces the archipelago
+                // The old cane was a flat ribbon living on the global X/Y plane. Depending on where it
+                // orbited the dome, that plane could be nearly edge-on and the hook looked rotated/broken.
+                // Build it from small 3-D beads instead and orient the hook inward toward the islands.
+                Vec3 inward=new Vec3(-p.x,0,-p.z);
+                if(inward.lengthSqr()<1.0E-6)inward=new Vec3(1,0,0);
+                inward=inward.normalize();
+                Vec3 foot=p.add(0,-s*1.72,0);
+                Vec3 top=foot;
+                for(int i=0;i<15;i++) {
+                    top=foot.add(0,i*s*.255,0);
+                    int stripe=(i/2)%2==0?0xfffaf4:0xff4f62;
+                    WarpMesh.sphere(b,m,top,s*.20,s*.20,s*.20,stripe,1,8,0,false);
                 }
-                for (int i = 0; i < 8; i++) {
-                    double t0 = Math.PI + i * Math.PI / 8, t1 = Math.PI + (i + 1) * Math.PI / 8;
-                    Vec3 hub = foot.add(s * 0.58, 0, 0);
-                    WarpMesh.ribbon(b, m, hub.add(Math.cos(t0) * s * 0.58, Math.sin(t0) * s * 0.58, 0),
-                        hub.add(Math.cos(t1) * s * 0.58, Math.sin(t1) * s * 0.58, 0),
-                        s * 0.19, i % 2 == 0 ? 0xff4f62 : 0xfffaf4, 1);
+                Vec3 hub=top.add(inward.scale(s*.60));
+                for(int i=0;i<=12;i++) {
+                    double a=Math.PI-i*Math.PI/12.0;
+                    Vec3 q=hub.add(inward.scale(Math.cos(a)*s*.60)).add(0,Math.sin(a)*s*.60,0);
+                    int stripe=(i/2)%2==0?0xff4f62:0xfffaf4;
+                    WarpMesh.sphere(b,m,q,s*.20,s*.20,s*.20,stripe,1,8,0,false);
+                }
+                Vec3 hookEnd=top.add(inward.scale(s*1.20));
+                for(int i=1;i<=4;i++) {
+                    Vec3 q=hookEnd.add(0,-i*s*.20,0);
+                    int stripe=((12+i)/2)%2==0?0xff4f62:0xfffaf4;
+                    WarpMesh.sphere(b,m,q,s*.20,s*.20,s*.20,stripe,1,8,0,false);
                 }
             }
             case 2 -> {   // donut / candy ring, deliberately simple from a distance
