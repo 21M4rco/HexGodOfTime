@@ -367,7 +367,7 @@ public final class HexServer {
         if(!HexData.spend(p,25)){notice(p,"Frost burst needs 25 Temporal Energy.");return;}
         HexData.get(p).putLong("cd_SWORD_FROST",now+160);
         FROST_CASTS.put(p.getUUID(),new FrostCast(now));
-        HexNetwork.animate(p,"sword_3");HexNetwork.fx(p,"frost_burst");
+        HexNetwork.animate(p,"sword_3");HexNetwork.fx(p,"frost_charge");
         p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,.8f,.85f);
         HexNetwork.sync(p);
     }

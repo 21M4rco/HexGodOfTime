@@ -26,8 +26,11 @@ public final class FrostClient {
     private static final Map<UUID,Aim> AIM=new HashMap<>();
 
     public static void receive(int id,CompoundTag data) {
-        if(data.getBoolean("frozen"))ICE.put(id,new Ice(new Vec3(data.getDouble("x"),data.getDouble("y"),data.getDouble("z")),
-            data.getFloat("yaw"),data.getFloat("pitch"),data.getInt("age"),data.getLong("until")));
+        if(data.getBoolean("frozen")) {
+            SHIVER.remove(id);
+            ICE.put(id,new Ice(new Vec3(data.getDouble("x"),data.getDouble("y"),data.getDouble("z")),
+                data.getFloat("yaw"),data.getFloat("pitch"),data.getInt("age"),data.getLong("until")));
+        }
         else if(data.getBoolean("shiver"))SHIVER.put(id,data.getLong("until"));
         else ICE.remove(id);
     }
@@ -60,13 +63,18 @@ public final class FrostClient {
         for(var entry:ICE.entrySet()) {
             Entity e=world.getEntity(entry.getKey());Ice ice=entry.getValue();
             if(e==null)continue;
-            e.setPos(ice.position);e.setYRot(ice.yaw);e.setXRot(ice.pitch);
+            if(e.position().distanceToSqr(ice.position)>1.0e-6)e.setPos(ice.position);
+            e.setYRot(ice.yaw);e.setXRot(ice.pitch);
             e.setDeltaMovement(Vec3.ZERO);e.tickCount=ice.age;
             e.xo=e.getX();e.yo=e.getY();e.zo=e.getZ();
             e.yRotO=e.getYRot();e.xRotO=e.getXRot();
-            if(e instanceof LivingEntity living){living.yHeadRot=ice.yaw;living.yBodyRot=ice.yaw;}
+            if(e instanceof LivingEntity living){
+                living.yHeadRot=ice.yaw;living.yHeadRotO=ice.yaw;
+                living.yBodyRot=ice.yaw;living.yBodyRotO=ice.yaw;
+            }
         }
         if(now%3==0)for(int id:SHIVER.keySet()) {
+            if(ICE.containsKey(id))continue;
             Entity e=world.getEntity(id);
             if(!(e instanceof LivingEntity living))continue;
             // A small tremor stays in the render state; it never changes server-side movement.

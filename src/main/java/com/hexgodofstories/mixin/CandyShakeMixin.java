@@ -1,6 +1,7 @@
 package com.hexgodofstories.mixin;
 
 import com.hexgodofstories.warping.CandyRush;
+import com.hexgodofstories.client.FrostClient;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.world.entity.LivingEntity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -25,6 +26,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class CandyShakeMixin {
     @Inject(method = "isShaking", at = @At("HEAD"), cancellable = true)
     private void hgos$candyRush(LivingEntity entity, CallbackInfoReturnable<Boolean> cir) {
-        if (CandyRush.on(entity)) cir.setReturnValue(true);
+        // Vanilla's fully-frozen renderer shakes an ice statue. Laevateinn's hold is still.
+        if (FrostClient.frozen(entity.getId())) cir.setReturnValue(false);
+        else if (CandyRush.on(entity)) cir.setReturnValue(true);
     }
 }

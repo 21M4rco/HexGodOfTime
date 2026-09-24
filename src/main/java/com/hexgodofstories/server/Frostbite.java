@@ -24,6 +24,7 @@ import java.util.UUID;
 /** Server-owned five-second ice hold, with a separate ten-second post-shatter frostbite. */
 public final class Frostbite {
     private Frostbite() { }
+    public static final double RANGE=15;
     private record Ice(LivingEntity entity,Vec3 position,Vec3 velocity,float yaw,float pitch,int age,long expires) { }
     private record Chill(LivingEntity entity,long expires) { }
     private static final Map<UUID,Ice> ICE=new HashMap<>();
@@ -39,20 +40,23 @@ public final class Frostbite {
     public static void burst(ServerPlayer caster) {
         ServerLevel level=caster.serverLevel();
         Vec3 origin=caster.getEyePosition(),forward=caster.getLookAngle().normalize();
-        Vec3 end=origin.add(forward.scale(10));
-        AABB bounds=new AABB(origin,end).inflate(3.5);
+        Vec3 end=origin.add(forward.scale(RANGE));
+        AABB bounds=new AABB(origin,end).inflate(5);
         for(LivingEntity victim:level.getEntitiesOfClass(LivingEntity.class,bounds,
             e->e!=caster&&!(e instanceof Player)&&HexServer.validTarget(caster,e))) {
             Vec3 center=victim.getBoundingBox().getCenter();
             Vec3 delta=center.subtract(origin);
             double distance=delta.dot(forward);
-            if(distance<0||distance>10+victim.getBbWidth()*.5)continue;
-            double spread=.38+Math.min(10,distance)*.29+Math.max(victim.getBbWidth(),victim.getBbHeight())*.4;
+            if(distance<0||distance>RANGE+victim.getBbWidth()*.5)continue;
+            if(delta.lengthSqr()>Math.pow(RANGE+victim.getBbWidth()*.5,2))continue;
+            double spread=.38+Math.min(RANGE,distance)*.29+Math.max(victim.getBbWidth(),victim.getBbHeight())*.4;
             if(delta.subtract(forward.scale(distance)).lengthSqr()>spread*spread)continue;
             BlockHitResult wall=level.clip(new ClipContext(origin,center,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,caster));
             if(wall.getType()!=HitResult.Type.MISS&&wall.getLocation().distanceToSqr(origin)+.12<delta.lengthSqr())continue;
             freeze(victim);
         }
+        BlockHitResult wall=level.clip(new ClipContext(origin,end,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,caster));
+        HexNetwork.frostBurst(caster,origin,forward,Math.min(RANGE,origin.distanceTo(wall.getLocation())));
         level.playSound(null,caster.blockPosition(),SoundEvents.GLASS_BREAK,SoundSource.PLAYERS,.85f,1.3f);
     }
 
@@ -65,15 +69,20 @@ public final class Frostbite {
             ?new Ice(target,prior.position,prior.velocity,prior.yaw,prior.pitch,prior.age,until)
             :new Ice(target,target.position(),target.getDeltaMovement(),target.getYRot(),target.getXRot(),target.tickCount,until);
         ICE.put(target.getUUID(),ice);
+        target.hurtTime=0;
         hold(ice);
         state(target,true,ice);
     }
 
     private static void hold(Ice ice) {
         LivingEntity e=ice.entity;
-        e.setPos(ice.position);e.setYRot(ice.yaw);e.setXRot(ice.pitch);
+        // The entity's tick is suspended. Only correct an actual displacement (for example a hit),
+        // otherwise repeatedly marking position/velocity dirty causes client interpolation to jitter.
+        if(e.position().distanceToSqr(ice.position)>1.0e-6)e.setPos(ice.position);
+        e.setYRot(ice.yaw);e.setXRot(ice.pitch);
         e.setYHeadRot(ice.yaw);e.yBodyRot=ice.yaw;
-        e.setDeltaMovement(Vec3.ZERO);e.setOldPosAndRot();e.hurtMarked=true;
+        if(e.getDeltaMovement().lengthSqr()>1.0e-8){e.setDeltaMovement(Vec3.ZERO);e.hurtMarked=true;}
+        e.setOldPosAndRot();
         e.invulnerableTime=0;
     }
 

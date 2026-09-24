@@ -47,7 +47,10 @@ public final class WorldEffects {
         String name=n.getString("effect");
         // All teleport destinations share the same quiet arrival; old effect names remain harmless.
         if(name.equals("arrive")||name.equals("arrive_realm")||name.equals("rift_cross"))name="nebula_arrival";
-        if(name.equals("frost_burst"))FrostClient.cast(entity);
+        if(name.equals("frost_charge"))FrostClient.cast(entity);
+        if(name.equals("frost_burst"))CosmicNebula.frostBurst(
+            new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z")),
+            new Vec3(n.getDouble("dx"),n.getDouble("dy"),n.getDouble("dz")),n.getDouble("reach"));
         Vec3 pos=new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z"));
         var p=Minecraft.getInstance().player;
         if(p!=null&&p.distanceToSqr(pos)<1600)TemporalScreen.trigger(name,entity==p.getId());
@@ -208,29 +211,12 @@ public final class WorldEffects {
         ParticleOptions green=HexGodOfStories.EMBER.get(),gold=HexGodOfStories.GOLD_EMBER.get();
         ParticleOptions nebula=HexGodOfStories.NEBULA.get(),veil=HexGodOfStories.VEIL.get(),star=HexGodOfStories.STAR.get(),smoke=HexGodOfStories.SMOKE.get();
         switch(kind) {
-            case "frost_burst" -> Vfx.bloom(entity,palm,look,17,(at,aim,t)->{
-                Entity wielder=mc.level.getEntity(entity);
-                Vec3 forward=wielder==null?aim:wielder.getLookAngle().normalize();
-                if(t<.35f) {
-                    Vfx.cone(FrostClient.PALE,at.add(forward.scale(1.1)),forward,Vfx.count(2.5f*Vfx.swell(t/.35f)),.06,.05);
-                    return;
-                }
-                if(t>.77f)return;
-                // A tip-first ten-block fan: six rays across a widening cone, drawn over several
-                // client ticks so a single attack cannot flood multiplayer clients with particles.
-                Vec3 right=forward.cross(new Vec3(0,1,0));
-                if(right.lengthSqr()<.01)right=new Vec3(1,0,0);
-                right=right.normalize();Vec3 up=right.cross(forward).normalize();
-                double reach=Math.min(10,2+(t-.35f)*24);
-                for(int ray=0;ray<9;ray++) {
-                    double angle=ray*Math.PI*2/9;
-                    Vec3 spread=right.scale(Math.cos(angle)).add(up.scale(Math.sin(angle)));
-                    for(int step=0;step<3;step++) {
-                        double distance=1.5+(step+1)*reach/3;
-                        Vec3 point=at.add(forward.scale(distance)).add(spread.scale(.12+distance*.24));
-                        Vfx.spark(ray%3==0?FrostClient.PALE:FrostClient.BLUE,point,forward.scale(.09));
-                    }
-                }
+            case "frost_charge" -> Vfx.bloom(entity,palm,look,8,(at,aim,t)->{
+                Vec3 forward=mc.level.getEntity(entity)==null?aim:mc.level.getEntity(entity).getLookAngle().normalize();
+                Vfx.cloud(FrostClient.BLUE,at.add(forward.scale(.8)),
+                    .35+.25*Vfx.ease(t),Vfx.count(2.5f*Vfx.swell(t)),.018);
+                Vfx.cone(FrostClient.PALE,at.add(forward.scale(1.1)),forward,
+                    Vfx.count(1.7f*Vfx.swell(t)),.035,.06);
             });
             case "frost_shatter" -> Vfx.bloom(-1,pos.add(0,.9,0),look,9,(at,aim,t)->{
                 Vfx.cone(FrostClient.PALE,at,new Vec3(0,.2,0),Vfx.count(8*Vfx.swell(t)),.22,.38);

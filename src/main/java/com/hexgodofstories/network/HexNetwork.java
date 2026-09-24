@@ -95,6 +95,15 @@ public final class HexNetwork {
         near(level,entity.position(),64,new Message(FX,entity.getId(),d));
     }
     public static void fx(Entity p,String name) {fx(p,name,p.getX(),p.getY(),p.getZ());}
+    /** Snapshot the discharged ray on the server so every viewer sees the same blue frost cloud. */
+    public static void frostBurst(ServerPlayer caster,net.minecraft.world.phys.Vec3 origin,
+                                  net.minecraft.world.phys.Vec3 direction,double reach) {
+        CompoundTag d=new CompoundTag();d.putString("effect","frost_burst");
+        d.putDouble("x",origin.x);d.putDouble("y",origin.y);d.putDouble("z",origin.z);
+        d.putDouble("dx",direction.x);d.putDouble("dy",direction.y);d.putDouble("dz",direction.z);
+        d.putDouble("reach",reach);
+        near(caster.serverLevel(),origin,64,new Message(FX,caster.getId(),d));
+    }
     public static void fx(Entity p,String name,double x,double y,double z) {
         CompoundTag d=new CompoundTag();d.putString("effect",name);d.putDouble("x",x);d.putDouble("y",y);d.putDouble("z",z);tracking(p,new Message(FX,p.getId(),d));
     }
