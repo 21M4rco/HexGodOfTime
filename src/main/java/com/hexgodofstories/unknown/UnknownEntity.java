@@ -19,6 +19,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -137,9 +138,9 @@ public final class UnknownEntity extends Mob implements GeoEntity {
             level().playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_LUNGE.get(),SoundSource.HOSTILE,4f,.83f);
             return;
         }
-        // He should feel immediately dangerous once active: a quick patrol pace, then a hard
-        // near-instant launch into a very fast chase instead of slowly winding up.
-        chaseSpeed=target==null?Mth.lerp(.18,chaseSpeed,.28):
+        // He never idles after emerging. Without prey he still prowls quickly through a wide area,
+        // and the instant he sees something edible he launches into the chase.
+        chaseSpeed=target==null?Mth.lerp(.14,chaseSpeed,.34):
                 Math.min(.96,Math.max(.62,chaseSpeed+.045));
         entityData.set(SPEED,(float)chaseSpeed);
         Vec3 direction=new Vec3(toward.x,0,toward.z).normalize();
@@ -193,28 +194,38 @@ public final class UnknownEntity extends Mob implements GeoEntity {
             if(!level.noCollision(this,body.move(0,y,0)))return false;
         return true;
     }
-    /** Keep patrolling the local ground and looking for prey between sightings. */
+    /** Keep prowling far beyond the immediate spawn area. It should always be going somewhere. */
     private Vec3 roam(ServerLevel level){
-        if(roamPoint==null||tickCount>=roamUntil||position().distanceToSqr(roamPoint)<16){
-            int x=Mth.floor(getX())+random.nextInt(37)-18,z=Mth.floor(getZ())+random.nextInt(37)-18;
+        if(roamPoint==null||tickCount>=roamUntil||position().distanceToSqr(roamPoint)<25){
+            double angle=random.nextDouble()*Math.PI*2.0;
+            double radius=30.0+random.nextDouble()*34.0;
+            int x=Mth.floor(getX()+Math.cos(angle)*radius);
+            int z=Mth.floor(getZ()+Math.sin(angle)*radius);
             BlockPos ground=level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,new BlockPos(x,0,z));
-            roamPoint=Vec3.atBottomCenterOf(ground);roamUntil=tickCount+80+random.nextInt(90);
+            roamPoint=Vec3.atBottomCenterOf(ground);
+            roamUntil=tickCount+110+random.nextInt(110);
         }
         return roamPoint.subtract(position());
     }
-    /** Acquire locally with sight; a target already acquired is pursued through walls and roofs. */
+    /** Hunt what is visible, but do not obsess over prey that escapes. */
     private LivingEntity findTarget(ServerLevel level){
         LivingEntity current=targetId==null?null:level.getEntity(targetId) instanceof LivingEntity living?living:null;
-        if(valid(current)&&distanceToSqr(current)<96*96)return current;
+        if(valid(current)){
+            double distance=distanceToSqr(current);
+            // Keep enough close-range memory to smash through a wall it just watched prey duck behind,
+            // but once the target is genuinely gone/out of sight, forget it and look for another meal.
+            if(distance<12*12||distance<42*42&&hasLineOfSight(current))return current;
+        }
         targetId=null;
-        if(++lastSense%8!=0)return null;
-        double best=28*28;
-        for(LivingEntity candidate:level.getEntitiesOfClass(LivingEntity.class,getBoundingBox().inflate(28),
+        setTarget(null);
+        if(++lastSense%4!=0)return null;
+        double best=42*42;
+        for(LivingEntity candidate:level.getEntitiesOfClass(LivingEntity.class,getBoundingBox().inflate(42),
                 this::valid)){
             double distance=distanceToSqr(candidate);
-            if(distance<best&&(distance<14*14||hasLineOfSight(candidate))){best=distance;current=candidate;}
+            if(distance<best&&(distance<12*12||hasLineOfSight(candidate))){best=distance;current=candidate;}
         }
-        if(current!=null&&valid(current)&&best<28*28)targetId=current.getUUID();
+        if(current!=null&&valid(current)&&best<42*42)targetId=current.getUUID();
         return targetId==null?null:current;
     }
     private boolean valid(LivingEntity target){
@@ -244,8 +255,9 @@ public final class UnknownEntity extends Mob implements GeoEntity {
                     if(UnknownTerrain.breakBlock(level,pos.immutable(),getUUID(),
                             born+UnknownSummoning.EMERGE_MS+UnknownSummoning.HUNT_MS+UnknownSummoning.VANISH_MS+15_000)){
                         taken++;
-                        level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK,state),
-                                pos.getX()+.5,pos.getY()+.5,pos.getZ()+.5,7,.25,.3,.25,.1);
+                        // Use Minecraft's native block-break event: the block's own break sound and
+                        // its normal debris particles, never Unknown's custom impact sound.
+                        level.levelEvent(2001,pos,Block.getId(state));
                         if(taken>=24)break;
                     }
                 }
@@ -253,10 +265,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
             }
             if(taken>=24)break;
         }
-        if(taken>0){
-            level.playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_IMPACT.get(),SoundSource.HOSTILE,2f,.9f);
-            blockedTicks=3; // Allow a fresh stride before the next impact.
-        }
+        if(taken>0)blockedTicks=3; // Allow a fresh stride before the next impact.
     }
     private void attack(ServerLevel level){
         attackTick++;entityData.set(ACTION_TICK,attackTick);
@@ -309,6 +318,10 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         if(attackTick>=(attackMode==2?70:29)){
             releaseVictim(level);attackTick=0;attackDelay=12;
             entityData.set(ACTION,0);entityData.set(ACTION_TICK,0);
+            // Meal is over. Immediately forget the previous victim and resume a wide prowl instead
+            // of lingering at the kill site or remaining mentally locked onto something that escaped.
+            targetId=null;setTarget(null);roamPoint=null;roamUntil=0;lastSense=3;
+            chaseSpeed=Math.max(chaseSpeed,.34);entityData.set(SPEED,(float)chaseSpeed);
         }
     }
     private Vec3 mouth(){
