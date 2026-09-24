@@ -183,7 +183,7 @@ public final class UnknownEntity extends Monster implements GeoEntity {
         entityData.set(PHASE,2);
         UnknownAbility.closePortal(this);
         ServerLevel server=(ServerLevel)level();
-        Nothingness.restoreUnknown(server,removed,restoreDue);
+        UnknownAbility.queueRestoration(server,removed,restoreDue);
         for(int i=0;i<14;i++)server.sendParticles(HexGodOfStories.TEMPORAL_DUST.get(),getX(),getY()+i*.55,getZ(),28,2.3,.8,2.3,.13);
         HexNetwork.fx(this,"demanifest");HexNetwork.pilgrimEffect(this,"unknown_vanish",position(),2);
         UnknownAbility.finished(this);
