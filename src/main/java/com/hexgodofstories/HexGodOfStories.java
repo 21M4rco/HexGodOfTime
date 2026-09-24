@@ -47,6 +47,9 @@ public final class HexGodOfStories {
     public static final RegistryObject<EntityType<ThrownDagger>> THROWN_DAGGER = ENTITIES.register("thrown_dagger", () -> EntityType.Builder.<ThrownDagger>of(ThrownDagger::new, MobCategory.MISC).sized(.28f,.28f).clientTrackingRange(8).updateInterval(1).build("hexgodofstories:thrown_dagger"));
     public static final RegistryObject<EntityType<RiftEntity>> RIFT = ENTITIES.register("rift", () -> EntityType.Builder.<RiftEntity>of(RiftEntity::new, MobCategory.MISC).sized(2.2f,2.8f).clientTrackingRange(10).updateInterval(2).fireImmune().noSummon().build("hexgodofstories:rift"));
 
+    public static final RegistryObject<EntityType<com.hexgodofstories.entity.UnknownEntity>> UNKNOWN =
+        ENTITIES.register("unknown",()->EntityType.Builder.of(com.hexgodofstories.entity.UnknownEntity::new,MobCategory.MONSTER)
+            .sized(4.8f,8.8f).clientTrackingRange(24).updateInterval(1).fireImmune().noSummon().build(ID+":unknown"));
     public static final RegistryObject<EntityType<StarfallEntity>> STARFALL = ENTITIES.register("starfall", () -> EntityType.Builder.<StarfallEntity>of(StarfallEntity::new, MobCategory.MISC).sized(.6f,.6f).clientTrackingRange(12).updateInterval(1).fireImmune().noSummon().build("hexgodofstories:starfall"));
 
     public static final RegistryObject<EntityType<ThroneSeat>> THRONE_SEAT = ENTITIES.register("throne_seat", () -> EntityType.Builder.<ThroneSeat>of(ThroneSeat::new, MobCategory.MISC).sized(.5f,.2f).clientTrackingRange(8).noSave().noSummon().build("hexgodofstories:throne_seat"));
@@ -145,7 +148,7 @@ public final class HexGodOfStories {
     public HexGodOfStories() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
         ENTITIES.register(bus); ITEMS.register(bus); BLOCKS.register(bus); SOUNDS.register(bus); TABS.register(bus); PARTICLES.register(bus); EFFECTS.register(bus);
-        bus.addListener((EntityAttributeCreationEvent e) -> {e.put(ILLUSION.get(), IllusionEntity.attributes().build());e.put(PILGRIM.get(),com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity.attributes().build());});
+        bus.addListener((EntityAttributeCreationEvent e) -> {e.put(ILLUSION.get(), IllusionEntity.attributes().build());e.put(PILGRIM.get(),com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity.attributes().build());e.put(UNKNOWN.get(),com.hexgodofstories.entity.UnknownEntity.attributes().build());});
         bus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) -> e.enqueueWork(HexNetwork::init));
     }
 }
