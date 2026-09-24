@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 
 public final class HexAnimations {
    private static final ResourceLocation LAYER = HexGodOfStories.id("casting");
-   private static final Set<String> OWN_FIRST_PERSON_ARM = Set.of("branch_punch");
+   private static final Set<String> OWN_FIRST_PERSON_ARM = Set.of("branch_punch", "unknown_summon");
    private static final Logger LOGGER = LogUtils.getLogger();
 
    private HexAnimations() {
@@ -83,4 +83,3 @@ public final class HexAnimations {
       }
    }
 }
-

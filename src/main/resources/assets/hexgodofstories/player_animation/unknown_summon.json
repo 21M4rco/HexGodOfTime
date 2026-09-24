@@ -15,12 +15,12 @@
         "tick": 0,
         "easing": "inoutquad",
         "rightArm": {
-          "pitch": -78,
+          "pitch": -48,
           "yaw": -12,
           "roll": -10
         },
         "leftArm": {
-          "pitch": -28,
+          "pitch": -18,
           "yaw": 18,
           "roll": 11
         },
@@ -34,12 +34,12 @@
         "tick": 6,
         "easing": "inoutquad",
         "rightArm": {
-          "pitch": -75,
+          "pitch": -44,
           "yaw": -12,
           "roll": -10
         },
         "leftArm": {
-          "pitch": -28,
+          "pitch": -18,
           "yaw": 18,
           "roll": 11
         },
@@ -53,12 +53,12 @@
         "tick": 15,
         "easing": "inoutquad",
         "rightArm": {
-          "pitch": -72,
+          "pitch": -48,
           "yaw": -12,
           "roll": -10
         },
         "leftArm": {
-          "pitch": -28,
+          "pitch": -18,
           "yaw": 18,
           "roll": 11
         },
@@ -72,12 +72,12 @@
         "tick": 25,
         "easing": "inoutquad",
         "rightArm": {
-          "pitch": -78,
+          "pitch": -48,
           "yaw": -12,
           "roll": -10
         },
         "leftArm": {
-          "pitch": -28,
+          "pitch": -18,
           "yaw": 18,
           "roll": 11
         },
@@ -91,12 +91,12 @@
         "tick": 35,
         "easing": "inoutquad",
         "rightArm": {
-          "pitch": -75,
+          "pitch": -44,
           "yaw": -12,
           "roll": -10
         },
         "leftArm": {
-          "pitch": -28,
+          "pitch": -18,
           "yaw": 18,
           "roll": 11
         },
@@ -110,12 +110,12 @@
         "tick": 40,
         "easing": "inoutquad",
         "rightArm": {
-          "pitch": -78,
+          "pitch": -48,
           "yaw": -12,
           "roll": -10
         },
         "leftArm": {
-          "pitch": -28,
+          "pitch": -18,
           "yaw": 18,
           "roll": 11
         },
