@@ -72,6 +72,7 @@ public final class ServerEvents {
     @SubscribeEvent public static void login(PlayerEvent.PlayerLoggedInEvent e) {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
         com.hexgodofstories.warping.CandyCorruption.sync(p,-1);
+        UnknownKillCredit.deliver(p);
         if(!HexData.access(p)){HexServer.access(p,false);return;}
         HexData.get(p).remove("transformStart");
         HexData.get(p).remove("branchStart");
