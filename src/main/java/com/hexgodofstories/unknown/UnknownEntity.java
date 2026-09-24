@@ -68,7 +68,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
     private double chaseSpeed;private Vec3 lastHeading=Vec3.ZERO;
     public UnknownEntity(EntityType<? extends UnknownEntity> type,Level level){
         super(type,level);setPersistenceRequired();
-        this.setMaxUpStep(2.5f);
+        this.setMaxUpStep(3.25f);
     }
     public static AttributeSupplier.Builder attributes(){
         return Mob.createMobAttributes().add(Attributes.MAX_HEALTH,100).add(Attributes.MOVEMENT_SPEED,.8)
@@ -168,7 +168,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         Vec3 step=direction.scale(chaseSpeed);
         // Track a real failed stride. Ordinary dirt, slopes and the floor beneath the creature
         // are NEVER valid obstructions to excavate.
-        if(target!=null&&previousChasePosition!=null&&position().distanceToSqr(previousChasePosition)<.06*.06
+        if(previousChasePosition!=null&&position().distanceToSqr(previousChasePosition)<.06*.06
                 &&horizontalCollision&&onGround())blockedTicks++;
         else blockedTicks=0;
         previousChasePosition=position();
@@ -180,9 +180,9 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         // Probe ahead every chase tick instead of waiting for a collision flag. If a real wall is
         // entering the creature's body path, tear through it immediately. The breach routine only
         // samples the forward body-height volume, never the ground beneath its feet.
-        if(target!=null&&onGround())breach(server,direction);
+        if(onGround())breach(server,direction);
         double vertical=getDeltaMovement().y;
-        boolean needsHighLeap=target!=null&&(target.getY()>getY()+2.0||wall||blockedTicks>=2);
+        boolean needsHighLeap=(target!=null&&target.getY()>getY()+2.0)||wall||blockedTicks>=2;
         if(onGround()&&needsHighLeap&&jumpCooldown==0&&clearAboveForLeap(server)){
             double rise=Math.max(0,target.getY()-getY());
             vertical=Mth.clamp(1.35+rise*.025,1.35,1.58);
@@ -192,7 +192,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
             blockedTicks=0;
             entityData.set(LEAPING,true);
             hasImpulse=true;
-        }else if(target!=null&&blockedTicks>=2){
+        }else if(blockedTicks>=2){
             // If there is not enough headroom to jump, chew through the obstruction immediately.
             breach(server,direction);
         }
@@ -277,20 +277,15 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         return target!=null&&target!=this&&target.isAlive()&&!target.isSpectator()
                 &&!(target instanceof UnknownEntity);
     }
-    /** Remove only the wall physically touching the front of the body after five failed strides. */
+    /** Remove only blocks entering the creature's forward body path, including low walls at its feet. */
     private void breach(ServerLevel level,Vec3 direction){
-        AABB body=getBoundingBox();
-        // Tall collisions need to be above the two-block step the creature can climb.
-        AABB high=new AABB(body.minX,body.minY+2.55,body.minZ,
-                body.maxX,body.maxY-.35,body.maxZ).move(direction.scale(.75));
-        if(level.noCollision(this,high))return;
         Vec3 front=position().add(direction.scale(getBbWidth()*.48));
         Vec3 side=new Vec3(-direction.z,0,direction.x);
         int floor=Mth.ceil(getY()-.01),taken=0;
         BlockState soundState=null;BlockPos soundPos=null;
-        for(int y=floor+1;y<floor+Math.min(8,Mth.ceil(getBbHeight()));y++){
+        for(int y=floor;y<floor+Math.min(8,Mth.ceil(getBbHeight()));y++){
             for(double across=-getBbWidth()*.43;across<=getBbWidth()*.43;across+=.85){
-                for(double ahead=0;ahead<=1.0;ahead+=.5){
+                for(double ahead=0;ahead<=1.5;ahead+=.5){
                     Vec3 hit=front.add(side.scale(across)).add(direction.scale(ahead));
                     BlockPos pos=BlockPos.containing(hit.x,y,hit.z);
                     if(pos.getY()<floor||!level.hasChunkAt(pos))continue;
