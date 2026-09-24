@@ -17,6 +17,7 @@ public final class UnknownAbility {
     public static final long CHARGE_MS=30_000, ACTIVE_MS=60_000, SPAWN_MS=10_000, COOLDOWN_MS=600_000;
     private record Charge(ServerLevel level,Vec3 spot,long started,long startedTick,long seed,int portalId){}
     private static final Map<UUID,Charge> CHARGING=new HashMap<>();
+    private static final Map<UUID,Charge> OPEN=new HashMap<>();
     private UnknownAbility(){}
     public static boolean charging(ServerPlayer p){return CHARGING.containsKey(p.getUUID());}
     private static Vec3 location(ServerPlayer p) {
@@ -61,6 +62,7 @@ public final class UnknownAbility {
         beast.summon(p,finish);
         if(!c.level.addFreshEntity(beast)){data.remove("unknown_active_until_ms");data.remove("unknown_cd_until_ms");clearPortal(c);return;}
         data.putUUID("unknown_entity",beast.getUUID());
+        OPEN.put(beast.getUUID(),c);
         portal(c.level,c,c.level.getGameTime(),false);
         HexNetwork.animate(p,"threads");
         HexNetwork.sync(p);
@@ -77,19 +79,15 @@ public final class UnknownAbility {
         }
     }
     public static void cancel(ServerPlayer p){Charge c=CHARGING.remove(p.getUUID());if(c!=null)clearPortal(c);}
+    public static void reset(){CHARGING.clear();OPEN.clear();}
+    public static void refreshPortal(UnknownEntity creature){Charge c=OPEN.get(creature.getUUID());if(c!=null)portal(c.level,c,c.startedTick+1,false);}
     public static void finished(UnknownEntity creature) {
         UUID owner=creature.summoner();
         if(owner==null)return;
         ServerPlayer player=creature.level().getServer().getPlayerList().getPlayer(owner);
         if(player!=null){CompoundTag d=HexData.get(player);d.remove("unknown_entity");d.remove("unknown_active_until_ms");HexNetwork.sync(player);}
     }
-    public static void closePortal(UnknownEntity creature) {
-        if(creature.summoner()==null)return;
-        ServerPlayer player=creature.level().getServer().getPlayerList().getPlayer(creature.summoner());
-        if(player==null)return;
-        CompoundTag n=new CompoundTag();n.putBoolean("clear",true);
-        HexNetwork.near((ServerLevel)creature.level(),creature.position(),100,new HexNetwork.Message(HexNetwork.WARP,-1_000_000-Math.floorMod(player.getUUID().hashCode(),1_000_000),n));
-    }
+    public static void closePortal(UnknownEntity creature) {Charge c=OPEN.remove(creature.getUUID());if(c!=null)clearPortal(c);}
     private static void clearPortal(Charge c) {
         CompoundTag n=new CompoundTag();n.putBoolean("clear",true);
         HexNetwork.near(c.level,c.spot,100,new HexNetwork.Message(HexNetwork.WARP,c.portalId,n));
