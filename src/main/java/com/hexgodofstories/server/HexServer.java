@@ -20,7 +20,7 @@ import net.minecraft.world.phys.*;
 import java.util.*;
 
 public final class HexServer {
-    public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12,BRANCH_TAP=13,WARP_CHOICE=14,WARP_RECALL=15,WARP_STRUGGLE=16;
+    public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12,BRANCH_TAP=13,WARP_CHOICE=14,WARP_RECALL=15,WARP_STRUGGLE=16,UNKNOWN_RELEASE=17;
     /** Values carried by {@link #TIME}: the permanent time controls, each on its own key. */
     public static final int TIME_HALT=0,TIME_RESUME=1,TIME_REWIND=2,TIME_DILATE=3;
     public record Moment(Vec3 position,float yaw,float pitch,float health) {}
@@ -52,6 +52,7 @@ public final class HexServer {
         if(action==RESYNC){HexNetwork.sync(p);return;}
         // Escaping a trap is available to ordinary players too; the live passage validates it.
         if(action==WARP_STRUGGLE){com.hexgodofstories.warping.WarpCrossing.struggle(p);return;}
+        if(action==UNKNOWN_RELEASE){UnknownAbility.release(p);return;}
         if(!HexData.access(p)){notice(p,"Your powers are locked. An operator must use /hgos unlock "+p.getGameProfile().getName()+" on.");return;}
         if(action==WARP_CHOICE){Warping.choose(p,value);return;}
         if(action==SELECT) {
@@ -70,6 +71,7 @@ public final class HexServer {
         // Being erased is not a state anything is cast out of, and a planted caster has only one move
         // left: letting go. Both refusals sit ahead of every other action on purpose.
         if(Erasure.erasing(p))return;
+        if(UnknownAbility.charging(p)){if(action==UTILITY)UnknownAbility.cancel(p);return;}
         if(TimeBranch.charging(p)&&action!=HOLD_END){if(action==UTILITY)TimeBranch.cancel(p);return;}
         if(action==SCROLL){Telekinesis.adjust(p,Math.max(-4,Math.min(4,value-8)));return;}
         if(action==HOLD_END){
@@ -155,6 +157,11 @@ public final class HexServer {
             default -> null;
         };
         if(a==null)return;
+        if(a==Ability.SLOW_FIELD){
+            if(!HexData.unlocked(p,a)||HexData.cooldown(p,a)>0||HexData.energy(p)<a.cost){notice(p,"Unknown is not ready.");return;}
+            if(UnknownAbility.begin(p))HexNetwork.sync(p);
+            return;
+        }
         if(a==Ability.TIME_STOP&&TemporalEngine.owns(p)) {
             TemporalEngine.clear(p);HexNetwork.sync(p);return;
         }
@@ -217,7 +224,8 @@ public final class HexServer {
                 gesture(p,"time_slip","slip",HexGodOfStories.SLIP.get());teleport(p,m.position);p.setYRot(m.yaw);p.setXRot(m.pitch);
                 HexNetwork.fx(p,"slip");return true;
             }
-            case SLOW_FIELD,TIME_STOP -> {boolean stop=a==Ability.TIME_STOP;if(!TemporalEngine.field(p,stop,null,stop?120:180))return false;gesture(p,"time_stop",stop?"stop":"dilate",HexGodOfStories.STOP.get());return true;}
+            case SLOW_FIELD -> {return false;} // replaced by Unknown's dedicated held-key sequence
+            case TIME_STOP -> {if(!TemporalEngine.field(p,true,null,120))return false;gesture(p,"time_stop","stop",HexGodOfStories.STOP.get());return true;}
             case SELECTIVE_STOP -> {if(t==null||!validTarget(p,t)||!TemporalEngine.field(p,true,t,t instanceof Player?40:100))return false;gesture(p,"time_stop","bind",HexGodOfStories.STOP.get());return true;}
             case THREADS -> {
                 if(t==null||!validTarget(p,t))return false;
@@ -392,6 +400,7 @@ public final class HexServer {
         Transformation.sustain(p);
         CosmicFlight.tick(p);
         TimeBranch.tick(p);
+        UnknownAbility.tick(p);
         BranchFist.tick(p);
         if(now%4==0&&!TemporalEngine.frozen(p)) {
             ArrayDeque<Moment> h=HISTORY.computeIfAbsent(p.getUUID(),k->new ArrayDeque<>());
@@ -583,6 +592,7 @@ public final class HexServer {
 
     public static void clear(ServerPlayer p,boolean death) {
         Warping.cancel(p);
+        UnknownAbility.cancel(p);
         com.hexgodofstories.warping.WarpCrossing.forget(p);
         com.hexgodofstories.warping.WarpEmergence.cancel(p);
         Telekinesis.forget(p);Architecture.dismiss(p);clearIllusions(p);dismissRift(p);TemporalEngine.clear(p);
@@ -597,7 +607,7 @@ public final class HexServer {
     public static void reset() {
         PersonalRewind.reset();
         HISTORY.clear();CHARMS.clear();STRIKES.clear();FROST_CASTS.clear();INPUT.clear();TRAINING.clear();ILLUSIONS.clear();WATCHED.clear();RIFTS.clear();
-        Warping.reset();
+        Warping.reset();UnknownAbility.reset();
         Telekinesis.reset();Architecture.reset();Bleed.reset();Frostbite.reset();PocketRealm.reset();TemporalEngine.reset();
         Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();
     }
