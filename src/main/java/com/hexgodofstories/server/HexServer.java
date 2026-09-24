@@ -36,7 +36,7 @@ public final class HexServer {
     private static final Map<UUID,UUID> RIFTS=new HashMap<>();
     private static final Map<UUID,ArrayDeque<Vec3>> WATCHED=new HashMap<>();
 
-    public static boolean validTarget(ServerPlayer p,Entity e) {return e!=p&&e.isAlive()&&!e.isSpectator()&&!p.isAlliedTo(e)&&(!(e instanceof Player q)||!q.isCreative()&&p.canHarmPlayer(q));}
+    public static boolean validTarget(ServerPlayer p,Entity e) {return !(e instanceof com.hexgodofstories.entity.UnknownEntity)&&e!=p&&e.isAlive()&&!e.isSpectator()&&!p.isAlliedTo(e)&&(!(e instanceof Player q)||!q.isCreative()&&p.canHarmPlayer(q));}
     public static Entity target(ServerPlayer p,double range) {
         Vec3 start=p.getEyePosition(),end=start.add(p.getLookAngle().scale(range));
         BlockHitResult block=p.level().clip(new ClipContext(start,end,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,p));
