@@ -178,18 +178,18 @@ public final class UnknownEntity extends Monster implements GeoEntity {
     @Override public boolean isPushable(){return false;}
     @Override public boolean canBeLeashed(Player player){return false;}
     @Override public boolean removeWhenFarAway(double distance){return false;}
-    @Override protected void addAdditionalSaveData(CompoundTag tag) {
+    @Override public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         if(owner!=null)tag.putUUID("Owner",owner);
         tag.putLong("EndMillis",endMillis);tag.putLong("RestoreDue",restoreDue);
         ListTag cells=new ListTag();for(BlockPos pos:removed)cells.add(LongTag.valueOf(pos.asLong()));tag.put("Wounds",cells);
     }
-    @Override protected void readAdditionalSaveData(CompoundTag tag) {
+    @Override public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         owner=tag.hasUUID("Owner")?tag.getUUID("Owner"):null;
         endMillis=tag.getLong("EndMillis");restoreDue=tag.getLong("RestoreDue");
         removed.clear();ListTag cells=tag.getList("Wounds",4);
-        for(int i=0;i<cells.size();i++)removed.add(BlockPos.of(cells.getLong(i)));
+        for(int i=0;i<cells.size();i++)removed.add(BlockPos.of(((LongTag)cells.get(i)).getAsLong()));
     }
     @Override public Packet<ClientGamePacketListener> getAddEntityPacket(){return NetworkHooks.getEntitySpawningPacket(this);}
     private <T extends UnknownEntity> PlayState animate(software.bernie.geckolib.core.animation.AnimationState<T> state){
