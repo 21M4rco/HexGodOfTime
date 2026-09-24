@@ -5,6 +5,7 @@ import com.hexgodofstories.data.HexData;
 import com.hexgodofstories.network.HexNetwork;
 import com.hexgodofstories.server.Nothingness;
 import com.hexgodofstories.server.UnknownAbility;
+import com.hexgodofstories.server.UnknownKillCredit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.LongTag;
@@ -156,8 +157,18 @@ public final class UnknownEntity extends Monster implements GeoEntity {
                 ServerPlayer caster=owner==null?null:level().getServer().getPlayerList().getPlayer(owner);
                 DamageSource source=caster!=null?victim.damageSources().playerAttack(caster):victim.damageSources().mobAttack(this);
                 victim.invulnerableTime=0;
-                victim.hurt(source,100000);
-                if(!victim.isAlive())HexNetwork.fx(victim,"demanifest");
+                boolean normal=victim.hurt(source,100000);
+                // Some servers disable PvP. The actual monster still attacks everyone, with
+                // manual player credit only when vanilla rejected the player-source strike.
+                if(!normal&&victim.isAlive()&&caster!=null){
+                    DamageSource fallback=victim.damageSources().mobAttack(this);
+                    victim.hurt(fallback,100000);
+                    if(!victim.isAlive())caster.awardKillScore(victim,0,fallback);
+                }
+                if(!victim.isAlive()){
+                    if(caster==null)UnknownKillCredit.recordOffline((ServerLevel)level(),owner,victim);
+                    HexNetwork.fx(victim,"demanifest");
+                }
             }
         }
         if(tickCount%12==0) {
