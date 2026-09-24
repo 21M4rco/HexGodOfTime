@@ -270,7 +270,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
             finish();
         super.remove(reason);
     }
-    @Override protected void addAdditionalSaveData(CompoundTag n){
+    @Override public void addAdditionalSaveData(CompoundTag n){
         super.addAdditionalSaveData(n);
         if(caster!=null)n.putUUID("Caster",caster);
         n.putLong("Born",born);n.putDouble("PortalX",portal.x);n.putDouble("PortalY",portal.y);
@@ -278,7 +278,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         n.putInt("Phase",phase());if(targetId!=null)n.putUUID("Target",targetId);
         // Grabbed players are released on unload/restart, never left with a control/camera modifier.
     }
-    @Override protected void readAdditionalSaveData(CompoundTag n){
+    @Override public void readAdditionalSaveData(CompoundTag n){
         super.readAdditionalSaveData(n);
         if(n.hasUUID("Caster"))caster=n.getUUID("Caster");
         born=n.getLong("Born");portal=new Vec3(n.getDouble("PortalX"),n.getDouble("PortalY"),n.getDouble("PortalZ"));
