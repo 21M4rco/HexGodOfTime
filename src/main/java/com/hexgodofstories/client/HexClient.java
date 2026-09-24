@@ -35,7 +35,7 @@ public final class HexClient {
     /** The permanent time commands, paired with the value {@link HexServer#TIME} carries for each. */
     public static final KeyMapping[] TIME_KEYS={TIME_STOP,TIME_RESUME,TIME_REWIND,TIME_DILATE};
     private static KeyMapping key(String name,int key){return new KeyMapping("key.hexgodofstories."+name,InputConstants.Type.KEYSYM,key,"key.categories.hexgodofstories");}
-    private static boolean primaryDown,selectDown,primaryWasHold,primaryLatched;
+    private static boolean primaryDown,selectDown,primaryWasHold,primaryLatched,unknownDown;
     private static int repeat;
     /** The server syncs this flag. Missing/false means this client gets no mod UI or controls at all. */
     public static boolean enabled(){return ClientState.self().getBoolean("abilitiesEnabled");}
@@ -61,6 +61,7 @@ public final class HexClient {
         @SubscribeEvent public static void entities(EntityRenderersEvent.RegisterRenderers e) {
             e.registerEntityRenderer(HexGodOfStories.ILLUSION.get(),IllusionRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.PILGRIM.get(),com.hexgodofstories.client.leviathan.AbyssalPilgrimRenderer::new);
+            e.registerEntityRenderer(HexGodOfStories.UNKNOWN.get(),UnknownRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.WARP_HAZARD.get(),WarpHazardRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.PROJECTILE.get(),SpellRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.THROWN_DAGGER.get(),DaggerRenderer::new);
@@ -89,11 +90,12 @@ public final class HexClient {
             if(e.phase!=TickEvent.Phase.END)return;
             ClientState.tick();
             Minecraft mc=Minecraft.getInstance();
-            if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;selectDown=false;QuickBar.closeBar(false);return;}
+            if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;selectDown=false;unknownDown=false;QuickBar.closeBar(false);return;}
             if(!enabled()) {
                 // Locked means invisible and inert, not merely server-rejected. Swallow every mod input
                 // and close any mod-only screen immediately when access is revoked.
                 BranchKeyInput.cancel(false);
+                unknownDown=false;
                 primaryLatched=primaryPhysicallyDown();
                 primaryDown=false;primaryWasHold=false;repeat=0;
                 selectDown=SELECT.isDown();
@@ -103,6 +105,7 @@ public final class HexClient {
             }
             if(mc.screen!=null) {
                 BranchKeyInput.cancel(true);
+                if(unknownDown){HexNetwork.send(HexServer.UNKNOWN_RELEASE,0);unknownDown=false;}
                 // Ending the hold here means the key is no longer "down" as far as this loop knows,
                 // so a key that is still physically held would read as a brand new press the moment
                 // the screen closes. Crossing a dimension puts the terrain screen up mid-hold, which
@@ -143,7 +146,12 @@ public final class HexClient {
             while(RELEASE.consumeClick())HexNetwork.send(HexServer.UTILITY,0);
             while(RECALL.consumeClick())HexNetwork.send(HexServer.WARP_RECALL,0);
             while(FLIGHT.consumeClick())HexNetwork.send(HexServer.FLIGHT,0);
-            for(int i=0;i<TIME_KEYS.length;i++)while(TIME_KEYS[i].consumeClick())HexNetwork.send(HexServer.TIME,i);
+            for(int i=0;i<3;i++)while(TIME_KEYS[i].consumeClick())HexNetwork.send(HexServer.TIME,i);
+            boolean heldUnknown=TIME_DILATE.isDown();
+            if(heldUnknown&&!unknownDown)HexNetwork.send(HexServer.TIME,HexServer.TIME_DILATE);
+            if(!heldUnknown&&unknownDown)HexNetwork.send(HexServer.UNKNOWN_RELEASE,0);
+            unknownDown=heldUnknown;
+            while(TIME_DILATE.consumeClick());
             drain();
         }
         /** Called when the world changes underfoot: a held cast must not survive the crossing. */
