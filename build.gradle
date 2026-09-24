@@ -145,3 +145,12 @@ tasks.register('verifyWarpTessellation', JavaExec) {
     mainClass = 'com.hexgodofstories.warping.WarpTessellationTest'
 }
 tasks.named('check') { dependsOn 'verifyWarpTessellation' }
+
+// The original two-arm Unknown rig, its jaw and all nine authored motion clips.
+tasks.register('verifyUnknown', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.hexgodofstories.warping.UnknownAssetTest'
+    enableAssertions = true
+}
+tasks.named('check') { dependsOn 'verifyUnknown' }
