@@ -26,6 +26,7 @@ import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.core.animation.*;
+import software.bernie.geckolib.core.object.PlayState;
 import software.bernie.geckolib.util.GeckoLibUtil;
 import java.util.*;
 
@@ -191,7 +192,7 @@ public final class UnknownEntity extends Monster implements GeoEntity {
         for(int i=0;i<cells.size();i++)removed.add(BlockPos.of(cells.getLong(i)));
     }
     @Override public Packet<ClientGamePacketListener> getAddEntityPacket(){return NetworkHooks.getEntitySpawningPacket(this);}
-    private <T extends UnknownEntity> PlayState animate(AnimationState<T> state){
+    private <T extends UnknownEntity> PlayState animate(software.bernie.geckolib.core.animation.AnimationState<T> state){
         String name=phase()==0?"spawn":phase()==2?"death":strikeTicks>0?"bite":isInWater()?"swim":entityData.get(CHASING)?"run":"idle";
         // Attack countdown synchronises on the server, but the client has its own current keyframe clock.
         if(phase()==1&&entityData.get(STRIKE)>0)name="bite";
