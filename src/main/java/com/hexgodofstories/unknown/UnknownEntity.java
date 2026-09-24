@@ -38,12 +38,13 @@ public final class UnknownEntity extends Mob implements GeoEntity {
     private static final EntityDataAccessor<Integer> ACTION=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> ACTION_TICK=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Float> SPEED=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Boolean> LEAPING=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.BOOLEAN);
     private final AnimatableInstanceCache cache=GeckoLibUtil.createInstanceCache(this);
     private UUID caster,targetId,heldId;
     private Vec3 portal=Vec3.ZERO;
     private long born,portalSeed,portalGameTick;private int portalId;
     private boolean finished,heldNoGravity,throwVictim;
-    private int lastSense,attackTick,attackMode,attackDelay,breakClock,roamUntil,blockedTicks;
+    private int lastSense,attackTick,attackMode,attackDelay,breakClock,roamUntil,blockedTicks,jumpCooldown,leapTicks;
     private Vec3 roamPoint;
     private Vec3 previousChasePosition;
     private double chaseSpeed;private Vec3 lastHeading=Vec3.ZERO;
@@ -57,7 +58,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
     }
     @Override protected void defineSynchedData(){
         super.defineSynchedData();entityData.define(PHASE,0);entityData.define(ACTION,0);
-        entityData.define(ACTION_TICK,0);entityData.define(SPEED,0f);
+        entityData.define(ACTION_TICK,0);entityData.define(SPEED,0f);entityData.define(LEAPING,false);
     }
     @Override protected void registerGoals(){}
     public void begin(UUID caster,long born,Vec3 portal,long seed,long gameTick){
@@ -113,6 +114,14 @@ public final class UnknownEntity extends Mob implements GeoEntity {
             return;
         }
         if(getY()<server.getMinBuildHeight()+2)teleportTo(portal.x,portal.y+2,portal.z);
+        if(jumpCooldown>0)jumpCooldown--;
+        if(entityData.get(LEAPING)){
+            leapTicks++;
+            if(leapTicks>4&&onGround()){
+                entityData.set(LEAPING,false);
+                leapTicks=0;
+            }
+        }
         if(attackTick>0){setDeltaMovement(0,getDeltaMovement().y,0);attack(server);return;}
         if(attackDelay>0)attackDelay--;
         LivingEntity target=findTarget(server);
@@ -143,16 +152,41 @@ public final class UnknownEntity extends Mob implements GeoEntity {
                 &&horizontalCollision&&onGround())blockedTicks++;
         else blockedTicks=0;
         previousChasePosition=position();
-        if(target!=null&&blockedTicks>=5&&tickCount%3==0)breach(server,direction);
-        // Horizontal motion goes through vanilla travel/collision; vertical motion remains gravity.
+
+        // This creature is far too large to be stopped by an ordinary roof or village wall.
+        // When prey is above it, or its full body actually collides with an obstacle while chasing,
+        // it makes a committed high leap instead of a tiny vanilla-style hop.
         boolean wall=horizontalCollision;
         double vertical=getDeltaMovement().y;
-        if(onGround()&&wall&&target!=null&&target.getY()>getY()+.8)vertical=.7;
+        boolean needsHighLeap=target!=null&&(target.getY()>getY()+2.0||wall||blockedTicks>=3);
+        if(onGround()&&needsHighLeap&&jumpCooldown==0&&clearAboveForLeap(server)){
+            double rise=Math.max(0,target.getY()-getY());
+            vertical=Mth.clamp(1.35+rise*.025,1.35,1.58);
+            step=direction.scale(Math.max(chaseSpeed,.74));
+            jumpCooldown=34;
+            leapTicks=0;
+            blockedTicks=0;
+            entityData.set(LEAPING,true);
+            hasImpulse=true;
+        }else if(target!=null&&blockedTicks>=5&&tickCount%3==0){
+            // If there is not enough headroom to jump, fall back to the existing wall breach.
+            breach(server,direction);
+        }
+        // Horizontal motion goes through vanilla travel/collision; vertical motion remains gravity.
         setDeltaMovement(step.x,vertical,step.z);hasImpulse=true;
         if(onGround()&&tickCount%13==0&&chaseSpeed>.3)
             server.playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_STEP.get(),SoundSource.HOSTILE,2.1f,.86f);
         if(tickCount%18==0&&chaseSpeed>.48)
             server.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,getX(),getY()+1,getZ(),5,1,.4,1,.02);
+    }
+    /** A high leap needs open air over the creature's enormous 6.4 x 7.4 block body. */
+    private boolean clearAboveForLeap(ServerLevel level){
+        AABB body=getBoundingBox();
+        // Check the first part of the ascent. Once this volume is clear, normal collision handling
+        // takes over for the rest of the arc and lets the creature land naturally on rooftops.
+        for(double y=1.5;y<=6.0;y+=1.5)
+            if(!level.noCollision(this,body.move(0,y,0)))return false;
+        return true;
     }
     /** Keep patrolling the local ground and looking for prey between sightings. */
     private Vec3 roam(ServerLevel level){
@@ -338,6 +372,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
     private PlayState movement(AnimationState<UnknownEntity> state){
         if(phase()==0)return state.setAndContinue(RawAnimation.begin().thenPlayAndHold("spawn"));
         if(phase()==2)return state.setAndContinue(RawAnimation.begin().thenPlayAndHold("death"));
+        if(entityData.get(LEAPING))return state.setAndContinue(RawAnimation.begin().thenPlayAndHold("jump"));
         if(speed()>.48)return state.setAndContinue(RawAnimation.begin().thenLoop("run"));
         if(speed()>.06)return state.setAndContinue(RawAnimation.begin().thenLoop("walk"));
         return state.setAndContinue(RawAnimation.begin().thenLoop("idle"));
