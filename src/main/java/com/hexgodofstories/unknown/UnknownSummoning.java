@@ -18,7 +18,7 @@ import java.util.*;
 
 /** Wall-clock sequence and saved cooldown; the portal packet is the existing Warping surface. */
 public final class UnknownSummoning extends SavedData {
-    public static final long CHARGE_MS=30_000,EMERGE_MS=10_000,HUNT_MS=60_000,VANISH_MS=4_000,COOLDOWN_MS=600_000;
+    public static final long CHARGE_MS=30_000,EMERGE_MS=10_000,HUNT_MS=80_000,VANISH_MS=4_000,COOLDOWN_MS=600_000;
     private static final String NAME="hexgodofstories_unknown_cooldowns";
     private final Map<UUID,Long> cooldowns=new HashMap<>(),pending=new HashMap<>();
     private static final Map<UUID,Charge> CHARGES=new HashMap<>();

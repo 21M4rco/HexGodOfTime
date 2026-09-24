@@ -581,6 +581,10 @@
       {
         "name": "hexgodofstories:unknown_lunge",
         "volume": 1.0
+      },
+      {
+        "name": "hexgodofstories:unknown_roar_alt",
+        "volume": 0.92
       }
     ]
   },

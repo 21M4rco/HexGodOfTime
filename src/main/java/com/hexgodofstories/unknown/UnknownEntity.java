@@ -3,6 +3,7 @@ package com.hexgodofstories.unknown;
 import com.hexgodofstories.HexGodOfStories;
 import com.hexgodofstories.network.HexNetwork;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -176,9 +177,10 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         // When prey is above it, or its full body actually collides with an obstacle while chasing,
         // it makes a committed high leap instead of a tiny vanilla-style hop.
         boolean wall=horizontalCollision;
-        // A real obstruction gets hit immediately. This only cuts the wall/body-height volume in
-        // front of the creature; it still never strips the ground underneath it.
-        if(target!=null&&onGround()&&wall)breach(server,direction);
+        // Probe ahead every chase tick instead of waiting for a collision flag. If a real wall is
+        // entering the creature's body path, tear through it immediately. The breach routine only
+        // samples the forward body-height volume, never the ground beneath its feet.
+        if(target!=null&&onGround())breach(server,direction);
         double vertical=getDeltaMovement().y;
         boolean needsHighLeap=target!=null&&(target.getY()>getY()+2.0||wall||blockedTicks>=2);
         if(onGround()&&needsHighLeap&&jumpCooldown==0&&clearAboveForLeap(server)){
@@ -285,6 +287,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         Vec3 front=position().add(direction.scale(getBbWidth()*.48));
         Vec3 side=new Vec3(-direction.z,0,direction.x);
         int floor=Mth.ceil(getY()-.01),taken=0;
+        BlockState soundState=null;BlockPos soundPos=null;
         for(int y=floor+1;y<floor+Math.min(8,Mth.ceil(getBbHeight()));y++){
             for(double across=-getBbWidth()*.43;across<=getBbWidth()*.43;across+=.85){
                 for(double ahead=0;ahead<=1.0;ahead+=.5){
@@ -298,9 +301,11 @@ public final class UnknownEntity extends Mob implements GeoEntity {
                     if(UnknownTerrain.breakBlock(level,pos.immutable(),getUUID(),
                             born+UnknownSummoning.EMERGE_MS+UnknownSummoning.HUNT_MS+UnknownSummoning.VANISH_MS+15_000)){
                         taken++;
-                        // Use Minecraft's native block-break event: the block's own break sound and
-                        // its normal debris particles, never Unknown's custom impact sound.
-                        level.levelEvent(2001,pos,Block.getId(state));
+                        if(soundState==null){soundState=state;soundPos=pos.immutable();}
+                        // Keep the normal Minecraft block debris, but do not emit a sound for every
+                        // single block in the wall or twenty break sounds stack into one ugly blast.
+                        level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK,state),
+                                pos.getX()+.5,pos.getY()+.5,pos.getZ()+.5,7,.25,.3,.25,.1);
                         if(taken>=24)break;
                     }
                 }
@@ -308,7 +313,13 @@ public final class UnknownEntity extends Mob implements GeoEntity {
             }
             if(taken>=24)break;
         }
-        if(taken>0)blockedTicks=3; // Allow a fresh stride before the next impact.
+        if(taken>0){
+            blockedTicks=3; // Allow a fresh stride before the next impact.
+            // One ordinary Minecraft break sound from the actual material that was destroyed.
+            var sound=soundState.getSoundType(level,soundPos,this);
+            level.playSound(null,soundPos,sound.getBreakSound(),SoundSource.BLOCKS,
+                    (sound.getVolume()+1f)*.5f,sound.getPitch()*.8f);
+        }
     }
     private void attack(ServerLevel level){
         attackTick++;entityData.set(ACTION_TICK,attackTick);
@@ -330,6 +341,9 @@ public final class UnknownEntity extends Mob implements GeoEntity {
             }
         }
         if(attackMode==2&&attackTick==28)entityData.set(ACTION,3); // chew
+        if(attackMode==2&&attackTick>=28&&attackTick<46&&attackTick%6==4
+                &&victim!=null&&victim.isAlive())
+            level.playSound(null,blockPosition(),HexGodOfStories.HEXOR_EAT.get(),SoundSource.HOSTILE,4.2f,.58f+random.nextFloat()*.08f);
         if(attackMode==2&&attackTick==46)entityData.set(ACTION,throwVictim?5:4);
         if(attackMode==2&&attackTick==52&&throwVictim){
             if(victim!=null&&victim.isAlive()){
