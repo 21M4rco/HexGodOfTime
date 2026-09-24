@@ -42,7 +42,13 @@ public final class HexData {
     public static void energy(Player p,float v) {get(p).putFloat("energy",Math.max(0,Math.min(maxEnergy(p),v)));}
     public static boolean spend(Player p,float v) {if(energy(p)<v)return false;energy(p,energy(p)-v);return true;}
     public static long now(Player p) {return p.level().getGameTime();}
-    public static int cooldown(Player p,Ability a) {return (int)Math.max(0,get(p).getLong("cd_"+a.name())-now(p));}
+    public static int cooldown(Player p,Ability a) {
+        if(a==Ability.SLOW_FIELD) {
+            long ms=Math.max(get(p).getLong("unknown_active_until_ms"),get(p).getLong("unknown_cd_until_ms"))-System.currentTimeMillis();
+            return (int)Math.min(Integer.MAX_VALUE,Math.max(0,(ms+49)/50));
+        }
+        return (int)Math.max(0,get(p).getLong("cd_"+a.name())-now(p));
+    }
     public static Ability selected(Player p) {
         Ability a=Ability.at(get(p).getInt("selected"));
         if(!a.dedicated)return a;
