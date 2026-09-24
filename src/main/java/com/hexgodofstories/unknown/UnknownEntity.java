@@ -137,8 +137,10 @@ public final class UnknownEntity extends Mob implements GeoEntity {
             level().playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_LUNGE.get(),SoundSource.HOSTILE,4f,.83f);
             return;
         }
-        // Slow survey, deliberate acceleration, then an entirely different full sprint animation.
-        chaseSpeed=target==null?Mth.lerp(.12,chaseSpeed,.16):Math.min(.66,chaseSpeed+(chaseSpeed<.23?.009:.022));
+        // He should feel immediately dangerous once active: a quick patrol pace, then a hard
+        // near-instant launch into a very fast chase instead of slowly winding up.
+        chaseSpeed=target==null?Mth.lerp(.18,chaseSpeed,.28):
+                Math.min(.96,Math.max(.62,chaseSpeed+.045));
         entityData.set(SPEED,(float)chaseSpeed);
         Vec3 direction=new Vec3(toward.x,0,toward.z).normalize();
         if(direction.lengthSqr()<.01){setDeltaMovement(0,getDeltaMovement().y,0);return;}
@@ -157,19 +159,22 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         // When prey is above it, or its full body actually collides with an obstacle while chasing,
         // it makes a committed high leap instead of a tiny vanilla-style hop.
         boolean wall=horizontalCollision;
+        // A real obstruction gets hit immediately. This only cuts the wall/body-height volume in
+        // front of the creature; it still never strips the ground underneath it.
+        if(target!=null&&onGround()&&wall)breach(server,direction);
         double vertical=getDeltaMovement().y;
-        boolean needsHighLeap=target!=null&&(target.getY()>getY()+2.0||wall||blockedTicks>=3);
+        boolean needsHighLeap=target!=null&&(target.getY()>getY()+2.0||wall||blockedTicks>=2);
         if(onGround()&&needsHighLeap&&jumpCooldown==0&&clearAboveForLeap(server)){
             double rise=Math.max(0,target.getY()-getY());
             vertical=Mth.clamp(1.35+rise*.025,1.35,1.58);
-            step=direction.scale(Math.max(chaseSpeed,.74));
+            step=direction.scale(Math.max(chaseSpeed,.90));
             jumpCooldown=34;
             leapTicks=0;
             blockedTicks=0;
             entityData.set(LEAPING,true);
             hasImpulse=true;
-        }else if(target!=null&&blockedTicks>=5&&tickCount%3==0){
-            // If there is not enough headroom to jump, fall back to the existing wall breach.
+        }else if(target!=null&&blockedTicks>=2){
+            // If there is not enough headroom to jump, chew through the obstruction immediately.
             breach(server,direction);
         }
         // Horizontal motion goes through vanilla travel/collision; vertical motion remains gravity.
@@ -241,12 +246,12 @@ public final class UnknownEntity extends Mob implements GeoEntity {
                         taken++;
                         level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK,state),
                                 pos.getX()+.5,pos.getY()+.5,pos.getZ()+.5,7,.25,.3,.25,.1);
-                        if(taken>=12)break;
+                        if(taken>=24)break;
                     }
                 }
-                if(taken>=12)break;
+                if(taken>=24)break;
             }
-            if(taken>=12)break;
+            if(taken>=24)break;
         }
         if(taken>0){
             level.playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_IMPACT.get(),SoundSource.HOSTILE,2f,.9f);
