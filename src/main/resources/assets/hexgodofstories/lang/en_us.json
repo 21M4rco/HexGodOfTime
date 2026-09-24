@@ -74,5 +74,6 @@
   "subtitles.hexgodofstories.teleport": "Teleport",
   "subtitles.hexgodofstories.time_resume": "Time resumes",
   "subtitles.hexgodofstories.time_slip": "Time slips",
-  "subtitles.hexgodofstories.time_stop": "Time stops"
+  "subtitles.hexgodofstories.time_stop": "Time stops",
+  "entity.hexgodofstories.unknown": "Unknown"
 }
