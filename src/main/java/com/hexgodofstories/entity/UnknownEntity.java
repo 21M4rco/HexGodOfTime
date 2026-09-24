@@ -34,6 +34,7 @@ public final class UnknownEntity extends Monster implements GeoEntity {
     public static final int MANIFEST_TICKS=200, HUNT_TICKS=1200;
     private static final EntityDataAccessor<Integer> PHASE=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> STRIKE=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Boolean> CHASING=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.BOOLEAN);
     private final AnimatableInstanceCache animations=GeckoLibUtil.createInstanceCache(this);
     private final Set<BlockPos> removed=new LinkedHashSet<>();
     private UUID owner, quarry;
@@ -51,7 +52,7 @@ public final class UnknownEntity extends Monster implements GeoEntity {
     public static AttributeSupplier.Builder attributes() {
         return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH,1024).add(Attributes.MOVEMENT_SPEED,1.1).add(Attributes.FOLLOW_RANGE,18).add(Attributes.KNOCKBACK_RESISTANCE,1);
     }
-    @Override protected void defineSynchedData() {super.defineSynchedData();entityData.define(PHASE,0);entityData.define(STRIKE,0);}
+    @Override protected void defineSynchedData() {super.defineSynchedData();entityData.define(PHASE,0);entityData.define(STRIKE,0);entityData.define(CHASING,false);}
     @Override protected void registerGoals() {}
     public void summon(ServerPlayer caster,long finishAt) {
         owner=caster.getUUID();endMillis=finishAt;restoreDue=((ServerLevel)level()).getGameTime()+MANIFEST_TICKS+HUNT_TICKS+200;
@@ -91,6 +92,7 @@ public final class UnknownEntity extends Monster implements GeoEntity {
         if(tickCount<MANIFEST_TICKS) {
             entityData.set(PHASE,0);
             if(tickCount%10==0) {
+                UnknownAbility.refreshPortal(this);
                 HexNetwork.pilgrimEffect(this,"unknown_manifest",position(),1);
                 ((ServerLevel)level()).sendParticles(HexGodOfStories.NEBULA.get(),getX(),getY()+1,getZ(),18,1.8,.5,1.8,.05);
             }
@@ -104,6 +106,7 @@ public final class UnknownEntity extends Monster implements GeoEntity {
         }
         if(strikeTicks>0){strikeTicks--;entityData.set(STRIKE,strikeTicks);}
         if(growlTicks>0)growlTicks--;
+        entityData.set(CHASING,target!=null);
         if(target!=null) {
             Vec3 direction=target.getBoundingBox().getCenter().subtract(position());
             Vec3 horizontal=new Vec3(direction.x,0,direction.z);
@@ -189,10 +192,10 @@ public final class UnknownEntity extends Monster implements GeoEntity {
     }
     @Override public Packet<ClientGamePacketListener> getAddEntityPacket(){return NetworkHooks.getEntitySpawningPacket(this);}
     private <T extends UnknownEntity> PlayState animate(AnimationState<T> state){
-        String name=phase()==0?"spawn":phase()==2?"death":strikeTicks>0?"bite":isInWater()?"swim":quarry!=null?"run":"idle";
+        String name=phase()==0?"spawn":phase()==2?"death":strikeTicks>0?"bite":isInWater()?"swim":entityData.get(CHASING)?"run":"idle";
         // Attack countdown synchronises on the server, but the client has its own current keyframe clock.
         if(phase()==1&&entityData.get(STRIKE)>0)name="bite";
-        if(phase()==1&&entityData.get(STRIKE)==0&&quarry==null)name=state.isMoving()?"walk":"idle";
+        if(phase()==1&&entityData.get(STRIKE)==0&&!entityData.get(CHASING))name=state.isMoving()?"walk":"idle";
         return state.setAndContinue(phase()==0||name.equals("bite")||name.equals("death")
             ?RawAnimation.begin().thenPlay("animation.unknown."+name)
             :RawAnimation.begin().thenLoop("animation.unknown."+name));
