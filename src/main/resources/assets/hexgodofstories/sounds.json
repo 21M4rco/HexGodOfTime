@@ -525,5 +525,104 @@
         "pitch": 0.78
       }
     ]
+  },
+  "unknown_charge": {
+    "subtitle": "subtitles.hexgodofstories.unknown_charge",
+    "sounds": [
+      {
+        "name": "hexgodofstories:unknown_charge",
+        "volume": 1.0
+      }
+    ]
+  },
+  "unknown_emerge": {
+    "subtitle": "subtitles.hexgodofstories.unknown_emerge",
+    "sounds": [
+      {
+        "name": "hexgodofstories:unknown_emerge",
+        "volume": 1.0
+      }
+    ]
+  },
+  "unknown_dig": {
+    "subtitle": "subtitles.hexgodofstories.unknown_dig",
+    "sounds": [
+      {
+        "name": "hexgodofstories:unknown_dig",
+        "volume": 1.0
+      }
+    ]
+  },
+  "unknown_impact": {
+    "subtitle": "subtitles.hexgodofstories.unknown_impact",
+    "sounds": [
+      {
+        "name": "hexgodofstories:unknown_impact",
+        "volume": 1.0
+      }
+    ]
+  },
+  "unknown_roar": {
+    "subtitle": "subtitles.hexgodofstories.unknown_roar",
+    "sounds": [
+      {
+        "name": "hexgodofstories:unknown_roar",
+        "volume": 1.0
+      }
+    ]
+  },
+  "unknown_lunge": {
+    "subtitle": "subtitles.hexgodofstories.unknown_lunge",
+    "sounds": [
+      {
+        "name": "hexgodofstories:unknown_lunge",
+        "volume": 1.0
+      }
+    ]
+  },
+  "unknown_step": {
+    "subtitle": "subtitles.hexgodofstories.unknown_step",
+    "sounds": [
+      {
+        "name": "hexgodofstories:unknown_step",
+        "volume": 1.0
+      }
+    ]
+  },
+  "unknown_grab": {
+    "subtitle": "subtitles.hexgodofstories.unknown_grab",
+    "sounds": [
+      {
+        "name": "hexgodofstories:unknown_grab",
+        "volume": 1.0
+      }
+    ]
+  },
+  "unknown_bite": {
+    "subtitle": "subtitles.hexgodofstories.unknown_bite",
+    "sounds": [
+      {
+        "name": "hexgodofstories:unknown_bite",
+        "volume": 1.0
+      }
+    ]
+  },
+  "unknown_throw": {
+    "subtitle": "subtitles.hexgodofstories.unknown_throw",
+    "sounds": [
+      {
+        "name": "hexgodofstories:unknown_throw",
+        "volume": 1.0
+      }
+    ]
+  },
+  "unknown_vanish": {
+    "subtitle": "subtitles.hexgodofstories.unknown_vanish",
+    "sounds": [
+      {
+        "name": "hexgodofstories:unknown_vanish",
+        "volume": 1.0
+      }
+    ]
   }
 }

@@ -43,10 +43,11 @@ public final class UnknownEntity extends Mob implements GeoEntity {
     private Vec3 portal=Vec3.ZERO;
     private long born,portalSeed;private int portalId;
     private boolean finished,heldNoGravity,throwVictim;
-    private int lastSense,attackTick,attackMode,attackDelay,breakClock;
+    private int lastSense,attackTick,attackMode,attackDelay,breakClock,roamUntil;
+    private Vec3 roamPoint;
     private double chaseSpeed;private Vec3 lastHeading=Vec3.ZERO;
     public UnknownEntity(EntityType<? extends UnknownEntity> type,Level level){
-        super(type,level);setPersistenceRequired();setNoGravity(true);
+        super(type,level);setPersistenceRequired();
         this.setMaxUpStep(2.5f);
     }
     public static AttributeSupplier.Builder attributes(){
@@ -63,7 +64,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         this.portalSeed=getUUID().getMostSignificantBits()^born;
         ServerPlayer player=getServer().getPlayerList().getPlayer(caster);
         this.portalId=player==null?getId():player.getId();
-        entityData.set(PHASE,0);noPhysics=true;
+        entityData.set(PHASE,0);noPhysics=true;setNoGravity(true);
     }
     public UUID caster(){return caster;}
     public long born(){return born;}
@@ -88,6 +89,11 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         long elapsed=System.currentTimeMillis()-born;
         if(elapsed<UnknownSummoning.EMERGE_MS){
             noPhysics=true;setDeltaMovement(Vec3.ZERO);
+            int stage=(int)(elapsed/50);
+            if(stage==38||stage==94||stage==170){
+                server.playSound(null,blockPosition(),stage==170?HexGodOfStories.UNKNOWN_IMPACT.get():HexGodOfStories.UNKNOWN_DIG.get(),SoundSource.HOSTILE,5f,stage==170?.68f:.8f);
+                server.sendParticles(ParticleTypes.POOF,portal.x,portal.y+.2,portal.z,45,2,.18,2,.12);
+            }
             if(tickCount%5==0){
                 UnknownSummoning.portal(this,false);
                 server.sendParticles(ParticleTypes.LARGE_SMOKE,portal.x,portal.y+.25,portal.z,18,2,.3,2,.03);
@@ -95,9 +101,9 @@ public final class UnknownEntity extends Mob implements GeoEntity {
             return;
         }
         if(phase()==0){
-            noPhysics=false;entityData.set(PHASE,1);
+            noPhysics=false;setNoGravity(false);entityData.set(PHASE,1);
             UnknownSummoning.portal(this,true);
-            server.playSound(null,blockPosition(),HexGodOfStories.PILGRIM_ROAR.get(),SoundSource.HOSTILE,8f,.62f);
+            server.playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_ROAR.get(),SoundSource.HOSTILE,8f,.85f);
         }
         if(elapsed>=UnknownSummoning.EMERGE_MS+UnknownSummoning.HUNT_MS){
             if(phase()!=2)vanish(server);
@@ -106,35 +112,50 @@ public final class UnknownEntity extends Mob implements GeoEntity {
             return;
         }
         if(getY()<server.getMinBuildHeight()+2)teleportTo(portal.x,portal.y+2,portal.z);
-        if(attackTick>0){attack(server);return;}
+        if(attackTick>0){setDeltaMovement(0,getDeltaMovement().y,0);attack(server);return;}
         if(attackDelay>0)attackDelay--;
         LivingEntity target=findTarget(server);
-        if(target==null){chaseSpeed*=.85;entityData.set(SPEED,(float)chaseSpeed);return;}
-        setTarget(target);
-        Vec3 toward=target.getBoundingBox().getCenter().subtract(getBoundingBox().getCenter());
-        double distance=toward.length();
-        if(distance<9.0&&attackDelay==0){
+        if(target!=null)setTarget(target);
+        else setTarget(null);
+        Vec3 toward=target!=null?target.position().subtract(position()):roam(server);
+        double distance=target!=null?target.position().distanceTo(position()):Double.MAX_VALUE;
+        if(target!=null&&distance<8.6&&attackDelay==0){
             attackMode=target.getBbWidth()<2.6&&target.getBbHeight()<4.2?2:1;
             throwVictim=attackMode==2&&random.nextInt(3)==0;
             attackTick=1;entityData.set(ACTION,attackMode);entityData.set(ACTION_TICK,1);
             chaseSpeed=0;entityData.set(SPEED,0f);
-            level().playSound(null,blockPosition(),HexGodOfStories.PILGRIM_LUNGE.get(),SoundSource.HOSTILE,4f,.76f);
+            level().playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_LUNGE.get(),SoundSource.HOSTILE,4f,.83f);
             return;
         }
         // Slow survey, deliberate acceleration, then an entirely different full sprint animation.
-        chaseSpeed=Math.min(.83,chaseSpeed+(chaseSpeed<.26?.018:.035));
+        chaseSpeed=target==null?Mth.lerp(.12,chaseSpeed,.16):Math.min(.66,chaseSpeed+(chaseSpeed<.23?.009:.022));
         entityData.set(SPEED,(float)chaseSpeed);
-        Vec3 direction=toward.normalize();lastHeading=direction;
+        Vec3 direction=new Vec3(toward.x,0,toward.z).normalize();
+        if(direction.lengthSqr()<.01){setDeltaMovement(0,getDeltaMovement().y,0);return;}
+        lastHeading=direction;
         setYRot((float)(Mth.atan2(-direction.x,direction.z)*180/Math.PI));
         yBodyRot=getYRot();yHeadRot=getYRot();
-        Vec3 step=new Vec3(direction.x*chaseSpeed,
-                Mth.clamp(direction.y*chaseSpeed,-.34,.42),direction.z*chaseSpeed);
-        breach(server,step,target);
-        move(MoverType.SELF,step);
-        setDeltaMovement(Vec3.ZERO);fallDistance=0;
-        if(horizontalCollision){move(MoverType.SELF,new Vec3(0,.4,0));}
-        if(tickCount%18==0&&chaseSpeed>.6)
+        Vec3 step=direction.scale(chaseSpeed);
+        if(target!=null)breach(server,step,target);
+        // Horizontal motion goes through vanilla travel/collision. Gravity and jumps stay physical:
+        // target height must never turn a ground hunter into a flying one.
+        boolean wall=horizontalCollision||!server.noCollision(this,getBoundingBox().move(step.x,.15,step.z));
+        double vertical=getDeltaMovement().y;
+        if(onGround()&&wall&&target!=null&&target.getY()>getY()+.8)vertical=.7;
+        setDeltaMovement(step.x,vertical,step.z);hasImpulse=true;
+        if(onGround()&&tickCount%13==0&&chaseSpeed>.3)
+            server.playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_STEP.get(),SoundSource.HOSTILE,2.1f,.86f);
+        if(tickCount%18==0&&chaseSpeed>.48)
             server.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,getX(),getY()+1,getZ(),5,1,.4,1,.02);
+    }
+    /** Keep patrolling the local ground and looking for prey between sightings. */
+    private Vec3 roam(ServerLevel level){
+        if(roamPoint==null||tickCount>=roamUntil||position().distanceToSqr(roamPoint)<16){
+            int x=Mth.floor(getX())+random.nextInt(37)-18,z=Mth.floor(getZ())+random.nextInt(37)-18;
+            BlockPos ground=level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,new BlockPos(x,0,z));
+            roamPoint=Vec3.atBottomCenterOf(ground);roamUntil=tickCount+80+random.nextInt(90);
+        }
+        return roamPoint.subtract(position());
     }
     /** Acquire locally with sight; a target already acquired is pursued through walls and roofs. */
     private LivingEntity findTarget(ServerLevel level){
@@ -146,7 +167,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         for(LivingEntity candidate:level.getEntitiesOfClass(LivingEntity.class,getBoundingBox().inflate(28),
                 this::valid)){
             double distance=distanceToSqr(candidate);
-            if(distance<best&&hasLineOfSight(candidate)){best=distance;current=candidate;}
+            if(distance<best&&(distance<14*14||hasLineOfSight(candidate))){best=distance;current=candidate;}
         }
         if(current!=null&&valid(current)&&best<28*28)targetId=current.getUUID();
         return targetId==null?null:current;
@@ -174,7 +195,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
             }
         }
         if(taken>0&&++breakClock%4==0)
-            level.playSound(null,blockPosition(),HexGodOfStories.PILGRIM_BREACH.get(),SoundSource.HOSTILE,2.6f,.74f);
+            level.playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_DIG.get(),SoundSource.HOSTILE,2.6f,.84f);
     }
     private void attack(ServerLevel level){
         attackTick++;entityData.set(ACTION_TICK,attackTick);
@@ -192,7 +213,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
             if(valid(target)&&distanceToSqr(target)<144){
                 heldId=target.getUUID();heldNoGravity=target.isNoGravity();
                 entityData.set(ACTION,2);
-                level.playSound(null,blockPosition(),HexGodOfStories.PILGRIM_GRAB.get(),SoundSource.HOSTILE,4f,.8f);
+                level.playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_GRAB.get(),SoundSource.HOSTILE,4f,.8f);
             }
         }
         if(attackMode==2&&attackTick==28)entityData.set(ACTION,3); // chew
@@ -203,7 +224,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
                 releaseVictim(level);
                 victim.setDeltaMovement(lastHeading.scale(2.3).add(0,.85,0));
                 victim.hurtMarked=true;
-                level.playSound(null,blockPosition(),HexGodOfStories.PILGRIM_THROW.get(),SoundSource.HOSTILE,4f,.65f);
+                level.playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_THROW.get(),SoundSource.HOSTILE,4f,.75f);
             }
         }
         if(attackMode==1&&attackTick==14){
@@ -212,7 +233,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
                 hurtAsCaster(target,26);
                 target.setDeltaMovement(lastHeading.scale(2.2).add(0,.75,0));target.hurtMarked=true;
             }
-            level.playSound(null,blockPosition(),HexGodOfStories.PILGRIM_BITE.get(),SoundSource.HOSTILE,4f,.7f);
+            level.playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_BITE.get(),SoundSource.HOSTILE,4f,.8f);
         }
         if(attackMode==2&&!throwVictim&&attackTick>=65){
             if(victim!=null&&victim.isAlive()){
@@ -258,7 +279,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         n.putDouble("dz",lastHeading.z);n.putInt("duration",80);n.putFloat("power",2.5f);
         n.putLong("start",level.getGameTime());n.putBoolean("implosion",false);
         HexNetwork.tracking(this,new HexNetwork.Message(HexNetwork.ERASURE,getId(),n));
-        level.playSound(null,blockPosition(),HexGodOfStories.PILGRIM_DEATH.get(),SoundSource.HOSTILE,5f,.45f);
+        level.playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_VANISH.get(),SoundSource.HOSTILE,5f,.72f);
     }
     private void finish(){
         if(finished)return;finished=true;

@@ -86,6 +86,15 @@ public final class HexClient {
 
     @Mod.EventBusSubscriber(modid=HexGodOfStories.ID,value=Dist.CLIENT)
     public static final class ForgeBus {
+        /** Keep the casting hand in view and physically pointed at the floor throughout the charge. */
+        @SubscribeEvent public static void unknownHand(RenderHandEvent e){
+            if(e.getHand()!=net.minecraft.world.InteractionHand.MAIN_HAND)return;
+            var d=ClientState.self();if(!d.contains("unknownChargeStartTick"))return;
+            float t=(float)Math.min(1,Math.max(0,(ClientState.now()-d.getLong("unknownChargeStartTick"))/12f));
+            e.getPoseStack().translate(-.1*t,-.24*t,-.13*t);
+            e.getPoseStack().mulPose(com.mojang.math.Axis.XN.rotationDegrees(54*t));
+            e.getPoseStack().mulPose(com.mojang.math.Axis.ZN.rotationDegrees(13*t));
+        }
         @SubscribeEvent public static void tick(TickEvent.ClientTickEvent e) {
             if(e.phase!=TickEvent.Phase.END)return;
             ClientState.tick();

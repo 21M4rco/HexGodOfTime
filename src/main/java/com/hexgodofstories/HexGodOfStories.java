@@ -95,6 +95,14 @@ public final class HexGodOfStories {
         PILGRIM_LUNGE = sound("pilgrim_lunge"), PILGRIM_TAIL_SWEEP = sound("pilgrim_tail_sweep"),
         PILGRIM_VOID_SCREAM = sound("pilgrim_void_scream"), PILGRIM_HURT = sound("pilgrim_hurt"),
         PILGRIM_DEATH = sound("pilgrim_death");
+    /** Unknown's own voice and impacts, independent of the Leviathan's sound bank. */
+    public static final RegistryObject<SoundEvent>
+        UNKNOWN_CHARGE=sound("unknown_charge"), UNKNOWN_EMERGE=sound("unknown_emerge"),
+        UNKNOWN_DIG=sound("unknown_dig"), UNKNOWN_IMPACT=sound("unknown_impact"),
+        UNKNOWN_ROAR=sound("unknown_roar"), UNKNOWN_LUNGE=sound("unknown_lunge"),
+        UNKNOWN_STEP=sound("unknown_step"), UNKNOWN_GRAB=sound("unknown_grab"),
+        UNKNOWN_BITE=sound("unknown_bite"), UNKNOWN_THROW=sound("unknown_throw"),
+        UNKNOWN_VANISH=sound("unknown_vanish");
     /**
      * Time Branch Unleashing's own bed. Each of these is one layer: the charge stacks the first five and
      * drives their volume and pitch from the synchronised charge, so the build is assembled at the ear

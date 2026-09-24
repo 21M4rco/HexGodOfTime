@@ -24,6 +24,18 @@ public final class HexHud {
         // Drawn before the ability panel and independently of it: a caster holding the torrent needs the
         // charge read-out even if their quick bar happens to be empty.
         BranchMeter.render(g,screenWidth,screenHeight);
+        if(d.contains("unknownChargeStartTick")){
+            float ticks=Math.max(0,Math.min(600,ClientState.now()-d.getLong("unknownChargeStartTick")));
+            int width=174,left=(screenWidth-width)/2,top=screenHeight/2+28;
+            float progress=ticks/600f;
+            g.fill(left-5,top-15,left+width+5,top+24,0xd009090c);
+            String label="UNKNOWN  "+String.format(Locale.ROOT,"%.1fs",Math.max(0,(600-ticks)/20f));
+            g.drawCenteredString(mc.font,label,screenWidth/2,top-12,0xffd3c7b7);
+            g.fill(left,top,left+width,top+8,0xff292127);
+            g.fill(left,top,left+(int)(width*progress),top+8,0xffb45f65);
+            for(int i=1;i<10;i++)g.fill(left+i*width/10,top,left+i*width/10+1,top+8,0xff23181b);
+            g.drawCenteredString(mc.font,"A doorway is opening beneath you",screenWidth/2,top+12,0xffa99d96);
+        }
         if(a==null)return;
         int bottom=screenHeight-(screenWidth<540?54:8);
         int x=8,y=bottom-(int)(HEIGHT*SCALE);

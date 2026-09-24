@@ -29,6 +29,10 @@ public final class UnknownSummoning extends SavedData {
     public static void syncCooldown(ServerPlayer p){
         long until=of(p.serverLevel()).cooldowns.getOrDefault(p.getUUID(),0L);
         HexData.get(p).putLong("cd_SLOW_FIELD",HexData.now(p)+Math.max(0,(until-System.currentTimeMillis()+49)/50));
+        if(!CHARGES.containsKey(p.getUUID())){
+            HexData.get(p).remove("unknownChargeStartTick");HexData.get(p).remove("unknownChargeEnds");
+            HexData.get(p).remove("unknownChargeSyncedAt");
+        }
     }
     public static void begin(ServerPlayer p){
         long now=System.currentTimeMillis();
@@ -46,17 +50,21 @@ public final class UnknownSummoning extends SavedData {
         if(!HexData.spend(p,Ability.SLOW_FIELD.cost))return;
         Charge charge=new Charge(p.serverLevel(),at,p.getUUID(),p.getId(),now,p.getUUID().getLeastSignificantBits()^now);
         CHARGES.put(p.getUUID(),charge);
+        HexData.get(p).putLong("unknownChargeEnds",now+CHARGE_MS);
+        HexData.get(p).putLong("unknownChargeStartTick",p.level().getGameTime());
+        HexData.get(p).putLong("unknownChargeSyncedAt",now);
+        HexNetwork.animate(p,"unknown_summon");
         data.pending.put(p.getUUID(),now+CHARGE_MS+EMERGE_MS+HUNT_MS+VANISH_MS);
         // If the server stops mid-hunt, cooldown and terrain repair still have a real-time deadline.
         data.cooldowns.put(p.getUUID(),now+CHARGE_MS+EMERGE_MS+HUNT_MS+VANISH_MS+COOLDOWN_MS);
         data.setDirty();
-        p.serverLevel().playSound(null,floor,HexGodOfStories.RIFT_OPEN.get(),SoundSource.HOSTILE,2f,.43f);
+        p.serverLevel().playSound(null,floor,HexGodOfStories.UNKNOWN_CHARGE.get(),SoundSource.HOSTILE,3f,.83f);
         send(charge,false,false);
         HexNetwork.sync(p);
     }
     public static void cancelCharge(ServerPlayer p){
         Charge c=CHARGES.remove(p.getUUID());
-        if(c!=null){send(c,true,false);UnknownSummoning d=of(p.serverLevel());d.pending.remove(p.getUUID());d.cooldowns.remove(p.getUUID());d.setDirty();}
+        if(c!=null){send(c,true,false);clearGesture(p);UnknownSummoning d=of(p.serverLevel());d.pending.remove(p.getUUID());d.cooldowns.remove(p.getUUID());d.setDirty();}
     }
     public static void tick(ServerLevel level){
         long now=System.currentTimeMillis();
@@ -65,24 +73,31 @@ public final class UnknownSummoning extends SavedData {
             ServerPlayer caster=level.getServer().getPlayerList().getPlayer(c.caster);
             if(caster==null||caster.level()!=level||!caster.isAlive()){
                 CHARGES.remove(c.caster);send(c,true,false);
+                if(caster!=null)clearGesture(caster);
                 UnknownSummoning d=of(level);d.pending.remove(c.caster);d.cooldowns.remove(c.caster);d.setDirty();continue;
             }
             if(now-c.begin>=CHARGE_MS){
                 CHARGES.remove(c.caster);
+                clearGesture(caster);
                 UnknownEntity creature=HexGodOfStories.UNKNOWN.get().create(level);
                 if(creature==null){send(c,true,false);UnknownSummoning d=of(level);d.pending.remove(c.caster);d.cooldowns.remove(c.caster);d.setDirty();return;}
                 creature.moveTo(c.at.x,c.at.y,c.at.z,caster.getYRot(),0);
                 creature.begin(c.caster,now,c.at);
                 level.addFreshEntity(creature);
-                level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.PILGRIM_BREACH.get(),SoundSource.HOSTILE,6f,.48f);
+                level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.UNKNOWN_EMERGE.get(),SoundSource.HOSTILE,6f,.84f);
                 // One independent packet per creature during emergence; no Warping crossing is registered.
                 send(c,false,true);
             }else if(level.getGameTime()%10==0){
                 send(c,false,false);
-                if(level.getGameTime()%40==0)level.playSound(null,BlockPos.containing(c.at),
-                        HexGodOfStories.PILGRIM_BREACH_CHARGE.get(),SoundSource.HOSTILE,2f,.56f);
+                if(level.getGameTime()%20==0){HexData.get(caster).putLong("unknownChargeSyncedAt",now);HexNetwork.sync(caster);}
+                if(level.getGameTime()%60==0)level.playSound(null,BlockPos.containing(c.at),
+                        HexGodOfStories.UNKNOWN_CHARGE.get(),SoundSource.HOSTILE,2f,.72f);
             }
         }
+    }
+    private static void clearGesture(ServerPlayer p){
+        HexData.get(p).remove("unknownChargeEnds");HexData.get(p).remove("unknownChargeSyncedAt");
+        HexData.get(p).remove("unknownChargeStartTick");HexNetwork.animate(p,"__clear__");HexNetwork.sync(p);
     }
     public static void portal(UnknownEntity creature,boolean clear){
         if(!(creature.level() instanceof ServerLevel level))return;
