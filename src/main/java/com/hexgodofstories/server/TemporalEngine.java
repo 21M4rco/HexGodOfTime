@@ -317,6 +317,7 @@ public final class TemporalEngine {
     private static boolean eligible(Entity e,Field f) {return eligible(e,f,f.radius);}
     private static boolean eligible(Entity e,Field f,double range) {
         if(PLAYER_GRACE.getOrDefault(e.getUUID(),0L)>e.level().getGameTime())return false;
+        if(e instanceof com.hexgodofstories.entity.UnknownEntity)return false;
         if(e.isRemoved()||e.isSpectator()||e.isPassenger()||e.isVehicle()||e.getUUID().equals(f.owner)||e.getUUID().equals(f.exempt))return false;
         if(e instanceof ServerPlayer p&&p.isCreative())return false;
         if(e.position().distanceToSqr(f.center)>range*range&&f.target==null)return false;
