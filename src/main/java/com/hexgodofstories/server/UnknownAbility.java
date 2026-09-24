@@ -18,6 +18,8 @@ public final class UnknownAbility {
     private record Charge(ServerLevel level,Vec3 spot,long started,long startedTick,long seed,int portalId){}
     private static final Map<UUID,Charge> CHARGING=new HashMap<>();
     private static final Map<UUID,Charge> OPEN=new HashMap<>();
+    private record Restoration(ArrayDeque<BlockPos> cells,long due){}
+    private static final Map<ServerLevel,ArrayDeque<Restoration>> RESTORING=new HashMap<>();
     private UnknownAbility(){}
     public static boolean charging(ServerPlayer p){return CHARGING.containsKey(p.getUUID());}
     private static Vec3 location(ServerPlayer p) {
@@ -79,7 +81,25 @@ public final class UnknownAbility {
         }
     }
     public static void cancel(ServerPlayer p){Charge c=CHARGING.remove(p.getUUID());if(c!=null)clearPortal(c);}
-    public static void reset(){CHARGING.clear();OPEN.clear();}
+    public static void reset(){CHARGING.clear();OPEN.clear();RESTORING.clear();}
+    /** 400 cells per tick. The original saved-data snapshots remain crash-safe on disk. */
+    public static void queueRestoration(ServerLevel level,Collection<BlockPos> cells,long originalDue){
+        if(cells.isEmpty())return;
+        RESTORING.computeIfAbsent(level,k->new ArrayDeque<>()).addLast(new Restoration(new ArrayDeque<>(cells),originalDue));
+    }
+    public static void tickRestoration(ServerLevel level) {
+        ArrayDeque<Restoration> queue=RESTORING.get(level);
+        if(queue==null)return;
+        int remaining=400;
+        while(remaining>0&&!queue.isEmpty()){
+            Restoration work=queue.peekFirst();
+            ArrayList<BlockPos> batch=new ArrayList<>(Math.min(remaining,work.cells.size()));
+            while(remaining>0&&!work.cells.isEmpty()){batch.add(work.cells.removeFirst());remaining--;}
+            Nothingness.restoreUnknown(level,batch,work.due);
+            if(work.cells.isEmpty())queue.removeFirst();
+        }
+        if(queue.isEmpty())RESTORING.remove(level);
+    }
     public static void refreshPortal(UnknownEntity creature){Charge c=OPEN.get(creature.getUUID());if(c!=null)portal(c.level,c,c.startedTick+1,false);}
     public static void finished(UnknownEntity creature) {
         UUID owner=creature.summoner();
