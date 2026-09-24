@@ -59,7 +59,7 @@ public final class ParadiseFood {
     /** Pink provenance prefix used everywhere Minecraft asks for this stack's visible name. */
     public static Component candyName(ItemStack stack,Component original) {
         if(!edible(stack))return original;
-        return Component.literal("Candy ").withStyle(ChatFormatting.LIGHT_PURPLE).append(original.copy());
+        return Component.literal("Candied "+original.getString()).withStyle(ChatFormatting.LIGHT_PURPLE);
     }
 
     /**
@@ -109,6 +109,8 @@ public final class ParadiseFood {
     public static ItemStack eat(ItemStack stack, Level level, LivingEntity eater) {
         if (eater instanceof Player player) {
             if (!level.isClientSide) {
+                if(player instanceof net.minecraft.server.level.ServerPlayer server)
+                    com.hexgodofstories.server.PersonalRewind.eaten(server,stack);
                 player.getFoodData().eat(nutrition(stack), saturation(stack));
                 reward(player, stack);
                 CandyCorruption.consume(player,1);
@@ -137,7 +139,6 @@ public final class ParadiseFood {
         @SubscribeEvent public static void crouched(PlayerInteractEvent.RightClickBlock e) {
             Player player = e.getEntity();
             if (!player.isShiftKeyDown() || !edible(e.getItemStack()) || player.isUsingItem()) return;
-            if (!player.canEat(false)) return;
             e.setCanceled(true);
             e.setCancellationResult(InteractionResult.CONSUME);
             player.startUsingItem(e.getHand());

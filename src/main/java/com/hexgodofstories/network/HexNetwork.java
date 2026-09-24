@@ -16,7 +16,7 @@ public final class HexNetwork {
     /** Highest accepted client action id; see {@link HexServer#input}. */
     public static final int MAX_ACTION=16;
     public static final int SYNC=0,ANIMATE=1,FX=2,FROZEN=3,GRIP=4,MEMORY=5,THREADS=6,SLOWED=7,ARCHITECTURE=8,BLEED=9,FIELD=10,DISGUISE=11,
-        BRANCH=12,TORRENT=13,ERASURE=14,WARP=15,WARP_REALM=16,PILGRIM=17,PILGRIM_PATH=18,MOON_FRAME=19,WARP_PHASE=20,WARP_SHADOWS=21,WARP_EMERGE=22,CANDY_BODY=23;
+        BRANCH=12,TORRENT=13,ERASURE=14,WARP=15,WARP_REALM=16,PILGRIM=17,PILGRIM_PATH=18,MOON_FRAME=19,WARP_PHASE=20,WARP_SHADOWS=21,WARP_EMERGE=22,CANDY_BODY=23,FROST=24;
     public record Input(int action,int value) {}
     /** A deliberate Fracture selection: a catalogue index and, where the mode needs one, a target. */
     public record Choice(int mode,java.util.UUID target) {}
@@ -95,6 +95,15 @@ public final class HexNetwork {
         near(level,entity.position(),64,new Message(FX,entity.getId(),d));
     }
     public static void fx(Entity p,String name) {fx(p,name,p.getX(),p.getY(),p.getZ());}
+    /** Snapshot the discharged ray on the server so every viewer sees the same blue frost cloud. */
+    public static void frostBurst(ServerPlayer caster,net.minecraft.world.phys.Vec3 origin,
+                                  net.minecraft.world.phys.Vec3 direction,double reach) {
+        CompoundTag d=new CompoundTag();d.putString("effect","frost_burst");
+        d.putDouble("x",origin.x);d.putDouble("y",origin.y);d.putDouble("z",origin.z);
+        d.putDouble("dx",direction.x);d.putDouble("dy",direction.y);d.putDouble("dz",direction.z);
+        d.putDouble("reach",reach);
+        near(caster.serverLevel(),origin,64,new Message(FX,caster.getId(),d));
+    }
     public static void fx(Entity p,String name,double x,double y,double z) {
         CompoundTag d=new CompoundTag();d.putString("effect",name);d.putDouble("x",x);d.putDouble("y",y);d.putDouble("z",z);tracking(p,new Message(FX,p.getId(),d));
     }

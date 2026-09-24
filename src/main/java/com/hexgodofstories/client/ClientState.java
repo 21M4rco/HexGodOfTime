@@ -55,6 +55,7 @@ public final class ClientState {
             case HexNetwork.WARP_SHADOWS -> WarpShadows.receive(m.entity(),m.data());
             case HexNetwork.WARP_EMERGE -> WarpEmergenceClient.receive(m.entity(),m.data());
             case HexNetwork.CANDY_BODY -> CandyCorruptionClient.receive(m.entity(),m.data());
+            case HexNetwork.FROST -> FrostClient.receive(m.entity(),m.data());
             case HexNetwork.PILGRIM_PATH -> {
                 var world = net.minecraft.client.Minecraft.getInstance().level;
                 if (world != null && world.getEntity(m.entity()) instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity pilgrim)
@@ -97,7 +98,7 @@ public final class ClientState {
         var mc=Minecraft.getInstance();
         if(mc.level!=world) {
             WarpRenderer.clear();PLAYERS.clear();FROZEN.clear();SLOWED.clear();THREADS.clear();DISGUISES.clear();WarpCrossingClient.clear();WarpEmergenceClient.clear();CandyCorruptionClient.clear();
-            WorldEffects.clear();HexSkin.clear();HexLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();
+            WorldEffects.clear();HexSkin.clear();HexLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();FrostClient.clear();
             com.hexgodofstories.client.leviathan.LeviathanEffects.clear();
             TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();GripRenderer.clear();
             HexClient.ForgeBus.releaseHeldCast();
@@ -106,6 +107,7 @@ public final class ClientState {
         com.hexgodofstories.client.leviathan.LeviathanEffects.tick();
         WarpCrossingClient.tick();
         if(mc.level==null)return;
+        FrostClient.tick();
         FROZEN.forEach((id,n)->{
             Entity e=mc.level.getEntity(id);
             if(e==null)return;

@@ -2,27 +2,27 @@
   "version": 3,
   "name": "sword_3",
   "author": "HexGodOfStories",
-  "description": "Layered upper-body gesture; locomotion remains available.",
+  "description": "Frost burst: draw the blade back, aim the tip forward along the look vector, then discharge and recover.",
   "emote": {
     "beginTick": 0,
-    "endTick": 20,
-    "stopTick": 20,
+    "endTick": 26,
+    "stopTick": 26,
     "isLoop": false,
-    "returnTick": 10,
+    "returnTick": 9,
     "degrees": true,
     "moves": [
       {
         "tick": 0,
         "easing": "inoutquad",
         "rightArm": {
-          "pitch": -25,
-          "yaw": 0,
-          "roll": -8
+          "pitch": -28,
+          "yaw": -8,
+          "roll": -12
         },
         "leftArm": {
-          "pitch": -15,
-          "yaw": 0,
-          "roll": 8
+          "pitch": -32,
+          "yaw": 18,
+          "roll": 12
         },
         "torso": {
           "pitch": 0,
@@ -31,55 +31,93 @@
         }
       },
       {
-        "tick": 7,
+        "tick": 4,
         "easing": "inoutquad",
         "rightArm": {
-          "pitch": -110,
-          "yaw": 65,
-          "roll": -30
-        },
-        "leftArm": {
-          "pitch": -14,
+          "pitch": -122,
           "yaw": 10,
-          "roll": 5
+          "roll": 8
+        },
+        "leftArm": {
+          "pitch": -78,
+          "yaw": -14,
+          "roll": -7
         },
         "torso": {
-          "pitch": -3,
-          "yaw": 22,
+          "pitch": -5,
+          "yaw": -7,
           "roll": 0
         }
       },
       {
-        "tick": 9,
+        "tick": 6,
         "easing": "inoutquad",
         "rightArm": {
-          "pitch": -60,
-          "yaw": -50,
-          "roll": 35
+          "pitch": -90,
+          "yaw": 0,
+          "roll": 0
         },
         "leftArm": {
-          "pitch": -20,
-          "yaw": 13,
-          "roll": 8
+          "pitch": -83,
+          "yaw": 17,
+          "roll": 6
         },
         "torso": {
-          "pitch": 4,
-          "yaw": -16,
+          "pitch": -4,
+          "yaw": 0,
           "roll": 0
         }
       },
       {
-        "tick": 20,
+        "tick": 11,
         "easing": "inoutquad",
         "rightArm": {
-          "pitch": -25,
+          "pitch": -91,
           "yaw": 0,
-          "roll": -8
+          "roll": 0
         },
         "leftArm": {
-          "pitch": -15,
+          "pitch": -80,
+          "yaw": 17,
+          "roll": 6
+        },
+        "torso": {
+          "pitch": -4,
           "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 17,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -65,
+          "yaw": -18,
+          "roll": -9
+        },
+        "leftArm": {
+          "pitch": -48,
+          "yaw": 12,
           "roll": 8
+        },
+        "torso": {
+          "pitch": 1,
+          "yaw": 5,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 26,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -28,
+          "yaw": -8,
+          "roll": -12
+        },
+        "leftArm": {
+          "pitch": -32,
+          "yaw": 18,
+          "roll": 12
         },
         "torso": {
           "pitch": 0,

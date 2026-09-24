@@ -40,7 +40,7 @@ public abstract class ParadiseFoodMixin {
                            CallbackInfoReturnable<InteractionResultHolder<ItemStack>> cir) {
         ItemStack stack=hgos$self();
         if(!ParadiseFood.edible(stack))return;
-        if(!player.canEat(false)){cir.setReturnValue(InteractionResultHolder.fail(stack));return;}
+        if(!player.isShiftKeyDown()&&stack.getItem() instanceof com.hexgodofstories.entity.ConjuredWeapon)return;
         player.startUsingItem(hand);
         cir.setReturnValue(InteractionResultHolder.consume(stack));
     }
@@ -48,6 +48,9 @@ public abstract class ParadiseFoodMixin {
     @Inject(method="finishUsingItem",at=@At("HEAD"),cancellable=true)
     private void hgos$swallow(Level level,LivingEntity eater,CallbackInfoReturnable<ItemStack> cir) {
         ItemStack stack=hgos$self();
+        if(!level.isClientSide&&eater instanceof net.minecraft.server.level.ServerPlayer player
+            &&!ParadiseFood.edible(stack)&&stack.getItem().isEdible())
+            com.hexgodofstories.server.PersonalRewind.eaten(player,stack);
         if(ParadiseFood.edible(stack))cir.setReturnValue(ParadiseFood.eat(stack,level,eater));
     }
 }

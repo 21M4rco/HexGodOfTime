@@ -23,12 +23,20 @@ import java.util.*;
 public final class CosmicNebula {
     private static ResourceLocation cloud;
     private record Puff(Vec3 at,float radius,float alpha,int tint,double rotation) {}
+    private record FrostBurst(Vec3 origin,Vec3 forward,double reach,long started) {}
+    private static final List<FrostBurst> FROST_BURSTS=new ArrayList<>();
+    /** The sword shares Cosmic Flight's soft cloud texture and depth-sorted volume, tinted ice blue. */
+    public static void frostBurst(Vec3 origin,Vec3 direction,double reach) {
+        if(direction.lengthSqr()<.01||reach<=0)return;
+        if(FROST_BURSTS.size()>=8)FROST_BURSTS.remove(0);
+        FROST_BURSTS.add(new FrostBurst(origin,direction.normalize(),Math.min(15,reach),ClientState.now()));
+    }
     /** Per-player presence, eased frame by frame; an entry is dropped once it has fully faded. */
     private static final Map<Integer,Float> PRESENCE=new HashMap<>();
     private static long presenceTick=Long.MIN_VALUE;
     /** Ticks the cloud takes to gather, and to disperse again. */
     private static final float GATHER=26,DISPERSE=34;
-    public static void clear(){PRESENCE.clear();if(cloud!=null){Minecraft.getInstance().getTextureManager().release(cloud);cloud=null;}}
+    public static void clear(){PRESENCE.clear();FROST_BURSTS.clear();if(cloud!=null){Minecraft.getInstance().getTextureManager().release(cloud);cloud=null;}}
     private static ResourceLocation cloud() {
         if(cloud!=null)return cloud;
         int size=128;NativeImage image=new NativeImage(size,size,false);
@@ -90,6 +98,57 @@ public final class CosmicNebula {
                 puffs.add(new Puff(point,(.62f+(float)Math.sin(f*Math.PI)*.36f)*(.4f+.6f*share),
                     visibility*share*(.24f+i%3*.035f),
                     i%5==0?0x8cfde6:i%3==0?0x10a269:0x32ef91,a));
+            }
+        }
+        // Time fields use this same textured, rotating cloud volume as Cosmic Flight. Their shell
+        // grows at the server's freeze-front rate; leave the middle sparse so first person stays clear.
+        int visibleFields=0;
+        for(WorldEffects.Field field:WorldEffects.fields()) {
+            if(field.centre().distanceToSqr(camera)>4900||++visibleFields>4)continue;
+            double age=time-field.started();
+            if(age<0)continue;
+            double expansion=field.stop()&&field.expires()==Long.MAX_VALUE
+                ?Mth.clamp(age/com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION,0,1)
+                :Mth.clamp(age/10,0,1);
+            double radius=field.radius()*expansion;
+            if(radius<.1)continue;
+            int count=field.stop()?78:58;
+            float fade=(float)Math.min(1,age/9);
+            if(field.expires()!=Long.MAX_VALUE)fade*=Mth.clamp((float)(field.expires()-time)/12,0,1);
+            for(int i=0;i<count;i++) {
+                double h=1-2*(i+.5)/count,around=i*2.399963+time*.013*(i%2==0?1:-1);
+                double rim=Math.sqrt(Math.max(0,1-h*h));
+                double wobble=1+.045*Math.sin(time*.065+i*1.8);
+                Vec3 point=field.centre().add(Math.cos(around)*rim*radius*wobble,h*radius*wobble,Math.sin(around)*rim*radius*wobble);
+                if(point.distanceToSqr(camera)<1.8)continue;
+                float size=field.stop()?.8f:.68f;
+                float alpha=fade*(field.stop()?.26f:.21f);
+                puffs.add(new Puff(point,size,alpha,i%5==0?0x8cfde6:i%3==0?0x10a269:0x32ef91,around+time*.012));
+            }
+        }
+        FROST_BURSTS.removeIf(burst->time-burst.started>20);
+        for(FrostBurst burst:FROST_BURSTS) {
+            double age=time-burst.started;
+            if(age<0||burst.origin.distanceToSqr(camera)>4096)continue;
+            double front=Mth.clamp(age/11,0,1),recede=Mth.clamp((20-age)/8,0,1);
+            Vec3 right=burst.forward.cross(new Vec3(0,1,0));
+            if(right.lengthSqr()<.01)right=new Vec3(1,0,0);
+            right=right.normalize();Vec3 up=right.cross(burst.forward).normalize();
+            // A traveling volume of the flight nebula: dense near the advancing front, with a
+            // softer wake. Its sampled ray and length are the server's discharge snapshot.
+            for(int i=0;i<72;i++) {
+                double along=(i+.5)/72.0;
+                if(along>front+.08)continue;
+                double distance=burst.reach*along;
+                double angle=i*2.399963+age*.08*(i%2==0?1:-1);
+                double radius=(.22+distance*.17)*(.45+.55*Math.sin(i*2.7)*Math.sin(i*2.7));
+                Vec3 point=burst.origin.add(burst.forward.scale(distance))
+                    .add(right.scale(Math.cos(angle)*radius)).add(up.scale(Math.sin(angle)*radius));
+                if(point.distanceToSqr(camera)<.9)continue;
+                float head=(float)Mth.clamp((front+.08-along)*4,0,1);
+                float alpha=(float)(recede*head*(.21+(i%4)*.018));
+                puffs.add(new Puff(point,(float)(.4+distance*.035),alpha,
+                    i%7==0?0xc4faff:i%3==0?0x46baff:0x254bdf,angle+age*.045));
             }
         }
         if(puffs.isEmpty())return;

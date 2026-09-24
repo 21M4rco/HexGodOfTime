@@ -27,7 +27,7 @@ public final class WorldEffects {
     public static final ResourceLocation WHITE=HexGodOfStories.id("textures/white.png");
     private record Echo(int entity,Vec3 pos,long end) {}
     private record Projection(BlockPos origin,long until,boolean preview,long shown,List<IllusoryWall.Placement> blocks) {}
-    private record Field(Vec3 centre,double radius,boolean stop,long started,long expires) {}
+    static record Field(Vec3 centre,double radius,boolean stop,long started,long expires) {}
 
     private static final List<Echo> ECHOES=new ArrayList<>();
     private static final Map<Integer,Projection> PROJECTIONS=new HashMap<>();
@@ -47,6 +47,10 @@ public final class WorldEffects {
         String name=n.getString("effect");
         // All teleport destinations share the same quiet arrival; old effect names remain harmless.
         if(name.equals("arrive")||name.equals("arrive_realm")||name.equals("rift_cross"))name="nebula_arrival";
+        if(name.equals("frost_charge"))FrostClient.cast(entity);
+        if(name.equals("frost_burst"))CosmicNebula.frostBurst(
+            new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z")),
+            new Vec3(n.getDouble("dx"),n.getDouble("dy"),n.getDouble("dz")),n.getDouble("reach"));
         Vec3 pos=new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z"));
         var p=Minecraft.getInstance().player;
         if(p!=null&&p.distanceToSqr(pos)<1600)TemporalScreen.trigger(name,entity==p.getId());
@@ -74,6 +78,7 @@ public final class WorldEffects {
         if(!n.getBoolean("active")){FIELDS.remove(caster);return;}
         FIELDS.put(caster,new Field(new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z")),n.getDouble("radius"),n.getBoolean("stop"),n.getLong("started"),n.getLong("expires")));
     }
+    static Collection<Field> fields() {return FIELDS.values();}
     /** The grasp is drawn as a construct rather than as a ring of motes; {@link GripRenderer} owns it. */
     public static void grip(int caster,CompoundTag n) {GripRenderer.set(caster,n);}
     /**
@@ -85,8 +90,12 @@ public final class WorldEffects {
         for(Field f:FIELDS.values()) {
             if(!f.stop)continue;
             double dx=f.centre.x-x,dy=f.centre.y-y,dz=f.centre.z-z;
-            if(dx*dx+dy*dy+dz*dz>f.radius*f.radius)continue;
-            best=Math.max(best,f.started);
+            double distance=Math.sqrt(dx*dx+dy*dy+dz*dz);
+            if(distance>f.radius)continue;
+            long reached=f.expires==Long.MAX_VALUE
+                ?f.started+(long)Math.ceil(distance/f.radius*com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION):f.started;
+            if(ClientState.now()<reached)continue;
+            best=Math.max(best,reached);
         }
         return best;
     }
@@ -130,16 +139,6 @@ public final class WorldEffects {
             if(e==null||e.position().distanceToSqr(eye)>1024||now%3!=0)continue;
             Vec3 at=e.position().add((mc.level.random.nextDouble()-.5)*(e.getBbWidth()+.6),e.getBbHeight()*mc.level.random.nextDouble(),(mc.level.random.nextDouble()-.5)*(e.getBbWidth()+.6));
             Vfx.spark(HexGodOfStories.MOTE.get(),at,Vec3.ZERO);
-        }
-        for(Field f:FIELDS.values()) {
-            if(f.centre.distanceToSqr(eye)>6400)continue;
-            // The held edge keeps breathing so a long suspension never settles into a static shell.
-            if(now%2==0) {
-                double a=mc.level.random.nextDouble()*Math.PI*2,tilt=(mc.level.random.nextDouble()-.5)*Math.PI;
-                Vec3 edge=new Vec3(Math.cos(a)*Math.cos(tilt),Math.sin(tilt)*.55,Math.sin(a)*Math.cos(tilt));
-                Vfx.spark(f.stop?HexGodOfStories.GOLD_EMBER.get():HexGodOfStories.EMBER.get(),f.centre.add(edge.scale(f.radius)),edge.scale(-.01));
-            }
-            if(f.stop&&now%3==0)Vfx.cloud(HexGodOfStories.VEIL.get(),f.centre.add(0,1,0),f.radius*.75,1,.002);
         }
         GripRenderer.tick(now);
         // One pass: blade trails, rift breath, and the embedded steel each wound bleeds from.
@@ -212,6 +211,17 @@ public final class WorldEffects {
         ParticleOptions green=HexGodOfStories.EMBER.get(),gold=HexGodOfStories.GOLD_EMBER.get();
         ParticleOptions nebula=HexGodOfStories.NEBULA.get(),veil=HexGodOfStories.VEIL.get(),star=HexGodOfStories.STAR.get(),smoke=HexGodOfStories.SMOKE.get();
         switch(kind) {
+            case "frost_charge" -> Vfx.bloom(entity,palm,look,8,(at,aim,t)->{
+                Vec3 forward=mc.level.getEntity(entity)==null?aim:mc.level.getEntity(entity).getLookAngle().normalize();
+                Vfx.cloud(FrostClient.BLUE,at.add(forward.scale(.8)),
+                    .35+.25*Vfx.ease(t),Vfx.count(2.5f*Vfx.swell(t)),.018);
+                Vfx.cone(FrostClient.PALE,at.add(forward.scale(1.1)),forward,
+                    Vfx.count(1.7f*Vfx.swell(t)),.035,.06);
+            });
+            case "frost_shatter" -> Vfx.bloom(-1,pos.add(0,.9,0),look,9,(at,aim,t)->{
+                Vfx.cone(FrostClient.PALE,at,new Vec3(0,.2,0),Vfx.count(8*Vfx.swell(t)),.22,.38);
+                Vfx.cloud(FrostClient.BLUE,at,.7,Vfx.count(4*Vfx.swell(t)),.035);
+            });
             case "cast","hold","enchant","memory" -> Vfx.bloom(entity,palm,look,14,(at,aim,t)->{
                 float swell=Vfx.swell(t);
                 Vfx.ring(green,at,.16+.22*Vfx.ease(t),Vfx.count(swell*3.5f),.02,.008);
@@ -255,20 +265,8 @@ public final class WorldEffects {
             });
             // A stopped moment arrives slowly on purpose: the edge of the field walks outward and the
             // suspended dust thickens behind it, so the world looks like it is being held, not switched.
-            case "stop" -> Vfx.bloom(entity,pos,look,46,(at,aim,t)->{
-                float swell=Vfx.swell(t);
-                double radius=1+10*Vfx.ease(Math.min(1,t*1.6f));
-                Vfx.ring(gold,at.add(0,.1,0),radius,Vfx.count(swell*7f),.03,.006);
-                Vfx.dome(veil,at.add(0,1,0),radius*.82,Vfx.count(swell*3f),.004);
-                Vfx.cloud(nebula,at.add(0,1.1,0),1.6,Vfx.count(swell*1.6f),.004);
-                Vfx.ring(HexGodOfStories.MOTE.get(),at.add(0,1.1,0),radius*.55,Vfx.count(swell*4f),.004,.002);
-            });
-            case "dilate" -> Vfx.bloom(entity,pos,look,34,(at,aim,t)->{
-                float swell=Vfx.swell(t);
-                double radius=1+7*Vfx.ease(Math.min(1,t*1.7f));
-                Vfx.ring(gold,at.add(0,.1,0),radius,Vfx.count(swell*5f),.02,.005);
-                Vfx.cloud(veil,at.add(0,1,0),1.3,Vfx.count(swell*1.3f),.005);
-            });
+            // The stopped and dilated fields use Cosmic Flight's layered cloud renderer.
+            case "stop","dilate" -> { }
             case "resume" -> Vfx.bloom(entity,pos,look,18,(at,aim,t)->{
                 float swell=Vfx.swell(t);
                 Vfx.gather(gold,at.add(0,.9,0),3.2*(1-Vfx.ease(t))+.3,Vfx.count(swell*6f),.22);
@@ -299,6 +297,24 @@ public final class WorldEffects {
             });
             case "slash" -> Vfx.bloom(entity,palm,look,7,(at,aim,t)->
                 Vfx.cone(green,at,aim,Vfx.count(Vfx.swell(t)*3f),.22,.09));
+            case "sovereign_sever" -> Vfx.bloom(-1,pos.add(0,1.62,0),look,19,(at,aim,t)->{
+                double age=t*19;
+                if(age<3||age>17)return;
+                double distance=(age-2)*.9,width=1.05+distance*.085;
+                Vec3 forward=aim.normalize(),right=forward.cross(new Vec3(0,1,0)).normalize();
+                if(right.lengthSqr()<.01)right=new Vec3(1,0,0);
+                Vec3 up=right.cross(forward).normalize(),front=at.add(forward.scale(distance));
+                if(mc.level.clip(new net.minecraft.world.level.ClipContext(at,front,
+                    net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,mc.player))
+                    .getType()!=net.minecraft.world.phys.HitResult.Type.MISS)return;
+                for(int i=0;i<=14;i++) {
+                    double angle=(i/14.0-.5)*2.5;
+                    Vec3 point=front.add(right.scale(Math.sin(angle)*width))
+                        .add(up.scale((Math.cos(angle)-.65)*width*.52));
+                    Vfx.spark(i%4==0?gold:green,point,forward.scale(.028));
+                }
+                Vfx.cloud(nebula,front,.44,2,.016);
+            });
             case "throw" -> Vfx.bloom(entity,palm,look,8,(at,aim,t)->{
                 Vfx.cone(green,at,aim,Vfx.count(Vfx.swell(t)*3f),.3,.05);
                 Vfx.cloud(nebula,at,.25,Vfx.count(Vfx.swell(t)*.7f),.01);

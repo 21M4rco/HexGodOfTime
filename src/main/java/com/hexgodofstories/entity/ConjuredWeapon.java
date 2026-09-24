@@ -9,12 +9,26 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.*;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.client.extensions.common.IClientItemExtensions;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Multimap;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import java.util.function.Consumer;
 
 public final class ConjuredWeapon extends Item {
     /** 0 dagger, 1 Laevateinn, 2 time stick. */
     public final int kind;
     public ConjuredWeapon(int kind) {super(new Properties().stacksTo(1).rarity(kind==2?Rarity.RARE:Rarity.UNCOMMON));this.kind=kind;}
+    /** Vanilla's normal attack cooldown and hit path apply to Laevateinn alone. */
+    @Override public Multimap<Attribute,AttributeModifier> getDefaultAttributeModifiers(EquipmentSlot slot) {
+        if(kind!=1||slot!=EquipmentSlot.MAINHAND)return super.getDefaultAttributeModifiers(slot);
+        return ImmutableMultimap.<Attribute,AttributeModifier>builder()
+            .put(Attributes.ATTACK_DAMAGE,new AttributeModifier(BASE_ATTACK_DAMAGE_UUID,"Laevateinn attack damage",11,AttributeModifier.Operation.ADDITION))
+            .put(Attributes.ATTACK_SPEED,new AttributeModifier(BASE_ATTACK_SPEED_UUID,"Laevateinn attack speed",-2.4,AttributeModifier.Operation.ADDITION))
+            .build();
+    }
     /** Off-hand twins are held point-down; the renderer reads this to flip the grip. */
     public static boolean reversed(ItemStack stack) {return stack.hasTag()&&stack.getTag().getBoolean("reverse");}
     /** A manifestation belongs to its caster, including stacks moved through a container. */

@@ -89,6 +89,7 @@ public final class ServerEvents {
         if (e.getTarget() instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity pilgrim)
             HexNetwork.to(p, new HexNetwork.Message(HexNetwork.PILGRIM_PATH, pilgrim.getId(), pilgrim.segments().snapshot()));
         TemporalEngine.track(p,e.getTarget());
+        Frostbite.track(p,e.getTarget());
         Erasure.track(p,e.getTarget());
         if(!(e.getTarget() instanceof ServerPlayer q))return;
         HexNetwork.syncTo(p,q);
@@ -96,10 +97,11 @@ public final class ServerEvents {
         // A borrowed shape is sent once, not every second, so a new viewer has to be told separately.
         Masquerade.resend(p,q);
     }
-    @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p)HexServer.clear(p,false);}
+    @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p){PersonalRewind.clear(p);HexServer.clear(p,false);}}
     @SubscribeEvent public static void dimension(PlayerEvent.PlayerChangedDimensionEvent e) {if(e.getEntity() instanceof ServerPlayer p){HexServer.clear(p,false);HexNetwork.sync(p);com.hexgodofstories.warping.WarpRealms.greet(p,e.getTo());}}
     @SubscribeEvent public static void leaving(net.minecraftforge.event.entity.EntityLeaveLevelEvent e){
         if(e.getLevel() instanceof ServerLevel level){
+            Frostbite.clear(e.getEntity());
             com.hexgodofstories.warping.WarpEmergence.cancel(e.getEntity());
             var reason=e.getEntity().getRemovalReason();
             // Unloaded chunks still own their saved residents. Confirmed removal or transfer does
@@ -120,11 +122,12 @@ public final class ServerEvents {
         com.hexgodofstories.warping.WarpEmergence.cancel(e.getEntity());
         Erasure.forget(e.getEntity());
         Bleed.clear(e.getEntity());
+        Frostbite.clear(e.getEntity());
         Threat.forget(e.getEntity());
         Decoy.release(e.getEntity());
         Starfall.forget(e.getEntity());
         SanctumWard.forget(e.getEntity());
-        if(e.getEntity() instanceof ServerPlayer p){com.hexgodofstories.warping.CandyCorruption.reset(p);HexServer.clear(p,true);}
+        if(e.getEntity() instanceof ServerPlayer p){PersonalRewind.clear(p);com.hexgodofstories.warping.CandyCorruption.reset(p);HexServer.clear(p,true);}
     }
     @SubscribeEvent public static void clone(PlayerEvent.Clone e) {e.getEntity().getPersistentData().put(HexData.TAG,HexData.get(e.getOriginal()).copy());HexData.clearTransient(e.getEntity(),e.isWasDeath());}
     @SubscribeEvent public static void respawn(PlayerEvent.PlayerRespawnEvent e) {if(e.getEntity() instanceof ServerPlayer p){HexNetwork.sync(p);com.hexgodofstories.warping.CandyCorruption.sync(p,-1);}}
@@ -155,7 +158,7 @@ public final class ServerEvents {
         if(Erasure.erasing(e.getEntity())||TimeBranch.planted(e.getEntity())){e.setCanceled(true);return;}
         if(!(e.getEntity() instanceof ServerPlayer p))return;
         if(e.getTarget() instanceof LivingEntity victim)HexServer.engaged(p,victim);
-        if(p.getMainHandItem().getItem() instanceof ConjuredWeapon){e.setCanceled(true);HexServer.weapon(p,false);}
+        if(p.getMainHandItem().getItem() instanceof ConjuredWeapon weapon&&weapon.kind!=1){e.setCanceled(true);HexServer.weapon(p,false);}
     }
     @SubscribeEvent public static void interact(PlayerInteractEvent e) {
         if(e.getLevel().isClientSide||!e.isCancelable())return;
@@ -164,6 +167,18 @@ public final class ServerEvents {
     }
     @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
     public static void branchPunch(LivingDamageEvent e) {BranchFist.damage(e);}
+
+    /** A real vanilla sword hit opens the dagger wound; a direct blow cracks the ice on any mob. */
+    @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
+    public static void swordDamage(LivingDamageEvent e) {
+        if(e.getAmount()<=0)return;
+        LivingEntity victim=e.getEntity();
+        if(e.getSource().getDirectEntity()!=null)e.setAmount(e.getAmount()+Frostbite.shatter(victim,e.getSource().getDirectEntity()));
+        if(e.getSource().getDirectEntity() instanceof ServerPlayer player
+            &&e.getSource().is(DamageTypes.PLAYER_ATTACK)
+            &&player.getMainHandItem().getItem() instanceof ConjuredWeapon sword&&sword.kind==1)
+            Bleed.apply(player,victim,1,160);
+    }
 
     @SubscribeEvent public static void hurt(LivingHurtEvent e) {
         if(e.getSource().is(DamageTypes.GENERIC_KILL))return;

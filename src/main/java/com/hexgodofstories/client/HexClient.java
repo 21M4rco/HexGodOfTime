@@ -180,7 +180,10 @@ public final class HexClient {
         @SubscribeEvent public static void mouse(InputEvent.InteractionKeyMappingTriggered e) {
             var mc=Minecraft.getInstance();
             if(mc.player==null||mc.screen!=null||!enabled())return;
-            if(!(mc.player.getMainHandItem().getItem() instanceof ConjuredWeapon)||!(e.isAttack()||e.isUseItem()))return;
+            if(!(mc.player.getMainHandItem().getItem() instanceof ConjuredWeapon weapon)||!(e.isAttack()||e.isUseItem()))return;
+            // The sword uses vanilla left-click combat and its Item#use for the right-click cut.
+            // Only daggers and the time stick need the old custom input/packet path.
+            if(weapon.kind==1)return;
             e.setCanceled(true);e.setSwingHand(false);
             if(!ClientState.frozen(mc.player.getId()))HexNetwork.send(HexServer.WEAPON,e.isUseItem()?1:0);
         }

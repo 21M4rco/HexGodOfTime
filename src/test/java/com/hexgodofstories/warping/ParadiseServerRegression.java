@@ -104,7 +104,7 @@ public final class ParadiseServerRegression {
         ItemStack food=new ItemStack(Items.PINK_CONCRETE,1);ParadiseFood.mark(food);
         ItemStack ordinary=new ItemStack(Items.PINK_CONCRETE,1);
         check(!ItemStack.isSameItemSameTags(food,ordinary),"Paradise candy blocks do not stack with ordinary blocks");
-        check(food.getHoverName().getString().equals("Candy Pink Concrete"),"Paradise block name gets Candy prefix");
+        check(food.getHoverName().getString().equals("Candied Pink Concrete"),"Paradise block name gets Candied prefix");
         check(CandyCorruption.DOSES_PER_LIMB==5&&CandyCorruption.BREAK_TICKS>=30,"five mouthfuls start one visible limb failure");
         check(CandyCorruption.WINDOW_TICKS==6000,"candy danger window is exactly five minutes");
         player.setItemInHand(InteractionHand.MAIN_HAND,food);
