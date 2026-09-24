@@ -187,6 +187,16 @@ public final class Nothingness extends SavedData {
         if(changed)data.setDirty();
     }
 
+    /** Restore only this predator's own snapshots immediately. Later overlapping effects own their extension. */
+    public static void restoreUnknown(ServerLevel level,Collection<BlockPos> cells,long expectedDue) {
+        Nothingness data=of(level);boolean changed=false;
+        for(BlockPos pos:cells) {
+            Wound w=data.wounds.get(pos.asLong());
+            if(w==null||w.due!=expectedDue||!level.hasChunkAt(pos))continue;
+            data.restore(level,w);data.wounds.remove(pos.asLong());changed=true;
+        }
+        if(changed)data.setDirty();
+    }
     /** How many positions are still owed a restore, for diagnostics and commands. */
     public static int pending(ServerLevel level) {return of(level).wounds.size();}
 
