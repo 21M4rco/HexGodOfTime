@@ -26,7 +26,7 @@ public enum Ability {
     MEMORY(ENCHANTMENT,160,0,120,false,"Memory Echo","Reveal the recent footsteps of a nearby entity."),
     TIME_SLIP(TEMPORAL,0,15,160,false,"Time Slipping","Early slips return to an unstable recent moment. Mastery grants control."),
     REWIND(TEMPORAL,180,35,200,false,true,"Personal Rewind","Return to your own state ten seconds ago. Permanent key; never in the quick bar."),
-    SLOW_FIELD(TEMPORAL,320,30,260,false,true,"Dilation","Slow nearby entities and projectiles smoothly, without changing server time. Permanent key; never in the quick bar."),
+    SLOW_FIELD(TEMPORAL,320,55,0,false,true,"Unknown","Hold M for thirty seconds to call forth a blind, catastrophic predator. Ten seconds to manifest, sixty seconds of slaughter; ten real minutes of recovery afterward. Everything it breaks restores."),
     TIME_STOP(TEMPORAL,560,0,0,false,true,"Stillness","Expand a local stopped moment. Costs five Temporal Energy per second until resumed."),
     SELECTIVE_STOP(TEMPORAL,740,30,160,false,"Chosen Moment","Suspend one target. Secondary: exempt one ally from your field."),
     THREADS(PURPOSE,0,25,80,false,"Temporal Threads","Bind a target in time. Secondary: pull it along the strand."),
