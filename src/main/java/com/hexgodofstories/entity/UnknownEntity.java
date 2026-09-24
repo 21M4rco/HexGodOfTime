@@ -36,11 +36,14 @@ public final class UnknownEntity extends Monster implements GeoEntity {
     private static final EntityDataAccessor<Integer> PHASE=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> STRIKE=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> CHASING=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> ROARING=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> LEAPING=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> STALKING=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.BOOLEAN);
     private final AnimatableInstanceCache animations=GeckoLibUtil.createInstanceCache(this);
     private final Set<BlockPos> removed=new LinkedHashSet<>();
     private UUID owner, quarry;
     private long endMillis, restoreDue;
-    private int strikeTicks, growlTicks, lastScan;
+    private int strikeTicks, growlTicks, jumpTicks, lastScan;
     private boolean finished;
     private String current="idle";
     public UnknownEntity(EntityType<? extends UnknownEntity> type,Level level) {
@@ -53,7 +56,7 @@ public final class UnknownEntity extends Monster implements GeoEntity {
     public static AttributeSupplier.Builder attributes() {
         return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH,1024).add(Attributes.MOVEMENT_SPEED,1.1).add(Attributes.FOLLOW_RANGE,18).add(Attributes.KNOCKBACK_RESISTANCE,1);
     }
-    @Override protected void defineSynchedData() {super.defineSynchedData();entityData.define(PHASE,0);entityData.define(STRIKE,0);entityData.define(CHASING,false);}
+    @Override protected void defineSynchedData() {super.defineSynchedData();entityData.define(PHASE,0);entityData.define(STRIKE,0);entityData.define(CHASING,false);entityData.define(ROARING,false);entityData.define(LEAPING,false);entityData.define(STALKING,false);}
     @Override protected void registerGoals() {}
     public void summon(ServerPlayer caster,long finishAt) {
         owner=caster.getUUID();endMillis=finishAt;restoreDue=((ServerLevel)level()).getGameTime()+MANIFEST_TICKS+HUNT_TICKS+200;
@@ -101,21 +104,30 @@ public final class UnknownEntity extends Monster implements GeoEntity {
         }
         entityData.set(PHASE,1);
         if(tickCount==MANIFEST_TICKS)UnknownAbility.closePortal(this);
+        UUID previous=quarry;
         LivingEntity target=quarry==null?null:((ServerLevel)level()).getEntity(quarry) instanceof LivingEntity v?v:null;
         if(target==null||!eligible(target)||distanceToSqr(target)>26*26||tickCount-lastScan>15&&(!aware(target)&&distanceToSqr(target)>18*18)) {
             target=pick();quarry=target==null?null:target.getUUID();lastScan=tickCount;
         }
         if(strikeTicks>0){strikeTicks--;entityData.set(STRIKE,strikeTicks);}
         if(growlTicks>0)growlTicks--;
+        if(jumpTicks>0)jumpTicks--;
+        if(target!=null&&!target.getUUID().equals(previous)&&growlTicks==0){
+            growlTicks=49;
+            level().playSound(null,blockPosition(),HexGodOfStories.PILGRIM_ROAR.get(),net.minecraft.sounds.SoundSource.HOSTILE,2.4f,.72f);
+            HexNetwork.pilgrimEffect(this,"unknown_roar",position(),1.4f);
+        }
+        entityData.set(ROARING,growlTicks>0);entityData.set(LEAPING,jumpTicks>0);
         entityData.set(CHASING,target!=null);
         if(target!=null) {
-            Vec3 direction=target.getBoundingBox().getCenter().subtract(position());
+            Vec3 direction=target.position().subtract(position());
             Vec3 horizontal=new Vec3(direction.x,0,direction.z);
             if(horizontal.lengthSqr()>.0001) {
                 Vec3 goal=horizontal.normalize();float yaw=(float)(Math.atan2(-goal.x,goal.z)*180/Math.PI);
                 setYRot(yaw);setYBodyRot(yaw);setYHeadRot(yaw);
                 double speed=strikeTicks>12?1.7:(distanceToSqr(target)>36?1.02:.57);
                 Vec3 step=goal.scale(speed).add(0,Math.max(-.5,Math.min(.82,direction.y*.22)),0);
+                if(direction.y>2.5&&jumpTicks==0){jumpTicks=35;entityData.set(LEAPING,true);}
                 Vec3 dest=position().add(step);
                 if(level().hasChunkAt(BlockPos.containing(dest))) {
                     excavate((ServerLevel)level(),dest,Math.max(0,96-removed.size()/250));
@@ -127,9 +139,13 @@ public final class UnknownEntity extends Monster implements GeoEntity {
                 level().playSound(null,blockPosition(),HexGodOfStories.PILGRIM_LUNGE.get(),net.minecraft.sounds.SoundSource.HOSTILE,2,.65f);
             }
         } else {
-            if(tickCount%18==0) {
-                Vec3 ahead=Vec3.directionFromRotation(0,getYRot()).scale(.12);
-                setPos(getX()+ahead.x,getY(),getZ()+ahead.z);
+            boolean stalking=tickCount%180>70;
+            entityData.set(STALKING,stalking);
+            if(stalking) {
+                if(tickCount%90==0)setYRot(getYRot()+(random.nextFloat()-.5f)*65);
+                Vec3 ahead=Vec3.directionFromRotation(0,getYRot()).scale(.065);
+                Vec3 dest=position().add(ahead);
+                if(level().hasChunkAt(BlockPos.containing(dest)))setPos(dest.x,dest.y,dest.z);
             }
         }
         if(strikeTicks==14||tickCount%6==0) {
@@ -158,7 +174,7 @@ public final class UnknownEntity extends Monster implements GeoEntity {
             BlockPos pos=mid.offset(dx,dy,dz);
             if(!level.hasChunkAt(pos)||removed.contains(pos))continue;
             var state=level.getBlockState(pos);
-            if(state.isAir()||state.getDestroySpeed(level,pos)<0||state.is(HexGodOfStories.NOTHINGNESS.get()))continue;
+            if(state.isAir()||state.is(HexGodOfStories.NOTHINGNESS.get()))continue;
             if(Nothingness.takeBeam(level,pos,restoreDue,false)){removed.add(pos.immutable());used++;}
         }
     }
@@ -196,8 +212,12 @@ public final class UnknownEntity extends Monster implements GeoEntity {
         String name=phase()==0?"spawn":phase()==2?"death":strikeTicks>0?"bite":isInWater()?"swim":entityData.get(CHASING)?"run":"idle";
         // Attack countdown synchronises on the server, but the client has its own current keyframe clock.
         if(phase()==1&&entityData.get(STRIKE)>0)name="bite";
-        if(phase()==1&&entityData.get(STRIKE)==0&&!entityData.get(CHASING))name=state.isMoving()?"walk":"idle";
-        return state.setAndContinue(phase()==0||name.equals("bite")||name.equals("death")
+        if(phase()==1&&entityData.get(STRIKE)==0){
+            if(entityData.get(ROARING))name="roar";
+            else if(entityData.get(LEAPING))name="jump";
+            else if(!entityData.get(CHASING))name=entityData.get(STALKING)?"walk":"idle";
+        }
+        return state.setAndContinue(phase()==0||name.equals("bite")||name.equals("jump")||name.equals("roar")||name.equals("death")
             ?RawAnimation.begin().thenPlay("animation.unknown."+name)
             :RawAnimation.begin().thenLoop("animation.unknown."+name));
     }
