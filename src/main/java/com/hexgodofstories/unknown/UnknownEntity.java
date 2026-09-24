@@ -3,7 +3,6 @@ package com.hexgodofstories.unknown;
 import com.hexgodofstories.HexGodOfStories;
 import com.hexgodofstories.network.HexNetwork;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -41,6 +40,23 @@ public final class UnknownEntity extends Mob implements GeoEntity {
     private static final EntityDataAccessor<Float> SPEED=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Boolean> LEAPING=SynchedEntityData.defineId(UnknownEntity.class,EntityDataSerializers.BOOLEAN);
     private final AnimatableInstanceCache cache=GeckoLibUtil.createInstanceCache(this);
+    private final Map<UUID,MotionSample> motionSamples=new HashMap<>();
+    private static final class MotionSample {
+        Vec3 pos;float yaw,pitch;int seenTick;
+        MotionSample(LivingEntity entity,int tick){
+            pos=entity.position();yaw=entity.getYRot();pitch=entity.getXRot();seenTick=tick;
+        }
+        boolean update(LivingEntity entity,int tick){
+            Vec3 now=entity.position();
+            boolean moved=now.distanceToSqr(pos)>.0004;
+            // For players, merely turning the camera is enough to give the creature a movement cue.
+            if(entity instanceof Player)
+                moved|=Math.abs(Mth.wrapDegrees(entity.getYRot()-yaw))>.75f
+                        ||Math.abs(entity.getXRot()-pitch)>.75f;
+            pos=now;yaw=entity.getYRot();pitch=entity.getXRot();seenTick=tick;
+            return moved;
+        }
+    }
     private UUID caster,targetId,heldId;
     private Vec3 portal=Vec3.ZERO;
     private long born,portalSeed,portalGameTick;private int portalId;
@@ -207,26 +223,53 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         }
         return roamPoint.subtract(position());
     }
-    /** Hunt what is visible, but do not obsess over prey that escapes. */
+    /**
+     * Motion is the trigger, not sight. A completely still living thing is effectively invisible
+     * to the creature until it moves. Players also trigger it by turning their camera.
+     *
+     * Once something has moved and been acquired, freezing no longer saves it: the scent is kept
+     * while the victim remains within the pursuit radius, even through walls. Escaping far enough
+     * still makes the creature give up, so it cannot stay locked to somebody hundreds of blocks away.
+     */
     private LivingEntity findTarget(ServerLevel level){
+        LivingEntity moving=senseMovement(level);
         LivingEntity current=targetId==null?null:level.getEntity(targetId) instanceof LivingEntity living?living:null;
-        if(valid(current)){
-            double distance=distanceToSqr(current);
-            // Keep enough close-range memory to smash through a wall it just watched prey duck behind,
-            // but once the target is genuinely gone/out of sight, forget it and look for another meal.
-            if(distance<12*12||distance<42*42&&hasLineOfSight(current))return current;
+        if(valid(current)&&distanceToSqr(current)<120*120)return current;
+
+        targetId=null;setTarget(null);
+        if(moving!=null){
+            targetId=moving.getUUID();
+            return moving;
         }
-        targetId=null;
-        setTarget(null);
-        if(++lastSense%4!=0)return null;
-        double best=42*42;
-        for(LivingEntity candidate:level.getEntitiesOfClass(LivingEntity.class,getBoundingBox().inflate(42),
+        return null;
+    }
+    /** Sample every nearby living thing every tick so standing still right now really means safe. */
+    private LivingEntity senseMovement(ServerLevel level){
+        LivingEntity best=null;
+        double bestDistance=100*100;
+        for(LivingEntity candidate:level.getEntitiesOfClass(LivingEntity.class,getBoundingBox().inflate(100),
                 this::valid)){
-            double distance=distanceToSqr(candidate);
-            if(distance<best&&(distance<12*12||hasLineOfSight(candidate))){best=distance;current=candidate;}
+            UUID id=candidate.getUUID();
+            MotionSample sample=motionSamples.get(id);
+            boolean moved;
+            if(sample==null){
+                sample=new MotionSample(candidate,tickCount);
+                motionSamples.put(id,sample);
+                Vec3 velocity=candidate.getDeltaMovement();
+                moved=velocity.x*velocity.x+velocity.y*velocity.y+velocity.z*velocity.z>.0004;
+            }else moved=sample.update(candidate,tickCount);
+
+            if(moved){
+                double distance=distanceToSqr(candidate);
+                if(distance<bestDistance){
+                    bestDistance=distance;
+                    best=candidate;
+                }
+            }
         }
-        if(current!=null&&valid(current)&&best<42*42)targetId=current.getUUID();
-        return targetId==null?null:current;
+        if(tickCount%40==0)
+            motionSamples.entrySet().removeIf(e->tickCount-e.getValue().seenTick>40);
+        return best;
     }
     private boolean valid(LivingEntity target){
         return target!=null&&target!=this&&target.isAlive()&&!target.isSpectator()
@@ -320,7 +363,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
             entityData.set(ACTION,0);entityData.set(ACTION_TICK,0);
             // Meal is over. Immediately forget the previous victim and resume a wide prowl instead
             // of lingering at the kill site or remaining mentally locked onto something that escaped.
-            targetId=null;setTarget(null);roamPoint=null;roamUntil=0;lastSense=3;
+            targetId=null;setTarget(null);roamPoint=null;roamUntil=0;
             chaseSpeed=Math.max(chaseSpeed,.34);entityData.set(SPEED,(float)chaseSpeed);
         }
     }
