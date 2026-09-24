@@ -52,8 +52,8 @@ public final class UnknownKillCredit extends SavedData {
         }
         int total=entry.mobs+entry.players;
         var board=owner.getScoreboard();
-        board.forAllObjectives(ObjectiveCriteria.TOTAL_KILL_COUNT,owner.getScoreboardName(),score->score.add(total));
-        if(entry.players>0)board.forAllObjectives(ObjectiveCriteria.PLAYER_KILL_COUNT,owner.getScoreboardName(),score->score.add(entry.players));
+        board.forAllObjectives(ObjectiveCriteria.KILL_COUNT_ALL,owner.getScoreboardName(),score->score.add(total));
+        if(entry.players>0)board.forAllObjectives(ObjectiveCriteria.KILL_COUNT_PLAYERS,owner.getScoreboardName(),score->score.add(entry.players));
     }
     private static UnknownKillCredit load(CompoundTag tag) {
         UnknownKillCredit data=new UnknownKillCredit();
