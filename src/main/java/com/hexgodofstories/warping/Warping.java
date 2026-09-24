@@ -202,6 +202,7 @@ public final class Warping {
         AABB area=new AABB(heart.x-SHADOW_REACH,heart.y-SHADOW_DROP,heart.z-SHADOW_REACH,
             heart.x+SHADOW_REACH,heart.y+28,heart.z+SHADOW_REACH);
         List<Entity> seen=to.getEntities((Entity)null,area,e->e.isAlive()&&!e.isRemoved()&&!e.isSpectator()
+            &&!(e instanceof com.hexgodofstories.entity.UnknownEntity)
             &&!(e instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity)
             &&!(e instanceof WarpHazard)&&e.getBbHeight()>.25);
         ListTag list=new ListTag();
@@ -427,6 +428,7 @@ public final class Warping {
      */
     private static boolean recallable(Entity e){
         if(!(e instanceof LivingEntity living)||!living.isAlive()||living.isRemoved()||living.isSpectator())return false;
+        if(living instanceof com.hexgodofstories.entity.UnknownEntity)return false;
         if(living instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity)return false;
         if(living.getType()==HexGodOfStories.PILGRIM.get())return false;
         // Players deliberately thrown through a Warping break are valid recall targets too.
