@@ -15,7 +15,7 @@ public final class HexHud {
     private static final int WIDTH=204,HEIGHT=122;
     /** The dedicated controls, in key order; a null power is the plain resume command. */
     private static final Ability[] CONTROLS={Ability.TIME_STOP,null,Ability.REWIND,Ability.SLOW_FIELD};
-    private static final String[] CONTROL_NAMES={"Stop","Resume","Rewind","Slow"};
+    private static final String[] CONTROL_NAMES={"Stop","Resume","Rewind","Unknown"};
     private static final float SCALE=.8f;
     public static void render(GuiGraphics g) {
         var mc=Minecraft.getInstance();if(mc.player==null||mc.options.hideGui)return;
@@ -132,7 +132,7 @@ public final class HexHud {
             case MEMORY -> "Reveal a target's recent steps.";
             case TIME_SLIP -> "Slip to a recent moment.";
             case REWIND -> "Rewind position and some health.";
-            case SLOW_FIELD -> "Slow nearby creatures and shots.";
+            case SLOW_FIELD -> "30s charge / 10s emergence / 60s hunt";
             case TIME_STOP -> "Freeze the local battlefield.";
             case SELECTIVE_STOP -> "Freeze the target in your aim.";
             case THREADS -> "Bind your target in time.";
@@ -152,7 +152,8 @@ public final class HexHud {
             case TELEKINESIS -> "Throw held target";
             case DAGGERS,TWIN_DAGGERS,LAEVATEINN -> "Dismiss weapons";
             case ENCHANT -> "Direct charmed creatures";
-            case SLOW_FIELD,TIME_STOP -> "Resume time";
+            case SLOW_FIELD -> "Cancel charge";
+            case TIME_STOP -> "Resume time";
             case SELECTIVE_STOP -> "Exempt an ally";
             case THREADS -> "Pull bound target";
             case TIME_BRANCH -> "None — release the cast key to fire";

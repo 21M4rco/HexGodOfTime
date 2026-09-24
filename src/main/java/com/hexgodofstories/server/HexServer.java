@@ -5,6 +5,7 @@ import com.hexgodofstories.warping.*;
 import com.hexgodofstories.data.*;
 import com.hexgodofstories.entity.*;
 import com.hexgodofstories.network.HexNetwork;
+import com.hexgodofstories.unknown.UnknownSummoning;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -125,7 +126,8 @@ public final class HexServer {
     }
 
     private static boolean secondary(ServerPlayer p,Ability a) {
-        if(a==Ability.TIME_STOP||a==Ability.SLOW_FIELD){TemporalEngine.clear(p);return true;}
+        if(a==Ability.SLOW_FIELD){UnknownSummoning.cancelCharge(p);return true;}
+        if(a==Ability.TIME_STOP){TemporalEngine.clear(p);return true;}
         if(a==Ability.DUPLICATE){return commandOrDismiss(p);}
         if(a==Ability.ARCHITECTURE){Architecture.dismiss(p);return true;}
         if(a==Ability.MASQUERADE){Masquerade.drop(p);return true;}
@@ -162,6 +164,7 @@ public final class HexServer {
         if(!HexData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return;}
         if(HexData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return;}
         if(HexData.energy(p)<a.cost){notice(p,"Not enough Temporal Energy.");return;}
+        if(a==Ability.SLOW_FIELD){UnknownSummoning.begin(p);return;}
         if(!cast(p,a,false))return;
         HexData.spend(p,a.cost);
         HexData.get(p).putLong("cd_"+a.name(),HexData.now(p)+a.cooldown);
@@ -217,7 +220,7 @@ public final class HexServer {
                 gesture(p,"time_slip","slip",HexGodOfStories.SLIP.get());teleport(p,m.position);p.setYRot(m.yaw);p.setXRot(m.pitch);
                 HexNetwork.fx(p,"slip");return true;
             }
-            case SLOW_FIELD,TIME_STOP -> {boolean stop=a==Ability.TIME_STOP;if(!TemporalEngine.field(p,stop,null,stop?120:180))return false;gesture(p,"time_stop",stop?"stop":"dilate",HexGodOfStories.STOP.get());return true;}
+            case TIME_STOP -> {if(!TemporalEngine.field(p,true,null,120))return false;gesture(p,"time_stop","stop",HexGodOfStories.STOP.get());return true;}
             case SELECTIVE_STOP -> {if(t==null||!validTarget(p,t)||!TemporalEngine.field(p,true,t,t instanceof Player?40:100))return false;gesture(p,"time_stop","bind",HexGodOfStories.STOP.get());return true;}
             case THREADS -> {
                 if(t==null||!validTarget(p,t))return false;

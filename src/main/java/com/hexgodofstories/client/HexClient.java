@@ -61,6 +61,7 @@ public final class HexClient {
         @SubscribeEvent public static void entities(EntityRenderersEvent.RegisterRenderers e) {
             e.registerEntityRenderer(HexGodOfStories.ILLUSION.get(),IllusionRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.PILGRIM.get(),com.hexgodofstories.client.leviathan.AbyssalPilgrimRenderer::new);
+            e.registerEntityRenderer(HexGodOfStories.UNKNOWN.get(),com.hexgodofstories.client.unknown.UnknownRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.WARP_HAZARD.get(),WarpHazardRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.PROJECTILE.get(),SpellRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.THROWN_DAGGER.get(),DaggerRenderer::new);

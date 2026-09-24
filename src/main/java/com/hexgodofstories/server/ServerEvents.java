@@ -59,6 +59,8 @@ public final class ServerEvents {
             // rule runs. That way a realm never has to already be simulating its victims in order
             // to discover that it should stay simulated.
             com.hexgodofstories.warping.WarpResidency.tick(s);
+            com.hexgodofstories.unknown.UnknownSummoning.tick(s);
+            com.hexgodofstories.unknown.UnknownTerrain.tick(s);
             TemporalEngine.tick(s);HexServer.tickLevel(s);
         }
         // Turning is eased after the creatures have turned, which is the only point it can be done.
@@ -81,6 +83,7 @@ public final class ServerEvents {
         // Attribute modifiers are saved with the player, so a session that ended mid-transformation would
         // otherwise hand the armour back for free. Re-derived from the mantle, never inherited.
         Transformation.strip(p);
+        com.hexgodofstories.unknown.UnknownSummoning.syncCooldown(p);
         Transformation.sustain(p);
         HexNetwork.sync(p);
     }
