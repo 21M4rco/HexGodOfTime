@@ -204,6 +204,7 @@ public final class UnknownEntity extends Monster implements GeoEntity {
     @Override public void push(Entity other){}
     @Override public boolean isPushable(){return false;}
     @Override public boolean canBeLeashed(Player player){return false;}
+    @Override public boolean canChangeDimensions(){return false;}
     @Override public boolean removeWhenFarAway(double distance){return false;}
     @Override public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
