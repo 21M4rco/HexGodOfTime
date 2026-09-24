@@ -460,6 +460,7 @@ public final class HexServer {
         TimeBranch.tickLevel(level);
         Erasure.tickLevel(level);
         Nothingness.tick(level);
+        UnknownAbility.tickRestoration(level);
         IllusoryWalls.tick(level);
         PocketRealm.tick(level);
         WarpEmergence.tick(level);
