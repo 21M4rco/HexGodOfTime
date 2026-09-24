@@ -20,7 +20,9 @@ public final class UnknownAssetTest {
         var bones=geometry.getAsJsonArray("bones");
         Set<String> names=new HashSet<>();int cubes=0;
         for(var element:bones) {
-            var bone=element.getAsJsonObject();names.add(bone.get("name").getAsString());
+            var bone=element.getAsJsonObject();
+            if(bone.has("parent"))require(names.contains(bone.get("parent").getAsString()),"Bone parent must appear before its child");
+            names.add(bone.get("name").getAsString());
             if(bone.has("cubes"))cubes+=bone.getAsJsonArray("cubes").size();
         }
         require(bones.size()==29&&cubes==695,"Reference geometry changed");
