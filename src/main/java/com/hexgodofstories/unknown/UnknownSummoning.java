@@ -22,10 +22,11 @@ public final class UnknownSummoning extends SavedData {
     private static final String NAME="hexgodofstories_unknown_cooldowns";
     private final Map<UUID,Long> cooldowns=new HashMap<>(),pending=new HashMap<>();
     private static final Map<UUID,Charge> CHARGES=new HashMap<>();
-    private record Charge(ServerLevel level,Vec3 at,UUID caster,int casterId,long begin,long seed){}
+    private record Charge(ServerLevel level,Vec3 at,UUID caster,int casterId,long begin,long seed,long openedTick){}
     public static UnknownSummoning of(ServerLevel level){
         return level.getServer().overworld().getDataStorage().computeIfAbsent(UnknownSummoning::load,UnknownSummoning::new,NAME);
     }
+    public static boolean isCharging(ServerPlayer p){return CHARGES.containsKey(p.getUUID());}
     public static void syncCooldown(ServerPlayer p){
         long until=of(p.serverLevel()).cooldowns.getOrDefault(p.getUUID(),0L);
         HexData.get(p).putLong("cd_SLOW_FIELD",HexData.now(p)+Math.max(0,(until-System.currentTimeMillis()+49)/50));
@@ -37,7 +38,8 @@ public final class UnknownSummoning extends SavedData {
     public static void begin(ServerPlayer p){
         long now=System.currentTimeMillis();
         UnknownSummoning data=of(p.serverLevel());
-        if(CHARGES.containsKey(p.getUUID())||now<data.pending.getOrDefault(p.getUUID(),0L))return;
+        if(isCharging(p)){cancelCharge(p);return;}
+        if(now<data.pending.getOrDefault(p.getUUID(),0L))return;
         if(now<data.cooldowns.getOrDefault(p.getUUID(),0L)){syncCooldown(p);HexNetwork.sync(p);return;}
         Vec3 eye=p.getEyePosition(),end=eye.add(p.getLookAngle().scale(24));
         BlockHitResult hit=p.level().clip(new ClipContext(eye,end,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,p));
@@ -48,7 +50,7 @@ public final class UnknownSummoning extends SavedData {
         BlockPos floor=hit.getBlockPos();
         Vec3 at=new Vec3(floor.getX()+.5,hit.getLocation().y+.03,floor.getZ()+.5);
         if(!HexData.spend(p,Ability.SLOW_FIELD.cost))return;
-        Charge charge=new Charge(p.serverLevel(),at,p.getUUID(),p.getId(),now,p.getUUID().getLeastSignificantBits()^now);
+        Charge charge=new Charge(p.serverLevel(),at,p.getUUID(),p.getId(),now,p.getUUID().getLeastSignificantBits()^now,-1);
         CHARGES.put(p.getUUID(),charge);
         HexData.get(p).putLong("unknownChargeEnds",now+CHARGE_MS);
         HexData.get(p).putLong("unknownChargeStartTick",p.level().getGameTime());
@@ -64,7 +66,12 @@ public final class UnknownSummoning extends SavedData {
     }
     public static void cancelCharge(ServerPlayer p){
         Charge c=CHARGES.remove(p.getUUID());
-        if(c!=null){send(c,true,false);clearGesture(p);UnknownSummoning d=of(p.serverLevel());d.pending.remove(p.getUUID());d.cooldowns.remove(p.getUUID());d.setDirty();}
+        if(c!=null){
+            send(c,true,false);
+            UnknownSummoning d=of(p.serverLevel());d.pending.remove(p.getUUID());d.cooldowns.remove(p.getUUID());d.setDirty();
+            HexData.energy(p,HexData.energy(p)+Ability.SLOW_FIELD.cost);
+            syncCooldown(p);clearGesture(p);
+        }
     }
     public static void tick(ServerLevel level){
         long now=System.currentTimeMillis();
@@ -82,16 +89,16 @@ public final class UnknownSummoning extends SavedData {
                 UnknownEntity creature=HexGodOfStories.UNKNOWN.get().create(level);
                 if(creature==null){send(c,true,false);UnknownSummoning d=of(level);d.pending.remove(c.caster);d.cooldowns.remove(c.caster);d.setDirty();return;}
                 creature.moveTo(c.at.x,c.at.y,c.at.z,caster.getYRot(),0);
-                creature.begin(c.caster,now,c.at);
+                creature.begin(c.caster,now,c.at,c.seed,level.getGameTime());
                 level.addFreshEntity(creature);
                 level.playSound(null,BlockPos.containing(c.at),HexGodOfStories.UNKNOWN_EMERGE.get(),SoundSource.HOSTILE,6f,.84f);
                 // One independent packet per creature during emergence; no Warping crossing is registered.
-                send(c,false,true);
+                portal(creature,false);
             }else if(level.getGameTime()%10==0){
                 send(c,false,false);
                 if(level.getGameTime()%20==0){HexData.get(caster).putLong("unknownChargeSyncedAt",now);HexNetwork.sync(caster);}
-                if(level.getGameTime()%60==0)level.playSound(null,BlockPos.containing(c.at),
-                        HexGodOfStories.UNKNOWN_CHARGE.get(),SoundSource.HOSTILE,2f,.72f);
+                if(level.getGameTime()%140==0)level.playSound(null,BlockPos.containing(c.at),
+                        HexGodOfStories.UNKNOWN_CHARGE.get(),SoundSource.HOSTILE,2f,1f);
             }
         }
     }
@@ -102,7 +109,7 @@ public final class UnknownSummoning extends SavedData {
     public static void portal(UnknownEntity creature,boolean clear){
         if(!(creature.level() instanceof ServerLevel level))return;
         Charge c=new Charge(level,creature.portal(),creature.caster(),creature.portalId(),
-                creature.born()-CHARGE_MS,creature.portalSeed());
+                creature.born()-CHARGE_MS,creature.portalSeed(),creature.portalGameTick());
         send(c,clear,true);
     }
     /** Reuse the exact WARP payload and jagged terrain-following renderer, with a separate id. */
@@ -112,8 +119,8 @@ public final class UnknownSummoning extends SavedData {
         CompoundTag n=new CompoundTag();
         n.putBoolean("clear",clear);
         n.putDouble("x",c.at.x);n.putDouble("y",c.at.y);n.putDouble("z",c.at.z);
-        n.putLong("start",game-held);n.putInt("destination",com.hexgodofstories.warping.Destination.VOID_SEA.ordinal());
-        n.putLong("opened",open?game-1:-1);n.putInt("held",held);n.putLong("seed",c.seed);
+        n.putLong("start",open?c.openedTick-100:game-Math.min(100,elapsed/300));n.putInt("destination",com.hexgodofstories.warping.Destination.VOID_SEA.ordinal());
+        n.putLong("opened",open?c.openedTick:-1);n.putInt("held",held);n.putLong("seed",c.seed);
         n.putLong("until",game+20);n.putInt("window",200);
         n.putInt("previewCap",100);n.putString("dimension",c.level.dimension().location().toString());n.putLong("sent",game);
         HexNetwork.near(c.level,c.at,96,new HexNetwork.Message(HexNetwork.WARP,-c.casterId-1,n));

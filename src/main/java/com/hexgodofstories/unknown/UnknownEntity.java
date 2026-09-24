@@ -41,10 +41,11 @@ public final class UnknownEntity extends Mob implements GeoEntity {
     private final AnimatableInstanceCache cache=GeckoLibUtil.createInstanceCache(this);
     private UUID caster,targetId,heldId;
     private Vec3 portal=Vec3.ZERO;
-    private long born,portalSeed;private int portalId;
+    private long born,portalSeed,portalGameTick;private int portalId;
     private boolean finished,heldNoGravity,throwVictim;
-    private int lastSense,attackTick,attackMode,attackDelay,breakClock,roamUntil;
+    private int lastSense,attackTick,attackMode,attackDelay,breakClock,roamUntil,blockedTicks;
     private Vec3 roamPoint;
+    private Vec3 previousChasePosition;
     private double chaseSpeed;private Vec3 lastHeading=Vec3.ZERO;
     public UnknownEntity(EntityType<? extends UnknownEntity> type,Level level){
         super(type,level);setPersistenceRequired();
@@ -59,9 +60,9 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         entityData.define(ACTION_TICK,0);entityData.define(SPEED,0f);
     }
     @Override protected void registerGoals(){}
-    public void begin(UUID caster,long born,Vec3 portal){
+    public void begin(UUID caster,long born,Vec3 portal,long seed,long gameTick){
         this.caster=caster;this.born=born;this.portal=portal;
-        this.portalSeed=getUUID().getMostSignificantBits()^born;
+        this.portalSeed=seed;this.portalGameTick=gameTick;
         ServerPlayer player=getServer().getPlayerList().getPlayer(caster);
         this.portalId=player==null?getId():player.getId();
         entityData.set(PHASE,0);noPhysics=true;setNoGravity(true);
@@ -69,6 +70,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
     public UUID caster(){return caster;}
     public long born(){return born;}
     public long portalSeed(){return portalSeed;}
+    public long portalGameTick(){return portalGameTick;}
     public int portalId(){return portalId;}
     public Vec3 portal(){return portal;}
     public int phase(){return entityData.get(PHASE);}
@@ -89,14 +91,13 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         long elapsed=System.currentTimeMillis()-born;
         if(elapsed<UnknownSummoning.EMERGE_MS){
             noPhysics=true;setDeltaMovement(Vec3.ZERO);
-            int stage=(int)(elapsed/50);
-            if(stage==38||stage==94||stage==170){
-                server.playSound(null,blockPosition(),stage==170?HexGodOfStories.UNKNOWN_IMPACT.get():HexGodOfStories.UNKNOWN_DIG.get(),SoundSource.HOSTILE,5f,stage==170?.68f:.8f);
-                server.sendParticles(ParticleTypes.POOF,portal.x,portal.y+.2,portal.z,45,2,.18,2,.12);
+            if(tickCount==38||tickCount==94||tickCount==170){
+                server.playSound(null,blockPosition(),tickCount==170?HexGodOfStories.UNKNOWN_IMPACT.get():HexGodOfStories.UNKNOWN_DIG.get(),SoundSource.HOSTILE,2.4f,.85f);
+                server.sendParticles(ParticleTypes.POOF,portal.x,portal.y+.1,portal.z,18,1.2,.06,1.2,.04);
             }
-            if(tickCount%5==0){
+            if(tickCount%10==0){
                 UnknownSummoning.portal(this,false);
-                server.sendParticles(ParticleTypes.LARGE_SMOKE,portal.x,portal.y+.25,portal.z,18,2,.3,2,.03);
+                server.sendParticles(ParticleTypes.LARGE_SMOKE,portal.x,portal.y+.12,portal.z,6,1.4,.07,1.4,.008);
             }
             return;
         }
@@ -136,10 +137,15 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         setYRot((float)(Mth.atan2(-direction.x,direction.z)*180/Math.PI));
         yBodyRot=getYRot();yHeadRot=getYRot();
         Vec3 step=direction.scale(chaseSpeed);
-        if(target!=null)breach(server,step,target);
-        // Horizontal motion goes through vanilla travel/collision. Gravity and jumps stay physical:
-        // target height must never turn a ground hunter into a flying one.
-        boolean wall=horizontalCollision||!server.noCollision(this,getBoundingBox().move(step.x,.15,step.z));
+        // Track a real failed stride. Ordinary dirt, slopes and the floor beneath the creature
+        // are NEVER valid obstructions to excavate.
+        if(target!=null&&previousChasePosition!=null&&position().distanceToSqr(previousChasePosition)<.06*.06
+                &&horizontalCollision&&onGround())blockedTicks++;
+        else blockedTicks=0;
+        previousChasePosition=position();
+        if(target!=null&&blockedTicks>=5&&tickCount%3==0)breach(server,direction);
+        // Horizontal motion goes through vanilla travel/collision; vertical motion remains gravity.
+        boolean wall=horizontalCollision;
         double vertical=getDeltaMovement().y;
         if(onGround()&&wall&&target!=null&&target.getY()>getY()+.8)vertical=.7;
         setDeltaMovement(step.x,vertical,step.z);hasImpulse=true;
@@ -176,26 +182,42 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         return target!=null&&target!=this&&target.isAlive()&&!target.isSpectator()
                 &&!(target instanceof UnknownEntity);
     }
-    /** Only the body's next swept volume, not a remote sphere in front of it, can break a wall. */
-    private void breach(ServerLevel level,Vec3 movement,LivingEntity target){
-        // The supplied skull sits about seven world blocks ahead of its torso at render scale.
-        AABB swept=getBoundingBox().expandTowards(movement.add(lastHeading.scale(6.5))).inflate(.18,.12,.18);
-        if(target.getY()>getY()+3)swept=swept.expandTowards(0,Math.min(2,target.getY()-getY()-3),0);
-        int taken=0;
-        for(BlockPos pos:BlockPos.betweenClosed(BlockPos.containing(swept.minX,swept.minY,swept.minZ),
-                BlockPos.containing(swept.maxX,swept.maxY,swept.maxZ))){
-            if(taken>=90)break;
-            BlockState state=level.getBlockState(pos);
-            if(state.isAir()||state.getCollisionShape(level,pos).isEmpty())continue;
-            if(UnknownTerrain.breakBlock(level,pos.immutable(),getUUID(),
-                    born+UnknownSummoning.EMERGE_MS+UnknownSummoning.HUNT_MS+UnknownSummoning.VANISH_MS+15_000)){
-                taken++;
-                if(taken%3==0)level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK,state),
-                        pos.getX()+.5,pos.getY()+.5,pos.getZ()+.5,8,.35,.35,.35,.18);
+    /** Remove only the wall physically touching the front of the body after five failed strides. */
+    private void breach(ServerLevel level,Vec3 direction){
+        AABB body=getBoundingBox();
+        // Tall collisions need to be above the two-block step the creature can climb.
+        AABB high=new AABB(body.minX,body.minY+2.55,body.minZ,
+                body.maxX,body.maxY-.35,body.maxZ).move(direction.scale(.75));
+        if(level.noCollision(this,high))return;
+        Vec3 front=position().add(direction.scale(getBbWidth()*.48));
+        Vec3 side=new Vec3(-direction.z,0,direction.x);
+        int floor=Mth.ceil(getY()-.01),taken=0;
+        for(int y=floor+1;y<floor+Math.min(8,Mth.ceil(getBbHeight()));y++){
+            for(double across=-getBbWidth()*.43;across<=getBbWidth()*.43;across+=.85){
+                for(double ahead=0;ahead<=1.0;ahead+=.5){
+                    Vec3 hit=front.add(side.scale(across)).add(direction.scale(ahead));
+                    BlockPos pos=BlockPos.containing(hit.x,y,hit.z);
+                    if(pos.getY()<floor||!level.hasChunkAt(pos))continue;
+                    BlockState state=level.getBlockState(pos);
+                    if(state.isAir()||state.getCollisionShape(level,pos).isEmpty())continue;
+                    // A block touched by the horizontal face is a wall. Blocks below the feet
+                    // remain structural support even when the visual tail overlaps them.
+                    if(UnknownTerrain.breakBlock(level,pos.immutable(),getUUID(),
+                            born+UnknownSummoning.EMERGE_MS+UnknownSummoning.HUNT_MS+UnknownSummoning.VANISH_MS+15_000)){
+                        taken++;
+                        level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK,state),
+                                pos.getX()+.5,pos.getY()+.5,pos.getZ()+.5,7,.25,.3,.25,.1);
+                        if(taken>=12)break;
+                    }
+                }
+                if(taken>=12)break;
             }
+            if(taken>=12)break;
         }
-        if(taken>0&&++breakClock%4==0)
-            level.playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_DIG.get(),SoundSource.HOSTILE,2.6f,.84f);
+        if(taken>0){
+            level.playSound(null,blockPosition(),HexGodOfStories.UNKNOWN_IMPACT.get(),SoundSource.HOSTILE,2f,.9f);
+            blockedTicks=3; // Allow a fresh stride before the next impact.
+        }
     }
     private void attack(ServerLevel level){
         attackTick++;entityData.set(ACTION_TICK,attackTick);
@@ -295,7 +317,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         super.addAdditionalSaveData(n);
         if(caster!=null)n.putUUID("Caster",caster);
         n.putLong("Born",born);n.putDouble("PortalX",portal.x);n.putDouble("PortalY",portal.y);
-        n.putDouble("PortalZ",portal.z);n.putLong("PortalSeed",portalSeed);n.putInt("PortalId",portalId);
+        n.putDouble("PortalZ",portal.z);n.putLong("PortalSeed",portalSeed);n.putLong("PortalGameTick",portalGameTick);n.putInt("PortalId",portalId);
         n.putInt("Phase",phase());if(targetId!=null)n.putUUID("Target",targetId);
         // Grabbed players are released on unload/restart, never left with a control/camera modifier.
     }
@@ -303,7 +325,7 @@ public final class UnknownEntity extends Mob implements GeoEntity {
         super.readAdditionalSaveData(n);
         if(n.hasUUID("Caster"))caster=n.getUUID("Caster");
         born=n.getLong("Born");portal=new Vec3(n.getDouble("PortalX"),n.getDouble("PortalY"),n.getDouble("PortalZ"));
-        portalSeed=n.getLong("PortalSeed");portalId=n.getInt("PortalId");
+        portalSeed=n.getLong("PortalSeed");portalGameTick=n.getLong("PortalGameTick");portalId=n.getInt("PortalId");
         entityData.set(PHASE,n.getInt("Phase"));
         if(n.hasUUID("Target"))targetId=n.getUUID("Target");
         noPhysics=phase()!=1;

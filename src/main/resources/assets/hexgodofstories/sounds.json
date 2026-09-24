@@ -568,6 +568,10 @@
       {
         "name": "hexgodofstories:unknown_roar",
         "volume": 1.0
+      },
+      {
+        "name": "hexgodofstories:unknown_roar_alt",
+        "volume": 1.0
       }
     ]
   },

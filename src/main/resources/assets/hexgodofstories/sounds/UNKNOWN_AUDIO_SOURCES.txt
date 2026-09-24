@@ -1,0 +1,19 @@
+Unknown audio sources (all CC0 1.0 Universal; no synthesis or reused Leviathan assets)
+
+"Big scary troll sounds" and "Monster snarls" by Darsycho:
+https://opengameart.org/content/big-scary-troll-sounds
+https://opengameart.org/content/monster-snarls
+Unknown's charge, two roar variants, lunge, grab, bite and throw are trimmed excerpts
+from the original recordings troll-idle-noises.ogg, troll-roars.ogg,
+monster-snarls.ogg, monster-snarl-5.ogg and monster-snarls-2.ogg.
+
+"CC0 Deep Monster Roar" by trazzz123:
+https://opengameart.org/content/cc0-deep-monster-roar
+Unknown's portal emergence uses the original monster_roar.wav converted to Vorbis.
+
+"80 CC0 RPG SFX" by rubberduck:
+https://opengameart.org/content/80-cc0-rpg-sfx
+Unknown's footsteps and obstruction impacts use unmodified stones_01.ogg,
+stones_02.ogg and stones_03.ogg; vanish uses unmodified spell_01.ogg.
+
+CC0 license: https://creativecommons.org/publicdomain/zero/1.0/

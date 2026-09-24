@@ -34,7 +34,7 @@ public final class HexHud {
             g.fill(left,top,left+width,top+8,0xff292127);
             g.fill(left,top,left+(int)(width*progress),top+8,0xffb45f65);
             for(int i=1;i<10;i++)g.fill(left+i*width/10,top,left+i*width/10+1,top+8,0xff23181b);
-            g.drawCenteredString(mc.font,"A doorway is opening beneath you",screenWidth/2,top+12,0xffa99d96);
+            g.drawCenteredString(mc.font,"Press M again to cancel",screenWidth/2,top+12,0xffa99d96);
         }
         if(a==null)return;
         int bottom=screenHeight-(screenWidth<540?54:8);
@@ -164,7 +164,7 @@ public final class HexHud {
             case TELEKINESIS -> "Throw held target";
             case DAGGERS,TWIN_DAGGERS,LAEVATEINN -> "Dismiss weapons";
             case ENCHANT -> "Direct charmed creatures";
-            case SLOW_FIELD -> "Cancel charge";
+            case SLOW_FIELD -> "M again: cancel charge";
             case TIME_STOP -> "Resume time";
             case SELECTIVE_STOP -> "Exempt an ally";
             case THREADS -> "Pull bound target";

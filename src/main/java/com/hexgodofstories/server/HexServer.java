@@ -157,6 +157,11 @@ public final class HexServer {
             default -> null;
         };
         if(a==null)return;
+        // A second press of the same permanent M key always cancels an unfinished summon.
+        // Check before cooldown and energy, since both are irrelevant to canceling it.
+        if(a==Ability.SLOW_FIELD&&UnknownSummoning.isCharging(p)){
+            UnknownSummoning.cancelCharge(p);return;
+        }
         if(a==Ability.TIME_STOP&&TemporalEngine.owns(p)) {
             TemporalEngine.clear(p);HexNetwork.sync(p);return;
         }
