@@ -75,6 +75,8 @@ public final class HexAnimations {
       }
    }
 
+   private static final class ScepterViewLayer extends ModifierLayer<IAnimation> { boolean left; }
+
    /** Keep the real player hand/item render active in first person for the entire carry. */
    public static void tickScepterView() {
       var mc=Minecraft.getInstance();
@@ -82,10 +84,10 @@ public final class HexAnimations {
       for(AbstractClientPlayer player:mc.level.players()) {
          var data=PlayerAnimationAccess.getPlayerAssociatedData(player);
          var existing=data.get(SCEPTER_VIEW);
-         ModifierLayer<IAnimation> layer;
-         if(existing instanceof ModifierLayer<?>)layer=(ModifierLayer<IAnimation>)existing;
+         ScepterViewLayer layer;
+         if(existing instanceof ScepterViewLayer view)layer=view;
          else {
-            layer=new ModifierLayer<>();
+            layer=new ScepterViewLayer();
             PlayerAnimationAccess.getPlayerAnimLayer(player).addAnimLayer(800,layer);
             data.set(SCEPTER_VIEW,layer);
          }
@@ -94,15 +96,14 @@ public final class HexAnimations {
          boolean left=player.getMainArm()==net.minecraft.world.entity.HumanoidArm.LEFT;
          String key=left?"scepter_hold_left":"scepter_hold";
          // A changed main-hand preference needs the corresponding arm immediately.
-         ResourceLocation state=HexGodOfStories.id("scepter_view_side");
-         if(layer.isActive()&&key.equals(data.get(state)))continue;
+         if(layer.isActive()&&layer.left==left)continue;
          var clip=PlayerAnimationRegistry.getAnimation(HexGodOfStories.id(key));
          if(clip==null)continue;
          layer.setAnimation(new KeyframeAnimationPlayer(clip)
             .setFirstPersonMode(FirstPersonMode.THIRD_PERSON_MODEL)
             .setFirstPersonConfiguration(new FirstPersonConfiguration()
                .setShowRightArm(!left).setShowLeftArm(left).setShowRightItem(true).setShowLeftItem(true)));
-         data.set(state,key);
+         layer.left=left;
       }
    }
 
