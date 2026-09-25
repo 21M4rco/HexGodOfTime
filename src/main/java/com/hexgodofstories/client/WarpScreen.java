@@ -30,11 +30,6 @@ public final class WarpScreen extends Screen {
             addRenderableWidget(Button.builder(label,button->{HexNetwork.send(HexServer.WARP_CHOICE,d.ordinal());onClose();})
                 .bounds(bx(d),by(d),bw(),19).build());
         }
-        // The World Tree's exit routes are a general Warping configuration, not a
-        // privilege of standing inside the sanctum. Keep the realm/trap choices above.
-        addRenderableWidget(Button.builder(Component.literal("WORLD TREE  /  CHOOSE EXIT"),
-            button -> FractureScreen.open())
-            .bounds(x+6,y+122,w-12,19).build());
     }
     @Override public void render(GuiGraphics g,int mx,int my,float partial){
         g.fill(x,y,x+w,Math.min(height-4,y+188),0xe00a0710);g.fill(x,y,x+2,Math.min(height-4,y+188),0xffb28ade);
@@ -51,7 +46,7 @@ public final class WarpScreen extends Screen {
         for(Destination d:Destination.values())if(mx>=bx(d)&&mx<bx(d)+bw()&&my>=by(d)&&my<by(d)+19)g.renderTooltip(font,font.split(Component.literal(d.description),220),mx,my);
         g.drawString(font,"VOID SEA: a cosmic sea god hunts it. It cannot be killed.",x+9,y+146,ALARM,false);
         g.drawString(font,"Hold R: spread pool   Y: pull normal realm creatures to you",x+9,y+159,0xb2a5bc,false);
-        g.drawString(font,"WORLD TREE: choose its exit above   Inside any realm, R leaves",x+9,y+172,0xb2a5bc,false);
+        g.drawString(font,"WORLD TREE / WARP REALMS: G chooses exit   R leaves",x+9,y+172,0xb2a5bc,false);
     }
     @Override public boolean isPauseScreen(){return false;}
     @Override public boolean keyPressed(int key,int scan,int modifiers){if(HexClient.SECONDARY.matches(key,scan)){onClose();return true;}return super.keyPressed(key,scan,modifiers);}
