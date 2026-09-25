@@ -27,7 +27,8 @@ import org.slf4j.Logger;
 
 public final class HexAnimations {
    private static final ResourceLocation LAYER = HexGodOfStories.id("casting");
-   private static final Set<String> OWN_FIRST_PERSON_ARM = Set.of("branch_punch", "time_stop", "scepter_fire", "scepter_fire_left");
+   private static final Set<String> OWN_FIRST_PERSON_ARM = Set.of("branch_punch", "time_stop");
+   private static final ResourceLocation SCEPTER_VIEW = HexGodOfStories.id("scepter_view");
    private static final Logger LOGGER = LogUtils.getLogger();
 
    private HexAnimations() {
@@ -56,7 +57,7 @@ public final class HexAnimations {
          } else {
             boolean left=abstractclientplayer.getMainArm()==net.minecraft.world.entity.HumanoidArm.LEFT;
             if(left&&(name.equals("scepter_fire")||name.equals("scepter_manifest")))name+="_left";
-            boolean manifest=name.startsWith("scepter_manifest");
+            boolean manifest=name.startsWith("scepter_manifest")||name.startsWith("scepter_fire");
             ResourceLocation resourcelocation = HexGodOfStories.id(name);
             KeyframeAnimation keyframeanimation = PlayerAnimationRegistry.getAnimation(resourcelocation);
             if (keyframeanimation == null) {
@@ -68,9 +69,40 @@ public final class HexAnimations {
                   .setFirstPersonConfiguration(
                      new FirstPersonConfiguration().setShowRightArm(manifest&&!left).setShowLeftArm(manifest&&left).setShowRightItem(true).setShowLeftItem(true)
                   );
-               modifierlayer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(Math.max(0, fadeTicks), Ease.INOUTQUAD), keyframeanimationplayer);
+               modifierlayer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(name.startsWith("scepter_fire")?0:Math.max(0, fadeTicks), Ease.INOUTQUAD), keyframeanimationplayer);
             }
          }
+      }
+   }
+
+   /** Keep the real player hand/item render active in first person for the entire carry. */
+   public static void tickScepterView() {
+      var mc=Minecraft.getInstance();
+      if(mc.level==null)return;
+      for(AbstractClientPlayer player:mc.level.players()) {
+         var data=PlayerAnimationAccess.getPlayerAssociatedData(player);
+         var existing=data.get(SCEPTER_VIEW);
+         ModifierLayer<IAnimation> layer;
+         if(existing instanceof ModifierLayer<?>)layer=(ModifierLayer<IAnimation>)existing;
+         else {
+            layer=new ModifierLayer<>();
+            PlayerAnimationAccess.getPlayerAnimLayer(player).addAnimLayer(800,layer);
+            data.set(SCEPTER_VIEW,layer);
+         }
+         boolean held=player.getMainHandItem().getItem() instanceof com.hexgodofstories.entity.ConjuredWeapon weapon&&weapon.kind==1;
+         if(!held) { if(layer.isActive())layer.setAnimation(null); continue; }
+         boolean left=player.getMainArm()==net.minecraft.world.entity.HumanoidArm.LEFT;
+         String key=left?"scepter_hold_left":"scepter_hold";
+         // A changed main-hand preference needs the corresponding arm immediately.
+         ResourceLocation state=HexGodOfStories.id("scepter_view_side");
+         if(layer.isActive()&&key.equals(data.get(state)))continue;
+         var clip=PlayerAnimationRegistry.getAnimation(HexGodOfStories.id(key));
+         if(clip==null)continue;
+         layer.setAnimation(new KeyframeAnimationPlayer(clip)
+            .setFirstPersonMode(FirstPersonMode.THIRD_PERSON_MODEL)
+            .setFirstPersonConfiguration(new FirstPersonConfiguration()
+               .setShowRightArm(!left).setShowLeftArm(left).setShowRightItem(true).setShowLeftItem(true)));
+         data.set(state,key);
       }
    }
 

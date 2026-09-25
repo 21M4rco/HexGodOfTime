@@ -2,7 +2,7 @@
   "version": 3,
   "name": "scepter_fire_left",
   "author": "HexGodOfStories",
-  "description": "Raise only the weapon arm, point the crystal forward, recoil and recover.",
+  "description": "One extended arm with the staff held horizontally along it; arm and item rotate together.",
   "emote": {
     "beginTick": 0,
     "endTick": 26,
@@ -13,78 +13,55 @@
     "moves": [
       {
         "tick": 0,
-        "easing": "inoutquad",
+        "easing": "linear",
         "leftArm": {
-          "pitch": -12,
+          "pitch": 0,
           "yaw": 0,
           "roll": 0
-        }
-      },
-      {
-        "tick": 3,
-        "easing": "inoutquad",
-        "torso": {
-          "pitch": 0,
-          "yaw": 8,
-          "roll": 0
         },
-        "leftArm": {
-          "pitch": -65,
-          "yaw": 12,
-          "roll": 6
+        "leftItem": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
         }
       },
       {
         "tick": 6,
-        "easing": "outquad",
-        "torso": {
-          "pitch": 0,
-          "yaw": 0,
-          "roll": 0
-        },
+        "easing": "linear",
         "leftArm": {
           "pitch": -90,
           "yaw": 0,
           "roll": 0
-        }
-      },
-      {
-        "tick": 8,
-        "easing": "inoutquad",
-        "torso": {
-          "pitch": -3,
-          "yaw": 0,
-          "roll": 0
         },
-        "leftArm": {
-          "pitch": -96,
+        "leftItem": {
+          "pitch": -70,
           "yaw": 0,
           "roll": 0
         }
       },
       {
         "tick": 12,
-        "easing": "inoutquad",
-        "torso": {
-          "pitch": 0,
+        "easing": "linear",
+        "leftArm": {
+          "pitch": -90,
           "yaw": 0,
           "roll": 0
         },
-        "leftArm": {
-          "pitch": -90,
+        "leftItem": {
+          "pitch": -70,
           "yaw": 0,
           "roll": 0
         }
       },
       {
         "tick": 26,
-        "easing": "inoutquad",
-        "torso": {
+        "easing": "linear",
+        "leftArm": {
           "pitch": 0,
           "yaw": 0,
           "roll": 0
         },
-        "leftArm": {
+        "leftItem": {
           "pitch": 0,
           "yaw": 0,
           "roll": 0

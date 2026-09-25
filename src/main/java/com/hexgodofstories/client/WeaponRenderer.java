@@ -112,18 +112,15 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         // Cancel that offset, placing the actual cylindrical grip at the hand pivot.
         pose.translate(.5,.5,.5);
         if(first) {
-            float aim=FrostClient.aim(stack);
-            pose.mulPose(Axis.ZP.rotationDegrees(12*aim));
-            pose.mulPose(Axis.XP.rotationDegrees(-110+20*aim));
-            pose.mulPose(Axis.YP.rotationDegrees(-15*(1-aim)));
+            // Fallback only: PlayerAnimator normally renders the real third-person hand in first person.
+            pose.mulPose(Axis.XP.rotationDegrees(-110+20*FrostClient.aim(stack)));
+            pose.mulPose(Axis.YP.rotationDegrees(90-180*FrostClient.aim(stack)));
         } else if(third) {
-            float aim=FrostClient.aim(stack);
-            // Vanilla rotates held items -90 degrees around X before the JSON transform.
-            // Rest: net -110 degrees (blade tip down, tail behind and up). Fire: compensate the
-            // raised arm so the shaft points down the crosshair instead of into the floor.
-            pose.mulPose(Axis.XP.rotationDegrees(-20+110*aim-FrostClient.pitch(stack)*aim));
-            // Keep the same physical blade facing for either hand.
-            pose.mulPose(Axis.YP.rotationDegrees(90));
+            // The fire clip rotates BOTH the arm and its held item on the same timeline.
+            // Vanilla's Y=180 hand transform reverses item-local X: the forward correction
+            // belongs in the negative direction, not the old +110-degree counter-rotation.
+            pose.mulPose(Axis.XP.rotationDegrees(-20-FrostClient.pitch(stack)*FrostClient.aim(stack)));
+            pose.mulPose(Axis.YP.rotationDegrees(90-180*FrostClient.aim(stack)));
         } else if(context==ItemDisplayContext.GUI||context==ItemDisplayContext.FIXED) {
             pose.scale(.32f,.32f,.32f);
             pose.translate(-.07,-.23,0);
@@ -131,8 +128,7 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
             pose.translate(0,1.16,0);
         }
         // Scale around the grip: a full-length staff, with the hand remaining on the shaft.
-        if(first)pose.scale(1.00f,1.00f,1.00f);
-        else if(third)pose.scale(2.30f,2.30f,2.30f);
+        if(first||third)pose.scale(2.30f,2.30f,2.30f);
         draw(1,pose,buffers,light,growth);
         pose.popPose();
     }
