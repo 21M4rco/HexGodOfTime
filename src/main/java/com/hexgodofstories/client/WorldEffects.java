@@ -27,7 +27,13 @@ public final class WorldEffects {
     public static final ResourceLocation WHITE=HexGodOfStories.id("textures/white.png");
     private record Echo(int entity,Vec3 pos,long end) {}
     private record Projection(BlockPos origin,long until,boolean preview,long shown,List<IllusoryWall.Placement> blocks) {}
-    static record Field(Vec3 centre,double radius,boolean stop,long started,long expires) {}
+    static record Field(int caster,Vec3 centre,double radius,boolean stop,long started,long expires) {
+        Vec3 position() {
+            var level=Minecraft.getInstance().level;
+            Entity entity=level==null?null:level.getEntity(caster);
+            return stop&&entity!=null?entity.position().add(entity.getEyePosition(1).subtract(entity.position()).scale(.5)):centre;
+        }
+    }
 
     private static final List<Echo> ECHOES=new ArrayList<>();
     private static final Map<Integer,Projection> PROJECTIONS=new HashMap<>();
@@ -76,7 +82,7 @@ public final class WorldEffects {
     }
     public static void field(int caster,CompoundTag n) {
         if(!n.getBoolean("active")){FIELDS.remove(caster);return;}
-        FIELDS.put(caster,new Field(new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z")),n.getDouble("radius"),n.getBoolean("stop"),n.getLong("started"),n.getLong("expires")));
+        FIELDS.put(caster,new Field(caster,new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z")),n.getDouble("radius"),n.getBoolean("stop"),n.getLong("started"),n.getLong("expires")));
     }
     static Collection<Field> fields() {return FIELDS.values();}
     /** The grasp is drawn as a construct rather than as a ring of motes; {@link GripRenderer} owns it. */
@@ -92,20 +98,21 @@ public final class WorldEffects {
     }
     private static long reached(Field f,double x,double y,double z) {
         if(!f.stop)return Long.MIN_VALUE;
-        double dx=f.centre.x-x,dy=f.centre.y-y,dz=f.centre.z-z;
+        Vec3 centre=f.position();
+        double dx=centre.x-x,dy=centre.y-y,dz=centre.z-z;
         double distance=Math.sqrt(dx*dx+dy*dy+dz*dz);
         if(distance>f.radius)return Long.MIN_VALUE;
-        long reached=f.expires==Long.MAX_VALUE
-            ?f.started+(long)Math.ceil(distance/f.radius*com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION):f.started;
+        long reached=f.started;
         return ClientState.now()>=reached?reached:Long.MIN_VALUE;
     }
     public static long heldSince(net.minecraft.world.phys.AABB box) {
         long best=Long.MIN_VALUE;
         for(Field field:FIELDS.values()) {
             if(!field.stop)continue;
-            double x=Mth.clamp(field.centre.x,box.minX,box.maxX);
-            double y=Mth.clamp(field.centre.y,box.minY,box.maxY);
-            double z=Mth.clamp(field.centre.z,box.minZ,box.maxZ);
+            Vec3 centre=field.position();
+            double x=Mth.clamp(centre.x,box.minX,box.maxX);
+            double y=Mth.clamp(centre.y,box.minY,box.maxY);
+            double z=Mth.clamp(centre.z,box.minZ,box.maxZ);
             best=Math.max(best,reached(field,x,y,z));
         }
         return best;

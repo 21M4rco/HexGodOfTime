@@ -64,7 +64,7 @@ public final class HexGodOfStories {
     public static final RegistryObject<Item> TIME_STICK = ITEMS.register("time_stick", () -> new ConjuredWeapon(2));
 
     public static final RegistryObject<SoundEvent> SORCERY = sound("sorcery"), ILLUSION_SOUND = sound("illusion"), TELEPORT = sound("teleport"),
-        SLIP = sound("time_slip"), STOP_CHARGE = sound("time_stop_charge"), STOP = sound("time_stop"), RESUME = sound("time_resume"), ASCEND = sound("ascend"), CONJURE = sound("conjure"),
+        SLIP = sound("time_slip"), STOP = sound("time_stop"), RESUME = sound("time_resume"), ASCEND = sound("ascend"), CONJURE = sound("conjure"),
         BLADE_SWING = sound("blade_swing"), BLADE_HIT = sound("blade_hit"), BLADE_THROW = sound("blade_throw"), BLADE_EMBED = sound("blade_embed"),
         RIFT_OPEN = sound("rift_open"), RIFT_CLOSE = sound("rift_close");
     /**

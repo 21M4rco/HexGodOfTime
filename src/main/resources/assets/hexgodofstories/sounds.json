@@ -521,14 +521,5 @@
         "stream": false
       }
     ]
-  },
-  "time_stop_charge": {
-    "subtitle": "subtitles.hexgodofstories.time_stop",
-    "sounds": [
-      {
-        "name": "hexgodofstories:time_stop_charge",
-        "stream": false
-      }
-    ]
   }
 }

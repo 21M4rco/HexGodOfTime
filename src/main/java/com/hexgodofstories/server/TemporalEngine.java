@@ -40,6 +40,8 @@ public final class TemporalEngine {
     private record Windup(ServerLevel level,long impact) {}
     private static final Map<UUID,Windup> WINDUPS=new HashMap<>();
     private static final Map<UUID,Frozen> FROZEN=new HashMap<>();
+    /** Roundabout allows a caster's newly launched projectiles to travel in stopped time. */
+    private static final Map<UUID,ServerLevel> CREATED_PROJECTILES=new HashMap<>();
     private static final Map<UUID,Long> PLAYER_GRACE=new HashMap<>();
     /** Entities currently running at a reduced rate, with the rate that has actually been applied. */
     private static final Map<UUID,Entity> SLOWED=new HashMap<>();
@@ -53,7 +55,8 @@ public final class TemporalEngine {
     private static final UUID DILATION_ATTACK=UUID.fromString("0c6c27e9-1f7d-4c58-9d0a-5b2f6ba0a4c1");
     private static final UUID DILATION_FLIGHT=UUID.fromString("a7d1f3b2-90c5-4a8e-bd41-2f9c8e1d7a30");
     private static final int MAX_FIELDS=64,MAX_ENTITIES_PER_FIELD=192;
-    public static final int STOP_RADIUS=10,STOP_EXPANSION=12,STOP_WINDUP=20;
+    /** Roundabout's default local range and roughly 17-tick expanding visual bubble. */
+    public static final int STOP_RADIUS=70,STOP_EXPANSION=17,STOP_WINDUP=20;
     /** Ticks spent decelerating into, and accelerating out of, a full stop. */
     public static final int RAMP=7;
     /** How much of normal time a dilated body experiences. */
@@ -72,6 +75,10 @@ public final class TemporalEngine {
     public static boolean owns(ServerPlayer p) {return WINDUPS.containsKey(p.getUUID())||FIELDS.stream().anyMatch(f->f.owner.equals(p.getUUID()));}
     public static boolean sustaining(ServerPlayer p) {
         return FIELDS.stream().anyMatch(f->f.owner.equals(p.getUUID())&&f.stop&&f.target==null&&f.expires==Long.MAX_VALUE);
+    }
+    public static void markProjectile(Projectile projectile) {
+        if(projectile.getOwner() instanceof ServerPlayer owner&&sustaining(owner))
+            CREATED_PROJECTILES.put(projectile.getUUID(),owner.serverLevel());
     }
     /** Only a true hold withholds a tick; a slowed body keeps ticking, it just changes more slowly. */
     public static boolean skipTick(Entity e) {
@@ -93,7 +100,6 @@ public final class TemporalEngine {
         WINDUPS.put(p.getUUID(),new Windup(p.serverLevel(),p.level().getGameTime()+STOP_WINDUP));
         HexData.get(p).putLong("stopWindup",p.level().getGameTime());
         HexNetwork.animate(p,"time_stop");
-        p.level().playSound(null,p.blockPosition(),HexGodOfStories.STOP_CHARGE.get(),SoundSource.PLAYERS,1.1f,1f);
         return true;
     }
 
@@ -156,6 +162,17 @@ public final class TemporalEngine {
         }
         return false;
     }
+    /** Suspend random chunk updates too: crops, weather, and ice otherwise change during the hold. */
+    public static boolean stoppedChunk(ServerLevel level,net.minecraft.world.level.ChunkPos chunk) {
+        int minX=chunk.getMinBlockX(),minZ=chunk.getMinBlockZ();
+        for(Field f:FIELDS) {
+            if(f.level!=level||!f.stop||f.target!=null||level.getGameTime()<f.started)continue;
+            double dx=Mth.clamp(f.center.x,minX,minX+15)-f.center.x;
+            double dz=Mth.clamp(f.center.z,minZ,minZ+15)-f.center.z;
+            if(dx*dx+dz*dz<=f.radius*f.radius)return true;
+        }
+        return false;
+    }
 
     private static void run(ServerLevel level) {
         long now=level.getGameTime();
@@ -177,6 +194,14 @@ public final class TemporalEngine {
                 HexNetwork.sync(caster);
             }
         }
+        // Roundabout anchors the stopped region to its living caster, so the field moves with them.
+        // Refresh before checking block ticks and entities; clients derive the same center from the
+        // tracked caster instead of receiving a full field packet every tick.
+        FIELDS.replaceAll(f->{
+            if(f.level!=level||!f.stop||f.target!=null)return f;
+            ServerPlayer owner=level.getServer().getPlayerList().getPlayer(f.owner);
+            return owner==null||owner.level()!=level?f:new Field(f.owner,f.level,owner.position(),f.radius,f.started,f.expires,f.stop,f.target,f.exempt);
+        });
         FIELDS.removeIf(f->{
             if(f.level!=level)return false;
             ServerPlayer owner=level.getServer().getPlayerList().getPlayer(f.owner);
@@ -193,6 +218,7 @@ public final class TemporalEngine {
             return expired;
         });
         PLAYER_GRACE.entrySet().removeIf(e->e.getValue()<=now);
+        CREATED_PROJECTILES.entrySet().removeIf(entry->entry.getValue()==level&&level.getEntity(entry.getKey())==null);
         Map<UUID,Long> desired=new HashMap<>();
         Map<UUID,Entity> entities=new HashMap<>();
         Map<UUID,Double> rates=new HashMap<>();
@@ -269,10 +295,9 @@ public final class TemporalEngine {
         }
         for(Frozen s:releasing)restore(s,now);
     }
-    private static double radius(Field f,long now) {
-        return f.stop&&f.target==null&&f.expires==Long.MAX_VALUE
-            ?f.radius*Math.min(1,Math.max(0,(now-f.started)/(double)STOP_EXPANSION)):f.radius;
-    }
+    // The reference stops the full local range at impact. Its expanding bubble is the reveal,
+    // not a delay that lets entities at the edge keep moving after time has stopped.
+    private static double radius(Field f,long now) {return f.radius;}
 
     /** Pins a suspended body exactly where its moment caught it, orientation included. */
     private static void hold(Entity e,Frozen s,long now) {
@@ -370,6 +395,12 @@ public final class TemporalEngine {
     private static boolean eligible(Entity e,Field f) {return eligible(e,f,f.radius);}
     private static boolean eligible(Entity e,Field f,double range) {
         if(PLAYER_GRACE.getOrDefault(e.getUUID(),0L)>e.level().getGameTime())return false;
+        if(e instanceof Projectile&&CREATED_PROJECTILES.containsKey(e.getUUID()))return false;
+        // Match Roundabout's default time-stop exemptions: creative players, wardens, and
+        // another active time stopper can still move inside an overlapping field.
+        if(e instanceof net.minecraft.world.entity.player.Player creative&&creative.isCreative()
+            ||e instanceof net.minecraft.world.entity.monster.warden.Warden
+            ||e instanceof ServerPlayer other&&sustaining(other))return false;
         if(e.isRemoved()||e.isSpectator()||e.getUUID().equals(f.owner)||e.getUUID().equals(f.exempt))return false;
         if(f.target==null&&!touches(e.getBoundingBox(),f.center,range))return false;
         return f.stop&&f.target==null||affectable(e);
@@ -444,7 +475,7 @@ public final class TemporalEngine {
     }
     public static void reset() {
         for(Frozen s:FROZEN.values())if(!s.entity.isRemoved()){s.entity.setDeltaMovement(s.velocity);s.entity.hurtMarked=true;sync(s,false);}
-        FROZEN.clear();FIELDS.clear();WINDUPS.clear();
+        FROZEN.clear();FIELDS.clear();WINDUPS.clear();CREATED_PROJECTILES.clear();
         for(Entity e:new ArrayList<>(SLOWED.values()))if(!e.isRemoved())rate(e,1);
         SLOWED.clear();APPLIED.clear();
         PLAYER_GRACE.clear();RECOVERING.clear();BANKED.clear();ROTATION.clear();
