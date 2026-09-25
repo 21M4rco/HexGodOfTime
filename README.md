@@ -193,20 +193,20 @@
 
 - **The cloak no longer stretches across the world.** Its solver now enforces two hard geometric limits after every pass and again on the frame the renderer draws, so no part of it can leave the shoulders by more than the fabric hanging above it, or leave the node above it by more than one stretched segment. Torso transforms that cannot be inverted are rejected rather than propagated, per-tick motion is capped, anything non-finite re-seeds the grid from the body, and a hem resting on the ground is dragged along instead of welded to the block it touched.
 - **Projections fight on their own.** They pick out hostile creatures — vanilla or modded — anything already hunting their caster, and anyone who has recently drawn the caster's blood, including another player. Friendly, tame and neutral creatures are left alone unless they attack first.
-- **A court carries mixed arms.** Copies spawn with a single dagger, twin daggers or the Void sword, and one always mirrors whatever the caster is actually holding. Swordsmen use the plain swing; dagger pairs alternate hands on a faster cadence.
+- **A court carries mixed arms.** Copies spawn with a single dagger, twin daggers or the Scepter, and one always mirrors whatever the caster is actually holding. Staff wielders use the plain swing; dagger pairs alternate hands on a faster cadence.
 - **Creatures cannot tell a copy from the original.** When something decides to hunt a keeper who has projections out, that decision is reopened across the keeper and every nearby copy and settled by a weighted draw on distance, line of sight and how much each body has recently hurt it. Being the real player counts for nothing. Existing aggression is redistributed the moment copies appear, and a copy that lands a blow draws retaliation onto itself.
 - **Copies are hard to pick out by eye.** They carry the caster's skin, armour, worn head gear, elytra, name tag, harmless potion effects and cloak, mirror the caster's crouch and visible flourishes, and glance around instead of staring at their target.
 - **Masquerade wears anything alive.** Any living entity in the game can be copied — vanilla or modded, passive, hostile, aquatic, flying, humanoid or not. The target's own saved state is captured, so a specific sheep keeps its colour and a specific modded creature keeps its variant instead of reverting to a default model. The borrowed body is driven from the player's movement, rotation, pose, swing and hurt state, and the player's own body is replaced rather than drawn underneath. Creatures respond to the costume: monsters ignore a monster shape and nothing hunts its own species, until the wearer attacks.
 - **Thrown daggers stay where they land.** A chest hit rides the chest, an arm hit swings with the arm and a head hit turns with the skull, at any body size, and wounds bleed from the blade itself and leave drying pools on the ground behind a moving body.
 - **Effects gather rather than switch on.** Every particle opens over its first ticks, ability effects release across a stretch of them, and the flight nebula condenses and disperses over about a second and a half. A nebula family built from the same noise field as that cloud gives the whole mod one material.
-- **Time control has permanent keys.** Stillness, Resume, Rewind and Dilation each own a key, are drawn permanently at the bottom of the screen beside those keys, and can no longer be scrolled to or bound to a quick slot.
+- **Time control has permanent keys.** Stillness, Rewind and Time Branch have dedicated keys. R resumes an active Stillness. B is unbound, and no resume entry appears in the HUD or archive.
 - **Stillness holds the world, not just the mobs.** Bodies, arrows, thrown weapons, loose items, falling blocks, primed charges and orbs all stop, and weather and loose particles freeze where they stand — rain hangs in the air and resumes from the same phase.
 - **Dilation is smooth.** Nothing has its ticks withheld any more; rates are scaled instead, so slow motion interpolates like ordinary movement rather than teleporting.
 
 ## 0.3.0 — Fracture and world-tree island
 
 - Fracture inside the realm opens a return portal without an energy/mastery/cooldown requirement. Walk through to return to your own saved dimension, position and facing. A short crossing grace period prevents bouncing back into the entry portal. The arrival sigil remains a crouch-to-exit fallback.
-- Dropped conjured daggers, Laevateinn and time sticks dissolve before spawning or being picked up, including inventory tosses and death drops. Transferred weapons cannot be used by another player. Thrown attack daggers still embed and dissolve as before.
+- Dropped conjured daggers, the Scepter and time sticks dissolve before spawning or being picked up, including inventory tosses and death drops. Transferred weapons cannot be used by another player. Thrown attack daggers still embed and dissolve as before.
 - Recorded Minecraft glass/weapon/material sounds replace the old synthetic audio. The portal's duplicate opening sound is removed. Resource-pack sample overrides are respected.
 - Black metal horns, charcoal/gray outfit and a broader, flaring charcoal cape; shoulder attachment stays on the posed torso.
 - Larger seeded mirror fractures with jagged apertures, uneven splinters and persistent branching cracks.
@@ -230,16 +230,15 @@ Install Player Animator **1.0.2-rc1+1.20** (CurseForge file 4587214) on clients.
 |---|---|
 | K | Mastery archive |
 | V *(hold)* | Quick bar — wheel to choose, release to select |
-| R | Cast the selected spell; **hold** for abilities that shape while held |
+| R | Cast the selected spell; **hold** for abilities that shape while held; press again to resume an active Stillness |
 | G | Alternate contextual action — **Fracture mode selector**, while Fracture is selected and you are inside your sanctum |
 | H | Glorious Purpose transformation |
 | X | Release held targets / seal your fracture / also resumes your time fields |
 | Z | **Stillness** — suspend the local battlefield |
-| B | **Resume Time** — release everything you are holding |
 | N | **Personal Rewind** |
-| M | **Dilation** — slow the local battlefield |
+| M | **Time Branch Unleashing** — tap for a charged fist or hold for the full beam |
 | Wheel *(while gripping)* | Push or pull what telekinesis is holding |
-| Attack / Use with a conjured weapon | Combination / dagger throw or artifact action |
+| Attack / Use with a conjured weapon | Dagger combination / throw; Scepter two-heart hit with one-second bleed / blue blast (100 blocks, three-second cooldown) |
 
 Nobody has powers until an operator grants them: `/hgos unlock <player> on`. Until then the mod shows no HUD, opens no screen, answers no key and records no progression. Key mappings are configurable. Free your hands before conjuring. Successful spell use trains its discipline; training is rate limited. Temporal progression opens after 600 combined mastery in the four magical disciplines. Glorious Purpose opens after 800 Temporal Mastery.
 

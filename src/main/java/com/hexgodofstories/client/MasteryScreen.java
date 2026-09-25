@@ -104,7 +104,7 @@ public final class MasteryScreen extends Screen {
 
     /** The permanent key a dedicated command answers to, so the archive can name it. */
     static String key(Ability a) {
-        int index=switch(a){case TIME_STOP->0;case REWIND->2;case TIME_BRANCH->3;default->-1;};
+        int index=switch(a){case TIME_STOP->0;case REWIND->1;case TIME_BRANCH->2;default->-1;};
         return index<0?"":HexClient.TIME_KEYS[index].getTranslatedKeyMessage().getString();
     }
 

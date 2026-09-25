@@ -125,6 +125,7 @@ public final class ClientState {
             DISGUISES.keySet().removeIf(id->mc.level.getEntity(id)==null);
         }
         THREADS.entrySet().removeIf(e->e.getValue().until<now());
+        STUNNED.entrySet().removeIf(e->e.getValue()<=now()||mc.level.getEntity(e.getKey())==null);
         WorldEffects.tick();
         TimeBranchRenderer.tick();
         ErasureRenderer.tick();
