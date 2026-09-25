@@ -21,7 +21,7 @@ public final class BranchFist {
             &&!TemporalEngine.frozen(p)&&!Erasure.erasing(p)&&!TimeBranch.charging(p);
     }
     public static void arm(ServerPlayer p) {
-        if(HexData.selected(p)!=Ability.TIME_BRANCH||!HexData.unlocked(p,Ability.TIME_BRANCH))return;
+        if(!HexData.unlocked(p,Ability.TIME_BRANCH))return;
         if(!eligible(p)){notice(p,"The Time Branches answer only the transformed and free.");return;}
         var d=HexData.get(p);long now=HexData.now(p);
         if(charged(p))return;

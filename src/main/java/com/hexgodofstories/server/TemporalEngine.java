@@ -1,10 +1,12 @@
 package com.hexgodofstories.server;
 
+import com.hexgodofstories.HexGodOfStories;
 import com.hexgodofstories.data.*;
 import com.hexgodofstories.network.HexNetwork;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.*;
 import net.minecraft.util.Mth;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.*;
 import net.minecraft.world.entity.item.*;
@@ -34,6 +36,9 @@ public final class TemporalEngine {
     private record Banked(float damage,UUID attacker) {}
 
     private static final List<Field> FIELDS=new ArrayList<>();
+    /** Server-side windup; no field or energy drain exists before the downward swing. */
+    private record Windup(ServerLevel level,long impact) {}
+    private static final Map<UUID,Windup> WINDUPS=new HashMap<>();
     private static final Map<UUID,Frozen> FROZEN=new HashMap<>();
     private static final Map<UUID,Long> PLAYER_GRACE=new HashMap<>();
     /** Entities currently running at a reduced rate, with the rate that has actually been applied. */
@@ -48,7 +53,7 @@ public final class TemporalEngine {
     private static final UUID DILATION_ATTACK=UUID.fromString("0c6c27e9-1f7d-4c58-9d0a-5b2f6ba0a4c1");
     private static final UUID DILATION_FLIGHT=UUID.fromString("a7d1f3b2-90c5-4a8e-bd41-2f9c8e1d7a30");
     private static final int MAX_FIELDS=64,MAX_ENTITIES_PER_FIELD=192;
-    public static final int STOP_RADIUS=10,STOP_EXPANSION=12,STOP_WINDUP=6;
+    public static final int STOP_RADIUS=10,STOP_EXPANSION=12,STOP_WINDUP=20;
     /** Ticks spent decelerating into, and accelerating out of, a full stop. */
     public static final int RAMP=7;
     /** How much of normal time a dilated body experiences. */
@@ -64,9 +69,33 @@ public final class TemporalEngine {
     }
     public static boolean slowed(Entity e) {return SLOWED.containsKey(e.getUUID());}
     public static double rateOf(Entity e) {return APPLIED.getOrDefault(e.getUUID(),1.0);}
-    public static boolean owns(ServerPlayer p) {return FIELDS.stream().anyMatch(f->f.owner.equals(p.getUUID()));}
+    public static boolean owns(ServerPlayer p) {return WINDUPS.containsKey(p.getUUID())||FIELDS.stream().anyMatch(f->f.owner.equals(p.getUUID()));}
+    public static boolean sustaining(ServerPlayer p) {
+        return FIELDS.stream().anyMatch(f->f.owner.equals(p.getUUID())&&f.stop&&f.target==null&&f.expires==Long.MAX_VALUE);
+    }
     /** Only a true hold withholds a tick; a slowed body keeps ticking, it just changes more slowly. */
-    public static boolean skipTick(Entity e) {return frozen(e);}
+    public static boolean skipTick(Entity e) {
+        if(frozen(e))return true;
+        if(!(e.level() instanceof ServerLevel level))return false;
+        long now=level.getGameTime();
+        for(Field f:FIELDS) {
+            if(f.level!=level||!f.stop||f.target!=null||f.owner.equals(e.getUUID())||f.exempt!=null&&f.exempt.equals(e.getUUID()))continue;
+            if(now<f.started||!eligible(e,f,radius(f,now)))continue;
+            Frozen s=new Frozen(e,e.position(),e.getDeltaMovement(),e.getYRot(),e.getXRot(),Long.MAX_VALUE);
+            FROZEN.put(e.getUUID(),s);hold(e,s,now);sync(s,true);
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean beginStop(ServerPlayer p) {
+        if(owns(p)||FIELDS.size()>=MAX_FIELDS||p.isPassenger()||HexData.energy(p)<5)return false;
+        WINDUPS.put(p.getUUID(),new Windup(p.serverLevel(),p.level().getGameTime()+STOP_WINDUP));
+        HexData.get(p).putLong("stopWindup",p.level().getGameTime());
+        HexNetwork.animate(p,"time_stop");
+        p.level().playSound(null,p.blockPosition(),HexGodOfStories.STOP_CHARGE.get(),SoundSource.PLAYERS,1.1f,1f);
+        return true;
+    }
 
     public static boolean field(ServerPlayer p,boolean stop,Entity target,int ticks) {
         if(FIELDS.size()>=MAX_FIELDS)return false;
@@ -74,7 +103,6 @@ public final class TemporalEngine {
         if(p.isPassenger()||target!=null&&target.isPassenger())return false;
         UUID ally=HexData.get(p).hasUUID("ally")?HexData.get(p).getUUID("ally"):null;
         long now=p.level().getGameTime();
-        if(stop&&target==null)now+=STOP_WINDUP;
         double radius=stop&&target==null?STOP_RADIUS:HexData.get(p).getBoolean("ascended")?18:12;
         long expires=stop&&target==null?Long.MAX_VALUE:now+ticks;
         FIELDS.add(new Field(p.getUUID(),p.serverLevel(),p.position(),radius,now,expires,stop,target==null?null:target.getUUID(),ally));
@@ -87,13 +115,18 @@ public final class TemporalEngine {
         FIELDS.replaceAll(f->f.owner.equals(p.getUUID())?new Field(f.owner,f.level,f.center,f.radius,f.started,f.expires,f.stop,f.target,ally.getUUID()):f);
     }
     public static void clear(ServerPlayer p) {
+        boolean winding=WINDUPS.remove(p.getUUID())!=null;
+        HexData.get(p).remove("stopWindup");
+        if(winding)HexNetwork.animate(p,"__clear__");
         boolean had=FIELDS.removeIf(f->f.owner.equals(p.getUUID()));
         if(had) {
             CompoundTag n=new CompoundTag();n.putBoolean("active",false);
             HexNetwork.tracking(p,new HexNetwork.Message(HexNetwork.FIELD,p.getId(),n));
             HexNetwork.fx(p,"resume");
+            p.level().playSound(null,p.blockPosition(),HexGodOfStories.RESUME.get(),SoundSource.PLAYERS,1.1f,1f);
         }
-        tick(p.serverLevel());
+        if(winding)HexNetwork.sync(p);
+        if(had)tick(p.serverLevel());
     }
 
     /** Harm aimed at a suspended body is held back and delivered the instant its moment resumes. */
@@ -102,7 +135,6 @@ public final class TemporalEngine {
         Banked existing=BANKED.get(victim.getUUID());
         float total=Math.min(MAX_BANKED,(existing==null?0:existing.damage)+amount);
         BANKED.put(victim.getUUID(),new Banked(total,attacker==null?(existing==null?null:existing.attacker):attacker.getUUID()));
-        HexNetwork.fx(victim,"banked");
         return true;
     }
 
@@ -119,8 +151,7 @@ public final class TemporalEngine {
         long now=level.getGameTime();
         for(Field field:FIELDS) {
             if(field.level!=level||!field.stop||field.target!=null||now<field.started)continue;
-            double radius=field.expires==Long.MAX_VALUE
-                ?field.radius*Math.min(1,(now-field.started)/(double)STOP_EXPANSION):field.radius;
+            double radius=radius(field,now);
             if(pos.distToCenterSqr(field.center.x,field.center.y,field.center.z)<=radius*radius)return true;
         }
         return false;
@@ -128,16 +159,35 @@ public final class TemporalEngine {
 
     private static void run(ServerLevel level) {
         long now=level.getGameTime();
+        Iterator<Map.Entry<UUID,Windup>> winds=WINDUPS.entrySet().iterator();
+        while(winds.hasNext()) {
+            var entry=winds.next();Windup wind=entry.getValue();
+            if(wind.level!=level)continue;
+            ServerPlayer caster=level.getServer().getPlayerList().getPlayer(entry.getKey());
+            if(caster==null||caster.level()!=level||!caster.isAlive()||!HexData.access(caster)||HexData.energy(caster)<5){
+                winds.remove();
+                if(caster!=null){HexData.get(caster).remove("stopWindup");HexNetwork.sync(caster);}
+                continue;
+            }
+            if(now<wind.impact)continue;
+            winds.remove();
+            HexData.get(caster).remove("stopWindup");
+            if(field(caster,true,null,0)) {
+                level.playSound(null,caster.blockPosition(),HexGodOfStories.STOP.get(),SoundSource.PLAYERS,1.3f,1f);
+                HexNetwork.sync(caster);
+            }
+        }
         FIELDS.removeIf(f->{
             if(f.level!=level)return false;
             ServerPlayer owner=level.getServer().getPlayerList().getPlayer(f.owner);
             boolean sustained=f.stop&&f.target==null&&f.expires==Long.MAX_VALUE;
             boolean expired=f.expires<=now||owner==null||owner.level()!=level||!owner.isAlive()
-                ||sustained&&(HexData.energy(owner)<5||now-f.started>=STOP_EXPANSION&&
-                    (now-f.started-STOP_EXPANSION)%20==0&&!HexData.spend(owner,5));
+                ||sustained&&(HexData.energy(owner)<5||now-f.started>=20&&
+                    (now-f.started)%20==0&&!HexData.spend(owner,5));
             if(expired&&owner!=null) {
                 CompoundTag n=new CompoundTag();n.putBoolean("active",false);
                 HexNetwork.tracking(owner,new HexNetwork.Message(HexNetwork.FIELD,owner.getId(),n));
+                if(sustained)level.playSound(null,owner.blockPosition(),HexGodOfStories.RESUME.get(),SoundSource.PLAYERS,1.1f,1f);
                 HexNetwork.sync(owner);
             }
             return expired;
@@ -148,8 +198,7 @@ public final class TemporalEngine {
         Map<UUID,Double> rates=new HashMap<>();
         for(Field f:FIELDS) {
             if(f.level!=level)continue;
-            double range=f.stop&&f.target==null&&f.expires==Long.MAX_VALUE
-                ?f.radius*Math.min(1,Math.max(0,(now-f.started)/(double)STOP_EXPANSION)):f.radius;
+            double range=radius(f,now);
             if((range<=0||now<f.started)&&f.target==null)continue;
             List<Entity> affected=f.target==null
                 ?level.getEntities((Entity)null,new AABB(f.center.subtract(range,range,range),f.center.add(range,range,range)),e->eligible(e,f,range))
@@ -219,6 +268,10 @@ public final class TemporalEngine {
             hold(e,s,now);
         }
         for(Frozen s:releasing)restore(s,now);
+    }
+    private static double radius(Field f,long now) {
+        return f.stop&&f.target==null&&f.expires==Long.MAX_VALUE
+            ?f.radius*Math.min(1,Math.max(0,(now-f.started)/(double)STOP_EXPANSION)):f.radius;
     }
 
     /** Pins a suspended body exactly where its moment caught it, orientation included. */
@@ -317,10 +370,16 @@ public final class TemporalEngine {
     private static boolean eligible(Entity e,Field f) {return eligible(e,f,f.radius);}
     private static boolean eligible(Entity e,Field f,double range) {
         if(PLAYER_GRACE.getOrDefault(e.getUUID(),0L)>e.level().getGameTime())return false;
-        if(e.isRemoved()||e.isSpectator()||e.isPassenger()||e.isVehicle()||e.getUUID().equals(f.owner)||e.getUUID().equals(f.exempt))return false;
-        if(e instanceof ServerPlayer p&&p.isCreative())return false;
-        if(e.position().distanceToSqr(f.center)>range*range&&f.target==null)return false;
-        return affectable(e);
+        if(e.isRemoved()||e.isSpectator()||e.getUUID().equals(f.owner)||e.getUUID().equals(f.exempt))return false;
+        if(f.target==null&&!touches(e.getBoundingBox(),f.center,range))return false;
+        return f.stop&&f.target==null||affectable(e);
+    }
+    /** The entire hitbox counts: a wing, boat, or projectile edge touching the bubble is enough. */
+    private static boolean touches(AABB box,Vec3 centre,double radius) {
+        double x=Mth.clamp(centre.x,box.minX,box.maxX)-centre.x;
+        double y=Mth.clamp(centre.y,box.minY,box.maxY)-centre.y;
+        double z=Mth.clamp(centre.z,box.minZ,box.maxZ)-centre.z;
+        return x*x+y*y+z*z<=radius*radius;
     }
     /** Everything in the local world that visibly moves under its own steam. */
     private static boolean affectable(Entity e) {
@@ -348,7 +407,6 @@ public final class TemporalEngine {
             living.hurt(source,banked.damage);
             living.setDeltaMovement(direct?s.velocity:s.velocity.scale(RESUME_RATE));
             living.hurtMarked=true;
-            HexNetwork.fx(living,"release");
         }
     }
 
@@ -386,7 +444,7 @@ public final class TemporalEngine {
     }
     public static void reset() {
         for(Frozen s:FROZEN.values())if(!s.entity.isRemoved()){s.entity.setDeltaMovement(s.velocity);s.entity.hurtMarked=true;sync(s,false);}
-        FROZEN.clear();FIELDS.clear();
+        FROZEN.clear();FIELDS.clear();WINDUPS.clear();
         for(Entity e:new ArrayList<>(SLOWED.values()))if(!e.isRemoved())rate(e,1);
         SLOWED.clear();APPLIED.clear();
         PLAYER_GRACE.clear();RECOVERING.clear();BANKED.clear();ROTATION.clear();

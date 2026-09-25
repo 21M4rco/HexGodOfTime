@@ -5,7 +5,6 @@ import com.hexgodofstories.warping.*;
 import com.hexgodofstories.data.*;
 import com.hexgodofstories.entity.*;
 import com.hexgodofstories.network.HexNetwork;
-import com.hexgodofstories.unknown.UnknownSummoning;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -21,9 +20,9 @@ import net.minecraft.world.phys.*;
 import java.util.*;
 
 public final class HexServer {
-    public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12,BRANCH_TAP=13,WARP_CHOICE=14,WARP_RECALL=15,WARP_STRUGGLE=16;
+    public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12,BRANCH_TAP=13,WARP_CHOICE=14,WARP_RECALL=15,WARP_STRUGGLE=16,BRANCH_BEGIN=17,BRANCH_END=18,BRANCH_CANCEL=19;
     /** Values carried by {@link #TIME}: the permanent time controls, each on its own key. */
-    public static final int TIME_HALT=0,TIME_RESUME=1,TIME_REWIND=2,TIME_DILATE=3;
+    public static final int TIME_HALT=0,TIME_RESUME=1,TIME_REWIND=2;
     public record Moment(Vec3 position,float yaw,float pitch,float health) {}
     private record Charm(Mob mob,UUID owner,long end,UUID previous) {}
     private record Strike(int weapon,int combo,long contact,long end) {}
@@ -71,20 +70,21 @@ public final class HexServer {
         // Being erased is not a state anything is cast out of, and a planted caster has only one move
         // left: letting go. Both refusals sit ahead of every other action on purpose.
         if(Erasure.erasing(p))return;
-        if(TimeBranch.charging(p)&&action!=HOLD_END){if(action==UTILITY)TimeBranch.cancel(p);return;}
+        if(action==BRANCH_CANCEL){TimeBranch.cancel(p);return;}
+        if(action==BRANCH_END){if(TimeBranch.charging(p))TimeBranch.release(p);return;}
+        if(TimeBranch.charging(p)){if(action==UTILITY)TimeBranch.cancel(p);return;}
         if(action==SCROLL){Telekinesis.adjust(p,Math.max(-4,Math.min(4,value-8)));return;}
         if(action==HOLD_END){
             if(Warping.charging(p)){Warping.release(p);return;}
-            // Read from the charge itself rather than the selector, so switching spells mid-hold still
-            // releases the torrent instead of stranding the caster planted in place.
-            if(TimeBranch.charging(p)){TimeBranch.release(p);return;}
             UUID id=RIFTS.get(p.getUUID());
             if(id!=null&&p.serverLevel().getEntity(id) instanceof RiftEntity rift)rift.releaseCharge();
             Architecture.commit(p);return;
         }
+        // M is independent of the selected spell and must register even immediately after another key.
+        if(action==BRANCH_TAP){BranchFist.arm(p);return;}
+        if(action==BRANCH_BEGIN){branchBegin(p);return;}
         if(now-INPUT.getOrDefault(p.getUUID(),-100L)<(TemporalEngine.slowed(p)?15:3))return;
         INPUT.put(p.getUUID(),now);
-        if(action==BRANCH_TAP){BranchFist.arm(p);return;}
         // The recall carries no argument at all: the destination is the one already saved on the
         // player, the point is the one the server's own ray finds, and both are read there.
         if(action==WARP_RECALL){Warping.recall(p);return;}
@@ -104,29 +104,28 @@ public final class HexServer {
         if(a==Ability.WARPING){if(action==HOLD_BEGIN||action==CAST)Warping.begin(p);return;}
         if(action==HOLD_BEGIN) {
             if(!a.hold)return;
-            if(a==Ability.TIME_BRANCH) {
-                if(TimeBranch.begin(p))HexData.spend(p,a.cost);
-                HexNetwork.sync(p);return;
-            }
             if(Architecture.begin(p))HexData.spend(p,a.cost);
             HexNetwork.sync(p);return;
         }
         // A plain cast press still charges; only a release fires. Deliberately limited to the cast key:
         // any other action starting a charge would plant the caster with nothing to release it but the
         // ten-second limit.
-        if(a==Ability.TIME_BRANCH) {
-            if(action==CAST&&TimeBranch.begin(p))HexData.spend(p,a.cost);
-            HexNetwork.sync(p);return;
-        }
         if(a.hold){Architecture.begin(p);return;}
         if(cast(p,a,action==ALTERNATE)) {
             HexData.spend(p,a.cost);HexData.get(p).putLong("cd_"+a.name(),now+a.cooldown);
             reward(p,a.discipline,90);HexNetwork.sync(p);
         }
     }
+    private static void branchBegin(ServerPlayer p) {
+        Ability a=Ability.TIME_BRANCH;
+        if(!HexData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return;}
+        if(HexData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return;}
+        if(HexData.energy(p)<a.cost){notice(p,"Not enough Temporal Energy.");return;}
+        if(TimeBranch.begin(p))HexData.spend(p,a.cost);
+        HexNetwork.sync(p);
+    }
 
     private static boolean secondary(ServerPlayer p,Ability a) {
-        if(a==Ability.SLOW_FIELD){UnknownSummoning.cancelCharge(p);return true;}
         if(a==Ability.TIME_STOP){TemporalEngine.clear(p);return true;}
         if(a==Ability.DUPLICATE){return commandOrDismiss(p);}
         if(a==Ability.ARCHITECTURE){Architecture.dismiss(p);return true;}
@@ -153,15 +152,9 @@ public final class HexServer {
         Ability a=switch(which) {
             case TIME_HALT -> Ability.TIME_STOP;
             case TIME_REWIND -> Ability.REWIND;
-            case TIME_DILATE -> Ability.SLOW_FIELD;
             default -> null;
         };
         if(a==null)return;
-        // A second press of the same permanent M key always cancels an unfinished summon.
-        // Check before cooldown and energy, since both are irrelevant to canceling it.
-        if(a==Ability.SLOW_FIELD&&UnknownSummoning.isCharging(p)){
-            UnknownSummoning.cancelCharge(p);return;
-        }
         if(a==Ability.TIME_STOP&&TemporalEngine.owns(p)) {
             TemporalEngine.clear(p);HexNetwork.sync(p);return;
         }
@@ -169,7 +162,6 @@ public final class HexServer {
         if(!HexData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return;}
         if(HexData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return;}
         if(HexData.energy(p)<a.cost){notice(p,"Not enough Temporal Energy.");return;}
-        if(a==Ability.SLOW_FIELD){UnknownSummoning.begin(p);return;}
         if(!cast(p,a,false))return;
         HexData.spend(p,a.cost);
         HexData.get(p).putLong("cd_"+a.name(),HexData.now(p)+a.cooldown);
@@ -225,7 +217,7 @@ public final class HexServer {
                 gesture(p,"time_slip","slip",HexGodOfStories.SLIP.get());teleport(p,m.position);p.setYRot(m.yaw);p.setXRot(m.pitch);
                 HexNetwork.fx(p,"slip");return true;
             }
-            case TIME_STOP -> {if(!TemporalEngine.field(p,true,null,120))return false;gesture(p,"time_stop","stop",HexGodOfStories.STOP.get());return true;}
+            case TIME_STOP -> {if(!TemporalEngine.beginStop(p))return false;return true;}
             case SELECTIVE_STOP -> {if(t==null||!validTarget(p,t)||!TemporalEngine.field(p,true,t,t instanceof Player?40:100))return false;gesture(p,"time_stop","bind",HexGodOfStories.STOP.get());return true;}
             case THREADS -> {
                 if(t==null||!validTarget(p,t))return false;
@@ -410,7 +402,7 @@ public final class HexServer {
         if(now%200==0&&temporal<160&&HexData.unlocked(p,Ability.TIME_SLIP)&&!TemporalEngine.frozen(p)&&!p.isPassenger()&&p.getRandom().nextInt(5)==0&&HexData.energy(p)>=15&&HexData.cooldown(p,Ability.TIME_SLIP)==0) {
             if(cast(p,Ability.TIME_SLIP,false)){HexData.spend(p,15);d.putLong("cd_TIME_SLIP",now+400);reward(p,Discipline.TEMPORAL,120);}
         }
-        if(now%20==0){HexData.energy(p,HexData.energy(p)+(d.getBoolean("ascended")?4:2));HexNetwork.sync(p);}
+        if(now%20==0){if(!TemporalEngine.sustaining(p))HexData.energy(p,HexData.energy(p)+(d.getBoolean("ascended")?4:2));HexNetwork.sync(p);}
         if(d.contains("disguise")&&d.getCompound("disguise").getLong("end")<now){Masquerade.drop(p);HexNetwork.sync(p);}
         if(now%5==0) {
             for(LivingEntity e:p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(12),LivingEntity::isAlive)) {

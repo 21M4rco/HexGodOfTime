@@ -26,12 +26,13 @@ public enum Ability {
     MEMORY(ENCHANTMENT,160,0,120,false,"Memory Echo","Reveal the recent footsteps of a nearby entity."),
     TIME_SLIP(TEMPORAL,0,15,160,false,"Time Slipping","Early slips return to an unstable recent moment. Mastery grants control."),
     REWIND(TEMPORAL,180,35,200,false,true,"Personal Rewind","Return to your own state ten seconds ago. Permanent key; never in the quick bar."),
-    SLOW_FIELD(TEMPORAL,320,30,0,false,true,"Unknown","Charge for 30 seconds to release an uncontrollable creature. Emergence takes 10 seconds; it hunts for 60 seconds, then the world repairs itself. Recovery: 10 real minutes after it vanishes."),
-    TIME_STOP(TEMPORAL,560,0,0,false,true,"Stillness","Expand a local stopped moment. Costs five Temporal Energy per second until resumed."),
+    // Save-compatible tombstone: removing this ordinal would silently remap every saved ability.
+    SLOW_FIELD(TEMPORAL,320,0,0,false,true,"Removed",""),
+    TIME_STOP(TEMPORAL,560,0,0,false,true,"Stillness","Raise your right arm, then bring it down to stop time. Costs five Temporal Energy per second until resumed."),
     SELECTIVE_STOP(TEMPORAL,740,30,160,false,"Chosen Moment","Suspend one target. Secondary: exempt one ally from your field."),
     THREADS(PURPOSE,0,25,80,false,"Temporal Threads","Bind a target in time. Secondary: pull it along the strand."),
     ASCENSION(PURPOSE,700,100,400,false,"Glorious Purpose","Weave the final mantle, living cloak and dark crown. Inside your own fracture world, toggle Cosmic Flight with its key; Space rises and crouch descends. No other dimension grants flight."),
-    TIME_BRANCH(PURPOSE,900,120,700,true,"Time Branch Unleashing","Transformed only. Hold to plant yourself and compress the Time Branches between both hands. Maximum charge now takes twelve uninterrupted seconds. Release early and living targets vanish from reality into either the Sun, Gravity Well, or Void Sea; only a fully charged torrent truly kills. If the charge is interrupted, the move enters its normal cooldown. Terrain damage remains temporary and restores exactly."),
+    TIME_BRANCH(PURPOSE,900,120,700,true,true,"Time Branch Unleashing","M key, transformed only. Tap for the charged right fist; hold to plant yourself and compress the Time Branches between both hands. Maximum charge takes twelve uninterrupted seconds. Release early to banish living targets; only a fully charged torrent truly kills. Terrain restores exactly."),
     WARPING(SORCERY,800,80,400,true,"Warping","Hold R on solid ground to spread a black Warping pool, up to 16 blocks across. G chooses a destination, including your World Tree sanctum. Release R to open it, then sink through. Y reaches into normal Warping realms. Inside the World Tree, G opens the preserved exit selector and R leaves through that saved route. Every Warping arrival rises slowly out of a black puddle.");
     public final Discipline discipline; public final int level,cost,cooldown; public final boolean hold,dedicated; public final String title,description;
     Ability(Discipline d,int l,int cost,int cd,boolean hold,String title,String description) {this(d,l,cost,cd,hold,false,title,description);}

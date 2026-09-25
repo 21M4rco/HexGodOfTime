@@ -31,9 +31,9 @@ public final class HexClient {
         /** Warping's other direction: reach into the realm chosen with G and pull its creatures out. */
         RECALL=key("recall",GLFW.GLFW_KEY_Y),
         TIME_STOP=key("time_stop",GLFW.GLFW_KEY_Z),TIME_RESUME=key("time_resume",GLFW.GLFW_KEY_B),
-        TIME_REWIND=key("time_rewind",GLFW.GLFW_KEY_N),TIME_DILATE=key("time_dilate",GLFW.GLFW_KEY_M);
+        TIME_REWIND=key("time_rewind",GLFW.GLFW_KEY_N),TIME_BRANCH=key("time_branch",GLFW.GLFW_KEY_M);
     /** The permanent time commands, paired with the value {@link HexServer#TIME} carries for each. */
-    public static final KeyMapping[] TIME_KEYS={TIME_STOP,TIME_RESUME,TIME_REWIND,TIME_DILATE};
+    public static final KeyMapping[] TIME_KEYS={TIME_STOP,TIME_RESUME,TIME_REWIND,TIME_BRANCH};
     private static KeyMapping key(String name,int key){return new KeyMapping("key.hexgodofstories."+name,InputConstants.Type.KEYSYM,key,"key.categories.hexgodofstories");}
     private static boolean primaryDown,selectDown,primaryWasHold,primaryLatched;
     private static int repeat;
@@ -61,7 +61,6 @@ public final class HexClient {
         @SubscribeEvent public static void entities(EntityRenderersEvent.RegisterRenderers e) {
             e.registerEntityRenderer(HexGodOfStories.ILLUSION.get(),IllusionRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.PILGRIM.get(),com.hexgodofstories.client.leviathan.AbyssalPilgrimRenderer::new);
-            e.registerEntityRenderer(HexGodOfStories.UNKNOWN.get(),com.hexgodofstories.client.unknown.UnknownRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.WARP_HAZARD.get(),WarpHazardRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.PROJECTILE.get(),SpellRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.THROWN_DAGGER.get(),DaggerRenderer::new);
@@ -79,21 +78,22 @@ public final class HexClient {
             e.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)r->{
                 WarpRenderer.clear();HexLayer.clear();WeaponRenderer.clear();RiftRenderer.clear();RealmSky.clear();CosmicNebula.clear();
                 BranchVfx.clear();TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();
-                DisguiseRenderer.clear();DisguiseRenderer.forgive();Blood.clear();WoundAnchor.clear();TemporalScreen.close();
+                DisguiseRenderer.clear();DisguiseRenderer.forgive();Blood.clear();WoundAnchor.clear();TemporalScreen.close();TimeStopScreen.close();
             });
         }
     }
 
     @Mod.EventBusSubscriber(modid=HexGodOfStories.ID,value=Dist.CLIENT)
     public static final class ForgeBus {
-        /** Keep the casting hand in view and physically pointed at the floor throughout the charge. */
-        @SubscribeEvent public static void unknownHand(RenderHandEvent e){
+        @SubscribeEvent public static void stopHand(RenderHandEvent e) {
             if(e.getHand()!=net.minecraft.world.InteractionHand.MAIN_HAND)return;
-            var d=ClientState.self();if(!d.contains("unknownChargeStartTick"))return;
-            float t=(float)Math.min(1,Math.max(0,(ClientState.now()-d.getLong("unknownChargeStartTick"))/12f));
-            e.getPoseStack().translate(-.1*t,-.24*t,-.13*t);
-            e.getPoseStack().mulPose(com.mojang.math.Axis.XN.rotationDegrees(54*t));
-            e.getPoseStack().mulPose(com.mojang.math.Axis.ZN.rotationDegrees(13*t));
+            var data=ClientState.self();
+            if(!data.contains("stopWindup"))return;
+            float ticks=Math.max(0,Math.min(25,ClientState.now()-data.getLong("stopWindup")+e.getPartialTick()));
+            float raised=Math.min(1,ticks/12f);
+            float swing=Math.max(0,Math.min(1,(ticks-19f)/3f));
+            e.getPoseStack().translate(-.08*raised,-.1*raised,-.15*raised);
+            e.getPoseStack().mulPose(com.mojang.math.Axis.XN.rotationDegrees(105*raised-135*swing));
         }
         @SubscribeEvent public static void tick(TickEvent.ClientTickEvent e) {
             if(e.phase!=TickEvent.Phase.END)return;
@@ -132,12 +132,11 @@ public final class HexClient {
             boolean primary=PRIMARY.isDown();
             // A cast that was interrupted needs a real release before it counts as pressed again.
             if(primaryLatched){if(primaryPhysicallyDown())primary=false;else primaryLatched=false;}
-            boolean branchInput=BranchKeyInput.tick(primary,primaryDown);
-            if(branchInput)primaryWasHold=false;
-            if(!branchInput&&primary&&!primaryDown){primaryWasHold=selected.hold;HexNetwork.send(selected.hold?HexServer.HOLD_BEGIN:HexServer.CAST,0);repeat=0;}
+            BranchKeyInput.tick();
+            if(primary&&!primaryDown){primaryWasHold=selected.hold;HexNetwork.send(selected.hold?HexServer.HOLD_BEGIN:HexServer.CAST,0);repeat=0;}
             // Holding an ordinary spell repeats it; the server's own rate limit and cooldown set the pace.
-            else if(!branchInput&&primary&&!selected.hold&&++repeat>=5){repeat=0;HexNetwork.send(HexServer.CAST,0);}
-            if(!branchInput&&!primary&&primaryDown&&primaryWasHold)HexNetwork.send(HexServer.HOLD_END,0);
+            else if(primary&&!selected.hold&&++repeat>=5){repeat=0;HexNetwork.send(HexServer.CAST,0);}
+            if(!primary&&primaryDown&&primaryWasHold)HexNetwork.send(HexServer.HOLD_END,0);
             primaryDown=primary;
 
             // G belongs to Warping. Outside the World Tree it chooses a destination. Inside that
@@ -153,7 +152,7 @@ public final class HexClient {
             while(RELEASE.consumeClick())HexNetwork.send(HexServer.UTILITY,0);
             while(RECALL.consumeClick())HexNetwork.send(HexServer.WARP_RECALL,0);
             while(FLIGHT.consumeClick())HexNetwork.send(HexServer.FLIGHT,0);
-            for(int i=0;i<TIME_KEYS.length;i++)while(TIME_KEYS[i].consumeClick())HexNetwork.send(HexServer.TIME,i);
+            for(int i=0;i<TIME_KEYS.length-1;i++)while(TIME_KEYS[i].consumeClick())HexNetwork.send(HexServer.TIME,i);
             drain();
         }
         /** Called when the world changes underfoot: a held cast must not survive the crossing. */
@@ -266,12 +265,12 @@ public final class HexClient {
         }
         @SubscribeEvent public static void world(RenderLevelStageEvent e) {
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);}
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES)WarpRenderer.renderRealm(e);
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES){TimeStopScreen.capture();WarpRenderer.renderRealm(e);}
             // Forge's supported translucent-effects stage, paired with the wave's particles
             // target so Fabulous composites the swell correctly over the water and entities.
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES)VoidSeaWaveRenderer.render(e);
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES){WorldEffects.render(e);WarpRenderer.render(e);}
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL)TemporalScreen.render(e.getPartialTick());
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL){TemporalScreen.render(e.getPartialTick());TimeStopScreen.render(e.getPartialTick());}
         }
         @SubscribeEvent public static void player(RenderPlayerEvent.Pre e) {
             // Checked before anything pushes a pose: a cancelled pre-event never gets its post-event, so

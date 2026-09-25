@@ -19,7 +19,6 @@ public abstract class ParticleMixin {
     @Inject(method="tickParticle",at=@At("HEAD"),cancellable=true,require=0)
     private void hgos$hold(Particle particle,CallbackInfo ci) {
         if(!WorldEffects.anyHold())return;
-        Vec3 at=particle.getBoundingBox().getCenter();
-        if(WorldEffects.heldSince(at.x,at.y,at.z)!=Long.MIN_VALUE)ci.cancel();
+        if(WorldEffects.heldSince(particle.getBoundingBox())!=Long.MIN_VALUE)ci.cancel();
     }
 }

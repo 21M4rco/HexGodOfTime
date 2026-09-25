@@ -104,6 +104,8 @@ public final class CosmicNebula {
         // grows at the server's freeze-front rate; leave the middle sparse so first person stays clear.
         int visibleFields=0;
         for(WorldEffects.Field field:WorldEffects.fields()) {
+            // Time stop is a screen-space bubble with no cloud or motes.
+            if(field.stop())continue;
             if(field.centre().distanceToSqr(camera)>4900||++visibleFields>4)continue;
             double age=time-field.started();
             if(age<0)continue;

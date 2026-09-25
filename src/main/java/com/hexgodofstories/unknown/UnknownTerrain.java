@@ -18,7 +18,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import java.util.*;
 
-/** Snapshots only blocks hit by Unknown's body. The record survives chunk unloads and server restarts. */
+/** Migration-only restoration of terrain altered by the removed Unknown ability in older saves. */
 @Mod.EventBusSubscriber(modid=HexGodOfStories.ID)
 public final class UnknownTerrain extends SavedData {
     private static final String NAME="hexgodofstories_unknown_terrain";

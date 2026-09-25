@@ -10,4 +10,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class ServerTickMixin {
     @Inject(method="tickNonPassenger",at=@At("HEAD"),cancellable=true)
     private void hgos$suspend(Entity entity,CallbackInfo ci) {if(TemporalEngine.skipTick(entity)||Frostbite.frozen(entity))ci.cancel();}
+    @Inject(method="tickPassenger",at=@At("HEAD"),cancellable=true)
+    private void hgos$suspendPassenger(Entity vehicle,Entity passenger,CallbackInfo ci) {
+        if(TemporalEngine.skipTick(passenger)||Frostbite.frozen(passenger))ci.cancel();
+    }
 }

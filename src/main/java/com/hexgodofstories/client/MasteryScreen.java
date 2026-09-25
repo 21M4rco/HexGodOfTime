@@ -32,6 +32,7 @@ public final class MasteryScreen extends Screen {
     private CompoundTag data(){return minecraft==null||minecraft.player==null?new CompoundTag():ClientState.data(minecraft.player.getId());}
     static int mastery(CompoundTag n,Discipline d){return MasteryCurve.levelForXp(n.getLong("xp_"+d.name()));}
     static boolean unlocked(CompoundTag n,Ability a) {
+        if(a==Ability.SLOW_FIELD)return false;
         if(n.getBoolean("unlock_"+a.name()))return true;
         int sum=0;
         for(Discipline d:Discipline.values())if(d.ordinal()<4)sum+=mastery(n,d);
@@ -52,7 +53,7 @@ public final class MasteryScreen extends Screen {
             addRenderableWidget(Button.builder(Component.literal(d.title),b->{chapter=d;rebuildWidgets();})
                 .bounds(left+12,top+69+d.ordinal()*29,nav-20,23).build());
 
-        var list=Arrays.stream(Ability.values()).filter(a->a.discipline==chapter&&a!=Ability.RIFT).toList();
+        var list=Arrays.stream(Ability.values()).filter(a->a.discipline==chapter&&a!=Ability.RIFT&&a!=Ability.SLOW_FIELD).toList();
         int card=cardHeight(list.size());
         int i=0;
         for(Ability a:list) {
@@ -103,7 +104,7 @@ public final class MasteryScreen extends Screen {
 
     /** The permanent key a dedicated command answers to, so the archive can name it. */
     static String key(Ability a) {
-        int index=switch(a){case TIME_STOP->0;case REWIND->2;case SLOW_FIELD->3;default->-1;};
+        int index=switch(a){case TIME_STOP->0;case REWIND->2;case TIME_BRANCH->3;default->-1;};
         return index<0?"":HexClient.TIME_KEYS[index].getTranslatedKeyMessage().getString();
     }
 
@@ -134,7 +135,7 @@ public final class MasteryScreen extends Screen {
         int master=mastery(data(),chapter);
         g.drawString(font,chapter.title.toUpperCase(Locale.ROOT)+"  /  "+master+" : 1000",left+nav+14,top+49,chapter.color,false);
 
-        var list=Arrays.stream(Ability.values()).filter(a->a.discipline==chapter).toList();
+        var list=Arrays.stream(Ability.values()).filter(a->a.discipline==chapter&&a!=Ability.SLOW_FIELD).toList();
         int card=cardHeight(list.size());
         int i=0;
         for(Ability a:list) {

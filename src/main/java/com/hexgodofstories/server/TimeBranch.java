@@ -74,7 +74,7 @@ public final class TimeBranch {
      * @return true when the charge actually started.
      */
     public static boolean begin(ServerPlayer p) {
-        if(charging(p))return false;
+        if(charging(p)||com.hexgodofstories.warping.Warping.charging(p))return false;
         if(!Transformation.transformed(p)) {
             p.displayClientMessage(Component.literal("The Time Branches answer only the transformed."),true);
             return false;

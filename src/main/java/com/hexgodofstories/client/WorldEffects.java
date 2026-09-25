@@ -87,15 +87,26 @@ public final class WorldEffects {
      */
     public static long heldSince(double x,double y,double z) {
         long best=Long.MIN_VALUE;
-        for(Field f:FIELDS.values()) {
-            if(!f.stop)continue;
-            double dx=f.centre.x-x,dy=f.centre.y-y,dz=f.centre.z-z;
-            double distance=Math.sqrt(dx*dx+dy*dy+dz*dz);
-            if(distance>f.radius)continue;
-            long reached=f.expires==Long.MAX_VALUE
-                ?f.started+(long)Math.ceil(distance/f.radius*com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION):f.started;
-            if(ClientState.now()<reached)continue;
-            best=Math.max(best,reached);
+        for(Field f:FIELDS.values())best=Math.max(best,reached(f,x,y,z));
+        return best;
+    }
+    private static long reached(Field f,double x,double y,double z) {
+        if(!f.stop)return Long.MIN_VALUE;
+        double dx=f.centre.x-x,dy=f.centre.y-y,dz=f.centre.z-z;
+        double distance=Math.sqrt(dx*dx+dy*dy+dz*dz);
+        if(distance>f.radius)return Long.MIN_VALUE;
+        long reached=f.expires==Long.MAX_VALUE
+            ?f.started+(long)Math.ceil(distance/f.radius*com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION):f.started;
+        return ClientState.now()>=reached?reached:Long.MIN_VALUE;
+    }
+    public static long heldSince(net.minecraft.world.phys.AABB box) {
+        long best=Long.MIN_VALUE;
+        for(Field field:FIELDS.values()) {
+            if(!field.stop)continue;
+            double x=Mth.clamp(field.centre.x,box.minX,box.maxX);
+            double y=Mth.clamp(field.centre.y,box.minY,box.maxY);
+            double z=Mth.clamp(field.centre.z,box.minZ,box.maxZ);
+            best=Math.max(best,reached(field,x,y,z));
         }
         return best;
     }
@@ -134,12 +145,6 @@ public final class WorldEffects {
         var mc=Minecraft.getInstance();
         if(mc.level==null||mc.player==null)return;
         Vec3 eye=mc.player.getEyePosition();
-        for(var id:ClientState.FROZEN.keySet()) {
-            Entity e=mc.level.getEntity(id);
-            if(e==null||e.position().distanceToSqr(eye)>1024||now%3!=0)continue;
-            Vec3 at=e.position().add((mc.level.random.nextDouble()-.5)*(e.getBbWidth()+.6),e.getBbHeight()*mc.level.random.nextDouble(),(mc.level.random.nextDouble()-.5)*(e.getBbWidth()+.6));
-            Vfx.spark(HexGodOfStories.MOTE.get(),at,Vec3.ZERO);
-        }
         GripRenderer.tick(now);
         // One pass: blade trails, rift breath, and the embedded steel each wound bleeds from.
         Map<Integer,List<com.hexgodofstories.entity.ThrownDagger>> wounds=new HashMap<>();
@@ -267,12 +272,7 @@ public final class WorldEffects {
             // suspended dust thickens behind it, so the world looks like it is being held, not switched.
             // The stopped and dilated fields use Cosmic Flight's layered cloud renderer.
             case "stop","dilate" -> { }
-            case "resume" -> Vfx.bloom(entity,pos,look,18,(at,aim,t)->{
-                float swell=Vfx.swell(t);
-                Vfx.gather(gold,at.add(0,.9,0),3.2*(1-Vfx.ease(t))+.3,Vfx.count(swell*6f),.22);
-                Vfx.cloud(nebula,at.add(0,1,0),.9,Vfx.count(swell),.02);
-                if(t>.8f)Vfx.spark(star,at.add(0,1.1,0),Vec3.ZERO);
-            });
+            case "resume" -> { }
             case "bind","marked","command" -> Vfx.bloom(entity,pos,look,14,(at,aim,t)->{
                 float swell=Vfx.swell(t);
                 Vfx.ring(gold,at.add(0,1,0),.55+.4*Vfx.ease(t),Vfx.count(swell*3.5f),.01,.01);

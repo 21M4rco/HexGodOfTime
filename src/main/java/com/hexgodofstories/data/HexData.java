@@ -30,6 +30,7 @@ public final class HexData {
         get(p).putLong("xp_"+d.name(),Math.min(MasteryCurve.MAX_XP,get(p).getLong("xp_"+d.name())+Math.max(0,xp)));
     }
     public static boolean unlocked(Player p,Ability a) {
+        if(a==Ability.SLOW_FIELD)return false;
         if(!access(p))return false;
         if(get(p).getBoolean("unlock_"+a.name()))return true;
         int total=0;for(Discipline d:Discipline.values())if(d!=Discipline.TEMPORAL&&d!=Discipline.PURPOSE)total+=mastery(p,d);
@@ -105,7 +106,7 @@ public final class HexData {
     }
 
     public static void clearTransient(Player p,boolean death) {
-        CompoundTag d=get(p);d.remove("disguise");d.remove("vanishUntil");d.remove("wardUntil");d.remove("held");d.remove("transformStart");d.remove("grip");
+        CompoundTag d=get(p);d.remove("disguise");d.remove("vanishUntil");d.remove("wardUntil");d.remove("held");d.remove("transformStart");d.remove("grip");d.remove("stopWindup");
         d.remove(BranchFistState.UNTIL);d.remove(BranchFistState.START);d.remove(BranchFistState.IMPACT);
         if(death){
             d.putBoolean("ascended",false);
