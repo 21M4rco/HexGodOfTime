@@ -16,7 +16,7 @@ public final class ScepterPose {
     public static Vec3 stoneMuzzle(LivingEntity caster) {
         Vec3 forward=caster.getLookAngle();
         if(forward.lengthSqr()>1.0E-8)forward=forward.normalize();
-        Vec3 right=new Vec3(forward.z,0,-forward.x);
+        Vec3 right=new Vec3(-forward.z,0,forward.x);
         if(right.lengthSqr()>1.0E-8)right=right.normalize();
         else right=new Vec3(1,0,0);
         double side=caster.getMainArm()==HumanoidArm.RIGHT?1:-1;
