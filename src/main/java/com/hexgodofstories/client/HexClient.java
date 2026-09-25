@@ -139,12 +139,13 @@ public final class HexClient {
             if(!primary&&primaryDown&&primaryWasHold)HexNetwork.send(HexServer.HOLD_END,0);
             primaryDown=primary;
 
-            // G belongs to Warping. Outside the World Tree it chooses a destination. Inside that
-            // one dimension alone it opens the preserved Fracture destination/exit selector.
+            // G chooses a Warping destination in ordinary worlds. Inside any Warping realm
+            // (including the World Tree), it directly opens the World Tree exit selector.
             while(SECONDARY.consumeClick()) {
                 Ability live=Ability.at(ClientState.self().getInt("selected"));
                 if(live==Ability.WARPING) {
-                    if(com.hexgodofstories.server.PocketRealm.inside(mc.player.level()))FractureScreen.open();
+                    if(com.hexgodofstories.server.PocketRealm.inside(mc.player.level())
+                        || com.hexgodofstories.warping.Destination.from(mc.player.level())!=null)FractureScreen.open();
                     else mc.setScreen(new WarpScreen());
                 } else HexNetwork.send(HexServer.ALTERNATE,0);
             }
