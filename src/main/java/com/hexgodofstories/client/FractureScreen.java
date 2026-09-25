@@ -246,9 +246,9 @@ public final class FractureScreen extends Screen {
     }
 
     /**
-     * Opened by G inside the World Tree, or from the Warping destination menu in
-     * any dimension. Choosing an exit configures the eventual World Tree departure; it
-     * does not teleport the player or change the selected Warping trap destination.
+     * Opened directly with G inside any Warping realm, including the World Tree.
+     * Choosing an exit configures the eventual World Tree departure; it does not
+     * teleport the player or change the selected Warping trap destination.
      */
     public static void open() {
         Minecraft mc=Minecraft.getInstance();
