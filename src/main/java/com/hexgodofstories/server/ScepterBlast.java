@@ -1,5 +1,6 @@
 package com.hexgodofstories.server;
 
+import com.hexgodofstories.data.ScepterPose;
 import com.hexgodofstories.network.HexNetwork;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -32,15 +33,19 @@ public final class ScepterBlast {
 
     public static void fire(ServerPlayer caster) {
         ServerLevel level=caster.serverLevel();
-        Vec3 origin=caster.getEyePosition(),end=origin.add(caster.getLookAngle().normalize().scale(RANGE));
-        BlockHitResult block=level.clip(new ClipContext(origin,end,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,caster));
-        double first=block.getType()==HitResult.Type.MISS?RANGE*RANGE:origin.distanceToSqr(block.getLocation());
+        // Aim/hit detection stays on the player's crosshair, but presentation starts at the
+        // Scepter's blue stone. This keeps the shot accurate without ever looking eye-fired.
+        Vec3 aimOrigin=caster.getEyePosition();
+        Vec3 end=aimOrigin.add(caster.getLookAngle().normalize().scale(RANGE));
+        Vec3 muzzle=ScepterPose.stoneMuzzle(caster);
+        BlockHitResult block=level.clip(new ClipContext(aimOrigin,end,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,caster));
+        double first=block.getType()==HitResult.Type.MISS?RANGE*RANGE:aimOrigin.distanceToSqr(block.getLocation());
         LivingEntity direct=null;Vec3 impact=block.getType()==HitResult.Type.MISS?end:block.getLocation();
-        for(LivingEntity candidate:level.getEntitiesOfClass(LivingEntity.class,new AABB(origin,end).inflate(1),
+        for(LivingEntity candidate:level.getEntitiesOfClass(LivingEntity.class,new AABB(aimOrigin,end).inflate(1),
             e->HexServer.validTarget(caster,e))) {
-            Optional<Vec3> hit=candidate.getBoundingBox().inflate(.28).clip(origin,end);
-            if(hit.isPresent()&&origin.distanceToSqr(hit.get())<first) {
-                first=origin.distanceToSqr(hit.get());impact=hit.get();direct=candidate;
+            Optional<Vec3> hit=candidate.getBoundingBox().inflate(.28).clip(aimOrigin,end);
+            if(hit.isPresent()&&aimOrigin.distanceToSqr(hit.get())<first) {
+                first=aimOrigin.distanceToSqr(hit.get());impact=hit.get();direct=candidate;
             }
         }
         if(direct!=null) {
@@ -57,11 +62,11 @@ public final class ScepterBlast {
             level.playSound(null,net.minecraft.core.BlockPos.containing(impact),SoundEvents.GENERIC_EXPLODE,SoundSource.PLAYERS,.8f,1.4f);
         }
         CompoundTag fx=new CompoundTag();fx.putString("effect","scepter_blast");
-        fx.putDouble("x",origin.x);fx.putDouble("y",origin.y);fx.putDouble("z",origin.z);
+        fx.putDouble("x",muzzle.x);fx.putDouble("y",muzzle.y);fx.putDouble("z",muzzle.z);
         fx.putDouble("tx",impact.x);fx.putDouble("ty",impact.y);fx.putDouble("tz",impact.z);
         fx.putBoolean("hit",direct!=null||block.getType()!=HitResult.Type.MISS);
         fx.putBoolean("floor",direct==null&&block.getType()!=HitResult.Type.MISS&&block.getDirection()==Direction.UP);
-        HexNetwork.near(level,origin,160,new HexNetwork.Message(HexNetwork.FX,caster.getId(),fx));
+        HexNetwork.near(level,muzzle,160,new HexNetwork.Message(HexNetwork.FX,caster.getId(),fx));
     }
 
     private static void stun(LivingEntity victim) {

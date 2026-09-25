@@ -1,5 +1,6 @@
 package com.hexgodofstories.client;
 
+import com.hexgodofstories.data.ScepterPose;
 import com.lowdragmc.photon.client.gameobject.emitter.Emitter;
 import com.lowdragmc.photon.client.gameobject.emitter.beam.BeamEmitter;
 import com.lowdragmc.photon.client.gameobject.emitter.data.MaterialSetting;
@@ -90,10 +91,7 @@ public final class ScepterFx {
     }
 
     public static Vec3 muzzle(LivingEntity caster) {
-        Vec3 forward=caster.getLookAngle();
-        Vec3 right=new Vec3(-forward.z,0,forward.x).normalize();
-        double side=caster.getMainArm()==net.minecraft.world.entity.HumanoidArm.RIGHT?1:-1;
-        return caster.getEyePosition().add(forward.scale(.95)).add(right.scale(.28*side)).add(0,-.27,0);
+        return ScepterPose.stoneMuzzle(caster);
     }
 
     public static void charge(int entity) {
@@ -127,11 +125,8 @@ public final class ScepterFx {
     public static void blast(int entity,Vec3 origin,Vec3 destination,boolean floor,boolean hit) {
         var level=Minecraft.getInstance().level;
         if(level==null)return;
-        if(level.getEntity(entity) instanceof LivingEntity caster) {
-            Vec3 muzzle=muzzle(caster);
-            // Do not put a muzzle beyond a close wall/target or extend the ray through it.
-            if(origin.distanceToSqr(destination)>origin.distanceToSqr(muzzle))origin=muzzle;
-        }
+        // The server snapshots the exact stone position used for this shot. Never pull the
+        // visual origin back to the eyes/hand: the blue beam must visibly leave the crystal.
         Vec3 ray=destination.subtract(origin);
         if(ray.lengthSqr()<.001)return;
         beam(origin,destination,.42f,0xff126bff);

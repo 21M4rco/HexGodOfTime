@@ -92,11 +92,10 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         } else if(context==ItemDisplayContext.GROUND) {
             pose.translate(0,1.16,0);
         }
-        // The old third-person path used the same 0.72 scale as first person while the
-        // item JSON also turned the entire broad scepter face edge-on. Keep first person
-        // unchanged, but let third person read at prop scale beside a two-block-tall player.
-        if(first)pose.scale(.72f,.72f,.72f);
-        else if(third)pose.scale(.82f,.82f,.82f);
+        // V4 is authored at physical prop scale (~1.05 blocks from counterweight to blade tip).
+        // Do not shrink it back into the old short/fork-sized presentation.
+        if(first)pose.scale(1.00f,1.00f,1.00f);
+        else if(third)pose.scale(1.05f,1.05f,1.05f);
         draw(1,pose,buffers,light,growth);
         pose.popPose();
     }
