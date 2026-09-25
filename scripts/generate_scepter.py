@@ -134,130 +134,224 @@ def rail(name, points, radius, mat, depth_scale=.72, sides=8):
     tube(name,path,[radius]*len(path),[radius*depth_scale]*len(path),mat,sides)
 
 # ---------------------------------------------------------------------------
-# Shaft: measured against the reference silhouette. Grip is exactly at y=0.
+# Reference-traced geometry.
+#
+# The supplied prop photograph is 1000x2000.  The visible prop bounds are
+# approximately x=364..710 and y=69..1942.  The helper below converts traced
+# front-view pixel coordinates into model space while keeping the hand grip at
+# y ~= 0 (reference y ~= 890).  This avoids the previous procedural "spear"
+# silhouette: the big crescent starts around reference y=400, NOT down at the
+# grip.
 # ---------------------------------------------------------------------------
-shaft=_smooth([
-    (.031,-.870,0.000), (.020,-.805,0.000), (.011,-.730,0.001),
-    (.014,-.655,-.001), (.026,-.575,0.000), (-.001,-.490,0.001),
-    (-.005,-.405,-.001), (.003,-.325,0.000), (.001,-.240,0.000),
-    (.005,-.160,0.000), (.006,-.080,0.000), (-.006,0.000,0.000),
-    (.003,.082,0.000), (.019,.165,0.000),
-],6)
-rx=[];rz=[]
-for x,y,z in shaft:
-    lower=max(0.0,min(1.0,(-y-.48)/.39))
-    shoulder=max(0.0,min(1.0,(y-.05)/.115))
-    tip=max(0.0,min(1.0,(-y-.82)/.05))
-    rx.append((.023 + .029*lower + .010*shoulder)*(1-.55*tip))
-    rz.append((.019 + .023*lower + .007*shoulder)*(1-.52*tip))
-tube("gold_shaft",shaft,rx,rz,"gold",14)
+REF_SCALE = 1.55 / (1942 - 69)
+def ref_xy(px, py):
+    return ((px - 430) * REF_SCALE, (1942 - py) * REF_SCALE - .87)
 
-rail("counterweight_seam",[(.061,-.842,.018),(.051,-.807,.020),(.031,-.774,.018)],.0032,"gold_dark",.50)
-rail("counterweight_edge",[(.052,-.860,.020),(.058,-.840,.021),(.050,-.818,.021)],.0025,"gold_edge",.45)
+def _poly_area(poly):
+    return .5 * sum(poly[i][0]*poly[(i+1)%len(poly)][1] -
+                    poly[(i+1)%len(poly)][0]*poly[i][1] for i in range(len(poly)))
 
-for idx,(y0,y1,tilt) in enumerate([
-    (-.72,-.64,1),(-.59,-.51,-1),(-.46,-.38,1),(-.33,-.25,-1),
-    (-.20,-.12,1),(-.07,.01,-1),(.045,.115,1)
+def _cross2(a,b,c):
+    return (b[0]-a[0])*(c[1]-a[1]) - (b[1]-a[1])*(c[0]-a[0])
+
+def _inside_tri(p,a,b,c):
+    c1=_cross2(a,b,p); c2=_cross2(b,c,p); c3=_cross2(c,a,p)
+    neg=(c1 < -1e-10) or (c2 < -1e-10) or (c3 < -1e-10)
+    pos=(c1 >  1e-10) or (c2 >  1e-10) or (c3 >  1e-10)
+    return not (neg and pos)
+
+def _triangulate(poly):
+    # Small pure-Python ear clipper so traced concave prop silhouettes stay
+    # concave instead of being filled as generic wedges.
+    idx=list(range(len(poly))); out=[]
+    orient=1 if _poly_area(poly)>0 else -1
+    guard=0
+    while len(idx)>3 and guard<10000:
+        guard+=1; found=False
+        for k in range(len(idx)):
+            i0=idx[k-1]; i1=idx[k]; i2=idx[(k+1)%len(idx)]
+            a,b,c=poly[i0],poly[i1],poly[i2]
+            if orient*_cross2(a,b,c) <= 1e-10:
+                continue
+            if any(_inside_tri(poly[j],a,b,c) for j in idx if j not in (i0,i1,i2)):
+                continue
+            out.append((i0,i1,i2)); idx.pop(k); found=True; break
+        if not found:
+            # Traces are hand-cleaned and should not hit this, but fall back to
+            # a fan rather than breaking CI if a future point becomes collinear.
+            return [(0,i,i+1) for i in range(1,len(poly)-1)]
+    if len(idx)==3: out.append(tuple(idx))
+    return out
+
+def extrude_poly(name, pixel_points, depth, front_mat, side_mat=None, zcenter=0.0):
+    side_mat = side_mat or front_mat
+    poly=[ref_xy(x,y) for x,y in pixel_points]
+    zf=zcenter+depth*.5; zb=zcenter-depth*.5
+    tris=_triangulate(poly)
+    # Front and back are both real surfaces; this is not a one-sided card.
+    for a,b,c in tris:
+        quad(name,[(poly[a][0],poly[a][1],zf),
+                   (poly[b][0],poly[b][1],zf),
+                   (poly[c][0],poly[c][1],zf)],front_mat)
+        quad(name,[(poly[c][0],poly[c][1],zb),
+                   (poly[b][0],poly[b][1],zb),
+                   (poly[a][0],poly[a][1],zb)],side_mat)
+    for i in range(len(poly)):
+        j=(i+1)%len(poly)
+        quad(name,[(poly[i][0],poly[i][1],zb),
+                   (poly[j][0],poly[j][1],zb),
+                   (poly[j][0],poly[j][1],zf),
+                   (poly[i][0],poly[i][1],zf)],side_mat)
+
+def ref_rail(name, pixel_points, z, radius, mat, depth_scale=.65):
+    rail(name,[(ref_xy(x,y)[0],ref_xy(x,y)[1],z) for x,y in pixel_points],
+         radius,mat,depth_scale,8)
+
+# --- Main gold shaft and counterweight: traced from the actual prop silhouette.
+# This replaces the old skinny round tube.  It is deliberately a flattened,
+# thick solid with the same long curve and widening counterweight as the prop.
+shaft_outline=[
+    (398,850),(430,865),(445,885),(446,980),(447,1100),(452,1250),
+    (460,1450),(468,1510),(485,1600),(500,1740),(515,1875),(512,1905),
+    (495,1925),(470,1940),(445,1930),(420,1905),(405,1870),(395,1800),
+    (390,1680),(388,1550),(389,1400),(390,1250),(392,1100),(395,970),(395,900)
+]
+extrude_poly("gold_shaft_body",shaft_outline,.055,"gold","bronze")
+
+# Raised/front armour leaves and the diagonal overlaps visible on the reference.
+extrude_poly("gold_upper_leaf",[
+    (430,525),(470,530),(490,550),(500,620),(480,670),(460,725),
+    (440,760),(420,735),(400,690),(397,620),(408,565)
+],.035,"gold_edge","bronze",.032)
+extrude_poly("gold_mid_leaf",[
+    (405,700),(440,755),(446,842),(432,890),(405,878),(382,835),(378,780)
+],.030,"gold","gold_dark",.030)
+extrude_poly("gold_side_flange",[
+    (438,875),(455,900),(465,980),(460,1030),(447,1025),(442,960)
+],.028,"gold_edge","bronze",.026)
+
+# Actual shaft panel lines.  These sit proud/recessed instead of being painted
+# straight stripes on a cylinder.
+for n,path in enumerate([
+    [(403,852),(430,875),(444,890)],
+    [(397,990),(420,1028),(438,1062)],
+    [(395,1110),(420,1145),(438,1178)],
+    [(398,1260),(430,1298),(452,1320)],
+    [(405,1500),(440,1550),(468,1590)],
+    [(428,1865),(470,1885),(510,1888)]
 ]):
-    ym=(y0+y1)*.5
-    x=min(shaft,key=lambda p:abs(p[1]-ym))[0]
-    z=.028
-    dx=.016
-    rail(f"gold_plate_seam_{idx}",[(x-dx*tilt,y0,z),(x+dx*tilt,y1,z+.001)],.0028,"gold_dark",.45,6)
-    rail(f"gold_plate_edge_{idx}",[(x-dx*tilt+.004,y0+.006,z+.003),(x+dx*tilt+.004,y1-.006,z+.004)],.0019,"gold_edge",.40,6)
-rail("shaft_recess",[(.000,-.61,-.031),(.002,-.42,-.029),(.006,-.22,-.027),(-.002,-.02,-.025)],.0028,"gold_dark",.48)
+    ref_rail("shaft_seam_"+str(n),path,.057,.0027,"gold_dark",.48)
+ref_rail("shaft_highlight",[(441,930),(442,1130),(448,1360),(462,1530),(492,1780)],.059,.0020,"gold_edge",.42)
 
-blade("gold_shoulder_left",[(-.045,.012,.085,.013),(-.055,.030,.135,.018),(-.046,.052,.195,.020)],("gold_edge","gold","bronze"))
-blade("gold_shoulder_right",[(.010,.052,.090,.012),(.022,.080,.150,.017),(.038,.096,.210,.018)],("gold_edge","gold","bronze"))
-rail("gold_shoulder_ridge",[(-.024,.105,.030),(-.020,.160,.032),(.010,.215,.030)],.007,"gold_edge")
+# --- Black ribbed throat directly beneath the crystal.
+extrude_poly("black_throat",[
+    (430,520),(470,522),(492,548),(493,592),(480,628),(457,650),
+    (438,630),(428,590)
+],.052,"black","gunmetal")
+for yy in range(540,631,9):
+    ref_rail("black_neck_rib",[(440,yy),(480,yy+7)],.030,.0028,"gunmetal",.50)
 
-neck=_smooth([(.020,.145,0),(.026,.190,0),(.042,.235,0),(.055,.278,0)],4)
-tube("black_neck",neck,[.028,.028,.026,.023],[.023,.023,.021,.019],"black",12)
-for i in range(12):
-    t=i/11
-    x=.020*(1-t)+.055*t; y=.151*(1-t)+.274*t
-    tube("black_neck_rib",[(x,y,0),(x+.001,y+.006,0)],[.030,.030],[.024,.024],"gunmetal",10)
+# --- Huge crescent blade.
+# These points are traced against the supplied front prop image.  Notice that
+# the blade root begins around y=400 and curves hard away from the crystal;
+# this is the key silhouette the prior model got wrong.
+main_crescent=[
+    (710,69),(650,100),(590,140),(545,185),(510,235),(480,295),(458,350),(445,400),
+    (490,400),(515,390),(525,372),(523,354),(535,347),(550,333),(565,305),
+    (585,270),(610,220),(635,170),(660,125),(685,90)
+]
+extrude_poly("blade_main",main_crescent,.064,"steel","steel_dark")
 
-blade("blade_main",[
-    (-.050,.010,.112,.027),
-    (-.046,.018,.165,.032),
-    (-.038,.026,.220,.036),
-    (-.028,.037,.280,.040),
-    (-.016,.054,.345,.042),
-    (.008,.083,.420,.041),
-    (.045,.118,.500,.036),
-    (.088,.153,.565,.030),
-    (.137,.187,.625,.020),
-    (.225,.225,.680,.0025),
-],("steel_edge","steel","steel"))
+# Bevel/cutting edge and the long recessed channel seen in the prop.
+ref_rail("blade_main_edge",[(704,76),(650,104),(592,145),(548,190),(513,240),(483,300),(460,355),(448,397)],.036,.0048,"steel_edge",.52)
+ref_rail("blade_main_channel",[(674,106),(627,142),(584,182),(548,228),(520,278),(496,327),(480,365)],.038,.0040,"steel_dark",.48)
 
-rail("blade_main_spine",[(-.020,.150,.022),(-.005,.235,.025),(.020,.330,.026),(.060,.445,.023),(.112,.565,.017),(.176,.645,.008)],.0062,"steel_edge",.55)
-rail("blade_main_channel",[(-.030,.150,-.052),(-.016,.245,-.055),(.010,.345,-.057),(.050,.455,-.053),(.102,.565,-.041),(.160,.635,-.026)],.0044,"steel_dark",.55)
+# Left-side silver support that continues down from the crescent and wraps the
+# crystal/upper gold armour instead of pretending the giant blade reaches the grip.
+left_support=[
+    (445,395),(472,398),(486,415),(480,440),(463,470),(450,510),(440,555),
+    (429,610),(417,660),(407,700),(392,700),(385,673),(389,630),(395,585),
+    (405,540),(416,500),(424,458),(430,420)
+]
+extrude_poly("left_silver_support",left_support,.056,"steel","steel_dark")
 
-blade("opposing_frame",[
-    (.050,.096,.108,.020),(.060,.122,.165,.024),(.078,.148,.230,.027),
-    (.098,.171,.295,.025),(.116,.184,.350,.020)
-],("steel_edge","steel","steel"))
+# Right silver frame, shaped around (not across) the crystal.
+right_frame=[
+    (555,398),(580,404),(590,430),(582,470),(570,510),(555,555),(540,595),
+    (525,635),(525,655),(540,670),(535,700),(520,730),(505,770),(490,815),
+    (485,840),(505,812),(530,775),(555,735),(580,705),(588,680),(570,655),
+    (560,642),(575,605),(590,565),(608,520),(620,475),(628,430),(625,400),
+    (615,382),(600,390),(590,408),(575,402)
+]
+extrude_poly("right_silver_frame",right_frame,.060,"steel","steel_dark")
 
-blade("fork_tall",[
-    (.138,.184,.330,.017),(.150,.190,.385,.016),(.164,.190,.438,.011),(.188,.188,.495,.0025)
-],("steel_edge","steel","steel"))
-blade("fork_short",[
-    (.112,.144,.338,.014),(.119,.149,.375,.013),(.129,.142,.422,.0025)
-],("steel_edge","steel","steel"))
+# The two deliberately unequal prongs from the reference.  They are separate
+# solids with a real V-shaped gap between them.
+extrude_poly("fork_short",[
+    (598,404),(594,384),(594,360),(600,336),(607,320),(614,318),
+    (612,344),(609,370),(611,395)
+],.050,"steel","steel_dark")
+extrude_poly("fork_tall",[
+    (611,402),(615,378),(621,354),(630,330),(639,314),(646,320),
+    (647,350),(646,388),(642,420)
+],.054,"steel","steel_dark")
+ref_rail("fork_outer_edge",[(644,322),(646,360),(644,410),(636,458),(624,505),(610,548)],.033,.0038,"steel_edge",.50)
 
-blade("lower_silver_overlay",[
-    (-.030,-.002,.098,.012),(-.041,.018,.145,.016),(-.038,.030,.195,.015),(-.026,.041,.235,.009)
-],("steel_edge","steel","steel_dark"))
-blade("lower_silver_keel",[
-    (.050,.080,.095,.011),(.063,.096,.138,.015),(.066,.101,.182,.015),(.058,.090,.222,.009)
-],("steel_edge","steel","steel_dark"))
+# Small lower steel keel and the three open rear/side braces shown between the
+# upper gold armour and the long right frame.
+extrude_poly("lower_silver_keel",[
+    (447,650),(470,646),(490,660),(492,692),(478,720),(465,746),(450,760),
+    (443,742),(448,710)
+],.045,"steel","steel_dark")
+for path in [[(448,688),(505,666)],[(444,720),(500,695)],[(438,752),(493,724)]]:
+    ref_rail("silver_open_brace",path,.034,.0040,"steel_edge",.50)
 
-cx,cy=.086,.335
+# --- Crystal: larger, elongated, irregular and physically deep in the cage.
+cx,cy=ref_xy(520,470)
 rings=[]
-lat_steps=14; lon_steps=18
+lat_steps=16; lon_steps=20
 for i in range(lat_steps+1):
     lat=-math.pi/2 + math.pi*i/lat_steps
     rr=math.cos(lat)
-    taper=.78+.22*((math.sin(lat)+1)/2)
+    taper=.82 + .18*((math.sin(lat)+1)/2)
     ring=[]
     for j in range(lon_steps):
         lon=j*2*math.pi/lon_steps
-        x=cx + .043*taper*rr*math.cos(lon) + .003*math.sin(lat*2)
-        y=cy + .058*math.sin(lat)
-        z=.047*rr*math.sin(lon)
+        # 134x150-ish reference footprint, with a subtle asymmetrical lean.
+        x=cx + .055*taper*rr*math.cos(lon) + .004*math.sin(lat*1.7)
+        y=cy + .064*math.sin(lat)
+        z=.052*rr*math.sin(lon)
         ring.append((x,y,z))
     rings.append(ring)
 for i in range(lat_steps):
     for j in range(lon_steps):
-        sig=(i*17+j*11)%41
-        mat="gem_white" if sig in (0,1) else "gem_cyan" if (i*7+j*3)%9 in (0,1) else "gem_blue"
+        sig=(i*19+j*13)%47
+        mat="gem_white" if sig in (0,1) else "gem_cyan" if (i*7+j*5)%10 in (0,1,2) else "gem_blue"
         quad("gem_blue_facets",[rings[i][j],rings[i][(j+1)%lon_steps],
                                 rings[i+1][(j+1)%lon_steps],rings[i+1][j]],mat)
+for path in [
+    [(488,430),(514,458),(538,492)],
+    [(505,414),(525,452),(548,510)],
+    [(535,426),(526,470),(516,520)]
+]:
+    ref_rail("gem_glint_fracture",path,.054,.0018,"gem_white",.45)
 
-for dx in (-.018,-.004,.014):
-    rail("gem_glint_fracture",[(cx+dx,cy-.035,-.006),(cx+dx*.6,cy,.005),(cx-dx*.15,cy+.035,-.004)],.0021,"gem_white",.55,6)
+# Front and rear claw cage.  Gaps are intentional so the stone reads as a
+# mounted object, not a blue texture pasted into a silver spear.
+for z,mat in ((.070,"steel_edge"),(-.070,"steel_dark")):
+    ref_rail("gem_claw_left",[(454,430),(445,470),(450,515),(470,540)],z,.0075,mat,.62)
+    ref_rail("gem_claw_top",[(458,405),(500,398),(545,410),(570,435)],z,.0075,mat,.62)
+    ref_rail("gem_claw_right",[(574,430),(586,465),(580,505),(565,535)],z,.0070,mat,.62)
+    ref_rail("gem_claw_bottom",[(455,535),(490,548),(530,548)],z,.0065,mat,.62)
 
-for z in (-.062,.062):
-    rail("gem_claw_side",[(-.002,.285,z),(-.018,.330,z),(-.012,.375,z),(.018,.408,z)],.0085,"steel",.70)
-    rail("gem_claw_upper",[(.020,.408,z),(.068,.420,z),(.112,.399,z)],.0080,"steel_edge",.70)
-    rail("gem_claw_lower",[(.120,.392,z),(.135,.354,z),(.132,.320,z)],.0075,"steel_dark",.70)
-rail("gem_hook",[(-.004,.300,.074),(-.014,.350,.076),(.012,.400,.072),(.060,.426,.066),(.112,.398,.056)],.0068,"steel_edge")
-rail("gem_hook",[(-.010,.298,-.076),(-.022,.350,-.078),(.004,.402,-.073),(.052,.429,-.066),(.106,.401,-.057)],.0068,"steel_dark")
+# Gold socket lip around the lower crystal and explicit rear supports.
+ref_rail("gold_crystal_socket",[(430,530),(468,525),(505,535),(535,548)],.040,.0075,"gold_edge",.55)
+for path in [[(430,420),(420,500),(410,590)],[(570,420),(600,500),(580,600)]]:
+    ref_rail("rear_support",path,-.083,.0065,"steel_dark",.70)
 
-rail("gold_crystal_socket",[(.024,.257,0),(.058,.246,0),(.096,.251,0),(.120,.270,0)],.0085,"gold_edge")
-box("gold_socket_plate",.070,.250,0,.066,.014,.038,"bronze")
-for n,(x,y,z) in enumerate([
-    (.000,.294,.052),(-.004,.370,.052),(.129,.300,.050),(.130,.370,.048),
-    (.026,.417,-.050),(.106,.414,-.048)
-]):
-    box(f"cage_tab_{n}",x,y,z,.015,.022,.023,"steel_edge" if n%2==0 else "steel")
-
-rail("rear_support",[(.010,.255,-.079),(-.010,.315,-.083),(.002,.382,-.078),(.030,.414,-.068)],.0064,"steel_dark")
-rail("rear_support",[(.116,.260,-.073),(.142,.318,-.075),(.134,.382,-.066)],.0060,"steel")
-
-rail("gold_inlay",[(.025,.215,-.046),(.060,.244,-.049),(.105,.260,-.044)],.0045,"bronze")
-rail("gold_inlay",[(.022,.215,.046),(.060,.244,.049),(.106,.262,.043)],.0045,"gold_edge")
+# Extra depth plates visible from 3/4 and side views.
+extrude_poly("rear_gold_spine",[(410,690),(430,745),(435,835),(420,875),(402,850)],.026,"bronze","gold_dark",-.050)
+extrude_poly("rear_frame_tab",[(520,650),(548,660),(565,688),(548,715),(526,700)],.028,"steel_dark","gunmetal",-.052)
 
 tile=48
 width,height=512,tile*len(MATERIALS)
