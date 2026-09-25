@@ -55,7 +55,7 @@ public final class FractureTravel {
     public static void choose(ServerPlayer owner,int index,UUID target) {
         FractureMode mode=FractureModes.byIndex(index);
         if(mode==null)return;
-        // The panel is shut outside the sanctum; the server does not take its word for that.
+        // A route can be prepared from any world, but only by a player with Warping access.
         if(!selectable(owner))return;
         if(mode.needsTarget) {
             ServerPlayer chosen=target==null?null:owner.server.getPlayerList().getPlayer(target);
@@ -105,8 +105,11 @@ public final class FractureTravel {
         return anchor!=null?anchor:towardReturn(owner);
     }
 
-    /** Whether the owner may choose a destination right now: only from inside the sanctum. */
-    public static boolean selectable(ServerPlayer owner) {return PocketRealm.inside(owner.level());}
+    /** The World Tree exit may be configured in any dimension by an unlocked Warping user. */
+    public static boolean selectable(ServerPlayer owner) {
+        return HexData.access(owner) && HexData.unlocked(owner,Ability.WARPING)
+            && HexData.selected(owner)==Ability.WARPING;
+    }
 
     // ------------------------------------------------------------------ resolvers ---
 
