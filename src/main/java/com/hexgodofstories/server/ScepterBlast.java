@@ -27,6 +27,9 @@ import java.util.UUID;
 public final class ScepterBlast {
     private ScepterBlast() { }
     public static final double RANGE=100;
+    private static final double ENTITY_HIT_RADIUS=.72;
+    private static final double IMPACT_RADIUS=5.0;
+    private static final double DIRECT_KNOCKBACK=3.6;
     private static final int STUN_TICKS=60,MAX_STUNS=192;
     private record Stun(LivingEntity victim,long until,boolean hadNoAi) { }
     private static final Map<UUID,Stun> STUNS=new HashMap<>();
@@ -36,39 +39,66 @@ public final class ScepterBlast {
         // Aim/hit detection stays on the player's crosshair, but presentation starts at the
         // Scepter's blue stone. This keeps the shot accurate without ever looking eye-fired.
         Vec3 aimOrigin=caster.getEyePosition();
-        Vec3 end=aimOrigin.add(caster.getLookAngle().normalize().scale(RANGE));
+        Vec3 direction=caster.getLookAngle().normalize();
+        Vec3 end=aimOrigin.add(direction.scale(RANGE));
         Vec3 muzzle=ScepterPose.stoneMuzzle(caster);
         BlockHitResult block=level.clip(new ClipContext(aimOrigin,end,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,caster));
         double first=block.getType()==HitResult.Type.MISS?RANGE*RANGE:aimOrigin.distanceToSqr(block.getLocation());
-        LivingEntity direct=null;Vec3 impact=block.getType()==HitResult.Type.MISS?end:block.getLocation();
-        for(LivingEntity candidate:level.getEntitiesOfClass(LivingEntity.class,new AABB(aimOrigin,end).inflate(1),
+        LivingEntity direct=null;
+        Vec3 impact=block.getType()==HitResult.Type.MISS?end:block.getLocation();
+
+        // Treat the beam as a narrow cylinder rather than an infinitely thin mathematical ray.
+        // The broadphase is deliberately generous; the per-entity inflated AABB still chooses the
+        // nearest real target and the block distance prevents hits through walls.
+        AABB beamBounds=new AABB(aimOrigin,end).inflate(1.35);
+        for(LivingEntity candidate:level.getEntitiesOfClass(LivingEntity.class,beamBounds,
             e->HexServer.validTarget(caster,e))) {
-            Optional<Vec3> hit=candidate.getBoundingBox().inflate(.28).clip(aimOrigin,end);
-            if(hit.isPresent()&&aimOrigin.distanceToSqr(hit.get())<first) {
-                first=aimOrigin.distanceToSqr(hit.get());impact=hit.get();direct=candidate;
+            Optional<Vec3> hit=candidate.getBoundingBox().inflate(ENTITY_HIT_RADIUS).clip(aimOrigin,end);
+            if(hit.isEmpty())continue;
+            double distance=aimOrigin.distanceToSqr(hit.get());
+            if(distance<first) {
+                first=distance;
+                impact=hit.get();
+                direct=candidate;
             }
         }
+
+        boolean hitSomething=direct!=null||block.getType()!=HitResult.Type.MISS;
+        boolean floor=direct==null&&block.getType()!=HitResult.Type.MISS&&block.getDirection()==Direction.UP;
+
         if(direct!=null) {
-            if(direct.hurt(caster.damageSources().indirectMagic(caster,caster),10))stun(direct);
+            direct.hurt(caster.damageSources().indirectMagic(caster,caster),10);
+            stun(direct);
+            massiveKnockback(direct,direction);
             level.playSound(null,direct.blockPosition(),SoundEvents.BEACON_DEACTIVATE,SoundSource.PLAYERS,1.1f,1.45f);
-        } else if(block.getType()!=HitResult.Type.MISS&&block.getDirection()==Direction.UP) {
-            // Four by four blocks, centred on the point where the ray met the floor.
-            AABB area=new AABB(impact.x-2,impact.y,impact.z-2,impact.x+2,impact.y+3,impact.z+2);
+        }
+
+        if(hitSomething) {
+            // Every impact gets the large explosion volume now: floor, wall, ceiling, or entity.
+            // Splash keeps the existing burn behavior but does NOT stun or launch nearby victims.
+            AABB area=new AABB(
+                impact.x-IMPACT_RADIUS,impact.y-3.0,impact.z-IMPACT_RADIUS,
+                impact.x+IMPACT_RADIUS,impact.y+3.5,impact.z+IMPACT_RADIUS);
             for(LivingEntity victim:level.getEntitiesOfClass(LivingEntity.class,area,
                 e->HexServer.validTarget(caster,e))) {
                 victim.setSecondsOnFire(4);
-                stun(victim);
             }
-            level.playSound(null,net.minecraft.core.BlockPos.containing(impact),SoundEvents.GENERIC_EXPLODE,SoundSource.PLAYERS,1.8f,.85f);
+            level.playSound(null,net.minecraft.core.BlockPos.containing(impact),SoundEvents.GENERIC_EXPLODE,
+                SoundSource.PLAYERS,2.2f,.72f);
         }
-        if(direct!=null||(block.getType()!=HitResult.Type.MISS&&block.getDirection()!=Direction.UP))
-            level.playSound(null,net.minecraft.core.BlockPos.containing(impact),SoundEvents.GENERIC_EXPLODE,SoundSource.PLAYERS,1.5f,1.05f);
+
         CompoundTag fx=new CompoundTag();fx.putString("effect","scepter_blast");
         fx.putDouble("x",muzzle.x);fx.putDouble("y",muzzle.y);fx.putDouble("z",muzzle.z);
         fx.putDouble("tx",impact.x);fx.putDouble("ty",impact.y);fx.putDouble("tz",impact.z);
-        fx.putBoolean("hit",direct!=null||block.getType()!=HitResult.Type.MISS);
-        fx.putBoolean("floor",direct==null&&block.getType()!=HitResult.Type.MISS&&block.getDirection()==Direction.UP);
+        fx.putBoolean("hit",hitSomething);
+        fx.putBoolean("floor",floor);
         HexNetwork.near(level,muzzle,160,new HexNetwork.Message(HexNetwork.FX,caster.getId(),fx));
+    }
+
+    private static void massiveKnockback(LivingEntity victim,Vec3 beamDirection) {
+        Vec3 push=beamDirection.normalize().scale(DIRECT_KNOCKBACK).add(0,.9,0);
+        victim.setDeltaMovement(victim.getDeltaMovement().add(push));
+        victim.hurtMarked=true;
     }
 
     private static void stun(LivingEntity victim) {
@@ -96,9 +126,6 @@ public final class ScepterBlast {
                 if(victim instanceof Mob mob&&!stun.hadNoAi)mob.setNoAi(false);
                 CompoundTag state=new CompoundTag();state.putLong("until",0);
                 if(!victim.isRemoved())HexNetwork.tracking(victim,new HexNetwork.Message(HexNetwork.STUN,victim.getId(),state));
-            } else {
-                victim.setDeltaMovement(0,Math.min(0,victim.getDeltaMovement().y),0);
-                victim.hurtMarked=true;
             }
         }
     }
