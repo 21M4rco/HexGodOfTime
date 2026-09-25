@@ -100,13 +100,13 @@ public final class CosmicNebula {
                     i%5==0?0x8cfde6:i%3==0?0x10a269:0x32ef91,a));
             }
         }
-        // Time fields use this same textured, rotating cloud volume as Cosmic Flight. Their shell
-        // grows at the server's freeze-front rate; leave the middle sparse so first person stays clear.
+        // Time fields share Cosmic Flight's translucent volume. Keep wisps through the
+        // interior so the expanding freeze front is visible without covering living models.
         int visibleFields=0;
         for(WorldEffects.Field field:WorldEffects.fields()) {
-            // Time stop is a screen-space bubble with no cloud or motes.
-            if(field.stop())continue;
-            if(field.centre().distanceToSqr(camera)>4900||++visibleFields>4)continue;
+            Vec3 centre=field.position();
+            double range=field.radius()+32;
+            if(centre.distanceToSqr(camera)>range*range||++visibleFields>4)continue;
             double age=time-field.started();
             if(age<0)continue;
             double expansion=field.stop()&&field.expires()==Long.MAX_VALUE
@@ -121,10 +121,12 @@ public final class CosmicNebula {
                 double h=1-2*(i+.5)/count,around=i*2.399963+time*.013*(i%2==0?1:-1);
                 double rim=Math.sqrt(Math.max(0,1-h*h));
                 double wobble=1+.045*Math.sin(time*.065+i*1.8);
-                Vec3 point=field.centre().add(Math.cos(around)*rim*radius*wobble,h*radius*wobble,Math.sin(around)*rim*radius*wobble);
+                // Most wisps trace the edge; the rest reveal the field near its caster.
+                double layer=field.stop()&&i%3==0?.16+.68*((i*37)%count)/(double)count:1;
+                Vec3 point=centre.add(Math.cos(around)*rim*radius*wobble*layer,h*radius*wobble*layer,Math.sin(around)*rim*radius*wobble*layer);
                 if(point.distanceToSqr(camera)<1.8)continue;
                 float size=field.stop()?.8f:.68f;
-                float alpha=fade*(field.stop()?.26f:.21f);
+                float alpha=fade*(field.stop()?.17f:.21f);
                 puffs.add(new Puff(point,size,alpha,i%5==0?0x8cfde6:i%3==0?0x10a269:0x32ef91,around+time*.012));
             }
         }

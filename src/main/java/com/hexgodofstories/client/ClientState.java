@@ -100,7 +100,7 @@ public final class ClientState {
         var mc=Minecraft.getInstance();
         if(mc.level!=world) {
             WarpRenderer.clear();PLAYERS.clear();FROZEN.clear();STUNNED.clear();SLOWED.clear();THREADS.clear();DISGUISES.clear();WarpCrossingClient.clear();WarpEmergenceClient.clear();CandyCorruptionClient.clear();
-            WorldEffects.clear();HexSkin.clear();HexLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();TimeStopScreen.close();FrostClient.clear();
+            WorldEffects.clear();HexSkin.clear();HexLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();FrostClient.clear();
             com.hexgodofstories.client.leviathan.LeviathanEffects.clear();
             TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();GripRenderer.clear();
             HexClient.ForgeBus.releaseHeldCast();

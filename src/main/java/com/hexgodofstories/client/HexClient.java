@@ -78,7 +78,7 @@ public final class HexClient {
             e.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)r->{
                 WarpRenderer.clear();HexLayer.clear();WeaponRenderer.clear();RiftRenderer.clear();RealmSky.clear();CosmicNebula.clear();
                 BranchVfx.clear();TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();
-                DisguiseRenderer.clear();DisguiseRenderer.forgive();Blood.clear();WoundAnchor.clear();TemporalScreen.close();TimeStopScreen.close();
+                DisguiseRenderer.clear();DisguiseRenderer.forgive();Blood.clear();WoundAnchor.clear();TemporalScreen.close();
             });
         }
     }
@@ -269,12 +269,12 @@ public final class HexClient {
         }
         @SubscribeEvent public static void world(RenderLevelStageEvent e) {
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);}
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES){TimeStopScreen.capture();WarpRenderer.renderRealm(e);}
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES)WarpRenderer.renderRealm(e);
             // Forge's supported translucent-effects stage, paired with the wave's particles
             // target so Fabulous composites the swell correctly over the water and entities.
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES)VoidSeaWaveRenderer.render(e);
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES){WorldEffects.render(e);WarpRenderer.render(e);}
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL){TemporalScreen.render(e.getPartialTick());TimeStopScreen.render(e.getPartialTick());}
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL)TemporalScreen.render(e.getPartialTick());
         }
         @SubscribeEvent public static void player(RenderPlayerEvent.Pre e) {
             // Checked before anything pushes a pose: a cancelled pre-event never gets its post-event, so
