@@ -20,9 +20,9 @@ import java.util.*;
 public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
     /** Grip position inside the item cube and an overall size trim, one entry per weapon kind. */
     private record Fit(float grip,float scale) {}
-    private static final Fit[] FITS={new Fit(.24f,1f),new Fit(.22f,.78f),new Fit(.27f,1f)};
+    private static final Fit[] FITS={new Fit(.24f,1f),new Fit(.29f,.72f),new Fit(.27f,1f)};
     private static final float DIAGONAL=(float)(1/Math.sqrt(2));
-    private static final ResourceLocation FROST_MATERIAL=new ResourceLocation("hexgodofstories","textures/laevateinn_frost.png");
+    private static final ResourceLocation SCEPTER_MATERIAL=new ResourceLocation("hexgodofstories","textures/scepter.png");
     private static WeaponRenderer INSTANCE;
     private static final Map<Integer,AuthoredMesh> MODELS=new HashMap<>();
 
@@ -33,7 +33,9 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
 
     /** Draws in weapon space: grip at the origin, blade toward +Y. Used by the hand, the projectile and the decoys. */
     public static void draw(int kind,PoseStack pose,MultiBufferSource buffers,int light,float growth) {
-        mesh(kind).drawManifesting(pose,buffers.getBuffer(RenderType.entityCutoutNoCull(kind==1?FROST_MATERIAL:HexLayer.MATERIAL)),light,growth,0);
+        mesh(kind).drawManifesting(pose,buffers.getBuffer(RenderType.entityCutoutNoCull(kind==1?SCEPTER_MATERIAL:HexLayer.MATERIAL)),light,growth,0);
+        if(kind==1&&growth>.65f)mesh(kind).draw(pose,buffers.getBuffer(RenderType.entityTranslucentEmissive(SCEPTER_MATERIAL)),15728880,
+            (group,point)->group.startsWith("gem_blue")||group.startsWith("gem_glint")||group.startsWith("gem_spark")?point:null);
     }
 
     @Override public void renderByItem(ItemStack stack,ItemDisplayContext context,PoseStack pose,MultiBufferSource buffers,int light,int overlay) {
@@ -54,7 +56,7 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         if(w.kind==1&&(context==ItemDisplayContext.FIRST_PERSON_LEFT_HAND||context==ItemDisplayContext.FIRST_PERSON_RIGHT_HAND))
             pose.translate(0,.12,0);
         pose.translate(grip,grip,.5f);
-        pose.mulPose(Axis.ZP.rotationDegrees(reverse?135:-45));
+        pose.mulPose(Axis.ZP.rotationDegrees(reverse?135:w.kind==1?-18:-45));
         if(w.kind==1&&held) {
             float aim=FrostClient.aim(stack);
             if(aim>0) {

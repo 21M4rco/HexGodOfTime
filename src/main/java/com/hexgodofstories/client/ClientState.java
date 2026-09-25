@@ -12,6 +12,7 @@ public final class ClientState {
     public static final Map<Integer,CompoundTag> PLAYERS=new HashMap<>();
     public static final Set<Integer> SLOWED=new HashSet<>();
     public static final Map<Integer,CompoundTag> FROZEN=new HashMap<>();
+    public static final Map<Integer,Long> STUNNED=new HashMap<>();
     public static final Map<Integer,ThreadLink> THREADS=new HashMap<>();
     /** Borrowed-shape snapshots, kept apart from the per-second state packet because of their size. */
     public static final Map<Integer,CompoundTag> DISGUISES=new HashMap<>();
@@ -29,7 +30,7 @@ public final class ClientState {
     public static int branchHeld(int id,float partial){return TimeBranchRenderer.held(id,partial);}
     /** Planted or being erased: either way this body takes no movement input of its own. */
     public static boolean immobile(net.minecraft.world.entity.Entity e) {
-        return e!=null&&(frozen(e.getId())||TimeBranchRenderer.charging(e.getId())
+        return e!=null&&(frozen(e.getId())||STUNNED.getOrDefault(e.getId(),0L)>now()||TimeBranchRenderer.charging(e.getId())
             ||ErasureRenderer.erasing(e)||GripRenderer.gripped(e.getId())||WarpEmergenceClient.emerging(e.getId()));
     }
     public static float progress(int id,float partial) {
@@ -56,6 +57,7 @@ public final class ClientState {
             case HexNetwork.WARP_EMERGE -> WarpEmergenceClient.receive(m.entity(),m.data());
             case HexNetwork.CANDY_BODY -> CandyCorruptionClient.receive(m.entity(),m.data());
             case HexNetwork.FROST -> FrostClient.receive(m.entity(),m.data());
+            case HexNetwork.STUN -> {long until=m.data().getLong("until");if(until>now())STUNNED.put(m.entity(),until);else STUNNED.remove(m.entity());}
             case HexNetwork.PILGRIM_PATH -> {
                 var world = net.minecraft.client.Minecraft.getInstance().level;
                 if (world != null && world.getEntity(m.entity()) instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity pilgrim)
@@ -97,7 +99,7 @@ public final class ClientState {
     public static void tick() {
         var mc=Minecraft.getInstance();
         if(mc.level!=world) {
-            WarpRenderer.clear();PLAYERS.clear();FROZEN.clear();SLOWED.clear();THREADS.clear();DISGUISES.clear();WarpCrossingClient.clear();WarpEmergenceClient.clear();CandyCorruptionClient.clear();
+            WarpRenderer.clear();PLAYERS.clear();FROZEN.clear();STUNNED.clear();SLOWED.clear();THREADS.clear();DISGUISES.clear();WarpCrossingClient.clear();WarpEmergenceClient.clear();CandyCorruptionClient.clear();
             WorldEffects.clear();HexSkin.clear();HexLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();TimeStopScreen.close();FrostClient.clear();
             com.hexgodofstories.client.leviathan.LeviathanEffects.clear();
             TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();GripRenderer.clear();

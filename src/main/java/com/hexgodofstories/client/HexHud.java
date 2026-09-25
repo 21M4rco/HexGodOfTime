@@ -8,14 +8,14 @@ import java.util.Locale;
 /**
  * One small bottom-left ability readout; selecting another slot changes its instructions in place.
  *
- * <p>Underneath it sits the time bar. Those four are not quick-bar entries and never scroll past:
+ * <p>Underneath it sits the time bar. Those controls are not quick-bar entries and never scroll past:
  * they are permanent commands, so they are drawn permanently, each beside the key that fires it.
  */
 public final class HexHud {
     private static final int WIDTH=204,HEIGHT=122;
-    /** The dedicated controls, in key order; a null power is the plain resume command. */
-    private static final Ability[] CONTROLS={Ability.TIME_STOP,null,Ability.REWIND,Ability.TIME_BRANCH};
-    private static final String[] CONTROL_NAMES={"Stop","Resume","Rewind","Branch"};
+    /** The dedicated controls, in key order. Stop toggles; R also resumes an active stop. */
+    private static final Ability[] CONTROLS={Ability.TIME_STOP,Ability.REWIND,Ability.TIME_BRANCH};
+    private static final String[] CONTROL_NAMES={"Stop","Rewind","Branch"};
     private static final float SCALE=.8f;
     public static void render(GuiGraphics g) {
         var mc=Minecraft.getInstance();if(mc.player==null||mc.options.hideGui)return;
@@ -97,16 +97,16 @@ public final class HexHud {
         for(int i=0;i<CONTROLS.length;i++) {
             Ability a=CONTROLS[i];
             int x=7+i*cell;
-            boolean locked=a!=null&&!MasteryScreen.unlocked(d,a);
-            long cd=a==null?0:Math.max(0,d.getLong("cd_"+a.name())-ClientState.now());
-            boolean poor=a!=null&&energy<a.cost;
+            boolean locked=!MasteryScreen.unlocked(d,a);
+            long cd=Math.max(0,d.getLong("cd_"+a.name())-ClientState.now());
+            boolean poor=energy<a.cost;
             int accent=locked?0xff44443a:cd>0?0xffbb9256:poor?0xff8f6f5a:0xffcf9f56;
             g.fill(x,top+11,x+cell-3,top+24,0xa6091612);
             g.fill(x,top+11,x+1,top+24,accent);
             String key=HexClient.TIME_KEYS[i].getTranslatedKeyMessage().getString();
             g.drawString(mc.font,key,x+4,top+14,locked?0x6f6f60:0xe9f3ec,false);
             int nameX=x+5+Math.max(8,mc.font.width(key));
-            String label=locked?"Locked":cd>0?String.format(Locale.ROOT,"%.0fs",cd/20f):CONTROL_NAMES[i];
+            String label=locked?"Locked":a==Ability.TIME_STOP&&d.getBoolean("timeStopped")?"R Resume":cd>0?String.format(Locale.ROOT,"%.0fs",cd/20f):CONTROL_NAMES[i];
             g.drawString(mc.font,label,nameX,top+14,locked?0x6d6d5e:cd>0?0xd6b284:poor?0xb08f79:0xd8e6d5,false);
         }
     }
@@ -127,7 +127,7 @@ public final class HexHud {
             case WARD -> "Raise a defensive veil.";
             case DAGGERS -> "Conjure a dagger in an empty hand.";
             case TWIN_DAGGERS -> "Conjure twin daggers. Use: throw.";
-            case LAEVATEINN -> "Conjure a frost sword. Use: freeze foes.";
+            case LAEVATEINN -> "Conjure the Scepter. Right click: blue blast.";
             case ENCHANT -> "Charm a creature to follow you.";
             case MEMORY -> "Reveal a target's recent steps.";
             case TIME_SLIP -> "Slip to a recent moment.";

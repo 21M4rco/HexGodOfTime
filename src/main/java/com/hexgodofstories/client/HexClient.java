@@ -19,9 +19,9 @@ import org.lwjgl.glfw.GLFW;
  * driven by the press and release of the same key rather than a second binding, so the scheme stays
  * small no matter how much progression adds.
  *
- * <p>The time controls are the exception, and deliberately so. Stopping, resuming, rewinding and
- * dilating are not spells to be scrolled to — they are commands, and each owns a permanent key that
- * works whatever else is selected. None of them appears in the quick bar at all. The four chosen keys
+ * <p>The time controls are the exception, and deliberately so. Stopping, rewinding and
+ * branching are not spells to be scrolled to — they are commands, and each owns a permanent key that
+ * works whatever else is selected. None of them appears in the quick bar at all. The chosen keys
  * are unbound in vanilla, so the scheme adds no conflicts.
  */
 public final class HexClient {
@@ -30,10 +30,10 @@ public final class HexClient {
         TRANSFORM=key("transform",GLFW.GLFW_KEY_H),RELEASE=key("release",GLFW.GLFW_KEY_X),FLIGHT=key("flight",GLFW.GLFW_KEY_J),
         /** Warping's other direction: reach into the realm chosen with G and pull its creatures out. */
         RECALL=key("recall",GLFW.GLFW_KEY_Y),
-        TIME_STOP=key("time_stop",GLFW.GLFW_KEY_Z),TIME_RESUME=key("time_resume",GLFW.GLFW_KEY_B),
+        TIME_STOP=key("time_stop",GLFW.GLFW_KEY_Z),
         TIME_REWIND=key("time_rewind",GLFW.GLFW_KEY_N),TIME_BRANCH=key("time_branch",GLFW.GLFW_KEY_M);
     /** The permanent time commands, paired with the value {@link HexServer#TIME} carries for each. */
-    public static final KeyMapping[] TIME_KEYS={TIME_STOP,TIME_RESUME,TIME_REWIND,TIME_BRANCH};
+    public static final KeyMapping[] TIME_KEYS={TIME_STOP,TIME_REWIND,TIME_BRANCH};
     private static KeyMapping key(String name,int key){return new KeyMapping("key.hexgodofstories."+name,InputConstants.Type.KEYSYM,key,"key.categories.hexgodofstories");}
     private static boolean primaryDown,selectDown,primaryWasHold,primaryLatched;
     private static int repeat;
@@ -133,9 +133,12 @@ public final class HexClient {
             // A cast that was interrupted needs a real release before it counts as pressed again.
             if(primaryLatched){if(primaryPhysicallyDown())primary=false;else primaryLatched=false;}
             BranchKeyInput.tick();
-            if(primary&&!primaryDown){primaryWasHold=selected.hold;HexNetwork.send(selected.hold?HexServer.HOLD_BEGIN:HexServer.CAST,0);repeat=0;}
+            // R resumes an active global stop, even when a different spell is selected.
+            // A separate resume shortcut would also fight the existing stop toggle.
+            boolean stopping=ClientState.self().getBoolean("timeStopped");
+            if(primary&&!primaryDown){primaryWasHold=!stopping&&selected.hold;HexNetwork.send(stopping?HexServer.TIME:selected.hold?HexServer.HOLD_BEGIN:HexServer.CAST,HexServer.TIME_HALT);repeat=0;}
             // Holding an ordinary spell repeats it; the server's own rate limit and cooldown set the pace.
-            else if(primary&&!selected.hold&&++repeat>=5){repeat=0;HexNetwork.send(HexServer.CAST,0);}
+            else if(primary&&!stopping&&!selected.hold&&++repeat>=5){repeat=0;HexNetwork.send(HexServer.CAST,0);}
             if(!primary&&primaryDown&&primaryWasHold)HexNetwork.send(HexServer.HOLD_END,0);
             primaryDown=primary;
 
@@ -152,7 +155,8 @@ public final class HexClient {
             while(RELEASE.consumeClick())HexNetwork.send(HexServer.UTILITY,0);
             while(RECALL.consumeClick())HexNetwork.send(HexServer.WARP_RECALL,0);
             while(FLIGHT.consumeClick())HexNetwork.send(HexServer.FLIGHT,0);
-            for(int i=0;i<TIME_KEYS.length-1;i++)while(TIME_KEYS[i].consumeClick())HexNetwork.send(HexServer.TIME,i);
+            while(TIME_STOP.consumeClick())HexNetwork.send(HexServer.TIME,HexServer.TIME_HALT);
+            while(TIME_REWIND.consumeClick())HexNetwork.send(HexServer.TIME,HexServer.TIME_REWIND);
             drain();
         }
         /** Called when the world changes underfoot: a held cast must not survive the crossing. */

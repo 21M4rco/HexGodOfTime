@@ -1,0 +1,130 @@
+{
+  "version": 3,
+  "name": "scepter_fire",
+  "author": "HexGodOfStories",
+  "description": "Raise the Chitauri Scepter and snap its blue core forward as the blast leaves the crown.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 26,
+    "stopTick": 26,
+    "isLoop": false,
+    "returnTick": 9,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -28,
+          "yaw": -8,
+          "roll": -12
+        },
+        "leftArm": {
+          "pitch": -32,
+          "yaw": 18,
+          "roll": 12
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 4,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -122,
+          "yaw": 10,
+          "roll": 8
+        },
+        "leftArm": {
+          "pitch": -78,
+          "yaw": -14,
+          "roll": -7
+        },
+        "torso": {
+          "pitch": -5,
+          "yaw": -7,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 6,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -90,
+          "yaw": 0,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": -83,
+          "yaw": 17,
+          "roll": 6
+        },
+        "torso": {
+          "pitch": -4,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 11,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -91,
+          "yaw": 0,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": -80,
+          "yaw": 17,
+          "roll": 6
+        },
+        "torso": {
+          "pitch": -4,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 17,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -65,
+          "yaw": -18,
+          "roll": -9
+        },
+        "leftArm": {
+          "pitch": -48,
+          "yaw": 12,
+          "roll": 8
+        },
+        "torso": {
+          "pitch": 1,
+          "yaw": 5,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 26,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -28,
+          "yaw": -8,
+          "roll": -12
+        },
+        "leftArm": {
+          "pitch": -32,
+          "yaw": 18,
+          "roll": 12
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}

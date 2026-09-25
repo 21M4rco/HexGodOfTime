@@ -89,7 +89,7 @@ public final class IllusionEntity extends PathfinderMob {
 
     /** Conjured steel, already fully formed so a copy never appears mid-manifestation. */
     private void arm(ServerPlayer caster,int loadout) {
-        ItemStack main=conjured(loadout==SWORD?HexGodOfStories.LAEVATEINN.get():HexGodOfStories.DAGGER.get(),caster,false);
+        ItemStack main=conjured(loadout==SWORD?HexGodOfStories.SCEPTER.get():HexGodOfStories.DAGGER.get(),caster,false);
         setItemSlot(EquipmentSlot.MAINHAND,main);
         setItemSlot(EquipmentSlot.OFFHAND,loadout==TWIN?conjured(HexGodOfStories.DAGGER.get(),caster,true):ItemStack.EMPTY);
     }

@@ -53,7 +53,10 @@ public final class WorldEffects {
         String name=n.getString("effect");
         // All teleport destinations share the same quiet arrival; old effect names remain harmless.
         if(name.equals("arrive")||name.equals("arrive_realm")||name.equals("rift_cross"))name="nebula_arrival";
-        if(name.equals("frost_charge"))FrostClient.cast(entity);
+        if(name.equals("scepter_charge"))FrostClient.cast(entity);
+        if(name.equals("scepter_blast"))ScepterFx.blast(
+            new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z")),
+            new Vec3(n.getDouble("tx"),n.getDouble("ty"),n.getDouble("tz")),n.getBoolean("floor"));
         if(name.equals("frost_burst"))CosmicNebula.frostBurst(
             new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z")),
             new Vec3(n.getDouble("dx"),n.getDouble("dy"),n.getDouble("dz")),n.getDouble("reach"));
@@ -223,7 +226,7 @@ public final class WorldEffects {
         ParticleOptions green=HexGodOfStories.EMBER.get(),gold=HexGodOfStories.GOLD_EMBER.get();
         ParticleOptions nebula=HexGodOfStories.NEBULA.get(),veil=HexGodOfStories.VEIL.get(),star=HexGodOfStories.STAR.get(),smoke=HexGodOfStories.SMOKE.get();
         switch(kind) {
-            case "frost_charge" -> Vfx.bloom(entity,palm,look,8,(at,aim,t)->{
+            case "scepter_charge" -> Vfx.bloom(entity,palm,look,8,(at,aim,t)->{
                 Vec3 forward=mc.level.getEntity(entity)==null?aim:mc.level.getEntity(entity).getLookAngle().normalize();
                 Vfx.cloud(FrostClient.BLUE,at.add(forward.scale(.8)),
                     .35+.25*Vfx.ease(t),Vfx.count(2.5f*Vfx.swell(t)),.018);

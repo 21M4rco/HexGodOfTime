@@ -99,6 +99,7 @@ public final class TemporalEngine {
         if(owns(p)||FIELDS.size()>=MAX_FIELDS||p.isPassenger()||HexData.energy(p)<5)return false;
         WINDUPS.put(p.getUUID(),new Windup(p.serverLevel(),p.level().getGameTime()+STOP_WINDUP));
         HexData.get(p).putLong("stopWindup",p.level().getGameTime());
+        HexData.get(p).putBoolean("timeStopped",true);
         HexNetwork.animate(p,"time_stop");
         return true;
     }
@@ -123,6 +124,7 @@ public final class TemporalEngine {
     public static void clear(ServerPlayer p) {
         boolean winding=WINDUPS.remove(p.getUUID())!=null;
         HexData.get(p).remove("stopWindup");
+        HexData.get(p).remove("timeStopped");
         if(winding)HexNetwork.animate(p,"__clear__");
         boolean had=FIELDS.removeIf(f->f.owner.equals(p.getUUID()));
         if(had) {
@@ -183,7 +185,7 @@ public final class TemporalEngine {
             ServerPlayer caster=level.getServer().getPlayerList().getPlayer(entry.getKey());
             if(caster==null||caster.level()!=level||!caster.isAlive()||!HexData.access(caster)||HexData.energy(caster)<5){
                 winds.remove();
-                if(caster!=null){HexData.get(caster).remove("stopWindup");HexNetwork.sync(caster);}
+                if(caster!=null){HexData.get(caster).remove("stopWindup");HexData.get(caster).remove("timeStopped");HexNetwork.sync(caster);}
                 continue;
             }
             if(now<wind.impact)continue;

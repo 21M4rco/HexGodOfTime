@@ -21,16 +21,16 @@ import java.util.*;
 
 public final class HexServer {
     public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12,BRANCH_TAP=13,WARP_CHOICE=14,WARP_RECALL=15,WARP_STRUGGLE=16,BRANCH_BEGIN=17,BRANCH_END=18,BRANCH_CANCEL=19;
-    /** Values carried by {@link #TIME}: the permanent time controls, each on its own key. */
-    public static final int TIME_HALT=0,TIME_RESUME=1,TIME_REWIND=2;
+    /** Keep rewind's wire value for saved clients; the B/resume action is retired. */
+    public static final int TIME_HALT=0,TIME_REWIND=2;
     public record Moment(Vec3 position,float yaw,float pitch,float health) {}
     private record Charm(Mob mob,UUID owner,long end,UUID previous) {}
     private record Strike(int weapon,int combo,long contact,long end) {}
     private static final Map<UUID,ArrayDeque<Moment>> HISTORY=new HashMap<>();
     private static final Map<UUID,Charm> CHARMS=new HashMap<>();
     private static final Map<UUID,Strike> STRIKES=new HashMap<>();
-    private record FrostCast(long start) { }
-    private static final Map<UUID,FrostCast> FROST_CASTS=new HashMap<>();
+    private record ScepterCast(long start) { }
+    private static final Map<UUID,ScepterCast> SCEPTER_CASTS=new HashMap<>();
     private static final Map<UUID,Long> INPUT=new HashMap<>(),TRAINING=new HashMap<>();
     private static final Map<UUID,List<UUID>> ILLUSIONS=new HashMap<>();
     private static final Map<UUID,UUID> RIFTS=new HashMap<>();
@@ -144,11 +144,6 @@ public final class HexServer {
      * directly and are reachable the instant they are unlocked, whatever spell is currently selected.
      */
     private static void time(ServerPlayer p,int which) {
-        if(which==TIME_RESUME) {
-            if(TemporalEngine.owns(p)){TemporalEngine.clear(p);notice(p,"Time resumes.");}
-            else notice(p,"No moment of yours is being held.");
-            HexNetwork.sync(p);return;
-        }
         Ability a=switch(which) {
             case TIME_HALT -> Ability.TIME_STOP;
             case TIME_REWIND -> Ability.REWIND;
@@ -306,7 +301,7 @@ public final class HexServer {
     private static boolean conjure(ServerPlayer p,Ability a) {
         if(!p.getMainHandItem().isEmpty()&&!(p.getMainHandItem().getItem() instanceof ConjuredWeapon)){notice(p,"Free your main hand to conjure.");return false;}
         if(a==Ability.TWIN_DAGGERS&&!p.getOffhandItem().isEmpty()&&!(p.getOffhandItem().getItem() instanceof ConjuredWeapon)){notice(p,"Free your other hand for twin daggers.");return false;}
-        ItemStack item=new ItemStack(a==Ability.LAEVATEINN?HexGodOfStories.LAEVATEINN.get():HexGodOfStories.DAGGER.get());
+        ItemStack item=new ItemStack(a==Ability.LAEVATEINN?HexGodOfStories.SCEPTER.get():HexGodOfStories.DAGGER.get());
         item.getOrCreateTag().putUUID("conjurer",p.getUUID());item.getOrCreateTag().putLong("formed",HexData.now(p));
         p.setItemInHand(InteractionHand.MAIN_HAND,item);
         if(a==Ability.TWIN_DAGGERS) {
@@ -333,7 +328,7 @@ public final class HexServer {
         if(hand==InteractionHand.OFF_HAND&&(!secondary||w.kind!=0))return;
         if(!ConjuredWeapon.belongsTo(held,p)){p.setItemInHand(hand,ItemStack.EMPTY);return;}
         if(w.kind==1) {
-            if(secondary)frostCast(p);
+            if(secondary)scepterCast(p);
             return;
         }
         long now=HexData.now(p);Strike prior=STRIKES.get(p.getUUID());
@@ -360,33 +355,32 @@ public final class HexServer {
         p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,.85f,1.08f+combo*.04f);
     }
 
-    /** A short windup gives the sword time to point down the player's live aim before discharge. */
-    private static void frostCast(ServerPlayer p) {
+    /** A single right click fires once; the server owns the three-second recovery. */
+    private static void scepterCast(ServerPlayer p) {
         long now=HexData.now(p);
-        if(HexData.get(p).getLong("cd_SWORD_FROST")>now||FROST_CASTS.containsKey(p.getUUID()))return;
-        if(!HexData.spend(p,25)){notice(p,"Frost burst needs 25 Temporal Energy.");return;}
-        HexData.get(p).putLong("cd_SWORD_FROST",now+160);
-        FROST_CASTS.put(p.getUUID(),new FrostCast(now));
-        HexNetwork.animate(p,"sword_3");HexNetwork.fx(p,"frost_charge");
-        p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,.8f,.85f);
+        if(HexData.get(p).getLong("cd_SCEPTER_BLAST")>now||SCEPTER_CASTS.containsKey(p.getUUID()))return;
+        HexData.get(p).putLong("cd_SCEPTER_BLAST",now+60);
+        SCEPTER_CASTS.put(p.getUUID(),new ScepterCast(now));
+        HexNetwork.animate(p,"scepter_fire");HexNetwork.fx(p,"scepter_charge");
+        p.level().playSound(null,p.blockPosition(),net.minecraft.sounds.SoundEvents.BEACON_ACTIVATE,SoundSource.PLAYERS,.9f,1.6f);
         HexNetwork.sync(p);
     }
 
-    private static void tickFrostCast(ServerPlayer p,long now) {
-        FrostCast cast=FROST_CASTS.get(p.getUUID());
+    private static void tickScepterCast(ServerPlayer p,long now) {
+        ScepterCast cast=SCEPTER_CASTS.get(p.getUUID());
         if(cast==null)return;
-        if(!p.isAlive()||!p.getMainHandItem().is(HexGodOfStories.LAEVATEINN.get())){FROST_CASTS.remove(p.getUUID());return;}
+        if(!p.isAlive()||!(p.getMainHandItem().getItem() instanceof ConjuredWeapon weapon&&weapon.kind==1)){SCEPTER_CASTS.remove(p.getUUID());return;}
         if(now-cast.start<6)return;
-        FROST_CASTS.remove(p.getUUID());
-        Frostbite.burst(p);
+        SCEPTER_CASTS.remove(p.getUUID());
+        ScepterBlast.fire(p);
     }
 
     public static void tick(ServerPlayer p) {
         long now=HexData.now(p);CompoundTag d=HexData.get(p);
-        if(!p.isAlive()){FROST_CASTS.remove(p.getUUID());Transformation.strip(p);return;}
-        if(!HexData.access(p)){FROST_CASTS.remove(p.getUUID());Transformation.strip(p);CosmicFlight.revoke(p);dismissWeapons(p);return;}
+        if(!p.isAlive()){SCEPTER_CASTS.remove(p.getUUID());Transformation.strip(p);return;}
+        if(!HexData.access(p)){SCEPTER_CASTS.remove(p.getUUID());Transformation.strip(p);CosmicFlight.revoke(p);dismissWeapons(p);return;}
         PersonalRewind.record(p);
-        tickFrostCast(p,now);
+        tickScepterCast(p,now);
         // The mantle is armour, so it is maintained where the mantle is: every tick, granted and
         // renewed while it is worn and taken off the instant it is not.
         Transformation.sustain(p);
@@ -445,6 +439,7 @@ public final class HexServer {
         }
         Bleed.tick(level);
         Frostbite.tick(level);
+        ScepterBlast.tick(level);
         Threat.tick(now);
         Decoy.tick(now);
         Telekinesis.tickSlams(level);
@@ -591,14 +586,14 @@ public final class HexServer {
         // The charge, the erasure hold and the granted armour all go together; none of them may outlive
         // a death, a logout or a crossing.
         TimeBranch.forget(p);BranchFist.clear(p);Erasure.forget(p);Transformation.strip(p);
-        HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());FROST_CASTS.remove(p.getUUID());INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
+        HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());SCEPTER_CASTS.remove(p.getUUID());INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         HexData.clearTransient(p,death);
     }
     public static void reset() {
         PersonalRewind.reset();
-        HISTORY.clear();CHARMS.clear();STRIKES.clear();FROST_CASTS.clear();INPUT.clear();TRAINING.clear();ILLUSIONS.clear();WATCHED.clear();RIFTS.clear();
+        HISTORY.clear();CHARMS.clear();STRIKES.clear();SCEPTER_CASTS.clear();INPUT.clear();TRAINING.clear();ILLUSIONS.clear();WATCHED.clear();RIFTS.clear();
         Warping.reset();
-        Telekinesis.reset();Architecture.reset();Bleed.reset();Frostbite.reset();PocketRealm.reset();TemporalEngine.reset();
+        Telekinesis.reset();Architecture.reset();Bleed.reset();Frostbite.reset();ScepterBlast.reset();PocketRealm.reset();TemporalEngine.reset();
         Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();
     }
 }

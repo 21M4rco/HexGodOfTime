@@ -106,7 +106,7 @@ public final class HexData {
     }
 
     public static void clearTransient(Player p,boolean death) {
-        CompoundTag d=get(p);d.remove("disguise");d.remove("vanishUntil");d.remove("wardUntil");d.remove("held");d.remove("transformStart");d.remove("grip");d.remove("stopWindup");
+        CompoundTag d=get(p);d.remove("disguise");d.remove("vanishUntil");d.remove("wardUntil");d.remove("held");d.remove("transformStart");d.remove("grip");d.remove("stopWindup");d.remove("timeStopped");
         d.remove(BranchFistState.UNTIL);d.remove(BranchFistState.START);d.remove(BranchFistState.IMPACT);
         if(death){
             d.putBoolean("ascended",false);

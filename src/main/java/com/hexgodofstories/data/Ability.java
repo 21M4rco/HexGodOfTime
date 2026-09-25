@@ -21,7 +21,7 @@ public enum Ability {
     RIFT(SORCERY,520,0,0,false,true,"Fracture (legacy)","The World Tree is now a Warping destination."),
     DAGGERS(CONJURATION,0,0,35,false,"Conjure Daggers","Manifest a dagger into an empty hand. Secondary: dismiss conjurations."),
     TWIN_DAGGERS(CONJURATION,160,0,55,false,"Twin Deceivers","Manifest two daggers, the off hand reversed. Attack: combinations. Use: throw."),
-    LAEVATEINN(CONJURATION,380,0,70,false,"Laevateinn","Manifest a frost sword. Normal hits bleed; use it to freeze foes, then strike to shatter them."),
+    LAEVATEINN(CONJURATION,380,0,70,false,"Scepter","Manifest the Chitauri Scepter. Hit for two hearts and one second of bleed; right click launches a blue blast up to 100 blocks with a three second cooldown."),
     ENCHANT(ENCHANTMENT,0,0,100,false,"Whispered Allegiance","Charm a creature into following you. Secondary: direct it at your aim."),
     MEMORY(ENCHANTMENT,160,0,120,false,"Memory Echo","Reveal the recent footsteps of a nearby entity."),
     TIME_SLIP(TEMPORAL,0,15,160,false,"Time Slipping","Early slips return to an unstable recent moment. Mastery grants control."),

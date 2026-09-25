@@ -18,15 +18,15 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import java.util.function.Consumer;
 
 public final class ConjuredWeapon extends Item {
-    /** 0 dagger, 1 Laevateinn, 2 time stick. */
+    /** 0 dagger, 1 Scepter (the old Laevateinn registry ID), 2 time stick. */
     public final int kind;
     public ConjuredWeapon(int kind) {super(new Properties().stacksTo(1).rarity(kind==2?Rarity.RARE:Rarity.UNCOMMON));this.kind=kind;}
-    /** Vanilla's normal attack cooldown and hit path apply to Laevateinn alone. */
+    /** Vanilla's normal attack cooldown and hit path apply to the Scepter alone. */
     @Override public Multimap<Attribute,AttributeModifier> getDefaultAttributeModifiers(EquipmentSlot slot) {
         if(kind!=1||slot!=EquipmentSlot.MAINHAND)return super.getDefaultAttributeModifiers(slot);
         return ImmutableMultimap.<Attribute,AttributeModifier>builder()
-            .put(Attributes.ATTACK_DAMAGE,new AttributeModifier(BASE_ATTACK_DAMAGE_UUID,"Laevateinn attack damage",11,AttributeModifier.Operation.ADDITION))
-            .put(Attributes.ATTACK_SPEED,new AttributeModifier(BASE_ATTACK_SPEED_UUID,"Laevateinn attack speed",-2.4,AttributeModifier.Operation.ADDITION))
+            .put(Attributes.ATTACK_DAMAGE,new AttributeModifier(BASE_ATTACK_DAMAGE_UUID,"Scepter attack damage",3,AttributeModifier.Operation.ADDITION))
+            .put(Attributes.ATTACK_SPEED,new AttributeModifier(BASE_ATTACK_SPEED_UUID,"Scepter attack speed",-2.4,AttributeModifier.Operation.ADDITION))
             .build();
     }
     /** Off-hand twins are held point-down; the renderer reads this to flip the grip. */

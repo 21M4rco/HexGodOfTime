@@ -61,6 +61,8 @@ public final class HexGodOfStories {
 
     public static final RegistryObject<Item> DAGGER = ITEMS.register("dagger", () -> new ConjuredWeapon(0));
     public static final RegistryObject<Item> LAEVATEINN = ITEMS.register("laevateinn", () -> new ConjuredWeapon(1));
+    /** Save-compatible legacy item above remains registered; all new manifestations use this ID. */
+    public static final RegistryObject<Item> SCEPTER = ITEMS.register("scepter", () -> new ConjuredWeapon(1));
     public static final RegistryObject<Item> TIME_STICK = ITEMS.register("time_stick", () -> new ConjuredWeapon(2));
 
     public static final RegistryObject<SoundEvent> SORCERY = sound("sorcery"), ILLUSION_SOUND = sound("illusion"), TELEPORT = sound("teleport"),
@@ -140,7 +142,7 @@ public final class HexGodOfStories {
     private static RegistryObject<Glow> particle(String name) { return PARTICLES.register(name, Glow::new); }
 
     static {
-        TABS.register("purpose", () -> CreativeModeTab.builder().title(Component.translatable("itemGroup.hexgodofstories")).icon(() -> new ItemStack(DAGGER.get())).displayItems((p,o) -> {o.accept(DAGGER.get());o.accept(LAEVATEINN.get());o.accept(TIME_STICK.get());}).build());
+        TABS.register("purpose", () -> CreativeModeTab.builder().title(Component.translatable("itemGroup.hexgodofstories")).icon(() -> new ItemStack(DAGGER.get())).displayItems((p,o) -> {o.accept(DAGGER.get());o.accept(SCEPTER.get());o.accept(TIME_STICK.get());}).build());
     }
     public HexGodOfStories() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();

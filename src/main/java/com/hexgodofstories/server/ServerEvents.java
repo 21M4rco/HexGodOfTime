@@ -78,6 +78,7 @@ public final class ServerEvents {
         com.hexgodofstories.warping.CandyCorruption.sync(p,-1);
         if(!HexData.access(p)){HexServer.access(p,false);return;}
         HexData.get(p).remove("transformStart");
+        HexData.get(p).remove("timeStopped");
         HexData.get(p).remove("branchStart");
         HexData.get(p).remove(BranchFistState.UNTIL);
         HexData.get(p).remove(BranchFistState.START);
@@ -94,6 +95,7 @@ public final class ServerEvents {
             HexNetwork.to(p, new HexNetwork.Message(HexNetwork.PILGRIM_PATH, pilgrim.getId(), pilgrim.segments().snapshot()));
         TemporalEngine.track(p,e.getTarget());
         Frostbite.track(p,e.getTarget());
+        ScepterBlast.track(p,e.getTarget());
         Erasure.track(p,e.getTarget());
         if(!(e.getTarget() instanceof ServerPlayer q))return;
         HexNetwork.syncTo(p,q);
@@ -106,6 +108,7 @@ public final class ServerEvents {
     @SubscribeEvent public static void leaving(net.minecraftforge.event.entity.EntityLeaveLevelEvent e){
         if(e.getLevel() instanceof ServerLevel level){
             Frostbite.clear(e.getEntity());
+            if(e.getEntity() instanceof LivingEntity living)ScepterBlast.clear(living);
             com.hexgodofstories.warping.WarpEmergence.cancel(e.getEntity());
             var reason=e.getEntity().getRemovalReason();
             // Unloaded chunks still own their saved residents. Confirmed removal or transfer does
@@ -127,6 +130,7 @@ public final class ServerEvents {
         Erasure.forget(e.getEntity());
         Bleed.clear(e.getEntity());
         Frostbite.clear(e.getEntity());
+        ScepterBlast.clear(e.getEntity());
         Threat.forget(e.getEntity());
         Decoy.release(e.getEntity());
         Starfall.forget(e.getEntity());
@@ -157,7 +161,7 @@ public final class ServerEvents {
     }
     @SubscribeEvent public static void attack(AttackEntityEvent e) {
         if(com.hexgodofstories.warping.CandyCorruption.handMissing(e.getEntity(),net.minecraft.world.InteractionHand.MAIN_HAND)){e.setCanceled(true);return;}
-        if(TemporalEngine.frozen(e.getEntity())){e.setCanceled(true);return;}
+        if(TemporalEngine.frozen(e.getEntity())||ScepterBlast.stunned(e.getEntity())){e.setCanceled(true);return;}
         // Nothing swings while it is being erased, and nothing swings while it is holding the torrent.
         if(Erasure.erasing(e.getEntity())||TimeBranch.planted(e.getEntity())){e.setCanceled(true);return;}
         if(!(e.getEntity() instanceof ServerPlayer p))return;
@@ -167,12 +171,12 @@ public final class ServerEvents {
     @SubscribeEvent public static void interact(PlayerInteractEvent e) {
         if(e.getLevel().isClientSide||!e.isCancelable())return;
         if(com.hexgodofstories.warping.CandyCorruption.handMissing(e.getEntity(),e.getHand())){e.setCanceled(true);return;}
-        if(TemporalEngine.frozen(e.getEntity())||Erasure.erasing(e.getEntity())||TimeBranch.planted(e.getEntity()))e.setCanceled(true);
+        if(TemporalEngine.frozen(e.getEntity())||ScepterBlast.stunned(e.getEntity())||Erasure.erasing(e.getEntity())||TimeBranch.planted(e.getEntity()))e.setCanceled(true);
     }
     @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
     public static void branchPunch(LivingDamageEvent e) {BranchFist.damage(e);}
 
-    /** A real vanilla sword hit opens the dagger wound; a direct blow cracks the ice on any mob. */
+    /** Vanilla's real Scepter hit deals four health (two hearts) and bleeds for one second. */
     @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
     public static void swordDamage(LivingDamageEvent e) {
         if(e.getAmount()<=0)return;
@@ -181,7 +185,8 @@ public final class ServerEvents {
         if(e.getSource().getDirectEntity() instanceof ServerPlayer player
             &&e.getSource().is(DamageTypes.PLAYER_ATTACK)
             &&player.getMainHandItem().getItem() instanceof ConjuredWeapon sword&&sword.kind==1)
-            Bleed.apply(player,victim,1,160);
+            // The wound ticks at +20; one extra tick of lifetime lets that single tick land.
+            Bleed.apply(player,victim,1,21);
     }
 
     @SubscribeEvent public static void hurt(LivingHurtEvent e) {
@@ -192,6 +197,7 @@ public final class ServerEvents {
         // ability exists for would be replaced by an ordinary death.
         if(Erasure.erasing(e.getEntity())){e.setCanceled(true);return;}
         if(e.getSource().getEntity()!=null&&TemporalEngine.frozen(e.getSource().getEntity())){e.setCanceled(true);return;}
+        if(e.getSource().getEntity() instanceof LivingEntity attacker&&ScepterBlast.stunned(attacker)){e.setCanceled(true);return;}
         // A suspended body cannot be wounded in a moment that is not passing; the harm waits for time to resume.
         if(TemporalEngine.bank(e.getEntity(),e.getAmount(),e.getSource().getEntity())){e.setCanceled(true);return;}
         if(e.getEntity() instanceof ServerPlayer p&&HexData.get(p).getLong("wardUntil")>HexData.now(p))e.setAmount(e.getAmount()*.25f);
