@@ -2,7 +2,7 @@
   "version": 3,
   "name": "scepter_fire",
   "author": "HexGodOfStories",
-  "description": "Raise the Chitauri Scepter and snap its blue core forward as the blast leaves the crown.",
+  "description": "Raise only the weapon arm, point the crystal forward, recoil and recover.",
   "emote": {
     "beginTick": 0,
     "endTick": 26,
@@ -18,11 +18,6 @@
           "pitch": -12,
           "yaw": 0,
           "roll": 0
-        },
-        "leftArm": {
-          "pitch": -10,
-          "yaw": 0,
-          "roll": 0
         }
       },
       {
@@ -32,11 +27,6 @@
           "pitch": -65,
           "yaw": -12,
           "roll": -6
-        },
-        "leftArm": {
-          "pitch": -45,
-          "yaw": 24,
-          "roll": -12
         },
         "torso": {
           "pitch": 0,
@@ -52,11 +42,6 @@
           "yaw": 0,
           "roll": 0
         },
-        "leftArm": {
-          "pitch": -75,
-          "yaw": 28,
-          "roll": -12
-        },
         "torso": {
           "pitch": 0,
           "yaw": 0,
@@ -70,11 +55,6 @@
           "pitch": -96,
           "yaw": 0,
           "roll": 0
-        },
-        "leftArm": {
-          "pitch": -78,
-          "yaw": 28,
-          "roll": -12
         },
         "torso": {
           "pitch": -3,
@@ -90,11 +70,6 @@
           "yaw": 0,
           "roll": 0
         },
-        "leftArm": {
-          "pitch": -75,
-          "yaw": 28,
-          "roll": -12
-        },
         "torso": {
           "pitch": 0,
           "yaw": 0,
@@ -105,11 +80,6 @@
         "tick": 26,
         "easing": "inoutquad",
         "rightArm": {
-          "pitch": 0,
-          "yaw": 0,
-          "roll": 0
-        },
-        "leftArm": {
           "pitch": 0,
           "yaw": 0,
           "roll": 0

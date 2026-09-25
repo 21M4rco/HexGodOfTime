@@ -38,8 +38,8 @@ MAT={
     "crystal_core":"gem_white",
 }
 COLORS={
-    "gold":(156,100,18),"gold_edge":(213,149,31),"gold_dark":(76,43,12),"gold_worn":(94,55,15),
-    "steel":(126,131,134),"steel_edge":(187,190,191),"steel_dark":(52,57,60),"recess":(23,26,27),
+    "gold":(175,117,28),"gold_edge":(238,180,58),"gold_dark":(76,43,12),"gold_worn":(94,55,15),
+    "steel":(158,165,172),"steel_edge":(231,239,246),"steel_dark":(52,57,60),"recess":(23,26,27),
     "grip":(8,8,9),"gem_blue":(7,102,242),"gem_cyan":(47,190,255),"gem_white":(181,245,255),
 }
 
@@ -235,6 +235,12 @@ for i,(cx,cy,w,h) in enumerate([
     (*pxy(458,516),0.012,0.016),(*pxy(530,514),0.012,0.017)
 ]):
     box(f"cage_depth_connector_{i}",(cx,cy,0.0),(w,h,0.050),"steel_dark")
+
+# Mirror raised metal relief onto the back face; preserve the asymmetric outline.
+for group,material,ids in list(faces):
+    if any(token in group for token in ('ridge','edge','recess','shaft_plate','shaft_seam','counterweight_shadow')):
+        mirrored=[vertex(vertices[i-1][0],vertices[i-1][1],-vertices[i-1][2]) for i in reversed(ids)]
+        faces.append((group+'_back',material,mirrored))
 
 # Shared UVs sample the centre of each material stripe. Four values keep every authored face in
 # the exact v/vt quad form AuthoredMesh expects.

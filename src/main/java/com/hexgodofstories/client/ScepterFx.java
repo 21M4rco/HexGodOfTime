@@ -129,6 +129,9 @@ public final class ScepterFx {
         // visual origin back to the eyes/hand: the blue beam must visibly leave the crystal.
         Vec3 ray=destination.subtract(origin);
         if(ray.lengthSqr()<.001)return;
+        var viewer=Minecraft.getInstance().player;
+        if(viewer!=null&&viewer.getId()==entity)
+            com.hexgodofstories.client.leviathan.LeviathanEffects.scepterRecoil();
         beam(origin,destination,.42f,0xff126bff);
         beam(origin,destination,.18f,0xff58d9ff);
         beam(origin,destination,.065f,0xfff4ffff);
@@ -144,13 +147,19 @@ public final class ScepterFx {
         mote(wake,Vec3.ZERO,Vec3.ZERO,.85f,0xff147bff);
         mote(wake,Vec3.ZERO,Vec3.ZERO,.36f,0xfff4ffff);
         if(!hit)return;
-        ParticleEmitter impact=particles(destination.add(0,floor?.04:0,0),14);
-        mote(impact,Vec3.ZERO,Vec3.ZERO,floor?2.3f:1.1f,0xff159bff);
-        mote(impact,Vec3.ZERO,Vec3.ZERO,.6f,0xffefffff);
-        int sparks=floor?90:38;
+        ParticleEmitter impact=particles(destination.add(0,floor?.04:0,0),22);
+        mote(impact,Vec3.ZERO,Vec3.ZERO,floor?5.0f:3.5f,0xff159bff);
+        mote(impact,Vec3.ZERO,Vec3.ZERO,1.5f,0xffefffff);
+        // Expanding Photon shock ring around every hit, plus the central white flash.
+        for(int i=0;i<64;i++) {
+            double angle=i*Math.PI*2/64;
+            Vec3 radial=new Vec3(Math.cos(angle),0,Math.sin(angle));
+            mote(impact,radial.scale(.15),radial.scale(.24),.36f,0xff72dcff);
+        }
+        int sparks=floor?160:100;
         for(int i=0;i<sparks;i++) {
             double angle=level.random.nextDouble()*Math.PI*2;
-            double speed=floor?.10+level.random.nextDouble()*.09:.04+level.random.nextDouble()*.08;
+            double speed=floor?.18+level.random.nextDouble()*.16:.12+level.random.nextDouble()*.15;
             Vec3 velocity=new Vec3(Math.cos(angle)*speed,(floor?.025:.0)+level.random.nextDouble()*.10,Math.sin(angle)*speed);
             mote(impact,Vec3.ZERO,velocity,i%3==0?.16f:.3f,i%3==0?0xffeaffff:0xff259bff);
         }

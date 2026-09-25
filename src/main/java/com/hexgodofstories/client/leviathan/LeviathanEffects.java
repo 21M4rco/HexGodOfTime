@@ -69,6 +69,8 @@ public final class LeviathanEffects {
         }
     }
 
+    public static void scepterRecoil() { addShake(1.15f, .82f); }
+
     private static void addShake(float amount, float decay) {
         if (amount <= shake && decay <= shakeDecay) return;
         shake = Math.max(shake, Math.min(amount, 4.0f));

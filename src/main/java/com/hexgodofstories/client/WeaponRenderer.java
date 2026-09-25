@@ -36,6 +36,12 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         mesh(kind).drawManifesting(pose,buffers.getBuffer(RenderType.entityCutoutNoCull(kind==1?SCEPTER_MATERIAL:HexLayer.MATERIAL)),light,growth,0);
         if(kind==1&&growth>.65f)mesh(kind).draw(pose,buffers.getBuffer(RenderType.entityTranslucentEmissive(SCEPTER_MATERIAL)),15728880,
             (group,point)->group.startsWith("gem_blue")||group.startsWith("gem_glint")||group.startsWith("gem_spark")?point:null);
+        if(kind==1&&growth>.65f) {
+            float pulse=1.12f+.025f*(float)Math.sin((ClientState.now()+Minecraft.getInstance().getFrameTime())*.22);
+            mesh(kind).draw(pose,buffers.getBuffer(RenderType.eyes(SCEPTER_MATERIAL)),15728880,
+                (group,point)->group.equals("gem_blue_crystal")
+                    ?new AuthoredMesh.Point(.04f+(point.x()-.04f)*pulse,.21f+(point.y()-.21f)*pulse,point.z()*pulse,point.u(),point.v()):null);
+        }
     }
 
     @Override public void renderByItem(ItemStack stack,ItemDisplayContext context,PoseStack pose,MultiBufferSource buffers,int light,int overlay) {
@@ -84,19 +90,20 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         pose.translate(.5,.5,.5);
         if(first) {
             float aim=FrostClient.aim(stack);
-            pose.mulPose(Axis.XP.rotationDegrees(-78*aim));
+            pose.mulPose(Axis.ZP.rotationDegrees(12*aim));
+            pose.mulPose(Axis.XP.rotationDegrees(-90*aim));
             pose.mulPose(Axis.YP.rotationDegrees(-15*(1-aim)));
+        } else if(third) {
+            pose.mulPose(Axis.XP.rotationDegrees(-FrostClient.pitch(stack)*FrostClient.aim(stack)));
         } else if(context==ItemDisplayContext.GUI||context==ItemDisplayContext.FIXED) {
             pose.scale(.32f,.32f,.32f);
             pose.translate(-.07,-.23,0);
         } else if(context==ItemDisplayContext.GROUND) {
             pose.translate(0,1.16,0);
         }
-        // Third-person held items go through the player-hand presentation path and the previous
-        // 1.05 scale still read dagger-sized in game. Keep first person untouched, but make the
-        // third-person Scepter read as a proper staff-sized prop while scaling around the authored grip.
+        // Scale around the grip: a full-length staff, with the hand remaining on the shaft.
         if(first)pose.scale(1.00f,1.00f,1.00f);
-        else if(third)pose.scale(1.80f,1.80f,1.80f);
+        else if(third)pose.scale(2.30f,2.30f,2.30f);
         draw(1,pose,buffers,light,growth);
         pose.popPose();
     }

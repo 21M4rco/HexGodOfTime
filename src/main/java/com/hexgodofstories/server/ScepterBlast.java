@@ -59,8 +59,10 @@ public final class ScepterBlast {
                 victim.setSecondsOnFire(4);
                 stun(victim);
             }
-            level.playSound(null,net.minecraft.core.BlockPos.containing(impact),SoundEvents.GENERIC_EXPLODE,SoundSource.PLAYERS,.8f,1.4f);
+            level.playSound(null,net.minecraft.core.BlockPos.containing(impact),SoundEvents.GENERIC_EXPLODE,SoundSource.PLAYERS,1.8f,.85f);
         }
+        if(direct!=null||(block.getType()!=HitResult.Type.MISS&&block.getDirection()!=Direction.UP))
+            level.playSound(null,net.minecraft.core.BlockPos.containing(impact),SoundEvents.GENERIC_EXPLODE,SoundSource.PLAYERS,1.5f,1.05f);
         CompoundTag fx=new CompoundTag();fx.putString("effect","scepter_blast");
         fx.putDouble("x",muzzle.x);fx.putDouble("y",muzzle.y);fx.putDouble("z",muzzle.z);
         fx.putDouble("tx",impact.x);fx.putDouble("ty",impact.y);fx.putDouble("tz",impact.z);
