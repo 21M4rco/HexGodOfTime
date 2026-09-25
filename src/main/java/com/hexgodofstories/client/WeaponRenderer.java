@@ -114,16 +114,16 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         if(first) {
             float aim=FrostClient.aim(stack);
             pose.mulPose(Axis.ZP.rotationDegrees(12*aim));
-            pose.mulPose(Axis.XP.rotationDegrees(-135+45*aim));
+            pose.mulPose(Axis.XP.rotationDegrees(-110+20*aim));
             pose.mulPose(Axis.YP.rotationDegrees(-15*(1-aim)));
         } else if(third) {
             float aim=FrostClient.aim(stack);
             // Vanilla rotates held items -90 degrees around X before the JSON transform.
-            // Rest: net -135 degrees (blade tip down, tail behind and up). Fire: compensate the
+            // Rest: net -110 degrees (blade tip down, tail behind and up). Fire: compensate the
             // raised arm so the shaft points down the crosshair instead of into the floor.
-            pose.mulPose(Axis.XP.rotationDegrees(-45+135*aim-FrostClient.pitch(stack)*aim));
-            boolean left=context==ItemDisplayContext.THIRD_PERSON_LEFT_HAND;
-            pose.mulPose(Axis.YP.rotationDegrees(left?-90:90));
+            pose.mulPose(Axis.XP.rotationDegrees(-20+110*aim-FrostClient.pitch(stack)*aim));
+            // Keep the same physical blade facing for either hand.
+            pose.mulPose(Axis.YP.rotationDegrees(90));
         } else if(context==ItemDisplayContext.GUI||context==ItemDisplayContext.FIXED) {
             pose.scale(.32f,.32f,.32f);
             pose.translate(-.07,-.23,0);
