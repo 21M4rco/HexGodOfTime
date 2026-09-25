@@ -44,8 +44,8 @@ public final class FrostClient {
         if(!sword.hasTag()||!sword.getTag().hasUUID("conjurer"))return 0;
         Aim aim=AIM.get(sword.getTag().getUUID("conjurer"));
         if(aim==null)return 0;
-        long age=ClientState.now()-aim.start;
-        return age<0||age>16?0:age<5?Mth.clamp(age/5f,0,1):Mth.clamp((16-age)/10f,0,1);
+        float age=ClientState.now()+Minecraft.getInstance().getFrameTime()-aim.start;
+        return age<0||age>26?0:age<6?Mth.clamp(age/6f,0,1):age<=12?1:Mth.clamp((26-age)/14f,0,1);
     }
     public static float pitch(ItemStack sword) {
         if(!sword.hasTag()||!sword.getTag().hasUUID("conjurer"))return 0;
@@ -59,7 +59,7 @@ public final class FrostClient {
         long now=ClientState.now();
         ICE.entrySet().removeIf(entry->entry.getValue().until<=now||world.getEntity(entry.getKey())==null);
         SHIVER.entrySet().removeIf(entry->entry.getValue()<=now||world.getEntity(entry.getKey())==null);
-        AIM.values().removeIf(aim->now-aim.start>18);
+        AIM.values().removeIf(aim->now-aim.start>28);
         for(var entry:ICE.entrySet()) {
             Entity e=world.getEntity(entry.getKey());Ice ice=entry.getValue();
             if(e==null)continue;

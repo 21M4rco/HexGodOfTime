@@ -53,10 +53,10 @@ public final class WorldEffects {
         String name=n.getString("effect");
         // All teleport destinations share the same quiet arrival; old effect names remain harmless.
         if(name.equals("arrive")||name.equals("arrive_realm")||name.equals("rift_cross"))name="nebula_arrival";
-        if(name.equals("scepter_charge"))FrostClient.cast(entity);
-        if(name.equals("scepter_blast"))ScepterFx.blast(
+        if(name.equals("scepter_charge")){FrostClient.cast(entity);ScepterFx.charge(entity);}
+        if(name.equals("scepter_blast"))ScepterFx.blast(entity,
             new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z")),
-            new Vec3(n.getDouble("tx"),n.getDouble("ty"),n.getDouble("tz")),n.getBoolean("floor"));
+            new Vec3(n.getDouble("tx"),n.getDouble("ty"),n.getDouble("tz")),n.getBoolean("floor"),n.getBoolean("hit"));
         if(name.equals("frost_burst"))CosmicNebula.frostBurst(
             new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z")),
             new Vec3(n.getDouble("dx"),n.getDouble("dy"),n.getDouble("dz")),n.getDouble("reach"));
@@ -465,7 +465,7 @@ public final class WorldEffects {
         Blood.render(pose,buffers,partial);
         CapeRenderer.renderAll(pose,buffers,partial);
         CosmicNebula.render(pose,buffers,partial);
-        ScepterFx.render(pose,buffers,partial);
+
         GripRenderer.render(pose,buffers,partial);
         TimeBranchRenderer.render(pose,buffers,partial);
         ErasureRenderer.render(pose,buffers,partial);

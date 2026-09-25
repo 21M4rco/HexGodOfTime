@@ -40,6 +40,7 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
 
     @Override public void renderByItem(ItemStack stack,ItemDisplayContext context,PoseStack pose,MultiBufferSource buffers,int light,int overlay) {
         if(!(stack.getItem() instanceof ConjuredWeapon w))return;
+        if(w.kind==1){renderScepter(stack,context,pose,buffers,light);return;}
         Fit fit=FITS[Math.max(0,Math.min(FITS.length-1,w.kind))];
         boolean held=context==ItemDisplayContext.THIRD_PERSON_LEFT_HAND||context==ItemDisplayContext.THIRD_PERSON_RIGHT_HAND
             ||context==ItemDisplayContext.FIRST_PERSON_LEFT_HAND||context==ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
@@ -70,4 +71,31 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         draw(w.kind,pose,buffers,light,growth);
         pose.popPose();
     }
+    /** Dedicated staff transform: mesh origin is the middle of the hand grip. */
+    private static void renderScepter(ItemStack stack,ItemDisplayContext context,PoseStack pose,MultiBufferSource buffers,int light) {
+        boolean first=context==ItemDisplayContext.FIRST_PERSON_LEFT_HAND||context==ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
+        boolean third=context==ItemDisplayContext.THIRD_PERSON_LEFT_HAND||context==ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
+        float growth=1;
+        if((first||third)&&stack.hasTag()&&stack.getTag().contains("formed"))
+            growth=Math.max(.05f,Math.min(1,(ClientState.now()+Minecraft.getInstance().getFrameTime()-stack.getTag().getLong("formed"))/12f));
+        pose.pushPose();
+        // ItemRenderer subtracts (.5,.5,.5) after the JSON display transform.
+        // Cancel that offset, placing the actual cylindrical grip at the hand pivot.
+        pose.translate(.5,.5,.5);
+        if(first) {
+            float aim=FrostClient.aim(stack);
+            pose.mulPose(Axis.XP.rotationDegrees(-78*aim));
+            pose.mulPose(Axis.YP.rotationDegrees(-15*(1-aim)));
+        } else if(context==ItemDisplayContext.GUI||context==ItemDisplayContext.FIXED) {
+            pose.scale(.32f,.32f,.32f);
+            pose.translate(-.07,-.23,0);
+        } else if(context==ItemDisplayContext.GROUND) {
+            pose.translate(0,1.16,0);
+        }
+        // Third person already follows the animated arm; applying aim again would double-rotate it.
+        if(first||third)pose.scale(.72f,.72f,.72f);
+        draw(1,pose,buffers,light,growth);
+        pose.popPose();
+    }
+
 }

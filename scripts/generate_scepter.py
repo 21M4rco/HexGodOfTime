@@ -1,86 +1,116 @@
-"""Build the Scepter's quadded OBJ and material atlas from its authored silhouette.
-
-Run from the repository root: python scripts/generate_scepter.py
-The old laevateinn registry/model path is retained so existing saves keep their item.
+"""Authored solid MCU scepter, grip at (0,0,0). Run from any directory.
+Swept cross sections, bevelled blade strips and a faceted gem; no polygon fans.
+The legacy OBJ name preserves existing saves. Units are Minecraft blocks.
 """
 from pathlib import Path
-from PIL import Image, ImageDraw
-import math
-
-root = Path(__file__).resolve().parents[1] / "src/main/resources/assets/hexgodofstories"
-model = root / "models/laevateinn.obj"
-texture = root / "textures/scepter.png"
-
-# A long tapered gold handle, wrapped in offset plates, holds a silver dark-metal
-# asymmetric twin-prong crown. The left horn sweeps forward into a single blade;
-# the short right horn cradles an exposed six-sided blue gem.
-parts = [
-    ("shaft", "gold", [(-.08,-1.03),(-.065,-.25),(-.058,.29),(-.085,.60),(.045,.60),(.065,.26),(.068,-.25),(.11,-1.03)]),
-    ("butt", "gold_light", [(-.13,-1.04),(-.12,-.80),(-.075,-.74),(.10,-.80),(.155,-1.05),(.08,-1.13),(-.05,-1.14)]),
-    ("wrap_low", "gold_light", [(-.09,-.56),(.055,-.47),(.07,-.34),(-.078,-.43)]),
-    ("wrap_mid", "gold_light", [(-.07,-.13),(.065,-.035),(.063,.095),(-.07,0)]),
-    ("wrap_high", "gold_light", [(-.075,.32),(.065,.43),(.09,.54),(-.083,.47)]),
-    ("socket", "dark", [(-.17,.49),(.14,.49),(.25,.68),(.19,.93),(-.04,1.04),(-.23,.86)]),
-    ("back_plate", "steel_shadow", [(-.25,.57),(-.17,.88),(-.21,1.11),(-.06,1.35),(.18,1.55),(.42,1.70),(.21,1.36),(.10,1.10),(.22,.88),(.13,.55)]),
-    ("long_blade", "steel", [(-.23,.70),(-.32,.70),(-.25,1.04),(-.10,1.31),(.14,1.55),(.44,1.73),(.30,1.48),(.08,1.25),(-.09,.98)]),
-    ("blade_edge", "steel_light", [(-.32,.70),(-.25,1.04),(-.10,1.31),(.14,1.55),(.44,1.73),(.29,1.51),(.055,1.29),(-.12,1.02)]),
-    ("short_horn", "steel", [(.18,.68),(.27,.78),(.36,1.01),(.32,1.16),(.28,1.03),(.19,1.04),(.18,.86)]),
-    ("horn_edge", "steel_light", [(.31,.97),(.35,1.14),(.36,1.01),(.32,.90)]),
-    ("collar", "gold_light", [(-.18,.64),(-.15,.72),(.19,.72),(.22,.64)]),
-    ("neck", "dark", [(-.075,.52),(.10,.52),(.15,.83),(.065,.84)]),
-    ("gem_iron", "steel_shadow", [(-.14,.78),(-.11,1.02),(.08,1.13),(.24,1.05),(.27,.86),(.09,.73)]),
-    ("gem_blue", "blue", [(-.105,.79),(-.105,.97),(.015,1.08),(.18,1.02),(.21,.87),(.07,.76)]),
-    ("gem_glint", "blue_hot", [(-.05,.87),(-.02,1.025),(.09,1.05),(.16,.96),(.05,.94)]),
-    ("gem_spark", "white", [(.08,.91),(.09,.98),(.13,1.01),(.14,.91)]),
-    ("gem_claw_left", "steel", [(-.17,.83),(-.14,1.08),(-.04,1.12),(.01,1.06),(-.09,1.03),(-.12,.82)]),
-    ("gem_claw_right", "steel", [(.17,.77),(.25,.84),(.26,1.01),(.18,1.09),(.20,.94),(.12,.82)]),
-    ("spine_fillet", "gold_light", [(.09,.56),(.15,.58),(.16,.70),(.10,.73)]),
-]
-
-atlas = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
-colours = {
-    "gold": (153, 101, 25), "gold_light": (215, 163, 55),
-    "dark": (24, 30, 39), "steel_shadow": (52, 64, 78),
-    "steel": (139, 154, 164), "steel_light": (218, 229, 227),
-    "blue": (10, 109, 242), "blue_hot": (54, 215, 255), "white": (239, 254, 255),
-}
-keys = list(colours)
-for row, key in enumerate(keys):
-    colour = colours[key]
-    for y in range(row*28, min(256, row*28+28)):
+from PIL import Image
+import math, json
+ROOT=Path(__file__).resolve().parents[1]
+ASSET=ROOT/'src/main/resources/assets/hexgodofstories'
+COLORS={'gold':(153,108,37),'gold_edge':(223,179,78),'gold_dark':(84,58,25),
+        'steel':(140,155,162),'edge':(224,234,235),'recess':(57,69,77),
+        'grip':(28,32,36),'gem_blue':(12,105,248),'gem_light':(39,164,255),'gem_white':(104,218,255)}
+keys=list(COLORS); vertices=[]; faces=[]
+def face(name,pts,mat):
+    if len(pts)==3:pts=pts+[pts[-1]]
+    base=len(vertices);vertices.extend(pts);faces.append((name,list(range(base+1,base+5)),mat))
+def tube(name,centres,radii,mat,sides=16):
+    rings=[]
+    for i,((x,y,z),r) in enumerate(zip(centres,radii)):
+        a=centres[max(0,i-1)];b=centres[min(len(centres)-1,i+1)]
+        dx,dy=b[0]-a[0],b[1]-a[1];l=math.hypot(dx,dy);nx,ny=dy/l,-dx/l
+        rings.append([(x+nx*r*math.cos(t*2*math.pi/sides),y+ny*r*math.cos(t*2*math.pi/sides),z+r*math.sin(t*2*math.pi/sides)) for t in range(sides)])
+    for i in range(len(rings)-1):
+        for j in range(sides):face(name,[rings[i][j],rings[i][(j+1)%sides],rings[i+1][(j+1)%sides],rings[i+1][j]],mat)
+    for ring,rev in ((rings[0],True),(rings[-1],False)):
+        c=tuple(sum(p[k] for p in ring)/sides for k in range(3))
+        for j in range(sides):face(name,[c,ring[(j+1)%sides],ring[j]] if rev else [c,ring[j],ring[(j+1)%sides]],mat)
+def smooth(points,steps=6):
+    out=[]
+    for i in range(len(points)-1):
+        a,b,c,d=points[max(0,i-1)],points[i],points[i+1],points[min(len(points)-1,i+2)]
+        for j in range(steps):
+            t=j/steps
+            out.append(tuple(.5*((2*b[k])+(-a[k]+c[k])*t+(2*a[k]-5*b[k]+4*c[k]-d[k])*t*t+(-a[k]+3*b[k]-3*c[k]+d[k])*t*t*t) for k in range(len(b))))
+    return out+[points[-1]]
+def blade(name,rows):
+    # Rows: outer edge X, inner edge X, height, ridge depth. Continuous beveled strip.
+    rings=[]
+    for left,right,y,z in smooth(rows,5):
+        w=right-left
+        rings.append([(left,y,0),(left+w*.16,y,z*.75),(left+w*.52,y,z),(right,y,0),
+                      (left+w*.52,y,-z),(left+w*.16,y,-z*.75)])
+    for a,b in zip(rings,rings[1:]):
+        for j in range(6):face(name,[a[j],b[j],b[(j+1)%6],a[(j+1)%6]],'edge' if j in (0,5) else 'steel' if j in (1,4) else 'recess')
+    for r in (rings[0],rings[-1]):
+        for j in range(1,5):face(name,[r[0],r[j],r[j+1]],'steel')
+# Curved, round shaft; the centre of the narrow hand grip is exactly the origin.
+path=smooth([(.10,-1.12,0),(.055,-.96,0),(-.045,-.58,0),(0,0,0),(-.022,.27,0),(-.052,.48,0),(.00,.67,0)],8)
+radii=[.037+.025*max(0,(-y-.65)/.47)+.012*max(0,(y-.20)/.47) for x,y,z in path]
+tube('curved_gold_shaft',path,radii,'gold')
+tube('rounded_pommel',[(.10,-1.15,0),(.108,-1.12,0),(.095,-1.055,0),(.081,-1.02,0)],[.012,.065,.066,.053],'gold_edge')
+# Overlapping helical armour ribbons follow the actual shaft surface.
+for side in (0,math.pi):
+    for k in range(len(path)-1):
+        row=[]
+        for q,offset in ((k,0),(k,.5),(k+1,.5),(k+1,0)):
+            x,y,z=path[q];a=y*11+side+offset;r=radii[q]+.003
+            row.append((x+r*math.cos(a),y,z+r*math.sin(a)))
+        face('spiral_armour',row,'gold_edge' if side==0 else 'gold_dark')
+# Dark ribbed neck, enclosed by the pierced silver support rails.
+tube('neck',[(0,.44,0),(.04,.73,0)],[.045,.036],'grip')
+for j in range(15):
+    y=.46+j*.017;x=(y-.44)*.04/.29
+    tube('neck_rib',[(x,y,0),(x+.001,y+.007,0)],[.046,.046],'recess',12)
+blade('long_swept_blade',[(-.13,-.062,.34,.025),(-.20,-.108,.60,.032),(-.175,-.080,.83,.037),(-.112,.011,1.04,.04),(-.004,.139,1.24,.033),(.142,.25,1.43,.023),(.33,.333,1.62,.001)])
+blade('short_fork_outer',[(.008,.063,.30,.023),(.043,.133,.47,.031),(.124,.197,.65,.038),(.188,.251,.82,.033),(.224,.27,.99,.022),(.233,.236,1.14,.001)])
+blade('short_fork_inner',[(.196,.249,.86,.02),(.188,.217,.997,.014),(.203,.206,1.105,.001)])
+# Two separated braces, leaving open negative space under the gem.
+for y in (.44,.53):
+    tube('silver_crossbrace',[(-.025,y,-.005),(.095,y+.035,-.005)],[.012,.012],'steel',8)
+tube('gold_socket',[(-.09,.705,0),(-.035,.731,0),(.034,.736,0),(.103,.716,0)],[.014]*4,'gold_edge',12)
+# Elongated faceted oval blue stone, with volume on both faces.
+cx,cy=.054,.849
+rings=[]
+for i in range(13):
+    lat=-math.pi/2+math.pi*i/12
+    rings.append([(cx+.077*math.cos(lat)*math.cos(j*2*math.pi/16),cy+.119*math.sin(lat),.068*math.cos(lat)*math.sin(j*2*math.pi/16)) for j in range(16)])
+for i in range(12):
+    for j in range(16):
+        mat='gem_white' if (i*7+j*3)%23==0 else 'gem_light' if (i+j*3)%5==0 else 'gem_blue'
+        face('gem_blue_facets',[rings[i][j],rings[i][(j+1)%16],rings[i+1][(j+1)%16],rings[i+1][j]],mat)
+# Claws curve around the outer edge, without a plate covering the stone.
+for z in (-.043,.043):
+    tube('gem_claw',smooth([(-.094,.79,z),(-.077,.927,z),(.018,.977,z),(.119,.949,z),(.15,.902,z)],4),[.013]*17,'steel',8)
+# Small pointed overlapping gold plates at the shoulder.
+for n in range(3):
+    y=.15+n*.13
+    blade('gold_shoulder_%d'%n,[(-.061,-.059,y-.10,.003),(-.073,.004,y,.048),(-.058,.025,y+.17,.041)])
+    for k in range(len(faces)-1,-1,-1):
+        name,idx,mat=faces[k]
+        if name!='gold_shoulder_%d'%n:break
+        faces[k]=(name,idx,'gold_edge' if mat=='edge' else 'gold')
+atlas=Image.new('RGBA',(256,320))
+for row,key in enumerate(keys):
+    base=COLORS[key]
+    for y in range(row*32,(row+1)*32):
         for x in range(256):
-            grain = 0 if key.startswith("blue") or key == "white" else int(5*math.sin(x*0.17+y*0.47))
-            shine = int(12*math.sin(x/256*math.pi))
-            atlas.putpixel((x,y), tuple(min(255,max(0,v+grain+shine)) for v in colour)+(255,))
-texture.parent.mkdir(parents=True, exist_ok=True)
-atlas.save(texture)
-
-lines=["# MCU Chitauri Scepter: swept silver horns, gold plated staff and exposed blue core."]
-vertices={};uvs={};faces=[]
-def face(name,points,material):
-    row=keys.index(material);v=(row*28+14)/256
-    refs=[]
-    for (x,y,z),u in zip(points,(.25,.38,.62,.75)):
-        vertex=(round(x,6),round(y,6),round(z,6));tex=(u,v)
-        if vertex not in vertices:vertices[vertex]=len(vertices)+1
-        if tex not in uvs:uvs[tex]=len(uvs)+1
-        refs.append(f"{vertices[vertex]}/{uvs[tex]}")
-    faces.append((name,refs))
-
-for name,material,shape in parts:
-    # The parser accepts quads. Three-sided surfaces have a repeated fourth
-    # vertex; the normal still comes from the first three corners.
-    z=.087 if name.startswith("gem") else .052 if "edge" in name else .070
-    centre=(sum(p[0] for p in shape)/len(shape),sum(p[1] for p in shape)/len(shape))
-    for i,a in enumerate(shape):
-        b=shape[(i+1)%len(shape)]
-        face(name+"_front",[(centre[0],centre[1],z),(a[0],a[1],z),(b[0],b[1],z),(b[0],b[1],z)],material)
-        face(name+"_back",[(centre[0],centre[1],-z),(b[0],b[1],-z),(a[0],a[1],-z),(a[0],a[1],-z)],material)
-        face(name+"_rim",[(a[0],a[1],-z),(b[0],b[1],-z),(b[0],b[1],z),(a[0],a[1],z)],"steel_shadow" if material.startswith("steel") else material)
-
-model.parent.mkdir(parents=True,exist_ok=True)
-for x,y,z in vertices:lines.append(f"v {x:.6f} {y:.6f} {z:.6f}")
-for u,v in uvs:lines.append(f"vt {u:.6f} {v:.6f}")
-for name,refs in faces:lines.extend(("g "+name,"f "+" ".join(refs)))
-model.write_text("\n".join(lines)+"\n")
-print(f"Wrote {model} ({len(vertices)} vertices, {len(faces)} quads) and {texture}")
+            noise=3*math.sin(x*.51+y*1.31)+2*math.sin(x*.17-y*.77)
+            shade=12*math.sin(x/255*math.pi)+noise
+            atlas.putpixel((x,y),tuple(max(0,min(255,round(v+shade))) for v in base)+(255,))
+atlas.save(ASSET/'textures/scepter.png')
+lines=['# Solid curved Chitauri scepter. Grip at origin. Authored quad mesh.']
+unique={}; remap={}
+for i,p in enumerate(vertices,1):
+    p=tuple(round(v,6) for v in p)
+    if p not in unique:unique[p]=len(unique)+1
+    remap[i]=unique[p]
+lines += ['v %.6f %.6f %.6f'%p for p in unique]
+for key in keys:
+    v=(keys.index(key)*32+16)/320
+    lines += ['vt %.6f %.6f'%(u,v) for u in (.2,.4,.7,.8)]
+for name,ids,mat in faces:
+    uv=keys.index(mat)*4+1
+    lines.extend(['g '+name,'f '+' '.join(f'{remap[i]}/{uv+j}' for j,i in enumerate(ids))])
+(ASSET/'models/laevateinn.obj').write_text('\n'.join(lines)+'\n')
+print(f'{len(vertices)} vertices; {len(faces)} quad faces')

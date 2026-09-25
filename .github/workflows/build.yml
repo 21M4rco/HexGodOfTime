@@ -19,8 +19,12 @@ jobs:
           gradle-version: '8.8'
       - name: Build
         run: gradle --no-daemon build
+      - name: Verify client dependency and renderer startup
+        run: python3 tools/frost_client_smoke.py
       - uses: actions/upload-artifact@v4
         with:
           name: hexgodofstories-forge-1.20.1
-          path: build/libs/*.jar
+          path: |
+            build/libs/*.jar
+            build/runtime-mods/*.jar
           if-no-files-found: error

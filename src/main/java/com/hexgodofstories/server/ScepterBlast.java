@@ -59,6 +59,7 @@ public final class ScepterBlast {
         CompoundTag fx=new CompoundTag();fx.putString("effect","scepter_blast");
         fx.putDouble("x",origin.x);fx.putDouble("y",origin.y);fx.putDouble("z",origin.z);
         fx.putDouble("tx",impact.x);fx.putDouble("ty",impact.y);fx.putDouble("tz",impact.z);
+        fx.putBoolean("hit",direct!=null||block.getType()!=HitResult.Type.MISS);
         fx.putBoolean("floor",direct==null&&block.getType()!=HitResult.Type.MISS&&block.getDirection()==Direction.UP);
         HexNetwork.near(level,origin,160,new HexNetwork.Message(HexNetwork.FX,caster.getId(),fx));
     }

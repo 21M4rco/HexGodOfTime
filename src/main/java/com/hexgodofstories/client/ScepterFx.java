@@ -1,78 +1,163 @@
 package com.hexgodofstories.client;
 
-import net.minecraft.core.particles.DustParticleOptions;
-import net.minecraft.core.particles.ParticleTypes;
+import com.lowdragmc.photon.client.gameobject.emitter.Emitter;
+import com.lowdragmc.photon.client.gameobject.emitter.beam.BeamEmitter;
+import com.lowdragmc.photon.client.gameobject.emitter.data.MaterialSetting;
+import com.lowdragmc.photon.client.gameobject.emitter.data.RendererSetting;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.NumberFunction;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.NumberFunction3;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.curve.Curve;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.curve.ECBCurves;
+import com.lowdragmc.photon.client.gameobject.emitter.data.material.TextureMaterial;
+import com.lowdragmc.photon.client.gameobject.emitter.particle.ParticleEmitter;
+import com.lowdragmc.photon.client.gameobject.particle.TileParticle;
+import com.mojang.blaze3d.platform.GlStateManager;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.client.renderer.MultiBufferSource;
-import com.mojang.blaze3d.vertex.PoseStack;
 import org.joml.Vector3f;
+import org.joml.Vector4f;
 import java.util.ArrayList;
 import java.util.List;
 
-/** A dense blue-white projectile with a moving white core and a broad floor detonation. */
+/** Real Photon emitters, rendered and ticked by Photon's particle engine. No vanilla substitute. */
 public final class ScepterFx {
     private ScepterFx() { }
-    private static final DustParticleOptions ELECTRIC=new DustParticleOptions(new Vector3f(.08f,.35f,1f),2.1f);
-    private static final DustParticleOptions AZURE=new DustParticleOptions(new Vector3f(.14f,.80f,1f),1.7f);
-    private static final DustParticleOptions WHITE=new DustParticleOptions(new Vector3f(.93f,.98f,1f),1.4f);
-    private record Shot(Vec3 start,Vec3 end,long born,int travel) { }
-    private static final List<Shot> SHOTS=new ArrayList<>();
+    private static final List<Emitter> ACTIVE=new ArrayList<>();
+    private static final ResourceLocation FLARE=new ResourceLocation("hexgodofstories","textures/particle/scepter_flare.png");
+    private static final ResourceLocation BEAM=new ResourceLocation("hexgodofstories","textures/particle/scepter_beam.png");
 
-    public static void clear(){SHOTS.clear();}
+    public static void clear(){for(Emitter e:ACTIVE)e.remove(true);ACTIVE.clear();}
 
-    /** Photon-bright layered core, continuous over all 100 blocks rather than disconnected particle puffs. */
-    public static void render(PoseStack pose,MultiBufferSource.BufferSource buffers,float partial) {
-        double now=ClientState.now()+partial;
-        SHOTS.removeIf(shot->now-shot.born>shot.travel+6);
-        if(SHOTS.isEmpty())return;
-        var type=BranchVfx.glow();var out=buffers.getBuffer(type);
-        for(Shot shot:SHOTS) {
-            double age=now-shot.born;
-            if(age<0)continue;
-            double progress=Math.min(1,age/shot.travel);
-            Vec3 direction=shot.end.subtract(shot.start);
-            Vec3 head=shot.start.add(direction.scale(progress));
-            float fade=(float)Math.min(1,Math.max(0,(shot.travel+6-age)/6));
-            double pulse=.8+.2*Math.sin(age*1.7);
-            BranchVfx.ribbon(pose,out,shot.start,head,.43*pulse,0x0569fa,.42f*fade);
-            BranchVfx.ribbon(pose,out,shot.start,head,.18*pulse,0x53caff,.88f*fade);
-            BranchVfx.ribbon(pose,out,shot.start,head,.055,0xf5ffff,.98f*fade);
-            BranchVfx.billboard(pose,out,head,.68,age*.14,0x168cff,.75f*fade);
-            BranchVfx.billboard(pose,out,head,.31,-age*.19,0xffffff,.97f*fade);
-        }
-        buffers.endBatch(type);
+    private static void register(Emitter emitter,Vec3 at) {
+        Minecraft mc=Minecraft.getInstance();
+        if(mc.level==null)return;
+        ACTIVE.removeIf(e->!e.isAlive());
+        while(ACTIVE.size()>=64)ACTIVE.remove(0).remove(true);
+        emitter.setLevel(mc.level);
+        emitter.setPos(at.x,at.y,at.z);
+        ACTIVE.add(emitter);
+        mc.particleEngine.add(emitter);
     }
 
-    public static void blast(Vec3 origin,Vec3 destination,boolean floor) {
-        Vec3 ray=destination.subtract(origin);
-        if(ray.lengthSqr()<.01)return;
-        Vec3 direction=ray.normalize();
-        int duration=Math.max(5,Math.min(13,(int)Math.ceil(ray.length()/11)));
-        if(SHOTS.size()>=12)SHOTS.remove(0);
-        SHOTS.add(new Shot(origin,destination,ClientState.now(),duration));
-        Vfx.bloom(-1,origin,direction,duration+5,(at,aim,t)->{
-            float travelled=Math.min(1,t*(duration+5)/(float)duration);
-            Vec3 head=at.add(ray.scale(travelled));
-            if(travelled<1) {
-                // Bright saturated centre; the blue wake fans out in the firing direction.
-                Vfx.cloud(WHITE,head,.24,11,.01);
-                Vfx.cloud(AZURE,head,.57,13,.025);
-                Vfx.cloud(ELECTRIC,head,1.05,9,.035);
-                Vfx.spark(ParticleTypes.END_ROD,head,Vec3.ZERO);
-                for(int i=1;i<=5;i++) {
-                    Vec3 wake=head.subtract(direction.scale(i*.37));
-                    Vfx.cloud(i%2==0?WHITE:AZURE,wake,.12+i*.065,4,.01);
-                }
-            } else if(t<duration/(float)(duration+5)+.12f) {
-                int burst=floor?30:18;
-                Vfx.cloud(WHITE,destination,.5,burst,.13);
-                Vfx.cloud(AZURE,destination,floor?2:1.2,burst,.16);
-                Vfx.cone(ELECTRIC,destination,new Vec3(0,.5,0),burst,.15,floor?.42:.28);
-                if(floor) {
-                    Vfx.ring(AZURE,destination,.5,20,.15,.04);
-                    Vfx.ring(ParticleTypes.FLAME,destination,1.7,16,.03,.08);
-                }
+    private static void material(MaterialSetting material,RendererSetting renderer,ResourceLocation texture) {
+        material.setMaterial(new TextureMaterial(texture));
+        material.setCull(false);
+        material.setDepthTest(true);
+        material.setDepthMask(false);
+        material.getBlendMode().setDstColorFactor(GlStateManager.DestFactor.ONE);
+        renderer.setBloomEffect(true);
+        renderer.getCull().setEnable(false); // Long beams must not be culled by their origin alone.
+    }
+
+    private static Curve taper(float initial) {
+        Curve curve=new Curve(0,initial,0,initial,initial,"lifetime","size");
+        curve.setCurves(new ECBCurves(0,1,.25f,1,.75f,.2f,1,0));
+        return curve;
+    }
+
+    private static ParticleEmitter particles(Vec3 at,int lifetime) {
+        ParticleEmitter emitter=new ParticleEmitter();
+        var c=emitter.config;
+        c.setDuration(1);c.setLooping(false);c.setMaxParticles(800);
+        c.setParallelUpdate(false);c.setParallelRendering(false);
+        c.emission.setEmissionRate(NumberFunction.constant(0));
+        c.setStartLifetime(NumberFunction.constant(lifetime));
+        c.setStartSpeed(NumberFunction.constant(0));
+        c.setStartSize(new NumberFunction3(1,1,1));
+        c.physics.setEnable(false);
+        c.sizeOverLifetime.setEnable(true);
+        c.sizeOverLifetime.setSize(new NumberFunction3(taper(1),taper(1),taper(1)));
+        material(c.material,c.renderer,FLARE);
+        register(emitter,at);
+        return emitter;
+    }
+
+    private static void mote(ParticleEmitter emitter,Vec3 offset,Vec3 velocity,float size,int color) {
+        TileParticle p=new TileParticle(emitter,emitter.config,emitter.getRandomSource()) {
+            { this.initialSize.set(size); }
+            @Override public void tick() {
+                super.tick();
+                float fade=Math.max(0,1-getT(0));
+                setColor(new Vector4f(((color>>16)&255)/255f,((color>>8)&255)/255f,(color&255)/255f,fade*fade));
+            }
+        };
+        p.setLocalPos(new Vector3f((float)offset.x,(float)offset.y,(float)offset.z),true);
+        p.setInternalVelocity(new Vector3f((float)velocity.x,(float)velocity.y,(float)velocity.z));
+        p.setSize(new Vector3f(size));p.setARGBColor(color);
+        emitter.emitParticle(p);
+    }
+
+    public static Vec3 muzzle(LivingEntity caster) {
+        Vec3 forward=caster.getLookAngle();
+        Vec3 right=new Vec3(-forward.z,0,forward.x).normalize();
+        double side=caster.getMainArm()==net.minecraft.world.entity.HumanoidArm.RIGHT?1:-1;
+        return caster.getEyePosition().add(forward.scale(.95)).add(right.scale(.28*side)).add(0,-.27,0);
+    }
+
+    public static void charge(int entity) {
+        var level=Minecraft.getInstance().level;
+        if(level==null||!(level.getEntity(entity) instanceof LivingEntity caster))return;
+        ParticleEmitter emitter=particles(muzzle(caster),6);
+        // Effect callbacks follow the caster during the six-tick raise/snap animation.
+        emitter.setEffect(new com.lowdragmc.photon.client.fx.IEffect() {
+            @Override public net.minecraft.world.level.Level getLevel(){return level;}
+            @Override public void updateFXObjectTick(com.lowdragmc.photon.client.gameobject.IFXObject object) {
+                if(!caster.isAlive()){emitter.remove(true);return;}
+                Vec3 at=muzzle(caster);emitter.setPos(at.x,at.y,at.z);
             }
         });
+        mote(emitter,Vec3.ZERO,Vec3.ZERO,.34f,0xff1389ff);
+        mote(emitter,Vec3.ZERO,Vec3.ZERO,.13f,0xffeeffff);
+    }
+
+    private static void beam(Vec3 from,Vec3 to,float width,int color) {
+        BeamEmitter emitter=new BeamEmitter();
+        var c=emitter.getConfig();
+        c.setDuration(7);c.setLooping(false);c.setWidth(taper(width));
+        c.setColor(NumberFunction.color(color));
+        Vec3 delta=to.subtract(from);c.getEnd().set((float)delta.x,(float)delta.y,(float)delta.z);
+        c.setEmitRate(NumberFunction.constant(.13f));
+        material(c.material,c.renderer,BEAM);
+        register(emitter,from);
+        emitter.init();
+    }
+
+    public static void blast(int entity,Vec3 origin,Vec3 destination,boolean floor,boolean hit) {
+        var level=Minecraft.getInstance().level;
+        if(level==null)return;
+        if(level.getEntity(entity) instanceof LivingEntity caster) {
+            Vec3 muzzle=muzzle(caster);
+            // Do not put a muzzle beyond a close wall/target or extend the ray through it.
+            if(origin.distanceToSqr(destination)>origin.distanceToSqr(muzzle))origin=muzzle;
+        }
+        Vec3 ray=destination.subtract(origin);
+        if(ray.lengthSqr()<.001)return;
+        beam(origin,destination,.42f,0xff126bff);
+        beam(origin,destination,.18f,0xff58d9ff);
+        beam(origin,destination,.065f,0xfff4ffff);
+        ParticleEmitter wake=particles(origin,9);
+        Vec3 direction=ray.normalize();
+        // A bounded continuous blue/white Photon wake, including the full 100-block range.
+        int count=Math.min(400,Math.max(8,(int)(ray.length()*4)));
+        for(int i=0;i<count;i++) {
+            double t=i/(double)count;
+            Vec3 jitter=new Vec3(level.random.nextGaussian()*.07,level.random.nextGaussian()*.07,level.random.nextGaussian()*.07);
+            mote(wake,ray.scale(t).add(jitter),direction.scale(.06),i%4==0?.19f:.33f,i%4==0?0xffe5ffff:0xff209dff);
+        }
+        mote(wake,Vec3.ZERO,Vec3.ZERO,.85f,0xff147bff);
+        mote(wake,Vec3.ZERO,Vec3.ZERO,.36f,0xfff4ffff);
+        if(!hit)return;
+        ParticleEmitter impact=particles(destination.add(0,floor?.04:0,0),14);
+        mote(impact,Vec3.ZERO,Vec3.ZERO,floor?2.3f:1.1f,0xff159bff);
+        mote(impact,Vec3.ZERO,Vec3.ZERO,.6f,0xffefffff);
+        int sparks=floor?90:38;
+        for(int i=0;i<sparks;i++) {
+            double angle=level.random.nextDouble()*Math.PI*2;
+            double speed=floor?.10+level.random.nextDouble()*.09:.04+level.random.nextDouble()*.08;
+            Vec3 velocity=new Vec3(Math.cos(angle)*speed,(floor?.025:.0)+level.random.nextDouble()*.10,Math.sin(angle)*speed);
+            mote(impact,Vec3.ZERO,velocity,i%3==0?.16f:.3f,i%3==0?0xffeaffff:0xff259bff);
+        }
     }
 }
