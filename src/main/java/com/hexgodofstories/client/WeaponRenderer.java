@@ -112,15 +112,15 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         // Cancel that offset, placing the actual cylindrical grip at the hand pivot.
         pose.translate(.5,.5,.5);
         if(first) {
-            // Fallback only: PlayerAnimator normally renders the real third-person hand in first person.
-            pose.mulPose(Axis.XP.rotationDegrees(-110+20*FrostClient.aim(stack)));
-            pose.mulPose(Axis.YP.rotationDegrees(90-180*FrostClient.aim(stack)));
+            // Native first-person item rendering keeps vanilla attack/equip swings intact.
+            pose.mulPose(Axis.XP.rotationDegrees(-35-55*FrostClient.aim(stack)));
+            pose.mulPose(Axis.YP.rotationDegrees(90));
         } else if(third) {
             // The fire clip rotates BOTH the arm and its held item on the same timeline.
             // Vanilla's Y=180 hand transform reverses item-local X: the forward correction
             // belongs in the negative direction, not the old +110-degree counter-rotation.
             pose.mulPose(Axis.XP.rotationDegrees(-20-FrostClient.pitch(stack)*FrostClient.aim(stack)));
-            pose.mulPose(Axis.YP.rotationDegrees(90-180*FrostClient.aim(stack)));
+            pose.mulPose(Axis.YP.rotationDegrees(90));
         } else if(context==ItemDisplayContext.GUI||context==ItemDisplayContext.FIXED) {
             pose.scale(.32f,.32f,.32f);
             pose.translate(-.07,-.23,0);

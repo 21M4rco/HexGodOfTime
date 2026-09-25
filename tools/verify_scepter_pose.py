@@ -26,3 +26,17 @@ model=json.loads((ASSET/'models/item/scepter.json').read_text())
 for side in ['righthand','lefthand']:
     assert model['display']['firstperson_'+side]==model['display']['thirdperson_'+side]
 print('PASS: both hands fire horizontally forward; carry remains tip-down; display transforms match.')
+
+# The blade bends toward authored +X. It must stay BELOW the shaft when firing.
+blade=(1,0,0)
+for axis,angle in [('y',90),('x',-20),('x',-70),('y',180),('x',-90),('x',-90),('x',180)]:
+    blade=rotate(blade,axis,angle)
+assert blade[1]<-.999999, blade
+renderer=(ROOT/'src/main/java/com/hexgodofstories/client/WeaponRenderer.java').read_text()
+held=renderer[renderer.index('private static void renderScepter'):]
+assert '90-180*' not in held
+assert held.count('Axis.YP.rotationDegrees(90)')==2
+animations=(ROOT/'src/main/java/com/hexgodofstories/client/HexAnimations.java').read_text()
+assert 'tickScepterView' not in animations
+assert 'name.startsWith("scepter_")' in animations
+print('PASS: blade stays down without axial spin; persistent first-person override removed.')

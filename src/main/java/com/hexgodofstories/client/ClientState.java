@@ -110,7 +110,6 @@ public final class ClientState {
         WarpCrossingClient.tick();
         if(mc.level==null)return;
         FrostClient.tick();
-        HexAnimations.tickScepterView();
         FROZEN.forEach((id,n)->{
             Entity e=mc.level.getEntity(id);
             if(e==null)return;
