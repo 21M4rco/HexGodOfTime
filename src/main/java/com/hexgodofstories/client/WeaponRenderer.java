@@ -92,8 +92,11 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         } else if(context==ItemDisplayContext.GROUND) {
             pose.translate(0,1.16,0);
         }
-        // Third person already follows the animated arm; applying aim again would double-rotate it.
-        if(first||third)pose.scale(.72f,.72f,.72f);
+        // The old third-person path used the same 0.72 scale as first person while the
+        // item JSON also turned the entire broad scepter face edge-on. Keep first person
+        // unchanged, but let third person read at prop scale beside a two-block-tall player.
+        if(first)pose.scale(.72f,.72f,.72f);
+        else if(third)pose.scale(.82f,.82f,.82f);
         draw(1,pose,buffers,light,growth);
         pose.popPose();
     }
