@@ -133,12 +133,9 @@ public final class HexClient {
             // A cast that was interrupted needs a real release before it counts as pressed again.
             if(primaryLatched){if(primaryPhysicallyDown())primary=false;else primaryLatched=false;}
             BranchKeyInput.tick();
-            // R resumes an active global stop, even when a different spell is selected.
-            // A separate resume shortcut would also fight the existing stop toggle.
-            boolean stopping=ClientState.self().getBoolean("timeStopped");
-            if(primary&&!primaryDown){primaryWasHold=!stopping&&selected.hold;HexNetwork.send(stopping?HexServer.TIME:selected.hold?HexServer.HOLD_BEGIN:HexServer.CAST,HexServer.TIME_HALT);repeat=0;}
+            if(primary&&!primaryDown){primaryWasHold=selected.hold;HexNetwork.send(selected.hold?HexServer.HOLD_BEGIN:HexServer.CAST,0);repeat=0;}
             // Holding an ordinary spell repeats it; the server's own rate limit and cooldown set the pace.
-            else if(primary&&!stopping&&!selected.hold&&++repeat>=5){repeat=0;HexNetwork.send(HexServer.CAST,0);}
+            else if(primary&&!selected.hold&&++repeat>=5){repeat=0;HexNetwork.send(HexServer.CAST,0);}
             if(!primary&&primaryDown&&primaryWasHold)HexNetwork.send(HexServer.HOLD_END,0);
             primaryDown=primary;
 

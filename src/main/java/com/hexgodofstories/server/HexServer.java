@@ -94,6 +94,8 @@ public final class HexServer {
         if(action==FLIGHT){CosmicFlight.toggle(p);return;}
         if(action==TIME){time(p,value);return;}
         Ability a=action==TRANSFORM?Ability.ASCENSION:HexData.selected(p);
+        // Archived selections can still hold a dedicated time ability. Only its own key may fire it.
+        if(action!=TRANSFORM&&a.dedicated)return;
         // Returning home must never depend on energy, mastery or the entry spell's recovery. The way
         // out follows whatever the owner's saved mode currently points at.
         if(a==Ability.WARPING&&(action==CAST||action==HOLD_BEGIN)&&Warping.leave(p))return;
@@ -126,7 +128,6 @@ public final class HexServer {
     }
 
     private static boolean secondary(ServerPlayer p,Ability a) {
-        if(a==Ability.TIME_STOP){TemporalEngine.clear(p);return true;}
         if(a==Ability.DUPLICATE){return commandOrDismiss(p);}
         if(a==Ability.ARCHITECTURE){Architecture.dismiss(p);return true;}
         if(a==Ability.MASQUERADE){Masquerade.drop(p);return true;}
@@ -151,7 +152,7 @@ public final class HexServer {
         };
         if(a==null)return;
         if(a==Ability.TIME_STOP&&TemporalEngine.owns(p)) {
-            TemporalEngine.clear(p);HexNetwork.sync(p);return;
+            TemporalEngine.clear(p);return;
         }
         if(a==Ability.TIME_STOP&&HexData.energy(p)<5){notice(p,"Five Temporal Energy is needed to hold time.");return;}
         if(!HexData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return;}

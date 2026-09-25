@@ -31,8 +31,6 @@ public final class ServerEvents {
 
     /** Cancel the spawn itself, before pickup, hoppers or another mod can collect a dropped illusion. */
     @SubscribeEvent public static void conjuredDrop(net.minecraftforge.event.entity.EntityJoinLevelEvent e) {
-        if(!e.getLevel().isClientSide&&e.getEntity() instanceof net.minecraft.world.entity.projectile.Projectile projectile)
-            TemporalEngine.markProjectile(projectile);
         if(!e.getLevel().isClientSide&&e.getEntity() instanceof net.minecraft.world.entity.item.ItemEntity item
             &&item.getItem().getItem() instanceof ConjuredWeapon) {e.setCanceled(true);item.discard();}
     }

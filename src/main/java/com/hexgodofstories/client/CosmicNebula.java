@@ -100,34 +100,28 @@ public final class CosmicNebula {
                     i%5==0?0x8cfde6:i%3==0?0x10a269:0x32ef91,a));
             }
         }
-        // Time fields share Cosmic Flight's translucent volume. Keep wisps through the
-        // interior so the expanding freeze front is visible without covering living models.
+        // The slow field uses the flight cloud; Time Stop has its own green particle edge.
         int visibleFields=0;
         for(WorldEffects.Field field:WorldEffects.fields()) {
+            if(field.stop())continue;
             Vec3 centre=field.position();
             double range=field.radius()+32;
             if(centre.distanceToSqr(camera)>range*range||++visibleFields>4)continue;
             double age=time-field.started();
             if(age<0)continue;
-            double expansion=field.stop()&&field.expires()==Long.MAX_VALUE
-                ?Mth.clamp(age/com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION,0,1)
-                :Mth.clamp(age/10,0,1);
+            double expansion=Mth.clamp(age/10,0,1);
             double radius=field.radius()*expansion;
             if(radius<.1)continue;
-            int count=field.stop()?78:58;
+            int count=58;
             float fade=(float)Math.min(1,age/9);
             if(field.expires()!=Long.MAX_VALUE)fade*=Mth.clamp((float)(field.expires()-time)/12,0,1);
             for(int i=0;i<count;i++) {
                 double h=1-2*(i+.5)/count,around=i*2.399963+time*.013*(i%2==0?1:-1);
                 double rim=Math.sqrt(Math.max(0,1-h*h));
                 double wobble=1+.045*Math.sin(time*.065+i*1.8);
-                // Most wisps trace the edge; the rest reveal the field near its caster.
-                double layer=field.stop()&&i%3==0?.16+.68*((i*37)%count)/(double)count:1;
-                Vec3 point=centre.add(Math.cos(around)*rim*radius*wobble*layer,h*radius*wobble*layer,Math.sin(around)*rim*radius*wobble*layer);
+                Vec3 point=centre.add(Math.cos(around)*rim*radius*wobble,h*radius*wobble,Math.sin(around)*rim*radius*wobble);
                 if(point.distanceToSqr(camera)<1.8)continue;
-                float size=field.stop()?.8f:.68f;
-                float alpha=fade*(field.stop()?.17f:.21f);
-                puffs.add(new Puff(point,size,alpha,i%5==0?0x8cfde6:i%3==0?0x10a269:0x32ef91,around+time*.012));
+                puffs.add(new Puff(point,.68f,fade*.21f,i%5==0?0x8cfde6:i%3==0?0x10a269:0x32ef91,around+time*.012));
             }
         }
         FROST_BURSTS.removeIf(burst->time-burst.started>20);

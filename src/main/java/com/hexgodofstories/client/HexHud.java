@@ -106,7 +106,7 @@ public final class HexHud {
             String key=HexClient.TIME_KEYS[i].getTranslatedKeyMessage().getString();
             g.drawString(mc.font,key,x+4,top+14,locked?0x6f6f60:0xe9f3ec,false);
             int nameX=x+5+Math.max(8,mc.font.width(key));
-            String label=locked?"Locked":a==Ability.TIME_STOP&&d.getBoolean("timeStopped")?"R Resume":cd>0?String.format(Locale.ROOT,"%.0fs",cd/20f):CONTROL_NAMES[i];
+            String label=locked?"Locked":a==Ability.TIME_STOP&&d.getBoolean("timeStopped")?"Resume":cd>0?String.format(Locale.ROOT,"%.0fs",cd/20f):CONTROL_NAMES[i];
             g.drawString(mc.font,label,nameX,top+14,locked?0x6d6d5e:cd>0?0xd6b284:poor?0xb08f79:0xd8e6d5,false);
         }
     }
@@ -153,7 +153,7 @@ public final class HexHud {
             case DAGGERS,TWIN_DAGGERS,LAEVATEINN -> "Dismiss weapons";
             case ENCHANT -> "Direct charmed creatures";
             case SLOW_FIELD -> "";
-            case TIME_STOP -> "Resume time";
+            case TIME_STOP -> "Press Z again to resume";
             case SELECTIVE_STOP -> "Exempt an ally";
             case THREADS -> "Pull bound target";
             case TIME_BRANCH -> "None — release the cast key to fire";

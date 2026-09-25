@@ -104,7 +104,10 @@ public final class WorldEffects {
         Vec3 centre=f.position();
         double dx=centre.x-x,dy=centre.y-y,dz=centre.z-z;
         double distance=Math.sqrt(dx*dx+dy*dy+dz*dz);
-        if(distance>f.radius)return Long.MIN_VALUE;
+        double radius=f.expires==Long.MAX_VALUE
+            ?f.radius*Mth.clamp((ClientState.now()-f.started)/(double)com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION,0,1)
+            :f.radius;
+        if(distance>radius)return Long.MIN_VALUE;
         long reached=f.started;
         return ClientState.now()>=reached?reached:Long.MIN_VALUE;
     }
@@ -156,12 +159,29 @@ public final class WorldEffects {
         if(mc.level==null||mc.player==null)return;
         Vec3 eye=mc.player.getEyePosition();
         GripRenderer.tick(now);
+        // Small emerald motes mark the actual ten-block freeze edge. These are particles,
+        // not the large textured cloud used by Cosmic Flight and slow fields.
+        if(now%2==0) {
+            int shown=0;
+            for(Field field:FIELDS.values()) {
+                if(!field.stop||field.expires!=Long.MAX_VALUE||++shown>4)continue;
+                Vec3 centre=field.position();
+                if(centre.distanceToSqr(eye)>1024)continue;
+                double progress=Mth.clamp((now-field.started)/(double)com.hexgodofstories.server.TemporalEngine.STOP_EXPANSION,0,1);
+                double radius=field.radius*progress;
+                if(radius<.2)continue;
+                // Keep the motes outside the stopped hitbox so they can fade normally.
+                Vfx.dome(HexGodOfStories.EMBER.get(),centre,radius+.5,15,.006);
+                Vfx.ring(HexGodOfStories.EMBER.get(),centre.add(0,-.9,0),radius+.5,4,.006,.002);
+            }
+        }
         // One pass: blade trails, rift breath, and the embedded steel each wound bleeds from.
         Map<Integer,List<com.hexgodofstories.entity.ThrownDagger>> wounds=new HashMap<>();
         for(var entity:mc.level.entitiesForRendering()) {
             if(entity instanceof com.hexgodofstories.entity.ThrownDagger dagger) {
                 if(dagger.flying()) {
-                    if(dagger.position().distanceToSqr(eye)<1024)Vfx.trail(dagger.position(),dagger.getDeltaMovement(),1);
+                    if(!ClientState.frozen(dagger.getId())&&dagger.position().distanceToSqr(eye)<1024)
+                        Vfx.trail(dagger.position(),dagger.getDeltaMovement(),1);
                 } else if(!BLEEDING.isEmpty()) {
                     Entity host=dagger.carrier();
                     if(host!=null&&BLEEDING.containsKey(host.getId()))
