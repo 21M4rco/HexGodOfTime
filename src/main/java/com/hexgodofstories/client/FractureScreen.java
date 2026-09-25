@@ -13,7 +13,7 @@ import net.minecraft.world.item.ItemStack;
 import java.util.*;
 
 /**
- * The Fracture selector: what the cast key is currently pointed at.
+ * The World Tree exit selector, available from Warping in any dimension.
  *
  * <p>This is configuration, not an action. Whatever is chosen here is saved on the server and stays
  * chosen — through casts, dimensions, death and a restart — until somebody deliberately opens this
@@ -120,7 +120,7 @@ public final class FractureScreen extends Screen {
 
         g.drawString(font,"W O R L D   T R E E   E X I T",left+PAD,top+12,GOLD,false);
         FractureMode live=active();
-        g.drawString(font,picking==null?"Choose where Warping sends you back out":"Choose who to emerge beside",left+PAD,top+26,DIM,false);
+        g.drawString(font,picking==null?"Choose where the World Tree sends you back out":"Choose who to emerge beside",left+PAD,top+26,DIM,false);
         String current=live.label(activeTarget());
         g.drawString(font,"NOW: "+current,left+WIDTH-PAD-font.width("NOW: "+current),top+12,ACCENT,false);
         g.drawString(font,picking==null?"R uses this route until you change it":"Escape to go back",
@@ -246,13 +246,13 @@ public final class FractureScreen extends Screen {
     }
 
     /**
-     * Opened from the alternate key while the Fracture is selected — and only from inside the
-     * sanctum. Out in the world the break has exactly one destination, so there is nothing here to
-     * choose and the panel stays shut.
+     * Opened by G inside the World Tree, or from the Warping destination menu in
+     * any dimension. Choosing an exit configures the eventual World Tree departure; it
+     * does not teleport the player or change the selected Warping trap destination.
      */
     public static void open() {
         Minecraft mc=Minecraft.getInstance();
-        if(mc.player==null||!HexClient.enabled()||!com.hexgodofstories.server.PocketRealm.inside(mc.player.level()))return;
+        if(mc.player==null||!HexClient.enabled())return;
         mc.setScreen(new FractureScreen());
     }
 }
