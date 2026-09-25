@@ -1,0 +1,70 @@
+{
+  "version": 3,
+  "name": "scepter_manifest_left",
+  "author": "HexGodOfStories",
+  "description": "Open and turn the weapon hand as magic forms the staff outward from the grip; settle into the carry pose.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 32,
+    "stopTick": 32,
+    "isLoop": false,
+    "returnTick": 24,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "inoutquad",
+        "leftArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 5,
+        "easing": "inoutquad",
+        "leftArm": {
+          "pitch": -22,
+          "yaw": 12,
+          "roll": 18
+        }
+      },
+      {
+        "tick": 10,
+        "easing": "inoutquad",
+        "leftArm": {
+          "pitch": -28,
+          "yaw": 8,
+          "roll": 28
+        }
+      },
+      {
+        "tick": 18,
+        "easing": "inoutquad",
+        "leftArm": {
+          "pitch": -24,
+          "yaw": 6,
+          "roll": 12
+        }
+      },
+      {
+        "tick": 24,
+        "easing": "inoutquad",
+        "leftArm": {
+          "pitch": -15,
+          "yaw": 0,
+          "roll": 4
+        }
+      },
+      {
+        "tick": 32,
+        "easing": "inoutquad",
+        "leftArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}

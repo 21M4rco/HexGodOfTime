@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 
 public final class HexAnimations {
    private static final ResourceLocation LAYER = HexGodOfStories.id("casting");
-   private static final Set<String> OWN_FIRST_PERSON_ARM = Set.of("branch_punch", "time_stop");
+   private static final Set<String> OWN_FIRST_PERSON_ARM = Set.of("branch_punch", "time_stop", "scepter_fire", "scepter_fire_left");
    private static final Logger LOGGER = LogUtils.getLogger();
 
    private HexAnimations() {
@@ -54,6 +54,9 @@ public final class HexAnimations {
          if ("__clear__".equals(name)) {
             modifierlayer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(Math.max(0, fadeTicks), Ease.INOUTQUAD), null);
          } else {
+            boolean left=abstractclientplayer.getMainArm()==net.minecraft.world.entity.HumanoidArm.LEFT;
+            if(left&&(name.equals("scepter_fire")||name.equals("scepter_manifest")))name+="_left";
+            boolean manifest=name.startsWith("scepter_manifest");
             ResourceLocation resourcelocation = HexGodOfStories.id(name);
             KeyframeAnimation keyframeanimation = PlayerAnimationRegistry.getAnimation(resourcelocation);
             if (keyframeanimation == null) {
@@ -63,7 +66,7 @@ public final class HexAnimations {
                KeyframeAnimationPlayer keyframeanimationplayer = new KeyframeAnimationPlayer(keyframeanimation)
                   .setFirstPersonMode(flag ? FirstPersonMode.NONE : FirstPersonMode.THIRD_PERSON_MODEL)
                   .setFirstPersonConfiguration(
-                     new FirstPersonConfiguration().setShowRightArm(false).setShowLeftArm(false).setShowRightItem(true).setShowLeftItem(true)
+                     new FirstPersonConfiguration().setShowRightArm(manifest&&!left).setShowLeftArm(manifest&&left).setShowRightItem(true).setShowLeftItem(true)
                   );
                modifierlayer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(Math.max(0, fadeTicks), Ease.INOUTQUAD), keyframeanimationplayer);
             }

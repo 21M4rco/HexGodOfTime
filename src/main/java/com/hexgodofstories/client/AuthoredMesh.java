@@ -255,6 +255,44 @@ public final class AuthoredMesh {
       }
    }
 
+   /** Clip both reveal fronts through the surface instead of compressing hidden vertices. */
+   public void drawRevealing(PoseStack pose, VertexConsumer out, int light, float growth) {
+      if (growth >= 1) { draw(pose, out, light, (group, p) -> p); return; }
+      float boundary = Math.max(Math.abs(minY), Math.abs(maxY)) * Math.max(0, growth);
+      for (Face face : faces) {
+         List<Point> polygon = clipReveal(List.of(face.points), boundary, 1);
+         polygon = clipReveal(polygon, boundary, -1);
+         for (int i = 1; i + 1 < polygon.size(); i++) {
+            Point a = polygon.get(0), b = polygon.get(i), c = polygon.get(i + 1);
+            Vector3f normal = new Vector3f(b.x-a.x,b.y-a.y,b.z-a.z)
+               .cross(new Vector3f(c.x-a.x,c.y-a.y,c.z-a.z));
+            if (normal.lengthSquared() < 1.0e-10f) continue;
+            normal.normalize();
+            for (Point v : new Point[]{a,b,c,c}) {
+               out.vertex(pose.last().pose(),v.x,v.y,v.z).color(255,255,255,255)
+                  .uv(v.u,v.v).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light)
+                  .normal(pose.last().normal(),normal.x,normal.y,normal.z).endVertex();
+            }
+         }
+      }
+   }
+
+   private static List<Point> clipReveal(List<Point> source, float boundary, int side) {
+      List<Point> result = new ArrayList<>();
+      if (source.isEmpty()) return result;
+      Point previous = source.get(source.size()-1);
+      for (Point current : source) {
+         boolean before = previous.y*side <= boundary, after = current.y*side <= boundary;
+         if (before != after) {
+            float t = (side*boundary-previous.y)/(current.y-previous.y);
+            result.add(lerp(previous,current,t));
+         }
+         if (after) result.add(current);
+         previous = current;
+      }
+      return result;
+   }
+
    public interface Deform {
       AuthoredMesh.Point apply(String var1, AuthoredMesh.Point var2);
    }

@@ -1,0 +1,95 @@
+{
+  "version": 3,
+  "name": "scepter_fire_left",
+  "author": "HexGodOfStories",
+  "description": "Raise only the weapon arm, point the crystal forward, recoil and recover.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 26,
+    "stopTick": 26,
+    "isLoop": false,
+    "returnTick": 9,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "inoutquad",
+        "leftArm": {
+          "pitch": -12,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 3,
+        "easing": "inoutquad",
+        "torso": {
+          "pitch": 0,
+          "yaw": 8,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": -65,
+          "yaw": 12,
+          "roll": 6
+        }
+      },
+      {
+        "tick": 6,
+        "easing": "outquad",
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": -90,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 8,
+        "easing": "inoutquad",
+        "torso": {
+          "pitch": -3,
+          "yaw": 0,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": -96,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 12,
+        "easing": "inoutquad",
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": -90,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 26,
+        "easing": "inoutquad",
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}

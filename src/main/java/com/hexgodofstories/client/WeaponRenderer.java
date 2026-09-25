@@ -33,15 +33,38 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
 
     /** Draws in weapon space: grip at the origin, blade toward +Y. Used by the hand, the projectile and the decoys. */
     public static void draw(int kind,PoseStack pose,MultiBufferSource buffers,int light,float growth) {
-        mesh(kind).drawManifesting(pose,buffers.getBuffer(RenderType.entityCutoutNoCull(kind==1?SCEPTER_MATERIAL:HexLayer.MATERIAL)),light,growth,0);
+        if(kind==1) {
+            // Reveal from the actual grip without squeezing or warping the authored silhouette.
+            mesh(1).drawRevealing(pose,buffers.getBuffer(RenderType.entityCutoutNoCull(SCEPTER_MATERIAL)),light,growth);
+            if(growth<1)manifestScepter(pose,buffers,growth);
+        } else mesh(kind).drawManifesting(pose,buffers.getBuffer(RenderType.entityCutoutNoCull(HexLayer.MATERIAL)),light,growth,0);
         if(kind==1&&growth>.65f)mesh(kind).draw(pose,buffers.getBuffer(RenderType.entityTranslucentEmissive(SCEPTER_MATERIAL)),15728880,
-            (group,point)->group.startsWith("gem_blue")||group.startsWith("gem_glint")||group.startsWith("gem_spark")?point:null);
-        if(kind==1&&growth>.65f) {
-            float pulse=1.12f+.025f*(float)Math.sin((ClientState.now()+Minecraft.getInstance().getFrameTime())*.22);
-            mesh(kind).draw(pose,buffers.getBuffer(RenderType.eyes(SCEPTER_MATERIAL)),15728880,
-                (group,point)->group.equals("gem_blue_crystal")
-                    ?new AuthoredMesh.Point(.04f+(point.x()-.04f)*pulse,.21f+(point.y()-.21f)*pulse,point.z()*pulse,point.u(),point.v()):null);
+            (group,point)->(group.startsWith("gem_blue")||group.startsWith("gem_glint")||group.startsWith("gem_spark"))&&Math.abs(point.y())<=.60f*growth?point:null);
+
+    }
+
+    /** Hand-local magic rings follow both reveal fronts; no world-space drift while moving. */
+    private static void manifestScepter(PoseStack pose,MultiBufferSource buffers,float progress) {
+        var out=buffers.getBuffer(RenderType.lightning());
+        float time=ClientState.now()+Minecraft.getInstance().getFrameTime();
+        float fade=Math.min(1,(1-progress)*6);
+        for(int side:new int[]{-1,1}) {
+            float y=side*.60f*progress;
+            float radius=.045f+.022f*(float)Math.sin(progress*Math.PI);
+            for(int i=0;i<40;i++) {
+                double a=i*Math.PI/20+time*.15,b=(i+1)*Math.PI/20+time*.15;
+                float x0=(float)Math.cos(a)*radius,z0=(float)Math.sin(a)*radius;
+                float x1=(float)Math.cos(b)*radius,z1=(float)Math.sin(b)*radius;
+                out.vertex(pose.last().pose(),x0,y-.009f,z0).color(.20f,1f,.65f,.8f*fade).endVertex();
+                out.vertex(pose.last().pose(),x1,y-.009f,z1).color(.20f,1f,.65f,.8f*fade).endVertex();
+                out.vertex(pose.last().pose(),x1,y+.009f,z1).color(.50f,1f,.92f,.8f*fade).endVertex();
+                out.vertex(pose.last().pose(),x0,y+.009f,z0).color(.50f,1f,.92f,.8f*fade).endVertex();
+            }
         }
+        float boundary=.60f*progress;
+        mesh(1).draw(pose,buffers.getBuffer(RenderType.eyes(SCEPTER_MATERIAL)),15728880,
+            (group,p)->Math.abs(Math.abs(p.y())-boundary)<.035f?p:null,
+            (group,p)->new int[]{70,255,190,(int)(fade*255)});
     }
 
     @Override public void renderByItem(ItemStack stack,ItemDisplayContext context,PoseStack pose,MultiBufferSource buffers,int light,int overlay) {
@@ -83,7 +106,7 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         boolean third=context==ItemDisplayContext.THIRD_PERSON_LEFT_HAND||context==ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
         float growth=1;
         if((first||third)&&stack.hasTag()&&stack.getTag().contains("formed"))
-            growth=Math.max(.05f,Math.min(1,(ClientState.now()+Minecraft.getInstance().getFrameTime()-stack.getTag().getLong("formed"))/12f));
+            growth=Math.max(.05f,Math.min(1,(ClientState.now()+Minecraft.getInstance().getFrameTime()-stack.getTag().getLong("formed"))/24f));
         pose.pushPose();
         // ItemRenderer subtracts (.5,.5,.5) after the JSON display transform.
         // Cancel that offset, placing the actual cylindrical grip at the hand pivot.
@@ -91,10 +114,16 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         if(first) {
             float aim=FrostClient.aim(stack);
             pose.mulPose(Axis.ZP.rotationDegrees(12*aim));
-            pose.mulPose(Axis.XP.rotationDegrees(-90*aim));
+            pose.mulPose(Axis.XP.rotationDegrees(-135+45*aim));
             pose.mulPose(Axis.YP.rotationDegrees(-15*(1-aim)));
         } else if(third) {
-            pose.mulPose(Axis.XP.rotationDegrees(-FrostClient.pitch(stack)*FrostClient.aim(stack)));
+            float aim=FrostClient.aim(stack);
+            // Vanilla rotates held items -90 degrees around X before the JSON transform.
+            // Rest: net -135 degrees (blade tip down, tail behind and up). Fire: compensate the
+            // raised arm so the shaft points down the crosshair instead of into the floor.
+            pose.mulPose(Axis.XP.rotationDegrees(-45+135*aim-FrostClient.pitch(stack)*aim));
+            boolean left=context==ItemDisplayContext.THIRD_PERSON_LEFT_HAND;
+            pose.mulPose(Axis.YP.rotationDegrees(left?-90:90));
         } else if(context==ItemDisplayContext.GUI||context==ItemDisplayContext.FIXED) {
             pose.scale(.32f,.32f,.32f);
             pose.translate(-.07,-.23,0);

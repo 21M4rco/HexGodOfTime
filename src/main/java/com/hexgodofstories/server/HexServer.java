@@ -308,7 +308,7 @@ public final class HexServer {
             ItemStack off=item.copy();off.getOrCreateTag().putBoolean("reverse",true);
             p.setItemInHand(InteractionHand.OFF_HAND,off);
         }
-        gesture(p,"conjure","conjure",HexGodOfStories.CONJURE.get());return true;
+        gesture(p,a==Ability.LAEVATEINN?"scepter_manifest":"conjure","conjure",HexGodOfStories.CONJURE.get());return true;
     }
     private static void dismissWeapons(ServerPlayer p) {
         for(InteractionHand hand:InteractionHand.values()) {
