@@ -92,10 +92,11 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         } else if(context==ItemDisplayContext.GROUND) {
             pose.translate(0,1.16,0);
         }
-        // V4 is authored at physical prop scale (~1.05 blocks from counterweight to blade tip).
-        // Do not shrink it back into the old short/fork-sized presentation.
+        // Third-person held items go through the player-hand presentation path and the previous
+        // 1.05 scale still read dagger-sized in game. Keep first person untouched, but make the
+        // third-person Scepter read as a proper staff-sized prop while scaling around the authored grip.
         if(first)pose.scale(1.00f,1.00f,1.00f);
-        else if(third)pose.scale(1.05f,1.05f,1.05f);
+        else if(third)pose.scale(1.80f,1.80f,1.80f);
         draw(1,pose,buffers,light,growth);
         pose.popPose();
     }
