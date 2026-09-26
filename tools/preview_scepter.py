@@ -265,11 +265,11 @@ def main():
 
 
 # WeaponRenderer's first-person poses: rest, and raised to fire (grip offset and slide up the shaft).
-REST = (180, 80, 73)
-REST_OFFSET = (-0.014, 0.255, -0.077)
-AIM = (-82, -50, 6)
-AIM_OFFSET = (-0.34, 0.38, -0.05)
-AIM_SLIDE = 0.20
+REST = (180, 65, 110)
+REST_OFFSET = (-0.12, 0.10, -0.077)
+AIM = (180, 65, 110)
+AIM_OFFSET = (-0.12, 0.22, -0.077)
+AIM_SLIDE = 0.0
 
 
 def pose(angles):

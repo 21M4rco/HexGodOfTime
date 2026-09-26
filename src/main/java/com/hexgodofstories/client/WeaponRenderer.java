@@ -19,7 +19,7 @@ import java.util.*;
  *
  * <p>The Scepter is the exception: a solid, separately shaded model ({@link ScepterModel}) with its own
  * poses. In first person it rests as it does in third: carried low, pointing forward with the tip toward
- * the ground and the blade curving up, and raises into a forward point — blade arched over it — to fire.
+ * the ground and the blade curving up, and lifts slightly without changing its orientation to fire.
  */
 public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
     /** Grip position inside the item cube and an overall size trim, one entry per weapon kind. */
@@ -33,12 +33,12 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
 
     // First-person rest and aim, as rotations applied X then Y then Z to the staff; tuned in
     // tools/preview_scepter.py against the game's hand transform and 70 degree hand field of view.
-    private static final Quaternionf REST=euler(180,80,73),AIM=euler(-82,-50,6);
-    private static final Quaternionf REST_LEFT=euler(180,-80,-73),AIM_LEFT=euler(-82,50,-6);
+    private static final Quaternionf REST=euler(180,65,110),AIM=euler(180,65,110);
+    private static final Quaternionf REST_LEFT=euler(180,-65,-110),AIM_LEFT=euler(180,-65,-110);
     /** Where the grip moves to when aiming (hand space) and how far the hand slides up the shaft. */
-    private static final float AIM_X=-.34f,AIM_Y=.38f,AIM_Z=-.05f,AIM_SLIDE=.20f;
-    /** Grip at rest (hand space): raised so the stone, off the shaft's axis, sits where it did with the blade down. */
-    private static final float REST_X=-.014f,REST_Y=.255f,REST_Z=-.077f;
+    private static final float AIM_X=-.12f,AIM_Y=.22f,AIM_Z=-.077f,AIM_SLIDE=0f;
+    /** Low diagonal carry: the shaft runs into the lower-right corner (mirrored for the left hand). */
+    private static final float REST_X=-.12f,REST_Y=.10f,REST_Z=-.077f;
 
     private static Quaternionf euler(float x,float y,float z) {
         return new Quaternionf().rotateX((float)Math.toRadians(x)).rotateY((float)Math.toRadians(y)).rotateZ((float)Math.toRadians(z));
@@ -132,8 +132,7 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
                 REST_Z*still+AIM_Z*aim+.10f*recoil);
             Quaternionf rest=left?REST_LEFT:REST,point=left?AIM_LEFT:AIM;
             pose.mulPose(new Quaternionf(rest).slerp(point,aim));
-            // Recoil pitches the head up and drives the staff back along its own length.
-            pose.mulPose(Axis.XP.rotationDegrees(9*recoil));
+            // Preserve the blade orientation through charging and recoil; only lift/backward motion.
             pose.scale(STAFF,STAFF,STAFF);
             pose.translate(0,-AIM_SLIDE*aim-.045f*recoil,0);
         } else if(third) {

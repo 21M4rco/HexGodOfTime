@@ -43,7 +43,7 @@ public final class ScepterFx {
     private static final ResourceLocation FLARE=new ResourceLocation("hexgodofstories","textures/particle/scepter_flare.png");
     private static final ResourceLocation BEAM=new ResourceLocation("hexgodofstories","textures/particle/scepter_beam.png");
     /** The stone in the raised first-person pose, in hand view space; see WeaponRenderer's AIM. */
-    private static final float STONE_X=.303f,STONE_Y=-.035f,STONE_Z=-.803f;
+    private static final float STONE_X=0.224880f,STONE_Y=-0.256646f,STONE_Z=-1.258326f;
 
     public static void clear(){for(Emitter e:ACTIVE)e.remove(true);ACTIVE.clear();}
 
