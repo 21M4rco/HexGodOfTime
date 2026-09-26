@@ -128,7 +128,7 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
             float tremor=charge*charge*.0035f;
             float still=1-aim;
             pose.translate(side*(REST_X*still+AIM_X*aim)+(float)Math.sin(time*2.9f)*tremor,
-                REST_Y*still+AIM_Y*aim+.006f*breath+(float)Math.cos(time*3.7f)*tremor,
+                REST_Y*still+AIM_Y*aim+.07f*ScepterClient.attackLift()*still+.006f*breath+(float)Math.cos(time*3.7f)*tremor,
                 REST_Z*still+AIM_Z*aim+.10f*recoil);
             Quaternionf rest=left?REST_LEFT:REST,point=left?AIM_LEFT:AIM;
             pose.mulPose(new Quaternionf(rest).slerp(point,aim));

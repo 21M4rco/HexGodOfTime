@@ -198,7 +198,7 @@ public final class HexClient {
             if(!(mc.player.getMainHandItem().getItem() instanceof ConjuredWeapon weapon)||!(e.isAttack()||e.isUseItem()))return;
             // The Scepter keeps vanilla left-click combat. Its right click is a press and hold that
             // ScepterClient reads from the key each tick, so vanilla's own use (and its repeat) is off.
-            if(weapon.kind==1){if(e.isUseItem()){e.setCanceled(true);e.setSwingHand(false);}return;}
+            if(weapon.kind==1){if(e.isAttack())ScepterClient.attackPressed();if(e.isUseItem()){e.setCanceled(true);e.setSwingHand(false);}return;}
             e.setCanceled(true);e.setSwingHand(false);
             if(!ClientState.frozen(mc.player.getId()))HexNetwork.send(HexServer.WEAPON,e.isUseItem()?1:0);
         }

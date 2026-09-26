@@ -44,6 +44,14 @@ public final class ScepterClient {
     private static final Map<Integer, State> STATES = new HashMap<>();
     private static final Map<Integer, Hum> HUMS = new HashMap<>();
     private static boolean useDown;
+    private static float attackLift, attackLiftPrev;
+    private static int attackLiftTicks;
+
+    public static void attackPressed() {attackLiftTicks = 4;}
+
+    public static float attackLift() {
+        return Mth.lerp(partial(), attackLiftPrev, attackLift);
+    }
     private static long nextShot;
     /** Our own release that came inside the recovery, shown when the server will fire it. */
     private static long queuedAt = -1;
@@ -55,6 +63,8 @@ public final class ScepterClient {
         HUMS.clear();
         STATES.clear();
         useDown = false;
+        attackLift = attackLiftPrev = 0;
+        attackLiftTicks = 0;
         queuedAt = -1;
     }
 
@@ -134,6 +144,13 @@ public final class ScepterClient {
     public static void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) {clear(); return;}
+        attackLiftPrev = attackLift;
+        boolean canLift = holding(mc.player) && mc.screen == null && mc.player.isAlive()
+            && !ClientState.immobile(mc.player);
+        boolean lift = canLift && (mc.options.keyAttack.isDown() || attackLiftTicks > 0);
+        attackLift += ((lift ? 1f : 0f) - attackLift) * (lift ? .6f : .3f);
+        if (!canLift) {attackLift = attackLiftPrev = 0; attackLiftTicks = 0;}
+        else if (attackLiftTicks > 0) attackLiftTicks--;
         long now = ClientState.now();
         if (queuedAt >= 0 && now >= queuedAt && mc.player != null) {
             queuedAt = -1;
