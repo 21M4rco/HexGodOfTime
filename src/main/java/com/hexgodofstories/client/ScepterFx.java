@@ -20,11 +20,14 @@ import com.lowdragmc.photon.client.gameobject.particle.TileParticle;
 import com.mojang.blaze3d.platform.GlStateManager;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.ParticleStatus;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -57,6 +60,8 @@ public final class ScepterFx {
     private static final ResourceLocation BEAM=new ResourceLocation("hexgodofstories","textures/particle/scepter_beam.png");
     /** The stone in the raised first-person pose, in hand view space; see WeaponRenderer's AIM. */
     private static final float STONE_X=0.224880f,STONE_Y=-0.256646f,STONE_Z=-1.258326f;
+    /** The same for a left-handed caster. The stone sits off the shaft, so this is no mirror of the right's. */
+    private static final float STONE_LEFT_X=-0.263432f,STONE_LEFT_Y=-0.006021f,STONE_LEFT_Z=-1.175652f;
 
     /** Where the stone was actually drawn, per player, and the frame it was drawn in. */
     private record Drawn(Vec3 at,long frame) {}
@@ -64,10 +69,20 @@ public final class ScepterFx {
     private static Matrix4f inverseView;
     private static Vec3 camera=Vec3.ZERO;
     private static long frame;
+    /** The frame our own first-person Scepter was last drawn in. */
+    private static long firstDrawn=Long.MIN_VALUE/2;
+    /** The fields of view this frame's world and hand were really drawn with; 0 until the first frame reports. */
+    private static double worldFov,handFov;
     /** The player whose model and layers are being drawn right now, between its render events. */
     private static Player drawing;
 
-    public static void clear(){for(Emitter e:ACTIVE)e.remove(true);ACTIVE.clear();DRAWN.clear();drawing=null;}
+    public static void clear(){for(Emitter e:ACTIVE)e.remove(true);ACTIVE.clear();DRAWN.clear();drawing=null;firstDrawn=Long.MIN_VALUE/2;}
+
+    /** From the field-of-view event: what the world ({@code world}) or the hand was drawn with, sprinting, potions and all. */
+    public static void fov(double fov,boolean world){if(world)worldFov=fov;else handFov=fov;}
+
+    /** From WeaponRenderer: our own Scepter has just been drawn in the first-person hand. */
+    static void drawnFirstPerson(){firstDrawn=frame;}
 
     /** Start of the world pass: the view the held staffs are about to be drawn in. */
     public static void beginFrame(RenderLevelStageEvent event) {
@@ -172,10 +187,17 @@ public final class ScepterFx {
         Minecraft mc=Minecraft.getInstance();
         if(caster==mc.player&&mc.options.getCameraType().isFirstPerson()) {
             Camera camera=mc.gameRenderer.getMainCamera();
-            // Carry the hand's 70 degree projection into the world's.
-            double k=Math.tan(Math.toRadians(mc.options.fov().get())/2)/Math.tan(Math.toRadians(35));
+            // Carry the hand's projection into the world's, both as this frame really drew them: sprinting,
+            // a speed potion or water all change the world's field of view, and the stone must not drift off.
+            double world=worldFov>0?worldFov:mc.options.fov().get(),hand=handFov>0?handFov:70;
+            double k=Math.tan(Math.toRadians(world)/2)/Math.tan(Math.toRadians(hand)/2);
+            // STONE is the raised pose. REST and AIM share one rotation, so lowered to rest the same stone
+            // only sits lower by the hand's drop, less whatever lift a left click is giving it.
+            float rest=1-ScepterClient.aim(caster.getId());
+            float drop=(WeaponRenderer.AIM_Y-WeaponRenderer.REST_Y-WeaponRenderer.LIFT*ScepterClient.attackLift())*rest;
+            boolean lefty=mc.player.getMainArm()==HumanoidArm.LEFT;
             Vector3f look=camera.getLookVector(),up=camera.getUpVector(),left=camera.getLeftVector();
-            double x=STONE_X*k,y=STONE_Y*k,z=-STONE_Z;
+            double x=(lefty?STONE_LEFT_X:STONE_X)*k,y=((lefty?STONE_LEFT_Y:STONE_Y)-drop)*k,z=-(lefty?STONE_LEFT_Z:STONE_Z);
             return camera.getPosition()
                 .add(-left.x()*x+up.x()*y+look.x()*z,-left.y()*x+up.y()*y+look.y()*z,-left.z()*x+up.z()*y+look.z()*z);
         }
@@ -235,6 +257,44 @@ public final class ScepterFx {
         mote(emitter,Vec3.ZERO,Vec3.ZERO,.10f+.30f*charge,0xff1f8bff);
     }
 
+    /**
+     * A stone still recovering from its shot smokes, from the stone itself: vanilla smoke, lightened to the
+     * grey of a cloud. Not the cloud particle: that one is dragged down to the nearest player's feet from
+     * within two blocks, so off a stone in a hand it would pour to the ground rather than rise. Thick just
+     * after a full stone and thinning as it cools; {@code left} is the recovery still to run, as a share of
+     * the longest there is. Called once a tick per caster holding a recovering Scepter.
+     */
+    public static void cooling(Player caster,float left) {
+        Minecraft mc=Minecraft.getInstance();
+        if(mc.level==null)return;
+        ParticleStatus setting=mc.options.particles().get();
+        if(setting==ParticleStatus.MINIMAL)return;
+        var random=mc.level.random;
+        if(random.nextFloat()>(.2f+.5f*left)*(setting==ParticleStatus.DECREASED?.5f:1))return;
+        Vec3 at=visibleStone(caster);
+        if(at==null||at.distanceToSqr(camera)>32*32)return;
+        net.minecraft.client.particle.Particle puff=mc.particleEngine.createParticle(ParticleTypes.SMOKE,
+            at.x+random.nextGaussian()*.015,at.y+random.nextGaussian()*.015,at.z+random.nextGaussian()*.015,
+            random.nextGaussian()*.003,.01+random.nextDouble()*.012,random.nextGaussian()*.003);
+        if(puff==null)return;
+        float grey=.72f+random.nextFloat()*.2f;
+        puff.setColor(grey,grey,grey);
+    }
+
+    /**
+     * The stone for smoke to rise from, or null when nobody can see it. Our own first-person stone counts
+     * only once the hand has settled: not mid-swing, and not still coming up after a switch, when it is
+     * somewhere the steady pose does not describe. Anyone else's counts only if their staff was drawn this
+     * frame, so an unseen or hidden caster never gives themselves away with a plume.
+     */
+    private static Vec3 visibleStone(Player caster) {
+        Minecraft mc=Minecraft.getInstance();
+        if(caster==mc.player&&mc.options.getCameraType().isFirstPerson())
+            return frame-firstDrawn<=1&&!caster.swinging&&ScepterClient.settled()?liveStone(caster):null;
+        Drawn drawn=DRAWN.get(caster.getId());
+        return drawn!=null&&frame-drawn.frame<=1?drawn.at:null;
+    }
+
     /** The stone has filled: one bright pulse and a chime, so the next release is known to be a full one. */
     public static void full(Entity caster) {
         if(Minecraft.getInstance().level==null)return;
@@ -251,7 +311,7 @@ public final class ScepterFx {
         Vec3 origin=new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z"));
         Vec3 destination=new Vec3(n.getDouble("tx"),n.getDouble("ty"),n.getDouble("tz"));
         float power=n.getFloat("power");
-        boolean charged=power>0,hit=n.getBoolean("hit"),floor=n.getBoolean("floor");
+        boolean charged=power>0;
         var viewer=Minecraft.getInstance().player;
         Entity caster=level.getEntity(entity);
         Vec3 live=caster==null?null:liveStone(caster);
@@ -300,33 +360,7 @@ public final class ScepterFx {
                         .add(level.random.nextGaussian()*.05,level.random.nextGaussian()*.05,level.random.nextGaussian()*.05));
             }
         }
-        if(!hit)return;
-        ParticleEmitter impact=particles(destination.add(0,floor?.04:0,0),charged?34:18);
-        float scale=charged?1+1.4f*power:.45f;
-        mote(impact,Vec3.ZERO,Vec3.ZERO,(floor?7.5f:6.5f)*scale,0xff159bff);
-        mote(impact,Vec3.ZERO,Vec3.ZERO,2.2f*scale,0xffefffff);
-        // Shock ring, then a dense blue and white burst.
-        int ring=charged?128:48;
-        for(int i=0;i<ring;i++) {
-            double angle=i*Math.PI*2/ring;
-            Vec3 radial=new Vec3(Math.cos(angle),0,Math.sin(angle));
-            mote(impact,radial.scale(.20),radial.scale(.40*scale),.44f,0xff72dcff);
-        }
-        if(charged) {
-            // A second, slower ring for the heavy discharge.
-            for(int i=0;i<64;i++) {
-                double angle=i*Math.PI*2/64;
-                Vec3 radial=new Vec3(Math.cos(angle),.05,Math.sin(angle));
-                mote(impact,radial.scale(.3),radial.scale(.22*scale),.8f,0xff1f7dff);
-            }
-        }
-        int sparks=charged?Math.round(260*scale):90;
-        for(int i=0;i<sparks;i++) {
-            double angle=level.random.nextDouble()*Math.PI*2;
-            double speed=(floor?.24:.22)*(charged?1+.4*power:.7)+level.random.nextDouble()*.24;
-            Vec3 velocity=new Vec3(Math.cos(angle)*speed,.02+level.random.nextDouble()*.15*(charged?1.6:1),Math.sin(angle)*speed);
-            mote(impact,Vec3.ZERO,velocity,i%3==0?.20f:.36f,i%3==0?0xffeaffff:0xff259bff);
-        }
+        // Where it stops, nothing goes up: the beam simply ends, and the walls it crossed keep their holes.
     }
 
     /** The shot as the caster hears it, the tick they let go; everyone else hears it from the server. */

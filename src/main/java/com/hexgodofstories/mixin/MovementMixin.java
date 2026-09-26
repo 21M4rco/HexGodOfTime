@@ -58,7 +58,7 @@ public abstract class MovementMixin {
         if(!player.serverLevel().getServer().isSameThread())return;
         if(TemporalEngine.frozen(player)||Erasure.erasing(player)){ci.cancel();return;}
         if(com.hexgodofstories.server.ScepterBlast.stunned(player)) {
-            // A stun holds the feet but lets the player look around until its 60 ticks end.
+            // A stun holds the feet but lets the player look around until it ends.
             float yaw=packet.getYRot(player.getYRot()),pitch=packet.getXRot(player.getXRot());
             if(Float.isFinite(yaw)&&Float.isFinite(pitch)){player.setYRot(yaw);player.setXRot(net.minecraft.util.Mth.clamp(pitch,-90,90));}
             clientIsFloating=false;ci.cancel();return;

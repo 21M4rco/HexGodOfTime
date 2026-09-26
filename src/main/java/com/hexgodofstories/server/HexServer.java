@@ -13,6 +13,7 @@ import net.minecraft.sounds.*;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.*;
 import net.minecraft.world.level.ClipContext;
@@ -305,9 +306,12 @@ public final class HexServer {
     }
 
     private static boolean conjure(ServerPlayer p,Ability a) {
-        if(!p.getMainHandItem().isEmpty()&&!(p.getMainHandItem().getItem() instanceof ConjuredWeapon)){notice(p,"Free your main hand to conjure.");return false;}
+        // Calling the Scepter already carried trades places with whatever is in hand, so it loses nothing
+        // and needs no free hand; only forming a new weapon does.
+        boolean calling=a==Ability.LAEVATEINN&&!ConjuredWeapon.scepter(p).isEmpty();
+        if(!calling&&!p.getMainHandItem().isEmpty()&&!(p.getMainHandItem().getItem() instanceof ConjuredWeapon)){notice(p,"Free your main hand to conjure.");return false;}
         if(a==Ability.TWIN_DAGGERS&&!p.getOffhandItem().isEmpty()&&!(p.getOffhandItem().getItem() instanceof ConjuredWeapon)){notice(p,"Free your other hand for twin daggers.");return false;}
-        ItemStack item=new ItemStack(a==Ability.LAEVATEINN?HexGodOfStories.SCEPTER.get():HexGodOfStories.DAGGER.get());
+        ItemStack item=a==Ability.LAEVATEINN?summonScepter(p):new ItemStack(HexGodOfStories.DAGGER.get());
         item.getOrCreateTag().putUUID("conjurer",p.getUUID());item.getOrCreateTag().putLong("formed",HexData.now(p));
         p.setItemInHand(InteractionHand.MAIN_HAND,item);
         if(a==Ability.TWIN_DAGGERS) {
@@ -315,6 +319,26 @@ public final class HexServer {
             p.setItemInHand(InteractionHand.OFF_HAND,off);
         }
         gesture(p,a==Ability.LAEVATEINN?"scepter_manifest":"conjure","conjure",HexGodOfStories.CONJURE.get());return true;
+    }
+    /**
+     * There is only ever one Scepter. Casting it again calls the one already carried, wherever it is in
+     * the inventory, into the selected slot (it forms there afresh) and lets any stray copy go; only a
+     * caster carrying none is given a new one. An ordinary item in hand moves to where the Scepter was;
+     * a conjured one in hand is dismissed, as it always was.
+     */
+    private static ItemStack summonScepter(ServerPlayer p) {
+        ItemStack kept=ConjuredWeapon.scepter(p),hand=p.getMainHandItem();
+        Inventory inventory=p.getInventory();
+        int from=-1;
+        for(int i=0;i<inventory.getContainerSize();i++) {
+            ItemStack stack=inventory.getItem(i);
+            if(!ConjuredWeapon.scepterOf(stack,p))continue;
+            if(stack==kept)from=i;
+            inventory.setItem(i,ItemStack.EMPTY);
+        }
+        if(kept.isEmpty())return new ItemStack(HexGodOfStories.SCEPTER.get());
+        if(from>=0&&from!=inventory.selected&&!hand.isEmpty()&&!(hand.getItem() instanceof ConjuredWeapon))inventory.setItem(from,hand);
+        return kept;
     }
     private static void dismissWeapons(ServerPlayer p) {
         for(InteractionHand hand:InteractionHand.values()) {

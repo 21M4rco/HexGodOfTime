@@ -36,9 +36,11 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
     private static final Quaternionf REST=euler(180,65,110),AIM=euler(180,65,110);
     private static final Quaternionf REST_LEFT=euler(180,-65,-110),AIM_LEFT=euler(180,-65,-110);
     /** Where the grip moves to when aiming (hand space) and how far the hand slides up the shaft. */
-    private static final float AIM_X=-.12f,AIM_Y=.22f,AIM_Z=-.077f,AIM_SLIDE=0f;
+    static final float AIM_X=-.12f,AIM_Y=.22f,AIM_Z=-.077f,AIM_SLIDE=0f;
     /** Low diagonal carry: the shaft runs into the lower-right corner (mirrored for the left hand). */
-    private static final float REST_X=-.12f,REST_Y=.10f,REST_Z=-.077f;
+    static final float REST_X=-.12f,REST_Y=.10f,REST_Z=-.077f;
+    /** How far a left click lifts the resting staff (hand space). ScepterFx follows the stone through both. */
+    static final float LIFT=.07f;
 
     private static Quaternionf euler(float x,float y,float z) {
         return new Quaternionf().rotateX((float)Math.toRadians(x)).rotateY((float)Math.toRadians(y)).rotateZ((float)Math.toRadians(z));
@@ -128,7 +130,7 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
             float tremor=charge*charge*.0035f;
             float still=1-aim;
             pose.translate(side*(REST_X*still+AIM_X*aim)+(float)Math.sin(time*2.9f)*tremor,
-                REST_Y*still+AIM_Y*aim+.07f*ScepterClient.attackLift()*still+.006f*breath+(float)Math.cos(time*3.7f)*tremor,
+                REST_Y*still+AIM_Y*aim+LIFT*ScepterClient.attackLift()*still+.006f*breath+(float)Math.cos(time*3.7f)*tremor,
                 REST_Z*still+AIM_Z*aim+.10f*recoil);
             Quaternionf rest=left?REST_LEFT:REST,point=left?AIM_LEFT:AIM;
             pose.mulPose(new Quaternionf(rest).slerp(point,aim));
@@ -152,6 +154,8 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         }
         // The stone as this frame draws it in a third-person hand: where the charge and the beam leave from.
         if(third)ScepterFx.drawn(stack,pose.last().pose());
+        // Our own first-person staff is on screen this frame, so its stone may smoke.
+        if(first)ScepterFx.drawnFirstPerson();
         ScepterModel.get().render(pose.last(),buffers,light,overlay,context==ItemDisplayContext.GUI,reveal,power,time,first);
         if(reveal<1)manifestScepter(pose,buffers,reveal);
         pose.popPose();

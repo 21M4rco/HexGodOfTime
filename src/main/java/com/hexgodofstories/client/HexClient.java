@@ -296,6 +296,9 @@ public final class HexClient {
         @SubscribeEvent public static void livingEnd(net.minecraftforge.client.event.RenderLivingEvent.Post<?,?> e) {
             BeamWounds.afterEntity(e.getEntity(),e.getMultiBufferSource(),e.getPackedLight());
         }
+        /** The field of view each frame is really drawn with, sprinting and potions included: the Scepter's stone follows it. */
+        @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
+        public static void fov(ViewportEvent.ComputeFov e){ScepterFx.fov(e.getFOV(),e.usedConfiguredFov());}
         /** Breaches, impacts and the standing tremor of something enormous passing underneath. */
         @SubscribeEvent public static void pilgrimCamera(net.minecraftforge.client.event.ViewportEvent.ComputeCameraAngles e){
             com.hexgodofstories.client.leviathan.LeviathanEffects.camera(e);

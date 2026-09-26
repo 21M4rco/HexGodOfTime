@@ -6,6 +6,7 @@ import com.hexgodofstories.network.HexNetwork;
 import com.hexgodofstories.server.HexServer;
 import com.hexgodofstories.server.ScepterBlast;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
@@ -13,6 +14,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -27,8 +30,11 @@ import java.util.UUID;
  * <p>The server decides whether anything fires and how hard; this only presents it. The local
  * player's own press and release are shown the tick they happen rather than a round trip later, and
  * every other player is driven by the server's charge and shot messages. Aim and recoil are springs
- * stepped once a tick and interpolated per frame, so rapid taps, a long hold and a release mid-raise
- * all blend without a pop.
+ * stepped once a tick and interpolated per frame, so a hold and a release mid-raise blend without a pop.
+ *
+ * <p>After every shot the stone recovers, and smokes while it does, in every hand that carries one; a
+ * recovering stone takes no right click at all. When it cools comes from the server, with the shot and
+ * in each player's synced data, so a caster who walks into view mid-recovery is seen smoking too.
  */
 public final class ScepterClient {
     private ScepterClient() { }
@@ -41,6 +47,8 @@ public final class ScepterClient {
         long shot = Long.MIN_VALUE / 2;
         float shotPower;
         float aim, aimPrev, recoil, recoilPrev, flash, flashPrev;
+        /** The tick the stone cools, from the latest shot: the server's word, or our own until it arrives. */
+        long ready;
     }
 
     private static final Map<Integer, State> STATES = new HashMap<>();
@@ -48,16 +56,22 @@ public final class ScepterClient {
     private static boolean useDown;
     private static float attackLift, attackLiftPrev;
     private static int attackLiftTicks;
+    /** Ticks the local player has been holding the Scepter without a break: 0 when they are not. */
+    private static int heldTicks;
+    /** Until when the server's daze is on us, and whether the sway it asks for has been drawn; see {@link #sway}. */
+    private static long dazedUntil = Long.MIN_VALUE;
+    private static boolean swayed;
+    /** How far the daze's sway goes, and how fast it gets there each tick past vanilla's own ease-off. */
+    private static final float SWAY = .7f, SWAY_RISE = .1f;
 
     public static void attackPressed() {attackLiftTicks = 4;}
 
     public static float attackLift() {
         return Mth.lerp(partial(), attackLiftPrev, attackLift);
     }
-    private static long nextShot;
-    /** Our own release that came inside the recovery, shown when the server will fire it. */
-    private static long queuedAt = -1;
-    private static float queuedPower;
+
+    /** The hand has had the Scepter long enough to have finished coming up into view. */
+    public static boolean settled() {return heldTicks >= 4;}
 
     public static void clear() {
         var manager = Minecraft.getInstance().getSoundManager();
@@ -67,23 +81,68 @@ public final class ScepterClient {
         useDown = false;
         attackLift = attackLiftPrev = 0;
         attackLiftTicks = 0;
-        queuedAt = -1;
+        heldTicks = 0;
+        dazedUntil = Long.MIN_VALUE;
+        swayed = false;
     }
 
     /** Server word on another player's Scepter (or a correction for our own). */
     public static void receive(int entity, CompoundTag data) {
         Minecraft mc = Minecraft.getInstance();
         boolean self = mc.player != null && mc.player.getId() == entity;
+        String state = data.getString("state");
+        if (state.equals("dazed")) {if (self) dazedUntil = data.getLong("until"); return;}
         State s = STATES.computeIfAbsent(entity, k -> new State());
-        switch (data.getString("state")) {
+        switch (state) {
             case "charge" -> {if (!self) s.charging = data.getLong("start");}
-            case "cancel" -> s.charging = -1;
+            // A dropped hold never fired, so nothing it was shown to fire is left cooling either.
+            case "cancel" -> {s.charging = -1; s.ready = 0;}
+            // Our press reached a server that still had the stone cooling: the charge we showed is dropped.
+            case "cooling" -> {s.charging = -1; s.ready = data.getLong("ready");}
             case "shot" -> {
-                // Our own shots were already shown on release.
-                if (!self) shoot(s, data.getFloat("power"));
+                float power = data.getFloat("power");
+                // Our own shots were already shown on release, unless the server let go of a hold we still
+                // thought was open (the hold limit); that one is shown now.
+                if (!self || s.charging >= 0) {
+                    shoot(s, power);
+                    if (self) ScepterFx.fired(mc.player, power);
+                }
+                s.ready = data.getLong("ready");
             }
             default -> { }
         }
+    }
+
+    /**
+     * The tick this player's stone cools, already past once it has: whichever is later of the latest shot
+     * and the player's synced data. A time further off than any recovery could reach counts as cooled.
+     */
+    public static long ready(int entity) {
+        State s = STATES.get(entity);
+        long ready = Math.max(s == null ? 0 : s.ready, ClientState.data(entity).getLong(ScepterBlast.READY));
+        return ready - ClientState.now() > ScepterBlast.FULL_COOLDOWN + 20 ? 0 : ready;
+    }
+
+    /**
+     * The Scepter's daze, drawn. Vanilla only sways the view for nausea while more than three seconds of it
+     * remain, and takes seven to reach full sway, so a two-second nausea would never show at all. While
+     * the daze lasts this drives the same sway itself, then leaves vanilla to ease it off at its own rate,
+     * stopping in time for that to finish before the effect ends: vanilla paints its portal overlay over
+     * any sway still left once nausea is gone. Runs after the player's own tick has eased it.
+     */
+    private static void sway(LocalPlayer me, long now) {
+        MobEffectInstance nausea = me.getEffect(MobEffects.CONFUSION);
+        if (nausea == null) {
+            // Cured early, milk or death: the sway goes with it rather than leave that overlay a frame.
+            if (swayed) me.portalTime = me.oPortalTime = 0;
+            swayed = false;
+            return;
+        }
+        int left = nausea.getDuration();
+        // Longer nausea is vanilla's own to draw; and the sway must be able to ease off (a twentieth a tick) in time.
+        if (now > dazedUntil || left > 60 || left <= me.portalTime / .05f + 2) return;
+        float target = Math.min(SWAY, me.portalTime + .05f + SWAY_RISE);
+        if (target > me.portalTime) {me.portalTime = target; swayed = true;}
     }
 
     private static void shoot(State s, float power) {
@@ -116,28 +175,20 @@ public final class ScepterClient {
         }
         if (!down && !useDown) return;
         State s = STATES.computeIfAbsent(player.getId(), k -> new State());
+        // A stone still smoking from its last shot takes no right click at all. A press made meanwhile is
+        // swallowed whole, so holding on through the end of the recovery never starts a charge by itself.
+        if (s.charging < 0 && now < ready(player.getId())) {useDown = down; return;}
         if (down && !useDown) {
             HexNetwork.send(HexServer.SCEPTER_PRESS, 0);
             s.charging = now;
         } else if (!down && useDown) {
             HexNetwork.send(HexServer.SCEPTER_RELEASE, 0);
             if (s.charging >= 0) {
-                long held = now - s.charging;
-                float power = ScepterBlast.power(held);
-                // Mirror the server's recovery and its one-shot queue, so what is shown firing is
-                // exactly what the server is going to fire, on the tick it will.
-                if (now >= nextShot) {
-                    shoot(s, power);
-                    ScepterFx.fired(player, power);
-                    nextShot = now + ScepterBlast.recovery(power);
-                } else {
-                    s.charging = -1;
-                    if (queuedAt < 0) {
-                        queuedAt = nextShot;
-                        queuedPower = power;
-                        nextShot += ScepterBlast.recovery(power);
-                    }
-                }
+                float power = ScepterBlast.power(now - s.charging);
+                shoot(s, power);
+                ScepterFx.fired(player, power);
+                // The same recovery the server is starting; its own word follows with the shot.
+                s.ready = now + ScepterBlast.cooldown(power);
             }
         }
         useDown = down;
@@ -154,13 +205,14 @@ public final class ScepterClient {
         if (!canLift) {attackLift = attackLiftPrev = 0; attackLiftTicks = 0;}
         else if (attackLiftTicks > 0) attackLiftTicks--;
         long now = ClientState.now();
-        if (queuedAt >= 0 && now >= queuedAt && mc.player != null) {
-            queuedAt = -1;
-            if (holding(mc.player)) {
-                shoot(STATES.computeIfAbsent(mc.player.getId(), k -> new State()), queuedPower);
-                ScepterFx.fired(mc.player, queuedPower);
-            }
+        heldTicks = holding(mc.player) ? Math.min(heldTicks + 1, 100) : 0;
+        // Every stone still recovering smokes, in whatever hand carries it, for everyone who can see it.
+        for (Player player : mc.level.players()) {
+            if (!holding(player)) continue;
+            long left = ready(player.getId()) - now;
+            if (left > 0) ScepterFx.cooling(player, Math.min(1, left / (float) ScepterBlast.FULL_COOLDOWN));
         }
+        if (mc.player != null) sway(mc.player, now);
         var manager = mc.getSoundManager();
         STATES.entrySet().removeIf(entry -> {
             Entity e = mc.level.getEntity(entry.getKey());
@@ -176,7 +228,8 @@ public final class ScepterClient {
             s.recoil *= .52f;
             s.flashPrev = s.flash;
             s.flash *= .72f;
-            return !raised && s.aim == 0 && s.recoil < .001f && s.flash < .001f && s.charging < 0;
+            // Kept while the stone cools: this is where our own shot's recovery lives until the server's word.
+            return !raised && s.aim == 0 && s.recoil < .001f && s.flash < .001f && s.charging < 0 && now >= s.ready;
         });
         HUMS.entrySet().removeIf(entry -> {
             if (charging(entry.getKey()) && !entry.getValue().isStopped()) return false;

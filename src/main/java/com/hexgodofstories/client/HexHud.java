@@ -127,7 +127,7 @@ public final class HexHud {
             case WARD -> "Raise a defensive veil.";
             case DAGGERS -> "Conjure a dagger in an empty hand.";
             case TWIN_DAGGERS -> "Conjure twin daggers. Use: throw.";
-            case LAEVATEINN -> "Conjure the Scepter. Tap right click: bolt. Hold: charged beam.";
+            case LAEVATEINN -> "Conjure/recall the Scepter. Tap right click: bolt. Hold: beam.";
             case ENCHANT -> "Charm a creature to follow you.";
             case MEMORY -> "Reveal a target's recent steps.";
             case TIME_SLIP -> "Slip to a recent moment.";

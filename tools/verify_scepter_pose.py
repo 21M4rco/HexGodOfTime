@@ -99,3 +99,13 @@ fx = floats(re.search(r'STONE_X=([^,]*),STONE_Y=([^,]*),STONE_Z=([^;]*);', (JAVA
             .group(0).replace('STONE_', ' '))
 assert all(abs(a - b) < .004 for a, b in zip(view, fx)), (view, fx)
 print(f'PASS: the caster\'s beam leaves the drawn stone at {tuple(round(c, 3) for c in view)}.')
+
+# A left-handed caster: the arm offset and the renderer's grip offset flip, the rotation is the mirrored
+# one, but the model is not mirrored, and its stone sits off the shaft, so the answer is no mirror image.
+aim_left = floats(re.search(r'AIM_LEFT=euler\(([^)]*)\)', renderer).group(1))
+view = apply(local, aim_left)
+view = (view[0] - .56 - offset[0], view[1] - .52 + offset[1], view[2] - .72 + offset[2])
+fx = floats(re.search(r'STONE_LEFT_X=([^,]*),STONE_LEFT_Y=([^,]*),STONE_LEFT_Z=([^;]*);', (JAVA / 'ScepterFx.java').read_text())
+            .group(0).replace('STONE_LEFT_', ' '))
+assert all(abs(a - b) < .004 for a, b in zip(view, fx)), (view, fx)
+print(f'PASS: a left-handed caster\'s beam and smoke leave the drawn stone at {tuple(round(c, 3) for c in view)}.')

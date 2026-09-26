@@ -3,6 +3,7 @@ package com.hexgodofstories.entity;
 import com.hexgodofstories.server.HexServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.*;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -40,6 +41,23 @@ public final class ConjuredWeapon extends Item {
         if(!(holder instanceof Player player)||!belongsTo(stack,player)){stack.setCount(0);return;}
         // Creative-tab and command-created weapons become bound on their first inventory tick too.
         if(!stack.getOrCreateTag().hasUUID("conjurer"))stack.getOrCreateTag().putUUID("conjurer",player.getUUID());
+        // There is only ever one Scepter. However a second one got in (a chest, a command, a creative tab),
+        // it goes the tick it arrives, and the one kept is the one in hand.
+        if(kind==1){ItemStack kept=scepter(player);if(!kept.isEmpty()&&kept!=stack)stack.setCount(0);}
+    }
+    /** One of this player's own Scepters. */
+    public static boolean scepterOf(ItemStack stack,Player player) {
+        return !stack.isEmpty()&&stack.getItem() instanceof ConjuredWeapon w&&w.kind==1&&belongsTo(stack,player);
+    }
+    /**
+     * The one Scepter a player carries: the one in their hand if they are holding one, otherwise the first
+     * in the inventory's own order (main slots, armour, off hand). Empty when they carry none.
+     */
+    public static ItemStack scepter(Player player) {
+        if(scepterOf(player.getMainHandItem(),player))return player.getMainHandItem();
+        Inventory inventory=player.getInventory();
+        for(int i=0;i<inventory.getContainerSize();i++)if(scepterOf(inventory.getItem(i),player))return inventory.getItem(i);
+        return ItemStack.EMPTY;
     }
     @Override public boolean onEntityItemUpdate(ItemStack stack,ItemEntity entity) {
         if(!entity.level().isClientSide)entity.discard();
