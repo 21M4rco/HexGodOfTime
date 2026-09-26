@@ -259,13 +259,14 @@ def main():
     render(head, 900, 900, 40).save(out / "head.png")
     back = matrix(rot_y(150), [0.05, -0.24, -0.62])
     render(back, 900, 900, 40).save(out / "back.png")
-    first_person(pose(REST)).save(out / "first_person_rest.png")
+    first_person(pose(REST), offset=REST_OFFSET).save(out / "first_person_rest.png")
     first_person(pose(AIM), offset=AIM_OFFSET, slide=AIM_SLIDE).save(out / "first_person_aim.png")
 
 
 
 # WeaponRenderer's first-person poses: rest, and raised to fire (grip offset and slide up the shaft).
-REST = (0, -80, 107)
+REST = (180, 80, 73)
+REST_OFFSET = (-0.014, 0.255, -0.077)
 AIM = (-82, -50, 6)
 AIM_OFFSET = (-0.34, 0.38, -0.05)
 AIM_SLIDE = 0.20

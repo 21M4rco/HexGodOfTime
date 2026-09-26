@@ -33,10 +33,12 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
 
     // First-person rest and aim, as rotations applied X then Y then Z to the staff; tuned in
     // tools/preview_scepter.py against the game's hand transform and 70 degree hand field of view.
-    private static final Quaternionf REST=euler(0,-80,107),AIM=euler(-82,-50,6);
-    private static final Quaternionf REST_LEFT=euler(0,80,-107),AIM_LEFT=euler(-82,50,-6);
+    private static final Quaternionf REST=euler(180,80,73),AIM=euler(-82,-50,6);
+    private static final Quaternionf REST_LEFT=euler(180,-80,-73),AIM_LEFT=euler(-82,50,-6);
     /** Where the grip moves to when aiming (hand space) and how far the hand slides up the shaft. */
     private static final float AIM_X=-.34f,AIM_Y=.38f,AIM_Z=-.05f,AIM_SLIDE=.20f;
+    /** Grip at rest (hand space): raised so the stone, off the shaft's axis, sits where it did with the blade down. */
+    private static final float REST_X=-.014f,REST_Y=.255f,REST_Z=-.077f;
 
     private static Quaternionf euler(float x,float y,float z) {
         return new Quaternionf().rotateX((float)Math.toRadians(x)).rotateY((float)Math.toRadians(y)).rotateZ((float)Math.toRadians(z));
@@ -124,9 +126,10 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
             // A slow breath at rest, and a live tremor in the hand while the stone is filling.
             float breath=(1-aim)*(float)Math.sin(time*.07f);
             float tremor=charge*charge*.0035f;
-            pose.translate(side*AIM_X*aim+(float)Math.sin(time*2.9f)*tremor,
-                AIM_Y*aim+.006f*breath+(float)Math.cos(time*3.7f)*tremor,
-                AIM_Z*aim+.10f*recoil);
+            float rest=1-aim;
+            pose.translate(side*(REST_X*rest+AIM_X*aim)+(float)Math.sin(time*2.9f)*tremor,
+                REST_Y*rest+AIM_Y*aim+.006f*breath+(float)Math.cos(time*3.7f)*tremor,
+                REST_Z*rest+AIM_Z*aim+.10f*recoil);
             Quaternionf rest=left?REST_LEFT:REST,point=left?AIM_LEFT:AIM;
             pose.mulPose(new Quaternionf(rest).slerp(point,aim));
             // Recoil pitches the head up and drives the staff back along its own length.
