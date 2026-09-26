@@ -126,10 +126,10 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
             // A slow breath at rest, and a live tremor in the hand while the stone is filling.
             float breath=(1-aim)*(float)Math.sin(time*.07f);
             float tremor=charge*charge*.0035f;
-            float rest=1-aim;
-            pose.translate(side*(REST_X*rest+AIM_X*aim)+(float)Math.sin(time*2.9f)*tremor,
-                REST_Y*rest+AIM_Y*aim+.006f*breath+(float)Math.cos(time*3.7f)*tremor,
-                REST_Z*rest+AIM_Z*aim+.10f*recoil);
+            float still=1-aim;
+            pose.translate(side*(REST_X*still+AIM_X*aim)+(float)Math.sin(time*2.9f)*tremor,
+                REST_Y*still+AIM_Y*aim+.006f*breath+(float)Math.cos(time*3.7f)*tremor,
+                REST_Z*still+AIM_Z*aim+.10f*recoil);
             Quaternionf rest=left?REST_LEFT:REST,point=left?AIM_LEFT:AIM;
             pose.mulPose(new Quaternionf(rest).slerp(point,aim));
             // Recoil pitches the head up and drives the staff back along its own length.
