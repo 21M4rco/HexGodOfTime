@@ -1,0 +1,14 @@
+--release
+17
+-proc:none
+-implicit:none
+-nowarn
+-XDrawDiagnostics
+-XDshould-stop.ifError=FLOW
+-Xmaxerrs
+10000000
+-encoding
+UTF-8
+-d
+/tmp/tmp.ejP0DFE2QE/classes
+@/tmp/tmp.ejP0DFE2QE/files

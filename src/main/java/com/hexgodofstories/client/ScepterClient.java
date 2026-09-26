@@ -134,15 +134,15 @@ public final class ScepterClient {
         MobEffectInstance nausea = me.getEffect(MobEffects.CONFUSION);
         if (nausea == null) {
             // Cured early, milk or death: the sway goes with it rather than leave that overlay a frame.
-            if (swayed) me.portalTime = me.oPortalTime = 0;
+            if (swayed) me.spinningEffectIntensity = me.oSpinningEffectIntensity = 0;
             swayed = false;
             return;
         }
         int left = nausea.getDuration();
         // Longer nausea is vanilla's own to draw; and the sway must be able to ease off (a twentieth a tick) in time.
-        if (now > dazedUntil || left > 60 || left <= me.portalTime / .05f + 2) return;
-        float target = Math.min(SWAY, me.portalTime + .05f + SWAY_RISE);
-        if (target > me.portalTime) {me.portalTime = target; swayed = true;}
+        if (now > dazedUntil || left > 60 || left <= me.spinningEffectIntensity / .05f + 2) return;
+        float target = Math.min(SWAY, me.spinningEffectIntensity + .05f + SWAY_RISE);
+        if (target > me.spinningEffectIntensity) {me.spinningEffectIntensity = target; swayed = true;}
     }
 
     private static void shoot(State s, float power) {
