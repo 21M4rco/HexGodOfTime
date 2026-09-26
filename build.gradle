@@ -159,6 +159,16 @@ tasks.register('verifyRenderClock', JavaExec) {
 }
 tasks.named('check') { dependsOn 'verifyRenderClock' }
 
+// The Scepter's hole is carved out of a limb, never drawn beside it: a hit at an edge or corner bites it
+// away, and no opening, tunnel wall or rim ever lies outside the limb. Geometry only; no Minecraft needed.
+tasks.register('verifyWoundCarve', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.hexgodofstories.data.WoundCarveTest'
+    enableAssertions = true
+}
+tasks.named('check') { dependsOn 'verifyWoundCarve' }
+
 // Ship the unmodified Photon runtime beside the mod, so the Actions download is installable.
 configurations { photonRuntime }
 dependencies {
