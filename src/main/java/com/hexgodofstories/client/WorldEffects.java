@@ -451,7 +451,7 @@ public final class WorldEffects {
         pose.translate(-camera.x,-camera.y,-camera.z);
         var buffers=mc.renderBuffers().bufferSource();
         var out=buffers.getBuffer(RenderType.entityTranslucent(WHITE));
-        double now=ClientState.now()+partial;
+        double now=ClientState.time(partial);
 
         renderProjections(mc,pose,camera,now);
 

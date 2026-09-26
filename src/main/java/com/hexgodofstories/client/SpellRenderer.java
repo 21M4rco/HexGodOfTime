@@ -24,7 +24,7 @@ public final class SpellRenderer extends EntityRenderer<SpellProjectile> {
         boolean charged=e.style()==1;
         float open=e.opened(partial);
         double scale=(charged?.30:.17)*(.45+.55*open);
-        double time=ClientState.now()+partial;
+        double time=ClientState.time(partial);
         float seed=e.spin();
         Vec3 travel=e.getDeltaMovement();
         Vec3 forward=travel.lengthSqr()<1e-8?new Vec3(0,0,1):travel.normalize();
@@ -34,9 +34,9 @@ public final class SpellRenderer extends EntityRenderer<SpellProjectile> {
         VertexConsumer out=buffers.getBuffer(BranchVfx.glow());
 
         // The core, and a soft body around it.
-        BranchVfx.billboard(pose,out,origin,scale*1.0,seed+time*.2,TemporalPalette.hot((float)(time*.07+seed),.9f),.85f);
-        BranchVfx.billboard(pose,out,origin,scale*2.1,-seed+time*.09,TemporalPalette.seidr((float)(time*.04+seed)),.34f);
-        BranchVfx.billboard(pose,out,origin,scale*3.4,seed*.5+time*.05,TemporalPalette.seidr((float)(time*.03+seed+.4f)),.14f);
+        BranchVfx.billboard(pose,out,origin,scale*1.0,seed+time*.2,TemporalPalette.hot(ClientState.cycle(time*.07+seed),.9f),.85f);
+        BranchVfx.billboard(pose,out,origin,scale*2.1,-seed+time*.09,TemporalPalette.seidr(ClientState.cycle(time*.04+seed)),.34f);
+        BranchVfx.billboard(pose,out,origin,scale*3.4,seed*.5+time*.05,TemporalPalette.seidr(ClientState.cycle(time*.03+seed+.4f)),.14f);
 
         // The husk: rings wound around the core, tighter at the front than the back.
         int rings=charged?5:4;
@@ -49,7 +49,7 @@ public final class SpellRenderer extends EntityRenderer<SpellProjectile> {
                 double a0=seed+i*Math.PI*2/points+time*.24+t*2.1,a1=seed+(i+1)*Math.PI*2/points+time*.24+t*2.1;
                 Vec3 p0=origin.add(forward.scale(back)).add(side.scale(Math.cos(a0)*radius)).add(up.scale(Math.sin(a0)*radius));
                 Vec3 p1=origin.add(forward.scale(back)).add(side.scale(Math.cos(a1)*radius)).add(up.scale(Math.sin(a1)*radius));
-                BranchVfx.ribbon(pose,out,p0,p1,scale*.16,TemporalPalette.seidr((float)(time*.05+t*.5)),(float)(.55-t*.3));
+                BranchVfx.ribbon(pose,out,p0,p1,scale*.16,TemporalPalette.seidr(ClientState.cycle(time*.05+t*.5)),(float)(.55-t*.3));
             }
         }
 
@@ -67,7 +67,7 @@ public final class SpellRenderer extends EntityRenderer<SpellProjectile> {
                 points[i]=origin.add(forward.scale(-t*length))
                     .add(side.scale(Math.cos(a)*radius)).add(up.scale(Math.sin(a)*radius));
             }
-            trail(pose,out,points,scale*.22,(float)(time*.05+s*.17),.55f);
+            trail(pose,out,points,scale*.22,ClientState.cycle(time*.05+s*.17),.55f);
         }
 
         // A couple of filaments shaken loose off the sides; they are what sell it as unstable.
@@ -85,7 +85,7 @@ public final class SpellRenderer extends EntityRenderer<SpellProjectile> {
                     .add(side.scale((TemporalLightning.rand(bolt,10+i)-.5)*scale*.8*Math.sin(t*Math.PI)))
                     .add(up.scale((TemporalLightning.rand(bolt,20+i)-.5)*scale*.8*Math.sin(t*Math.PI)));
             }
-            trail(pose,out,points,scale*.10,(float)(time*.06+f*.2),.42f);
+            trail(pose,out,points,scale*.10,ClientState.cycle(time*.06+f*.2),.42f);
         }
         super.render(e,yaw,partial,pose,buffers,light);
     }

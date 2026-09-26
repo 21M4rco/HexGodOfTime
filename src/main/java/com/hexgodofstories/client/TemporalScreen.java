@@ -37,7 +37,7 @@ public final class TemporalScreen {
         try{
             if(chain==null){chain=new PostChain(mc.getTextureManager(),mc.getResourceManager(),mc.getMainRenderTarget(),HexGodOfStories.id("shaders/post/temporal.json"));width=0;}
             int w=mc.getWindow().getWidth(),h=mc.getWindow().getHeight();if(width!=w||height!=h){chain.resize(w,h);width=w;height=h;}
-            float age=ClientState.now()+partial-start;float duration=Math.max(1,end-start);float power=Math.min(1,age/5)*Mth.clamp((duration-age)/12,0,1);
+            float age=ClientState.since(start,partial);float duration=Math.max(1,end-start);float power=Math.min(1,age/5)*Mth.clamp((duration-age)/12,0,1);
             if(sustained>0)power=sustained;
             if(mode==MEMBRANE)power=Mth.clamp((duration-age)/duration,0,1);
             for(var pass:((com.hexgodofstories.mixin.PostChainAccessor)(Object)chain).hgos$passes()) {var fx=pass.getEffect();var uniform=fx.getUniform("Strength");if(uniform!=null)uniform.set(power);uniform=fx.getUniform("Phase");if(uniform!=null)uniform.set(age/20);uniform=fx.getUniform("Mode");if(uniform!=null)uniform.set((float)mode);}

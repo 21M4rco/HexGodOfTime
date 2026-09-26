@@ -34,6 +34,16 @@
   tick and snapped back; limbs, dropped items, wings and idle animations did the same. Every one of
   those values is now pinned and a held body is drawn at one fixed instant, and a player caught in
   the stop can no longer jitter their view with the mouse.
+- **Powers keep time on a server that has been running for weeks.** Effects were timed from the
+  world's game time plus the frame's partial tick, and `ClientState.now()+partial` quietly adds in
+  float. A float holds 24 bits: once a world has run 2^23 ticks (under five days of uptime) the
+  partial tick rounds away, past 2^25 (about nineteen days) the clock moves in steps of four ticks,
+  and it only gets coarser from there. Portals, Time Branch, meteors, grips, wounds and the HUD
+  meters started late and moved in jumps on a long-running server, while a new single-player world
+  looked perfect. The cape never showed it because its cloth runs on the wearer's own tick count.
+  `ClientState.time`, `since`, `cycle` and `wave` now keep that arithmetic exact at any world age,
+  and `verifyRenderClock` fails the build if a renderer adds a partial tick to the clock in float
+  again.
 
 ## 0.6.0 — The portal is a pool now, and you fall into it
 

@@ -149,6 +149,16 @@ tasks.register('verifyWarpTessellation', JavaExec) {
 }
 tasks.named('check') { dependsOn 'verifyWarpTessellation' }
 
+// Effects must be timed the same on a server world that has run for months as on a new one: the
+// game-time clock may never be summed with a partial tick, or feed a palette, as a float.
+tasks.register('verifyRenderClock', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.hexgodofstories.client.RenderClockTest'
+    enableAssertions = true
+}
+tasks.named('check') { dependsOn 'verifyRenderClock' }
+
 // Ship the unmodified Photon runtime beside the mod, so the Actions download is installable.
 configurations { photonRuntime }
 dependencies {

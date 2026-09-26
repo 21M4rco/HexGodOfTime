@@ -232,7 +232,7 @@ public final class ScepterClient {
     /** 0..1 over the charge window, rising only once the hold outlasts a tap. */
     private static float charge(State s, float partial) {
         if (s.charging < 0) return 0;
-        float held = ClientState.now() + partial - s.charging;
+        float held = ClientState.since(s.charging, partial);
         return Mth.clamp((held - ScepterBlast.TAP) / ScepterBlast.FULL, 0, 1);
     }
 
@@ -283,7 +283,7 @@ public final class ScepterClient {
             z = source.getZ();
             float c = charge(caster, 0);
             volume = .18f + .62f * c;
-            pitch = .62f + .95f * c + (c >= 1 ? Mth.sin(ClientState.now() * 1.3f) * .03f : 0);
+            pitch = .62f + .95f * c + (c >= 1 ? (float) Math.sin(ClientState.now() * 1.3) * .03f : 0);
         }
     }
 

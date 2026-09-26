@@ -61,7 +61,7 @@ public final class ParadiseSky {
         RenderSystem.defaultBlendFunc();
         pose.pushPose();
         try {
-            pose.mulPose(Axis.YP.rotationDegrees((float) (time * 0.0022)));
+            pose.mulPose(Axis.YP.rotationDegrees((float) (time * 0.0022 % 360)));
             dome.bind();
             dome.drawWithShader(pose.last().pose(), RenderSystem.getProjectionMatrix(), GameRenderer.getPositionColorShader());
             VertexBuffer.unbind();

@@ -74,7 +74,7 @@ public final class CosmicNebula {
     public static void render(PoseStack pose,MultiBufferSource.BufferSource buffers,float partial) {
         var mc=Minecraft.getInstance();if(mc.level==null)return;
         Vec3 camera=mc.gameRenderer.getMainCamera().getPosition();
-        double time=ClientState.now()+partial;
+        double time=ClientState.time(partial);
         advance(mc);
         List<Puff> puffs=new ArrayList<>();
         for(var player:mc.level.players()) {

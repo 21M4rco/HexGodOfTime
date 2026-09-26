@@ -20,6 +20,23 @@ public final class ClientState {
     private static Object world;
 
     public static long now(){return Minecraft.getInstance().level==null?0:Minecraft.getInstance().level.getGameTime();}
+    /**
+     * The render clock: {@link #now()} plus this frame's partial tick, in double. Writing it as
+     * {@code now()+partial} quietly does the sum in float, which holds 24 bits: once a world has run
+     * 2^23 ticks (about five days) the partial tick rounds away, and past 2^25 (about nineteen days)
+     * the sum moves in steps of four ticks, so everything timed from it starts late and moves in jumps.
+     * A long-running server world gets there; a fresh single-player world does not.
+     */
+    public static double time(float partial){return now()+(double)partial;}
+    /** Ticks since {@code stamp}, a time on this same clock, plus the partial tick. Subtracting first keeps it exact at any world age. */
+    public static float since(long stamp,float partial){return (now()-stamp)+partial;}
+    /** A palette phase from the render clock. The palettes repeat every 1, so whole turns are dropped before the value narrows to float. */
+    public static float cycle(double phase){return (float)(phase-Math.floor(phase));}
+    /**
+     * The render clock folded every 2^20 ticks (about 14.6 hours), for motion drawn with float maths:
+     * pulses, drift and spin. It keeps a sixteenth of a tick, at the cost of one jump per fold.
+     */
+    public static float wave(float partial){return (float)(Math.floorMod(now(),1L<<20)+(double)partial);}
     public static CompoundTag data(int id){return PLAYERS.getOrDefault(id,new CompoundTag());}
     public static CompoundTag self(){var p=Minecraft.getInstance().player;return p==null?new CompoundTag():data(p.getId());}
     public static boolean hidden(Entity entity) {
@@ -59,7 +76,7 @@ public final class ClientState {
         CompoundTag d=data(id);
         if(!d.getBoolean("ascended"))return 0;
         if(!d.contains("transformStart"))return 1;
-        return Math.max(0,Math.min(1,(now()+partial-d.getLong("transformStart"))/140f));
+        return Math.max(0,Math.min(1,since(d.getLong("transformStart"),partial)/140f));
     }
 
     public static void receive(HexNetwork.Message m) {

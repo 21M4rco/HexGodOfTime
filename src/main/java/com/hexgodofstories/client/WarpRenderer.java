@@ -63,7 +63,7 @@ public final class WarpRenderer {
     public static void clear(){WINDOWS.clear();BREAKS.clear();realm=new CompoundTag();WarpScene.clear();}
     public static void render(RenderLevelStageEvent e){
         var mc=Minecraft.getInstance();if(mc.level==null)return;
-        var pose=e.getPoseStack();Vec3 camera=e.getCamera().getPosition();double time=mc.level.getGameTime()+e.getPartialTick();
+        var pose=e.getPoseStack();Vec3 camera=e.getCamera().getPosition();double time=mc.level.getGameTime()+(double)e.getPartialTick();
         long now=mc.level.getGameTime();
         for(var entry:new ArrayList<>(WINDOWS.entrySet())){
             CompoundTag n=entry.getValue();
@@ -80,7 +80,7 @@ public final class WarpRenderer {
     /** Render spatial realm geometry before particles, with explicit depth state independent of effects. */
     public static void renderRealm(RenderLevelStageEvent e){
         var mc=Minecraft.getInstance();if(mc.level==null)return;
-        var pose=e.getPoseStack();Vec3 camera=e.getCamera().getPosition();double time=mc.level.getGameTime()+e.getPartialTick();
+        var pose=e.getPoseStack();Vec3 camera=e.getCamera().getPosition();double time=mc.level.getGameTime()+(double)e.getPartialTick();
         Destination d=Destination.from(mc.level);
         if(d!=null){
             pose.pushPose();pose.translate((d==Destination.GRAVITY_WELL||d==Destination.CRUSHING_REALM?0:WarpMath.cellX(camera.x))-camera.x,-camera.y,-camera.z);

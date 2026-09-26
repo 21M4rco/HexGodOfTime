@@ -52,7 +52,7 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
     /** Draws in weapon space: grip at the origin, blade toward +Y. Used by the hand, the projectile and the decoys. */
     public static void draw(int kind,PoseStack pose,MultiBufferSource buffers,int light,float growth) {
         if(kind==1) {
-            float time=ClientState.now()+Minecraft.getInstance().getFrameTime();
+            float time=ClientState.wave(Minecraft.getInstance().getFrameTime());
             ScepterModel.get().render(pose.last(),buffers,light,net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY,
                 false,growth,1,time,false);
             return;
@@ -63,7 +63,7 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
     /** Hand-local magic rings follow both reveal fronts; no world-space drift while moving. */
     private static void manifestScepter(PoseStack pose,MultiBufferSource buffers,float progress) {
         var out=buffers.getBuffer(RenderType.lightning());
-        float time=ClientState.now()+Minecraft.getInstance().getFrameTime();
+        float time=ClientState.wave(Minecraft.getInstance().getFrameTime());
         float fade=Math.min(1,(1-progress)*6);
         float extent=ScepterModel.get().extent();
         for(int side:new int[]{-1,1}) {
@@ -95,7 +95,7 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         float growth=1;
         boolean still=context==ItemDisplayContext.GUI||context==ItemDisplayContext.GROUND||context==ItemDisplayContext.FIXED;
         if(stack.hasTag()&&stack.getTag().contains("formed")&&!still)
-            growth=Math.max(.05f,Math.min(1,(ClientState.now()+Minecraft.getInstance().getFrameTime()-stack.getTag().getLong("formed"))/12f));
+            growth=Math.max(.05f,Math.min(1,ClientState.since(stack.getTag().getLong("formed"),Minecraft.getInstance().getFrameTime())/12f));
 
         pose.pushPose();
         pose.translate(grip,grip,.5f);
@@ -111,10 +111,10 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         boolean third=context==ItemDisplayContext.THIRD_PERSON_LEFT_HAND||context==ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
         boolean left=context==ItemDisplayContext.FIRST_PERSON_LEFT_HAND||context==ItemDisplayContext.THIRD_PERSON_LEFT_HAND;
         float partial=Minecraft.getInstance().getFrameTime();
-        float time=ClientState.now()+partial;
+        float time=ClientState.wave(partial);
         float reveal=1;
         if((first||third)&&stack.hasTag()&&stack.getTag().contains("formed"))
-            reveal=Math.max(.05f,Math.min(1,(time-stack.getTag().getLong("formed"))/24f));
+            reveal=Math.max(.05f,Math.min(1,ClientState.since(stack.getTag().getLong("formed"),partial)/24f));
         float aim=ScepterClient.aim(stack),recoil=ScepterClient.recoil(stack),charge=ScepterClient.charge(stack);
         float power=ScepterClient.power(stack);
         pose.pushPose();

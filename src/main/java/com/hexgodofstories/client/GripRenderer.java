@@ -73,7 +73,7 @@ public final class GripRenderer {
         var mc=Minecraft.getInstance();
         if(mc.level==null){PAINTER.discard();return;}
         Vec3 camera=mc.gameRenderer.getMainCamera().getPosition();
-        double time=ClientState.now()+partial;
+        double time=ClientState.time(partial);
         RenderType glow=BranchVfx.glow(),strand=BranchVfx.strand(),cloud=BranchVfx.cloud();
         for(var entry:GRASPS.entrySet()) {
             Entity owner=mc.level.getEntity(entry.getKey());
@@ -104,13 +104,13 @@ public final class GripRenderer {
                 double p0=s*Math.PI*2/sides+time*.02,p1=(s+1)*Math.PI*2/sides+time*.02;
                 PAINTER.quad(glow,skin(centre,radius,th0,p0,time),skin(centre,radius,th0,p1,time),
                     skin(centre,radius,th1,p1,time),skin(centre,radius,th1,p0,time),
-                    TemporalPalette.seidr((float)(time*.02+r*.11)),.055f);
+                    TemporalPalette.seidr(ClientState.cycle(time*.02+r*.11)),.055f);
             }
         }
         for(int i=0;i<3;i++) {
             double a=i*2.3+time*.016;
             BranchVfx.billboard(PAINTER,cloud,centre.add(Math.cos(a)*radius*.5,Math.sin(a*.7)*radius*.4,Math.sin(a)*radius*.5),
-                radius*1.05,a,TemporalPalette.seidr((float)(time*.013+i*.3)),.075f);
+                radius*1.05,a,TemporalPalette.seidr(ClientState.cycle(time*.013+i*.3)),.075f);
         }
     }
     private static Vec3 skin(Vec3 centre,double radius,double theta,double phi,double time) {
@@ -138,7 +138,7 @@ public final class GripRenderer {
                 points[i]=hand.add(along.scale(t)).add(out.scale(bow*(1-curl*.55)))
                     .add(out.scale(Math.sin(time*.14+f*1.3)*.05));
             }
-            seidrLine(strand,points,.032,(float)(time*.023+f*.13),.5f);
+            seidrLine(strand,points,.032,ClientState.cycle(time*.023+f*.13),.5f);
         }
     }
 
@@ -156,11 +156,11 @@ public final class GripRenderer {
                 .add(side.scale(Math.sin(time*.1+t*5)*sway))
                 .add(up.scale(Math.cos(time*.12+t*4)*sway));
         }
-        seidrLine(strand,points,.045,(float)(time*.03),.62f);
+        seidrLine(strand,points,.045,ClientState.cycle(time*.03),.62f);
         for(int pulse=0;pulse<2;pulse++) {
             double at=((time*.055+pulse*.5)%1);
             Vec3 point=points[Math.min(steps,(int)(at*steps))];
-            BranchVfx.billboard(PAINTER,glow,point,.11,time*.2,TemporalPalette.seidr((float)(time*.06)),.55f);
+            BranchVfx.billboard(PAINTER,glow,point,.11,time*.2,TemporalPalette.seidr(ClientState.cycle(time*.06)),.55f);
         }
     }
 
@@ -170,7 +170,7 @@ public final class GripRenderer {
             double tilt=Math.sin(time*.04+i)*radius*.55;
             Vec3 at=centre.add(Math.cos(a)*radius*1.3,tilt,Math.sin(a)*radius*1.3);
             BranchVfx.billboard(PAINTER,glow,at,.055+.02*Math.sin(time*.2+i),a,
-                TemporalPalette.seidr((float)(time*.04+TemporalPalette.offset(i))),.55f);
+                TemporalPalette.seidr(ClientState.cycle(time*.04+TemporalPalette.offset(i))),.55f);
         }
     }
 
@@ -181,7 +181,7 @@ public final class GripRenderer {
             double a=i*Math.PI*2/marks-time*.025;
             Vec3 at=base.add(Math.cos(a)*radius*1.5,0,Math.sin(a)*radius*1.5);
             BranchVfx.billboard(PAINTER,glow,at,.05+(i%3==0?.03:0),a,
-                TemporalPalette.seidr((float)(time*.02+i*.07)),.34f);
+                TemporalPalette.seidr(ClientState.cycle(time*.02+i*.07)),.34f);
         }
     }
 

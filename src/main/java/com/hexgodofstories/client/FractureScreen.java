@@ -111,7 +111,7 @@ public final class FractureScreen extends Screen {
     }
 
     @Override public void render(GuiGraphics g,int mx,int my,float partial) {
-        float time=ClientState.now()+partial;
+        float time=ClientState.wave(partial);
         g.fill(0,0,width,height,0xa603080a);
         nebula(g,time);
         g.fill(left-1,top-1,left+WIDTH+1,top+panel+1,EDGE);

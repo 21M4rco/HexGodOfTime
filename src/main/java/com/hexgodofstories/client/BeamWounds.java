@@ -77,7 +77,7 @@ public final class BeamWounds {
             this.life = life;
         }
 
-        float age(float partial) {return (ClientState.now() + partial - start) / life;}
+        float age(float partial) {return ClientState.since(start, partial) / life;}
     }
 
     private static final Map<Integer, List<Wound>> WOUNDS = new HashMap<>();

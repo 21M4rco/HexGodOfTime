@@ -44,7 +44,7 @@ public final class FrostClient {
         if(!sword.hasTag()||!sword.getTag().hasUUID("conjurer"))return 0;
         Aim aim=AIM.get(sword.getTag().getUUID("conjurer"));
         if(aim==null)return 0;
-        float age=ClientState.now()+Minecraft.getInstance().getFrameTime()-aim.start;
+        float age=ClientState.since(aim.start,Minecraft.getInstance().getFrameTime());
         return age<0||age>26?0:age<6?Mth.clamp(age/6f,0,1):age<=12?1:Mth.clamp((26-age)/14f,0,1);
     }
     public static float pitch(ItemStack sword) {

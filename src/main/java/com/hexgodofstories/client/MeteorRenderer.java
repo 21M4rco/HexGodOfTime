@@ -33,7 +33,7 @@ public final class MeteorRenderer extends EntityRenderer<StarfallEntity> {
     @Override public void render(StarfallEntity e,float yaw,float partial,PoseStack pose,MultiBufferSource buffers,int light) {
         float heat=Mth.clamp(e.heat(),0,1);
         float charge=Mth.clamp(e.charge(),0,1);
-        double time=ClientState.now()+partial;
+        double time=ClientState.time(partial);
         int seed=e.seed();
         Vec3 travel=e.getDeltaMovement();
         Vec3 forward=travel.lengthSqr()<1e-8?new Vec3(0,-1,0):travel.normalize();

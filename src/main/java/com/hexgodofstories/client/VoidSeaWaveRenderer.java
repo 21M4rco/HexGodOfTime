@@ -96,7 +96,7 @@ public final class VoidSeaWaveRenderer {
         // them rather than swimming along with it.
         originX = Math.floor(camX / CELL) * CELL - radius;
         originZ = Math.floor(camZ / CELL) * CELL - radius;
-        double time = mc.level.getGameTime() + event.getPartialTick();
+        double time = mc.level.getGameTime() + (double) event.getPartialTick();
 
         // The dozen or so waves that can reach this patch, resolved once for the whole frame rather
         // than re-derived at each of several thousand grid points.

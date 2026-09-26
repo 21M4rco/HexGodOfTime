@@ -87,7 +87,7 @@ public final class Blood {
         if(SPLATS.isEmpty())return;
         Minecraft mc=Minecraft.getInstance();
         if(mc.level==null)return;
-        double now=ClientState.now()+partial;
+        double now=ClientState.time(partial);
         VertexConsumer out=buffers.getBuffer(RenderType.entityTranslucent(POOL));
         for(Splat splat:SPLATS) {
             double age=now-splat.start;

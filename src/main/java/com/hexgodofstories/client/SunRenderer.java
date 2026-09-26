@@ -49,7 +49,7 @@ public final class SunRenderer {
     }
     public static void draw(PoseStack pose,double time){
         if(surface==null)bake();
-        pose.pushPose();pose.translate(0,WarpMath.SUN_Y,0);pose.mulPose(Axis.YP.rotationDegrees((float)(time*.025)));
+        pose.pushPose();pose.translate(0,WarpMath.SUN_Y,0);pose.mulPose(Axis.YP.rotationDegrees((float)(time*.025%360)));
         RenderSystem.enableDepthTest();RenderSystem.depthFunc(GL11.GL_LEQUAL);RenderSystem.depthMask(true);
         RenderSystem.enableCull();RenderSystem.disableBlend();RenderSystem.setShaderColor(1,1,1,1);
         try{

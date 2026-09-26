@@ -29,7 +29,7 @@ public final class BranchMeter {
         float power=BranchCharge.power(held);
         int stage=BranchCharge.stage(held);
         float over=BranchCharge.overcharge(held);
-        double time=ClientState.now()+mc.getFrameTime();
+        double time=ClientState.time(mc.getFrameTime());
 
         int centre=screenWidth/2,top=screenHeight/2+16;
         int reach=(int)(46+34*power);
@@ -38,7 +38,7 @@ public final class BranchMeter {
         for(int side=-1;side<=1;side+=2) {
             for(int i=0;i<reach;i++) {
                 float t=i/(float)reach;
-                int colour=TimeBranchPalette.shade((float)(time*.03+t*.5+(side>0?.12:0)));
+                int colour=TimeBranchPalette.shade(ClientState.cycle(time*.03+t*.5+(side>0?.12:0)));
                 int alpha=(int)(255*Mth.clamp(.35f+.55f*power,0,1)*(1-t*.25f));
                 int wobble=(int)(Math.sin(t*9+time*.22*side)*(1+power*2.2));
                 g.fill(centre+side*i,top+wobble,centre+side*i+1,top+wobble+1+(power>.6f?1:0),alpha<<24|colour);
@@ -54,7 +54,7 @@ public final class BranchMeter {
             int length=(int)((7+b*4)*grow);
             for(int i=0;i<length;i++) {
                 float t=i/(float)Math.max(1,length);
-                int colour=TimeBranchPalette.hot((float)(time*.045+b*.17),t*.4f);
+                int colour=TimeBranchPalette.hot(ClientState.cycle(time*.045+b*.17),t*.4f);
                 int alpha=(int)(220*(1-t*.6f)*grow);
                 int x=centre+side*(from+i);
                 int y=top+rise*(int)(i*(.55+b*.12)+Math.sin(t*6+time*.3)*1.4);
@@ -63,7 +63,7 @@ public final class BranchMeter {
         }
         // Instability at the top end shows as the whole figure flickering, not as more of it.
         if(over>0&&Math.sin(time*.9)>.55-over*.5) {
-            int colour=TimeBranchPalette.hot((float)(time*.2),.8f);
+            int colour=TimeBranchPalette.hot(ClientState.cycle(time*.2),.8f);
             g.fill(centre-reach,top-1,centre+reach,top,(int)(120*over)<<24|colour);
         }
 
