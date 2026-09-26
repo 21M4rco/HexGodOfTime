@@ -92,7 +92,6 @@ public final class ScepterBlast {
         n.putString("state", "charge");
         n.putLong("start", now);
         HexNetwork.tracking(p, new HexNetwork.Message(HexNetwork.SCEPTER, p.getId(), n));
-        HexNetwork.animate(p, "scepter_aim");
     }
 
     public static void release(ServerPlayer p) {
@@ -194,8 +193,8 @@ public final class ScepterBlast {
         CompoundTag state = new CompoundTag();
         state.putString("state", "shot");
         state.putFloat("power", power);
+        // No arm clip: in third person the staff stays in its low carry, whatever the caster looks at.
         HexNetwork.tracking(caster, new HexNetwork.Message(HexNetwork.SCEPTER, caster.getId(), state));
-        HexNetwork.animate(caster, charged ? "scepter_fire" : "scepter_shot");
 
         CompoundTag fx = new CompoundTag();
         fx.putString("effect", "scepter_blast");

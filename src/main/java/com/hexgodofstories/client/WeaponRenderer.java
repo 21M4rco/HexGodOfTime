@@ -134,9 +134,9 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
             pose.scale(STAFF,STAFF,STAFF);
             pose.translate(0,-AIM_SLIDE*aim-.045f*recoil,0);
         } else if(third) {
-            // The fire animation rotates the arm and its item together on one timeline; this only
-            // follows the caster's vertical look while the staff is raised.
-            pose.mulPose(Axis.XP.rotationDegrees(-20-ScepterClient.pitch(stack)*aim+6*recoil));
+            // Always the low carry, tip toward the ground; it never follows the caster's look up or
+            // down. A shot only kicks the head up for a moment.
+            pose.mulPose(Axis.XP.rotationDegrees(-20+6*recoil));
             pose.mulPose(Axis.YP.rotationDegrees(90));
             pose.scale(STAFF,STAFF,STAFF);
         } else if(context==ItemDisplayContext.GUI||context==ItemDisplayContext.FIXED) {
