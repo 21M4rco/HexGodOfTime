@@ -263,9 +263,6 @@ def main():
     first_person(pose(AIM), offset=AIM_OFFSET, slide=AIM_SLIDE).save(out / "first_person_aim.png")
 
 
-if __name__ == "__main__":
-    main()
-
 
 # WeaponRenderer's first-person poses: rest, and raised to fire (grip offset and slide up the shaft).
 REST = (-15, -35, 18)
@@ -285,3 +282,7 @@ def first_person(rotation, scale=2.3, width=1280, height=720, equip=0.0, offset=
     m = matrix(rotation, arm, scale)
     m[:3, 3] += (rotation * scale) @ np.array([0, -slide, 0])
     return render(m, width, height, 70.0, background=(118, 152, 196))
+
+
+if __name__ == "__main__":
+    main()
