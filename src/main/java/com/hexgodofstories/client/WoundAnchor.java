@@ -24,6 +24,8 @@ public final class WoundAnchor {
     private static Object world;
     /** True while a living body's own model is being emitted (WoundBodyMixin), not its layers. */
     private static boolean body;
+    /** Whether that bracket has ever fired; if another mod took the call over, every part counts. */
+    private static boolean bodyKnown;
     private record Active(Entity host,float partial,List<ThrownDagger> daggers) {}
     private static final class Pin {
         Object part,candidate;
@@ -52,7 +54,7 @@ public final class WoundAnchor {
         PINS.keySet().retainAll(alive);
     }
 
-    public static void body(boolean emitting){body=emitting;}
+    public static void body(boolean emitting){body=emitting;bodyKnown|=emitting;}
     public static void beginEntity(Entity host,float partial) {
         body=false;
         List<ThrownDagger> daggers=BY_HOST.getOrDefault(host.getId(),List.of());
@@ -77,7 +79,7 @@ public final class WoundAnchor {
 
     /** Invoked only when an actual ModelPart emits its posed geometry, including walk/attack/scale. */
     public static void capturePart(Object part,PoseStack.Pose pose,List<ModelPart.Cube> cubes) {
-        if(!ACTIVE.isEmpty())BeamWounds.capture(ACTIVE.peek().host(),ACTIVE.peek().partial(),part,pose,cubes,body);
+        if(!ACTIVE.isEmpty())BeamWounds.capture(ACTIVE.peek().host(),ACTIVE.peek().partial(),part,pose,cubes,body||!bodyKnown);
         if(ACTIVE.isEmpty()||ACTIVE.peek().daggers().isEmpty()||inverseView==null||cubes.isEmpty())return;
         Active active=ACTIVE.peek();
         Matrix4f matrix=new Matrix4f(inverseView).mul(pose.pose());
