@@ -18,8 +18,8 @@ import java.util.*;
  * turn, which is what makes the reverse grip read as deliberate rather than as a flipped model.
  *
  * <p>The Scepter is the exception: a solid, separately shaded model ({@link ScepterModel}) with its own
- * poses. In first person it rests diagonally beside the view with the stone turned toward the eye, and
- * raises into a forward point — head just under the crosshair, blade arched over it — to fire.
+ * poses. In first person it rests as it does in third: carried low, pointing forward with the tip toward
+ * the ground and the blade curving up, and raises into a forward point — blade arched over it — to fire.
  */
 public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
     /** Grip position inside the item cube and an overall size trim, one entry per weapon kind. */
@@ -33,8 +33,8 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
 
     // First-person rest and aim, as rotations applied X then Y then Z to the staff; tuned in
     // tools/preview_scepter.py against the game's hand transform and 70 degree hand field of view.
-    private static final Quaternionf REST=euler(-15,-35,18),AIM=euler(-82,-50,6);
-    private static final Quaternionf REST_LEFT=euler(-15,35,-18),AIM_LEFT=euler(-82,50,-6);
+    private static final Quaternionf REST=euler(0,-80,107),AIM=euler(-82,-50,6);
+    private static final Quaternionf REST_LEFT=euler(0,80,-107),AIM_LEFT=euler(-82,50,-6);
     /** Where the grip moves to when aiming (hand space) and how far the hand slides up the shaft. */
     private static final float AIM_X=-.34f,AIM_Y=.38f,AIM_Z=-.05f,AIM_SLIDE=.20f;
 

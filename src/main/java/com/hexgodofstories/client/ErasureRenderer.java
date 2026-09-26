@@ -14,7 +14,8 @@ import java.util.*;
 public final class ErasureRenderer {
     private ErasureRenderer() {}
 
-    private record Fading(Vec3 direction,long start,int duration,float power,boolean implosion) {}
+    /** {@code upright}: an already-dead body (a Scepter kill) held standing and untinted while it goes. */
+    private record Fading(Vec3 direction,long start,int duration,float power,boolean implosion,boolean upright) {}
     private static final Map<Integer,Fading> FADING=new HashMap<>();
     /** The original buildup before the directional fade starts. */
     private static final float TAKEOVER=.18f;
@@ -31,7 +32,7 @@ public final class ErasureRenderer {
         Vec3 direction=new Vec3(n.getDouble("dx"),n.getDouble("dy"),n.getDouble("dz"));
         if(direction.lengthSqr()<1e-8)direction=new Vec3(1,0,0);
         if(FADING.size()>48)FADING.clear();
-        FADING.put(entity,new Fading(direction.normalize(),n.getLong("start"),Math.max(1,n.getInt("duration")),n.getFloat("power"),n.getBoolean("implosion")));
+        FADING.put(entity,new Fading(direction.normalize(),n.getLong("start"),Math.max(1,n.getInt("duration")),n.getFloat("power"),n.getBoolean("implosion"),n.getBoolean("upright")));
         var mc=Minecraft.getInstance();
         if(mc.level!=null&&mc.level.getEntity(entity)!=null)
             BranchAudio.erase(mc.level.getEntity(entity).position());
@@ -58,7 +59,7 @@ public final class ErasureRenderer {
         FADING.entrySet().removeIf(e->{
             Entity victim=mc.level.getEntity(e.getKey());
             if(victim==null)return now>e.getValue().start()+e.getValue().duration()+GRACE;
-            if(e.getValue().implosion()&&victim instanceof net.minecraft.world.entity.LivingEntity living){living.hurtTime=0;living.deathTime=0;}
+            if((e.getValue().implosion()||e.getValue().upright())&&victim instanceof net.minecraft.world.entity.LivingEntity living){living.hurtTime=0;living.deathTime=0;}
             long over=now-e.getValue().start()-e.getValue().duration();
             if(over<GRACE)return false;
             // Past the sequence. A body that has gone, or that genuinely survived, can be let go of. One

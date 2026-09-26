@@ -294,7 +294,7 @@ public final class HexClient {
         @SubscribeEvent public static void playerEnd(RenderPlayerEvent.Post e){WorldEffects.afterPlayer(e);}
         /** Scepter wound rims go over the body once it has been drawn. */
         @SubscribeEvent public static void livingEnd(net.minecraftforge.client.event.RenderLivingEvent.Post<?,?> e) {
-            BeamWounds.afterEntity(e.getEntity(),e.getMultiBufferSource());
+            BeamWounds.afterEntity(e.getEntity(),e.getMultiBufferSource(),e.getPackedLight());
         }
         /** Breaches, impacts and the standing tremor of something enormous passing underneath. */
         @SubscribeEvent public static void pilgrimCamera(net.minecraftforge.client.event.ViewportEvent.ComputeCameraAngles e){

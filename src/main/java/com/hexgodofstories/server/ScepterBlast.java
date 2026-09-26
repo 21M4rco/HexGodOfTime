@@ -221,15 +221,34 @@ public final class ScepterBlast {
         // Taps come faster than vanilla's hurt immunity; each one still lands.
         victim.invulnerableTime = 0;
         victim.hurt(caster.damageSources().indirectMagic(caster, caster), charged ? 12 + 20 * power : 6.5f);
-        victim.setSecondsOnFire(charged ? 3 + Math.round(4 * power) : 2);
-        BeamWound.open(victim, hit.at, direction, charged ? .15f + .13f * power : .10f, charged ? 220 : 150);
+        victim.level().playSound(null, hit.at.x, hit.at.y, hit.at.z, HexGodOfStories.SCEPTER_BURN.get(), SoundSource.PLAYERS,
+            1.2f, .9f + victim.getRandom().nextFloat() * .25f);
+        if (victim.isDeadOrDying()) {dissolve(victim, direction, power); return;}
+        // A clean hole that stays open for most of a minute before it knits shut. Bleed, never fire.
+        BeamWound.open(victim, hit.at, direction, charged ? .20f + .14f * power : .15f, charged ? 1200 : 900);
         Bleed.apply(caster, victim, charged ? 2 + Math.round(3 * power) : 1, charged ? 180 : 110);
         Vec3 push = direction.scale(charged ? 1.1 + 2.6 * power : .5).add(0, charged ? .3 + .4 * power : .16, 0);
         victim.setDeltaMovement(victim.getDeltaMovement().add(push));
         victim.hurtMarked = true;
         if (charged && power >= .5f) stun(victim, Math.round(20 + 40 * power));
-        victim.level().playSound(null, hit.at.x, hit.at.y, hit.at.z, HexGodOfStories.SCEPTER_BURN.get(), SoundSource.PLAYERS,
-            1.2f, .9f + victim.getRandom().nextFloat() * .25f);
+    }
+
+    /**
+     * A body the beam kills comes apart the way Time Branch Unleashing unmakes one, only far faster: the
+     * same fracturing surface, dust and threads, run inside vanilla's twenty-tick death so the last
+     * fragment goes as the body does. Bosses keep their own deaths.
+     */
+    private static void dissolve(LivingEntity victim, Vec3 direction, float power) {
+        if (victim.getType().is(net.minecraftforge.common.Tags.EntityTypes.BOSSES)) return;
+        CompoundTag n = new CompoundTag();
+        n.putDouble("dx", direction.x);
+        n.putDouble("dy", direction.y);
+        n.putDouble("dz", direction.z);
+        n.putInt("duration", victim instanceof net.minecraft.world.entity.player.Player ? 30 : 19);
+        n.putFloat("power", .5f + .5f * power);
+        n.putLong("start", victim.level().getGameTime());
+        n.putBoolean("upright", true);
+        HexNetwork.tracking(victim, new HexNetwork.Message(HexNetwork.ERASURE, victim.getId(), n));
     }
 
     /** Whatever the beam finally reaches goes up: a burst of heat, never a hole in the terrain. */
@@ -243,8 +262,8 @@ public final class ScepterBlast {
             if (d > radius) continue;
             float falloff = (float) (1 - d / radius);
             victim.hurt(caster.damageSources().indirectMagic(caster, caster), damage * (.35f + .65f * falloff));
-            if (charged) victim.setSecondsOnFire(2 + Math.round(3 * power));
             Vec3 away = victim.getBoundingBox().getCenter().subtract(at);
+            if (victim.isDeadOrDying()) {dissolve(victim, away.lengthSqr() > 1e-6 ? away.normalize() : new Vec3(0, 1, 0), power); continue;}
             if (away.lengthSqr() > 1e-6) {
                 victim.setDeltaMovement(victim.getDeltaMovement().add(away.normalize().scale((charged ? .5 + power : .25) * falloff)).add(0, .2 * falloff, 0));
                 victim.hurtMarked = true;

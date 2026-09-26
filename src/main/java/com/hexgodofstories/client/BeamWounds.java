@@ -94,7 +94,7 @@ public final class BeamWounds {
             n.getDouble("z") - n.getDouble("ez")).yRot(yaw);
         Vec3 direction = new Vec3(n.getDouble("dx"), n.getDouble("dy"), n.getDouble("dz")).normalize().yRot(yaw);
         List<Wound> list = WOUNDS.computeIfAbsent(entity, k -> new ArrayList<>());
-        if (list.size() >= 4) list.remove(0);
+        if (list.size() >= 8) list.remove(0);
         if (WOUNDS.size() > 256) WOUNDS.clear();
         list.add(new Wound(point, direction, n.getFloat("r"), n.getLong("start"), Math.max(1, n.getInt("life"))));
     }
@@ -119,7 +119,8 @@ public final class BeamWounds {
 
     private static float radius(Wound w, float partial) {
         float age = w.age(partial);
-        float close = Mth.clamp((age - .30f) / .70f, 0, 1);
+        // Open for three quarters of its life, then it knits shut.
+        float close = Mth.clamp((age - .75f) / .25f, 0, 1);
         return w.radius * (1 - close * close * (3 - 2 * close));
     }
 
@@ -238,8 +239,8 @@ public final class BeamWounds {
         if (r < .004f) {w.rim = null; return;}
         float age = w.age(partial);
         // Fit each opening inside its own face so the hole never cuts the space beside the limb.
-        r = Math.min(r, fit(w.entry, w.entryAxis, w.face) * .92f);
-        r = Math.min(r, fit(w.exit, w.exitAxis, w.face) * .92f);
+        r = Math.min(r, fit(w.entry, w.entryAxis, w.face) * .95f);
+        r = Math.min(r, fit(w.exit, w.exitAxis, w.face) * .95f);
         if (r < .004f) {w.rim = null; return;}
         // Armour sits up to a pixel outside the body and is drawn after it; an armoured body is cut from
         // just beyond the armour's surface in, so the plate is holed along with the flesh under it.
@@ -260,7 +261,7 @@ public final class BeamWounds {
             RenderSystem.disableCull();
             RenderSystem.disableBlend();
             RenderSystem.setShader(GameRenderer::getPositionColorShader);
-            // Tunnel: white-hot at the mouths, charred to black at the middle, cooling with time.
+            // Tunnel: raw red flesh at the mouths, darkening toward the middle.
             b.begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
             int bands = 4;
             for (int k = 0; k < RING; k++) {
@@ -303,43 +304,41 @@ public final class BeamWounds {
     }
 
     /** From the entity's post-render event: the rims, added over the body now that it is drawn. */
-    public static void afterEntity(Entity host, MultiBufferSource buffers) {
+    public static void afterEntity(Entity host, MultiBufferSource buffers, int light) {
         if (!world) return;
         List<Wound> list = WOUNDS.get(host.getId());
         if (list == null) return;
         VertexConsumer out = null;
         for (Wound w : list) {
             if (w.rim == null || w.seen != ClientState.now()) continue;
-            if (out == null) out = buffers.getBuffer(ScepterRenderTypes.glow(WorldEffects.WHITE));
-            float heat = .25f + .75f * w.heat;
+            // Blended, not added: a dark wet ring reads on pale skin and dark hide alike.
+            if (out == null) out = buffers.getBuffer(ScepterRenderTypes.glass(WorldEffects.WHITE));
             for (int mouth = 0; mouth < 2; mouth++) {
                 int base = mouth * RING * 6;
                 for (int k = 0; k < RING; k++) {
                     int a = base + k * 6, b = base + ((k + 1) % RING) * 6;
-                    // Inner edge burns; the outer edge fades to nothing on the skin.
-                    rimVertex(out, w.rim, a, heat, true);
-                    rimVertex(out, w.rim, b, heat, true);
-                    rimVertex(out, w.rim, b + 3, heat, false);
-                    rimVertex(out, w.rim, a, heat, true);
-                    rimVertex(out, w.rim, b + 3, heat, false);
-                    rimVertex(out, w.rim, a + 3, heat, false);
+                    // Raw at the edge of the opening, fading into the skin around it.
+                    rimVertex(out, w.rim, a, true, light);
+                    rimVertex(out, w.rim, b, true, light);
+                    rimVertex(out, w.rim, b + 3, false, light);
+                    rimVertex(out, w.rim, a, true, light);
+                    rimVertex(out, w.rim, b + 3, false, light);
+                    rimVertex(out, w.rim, a + 3, false, light);
                 }
             }
             w.rim = null;
         }
     }
 
-    private static void rimVertex(VertexConsumer out, float[] rim, int i, float heat, boolean inner) {
-        float k = inner ? heat : 0;
-        out.vertex(rim[i], rim[i + 1], rim[i + 2], Math.min(1, 1.0f * k), Math.min(1, .45f * k + .1f * k * k),
-            Math.min(1, .12f * k * k), 1, .5f, .5f, 0, 15728880, 0, 0, 1);
+    private static void rimVertex(VertexConsumer out, float[] rim, int i, boolean inner, int light) {
+        out.vertex(rim[i], rim[i + 1], rim[i + 2], inner ? .40f : .26f, inner ? .02f : .01f, inner ? .03f : .01f, inner ? .95f : 0,
+            .5f, .5f, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, light, 0, 0, 1);
     }
 
     private static int tunnel(float along, float heat) {
         // 0 at a mouth, 1 at the middle.
         float depth = 1 - Math.abs(along * 2 - 1);
-        float glow = heat * (1 - depth) * (1 - depth);
-        float r = .09f + .95f * glow, g = .03f + .42f * glow * glow, b = .02f + .10f * glow * glow * glow;
+        float r = .52f - .36f * depth, g = .06f - .045f * depth, b = .06f - .04f * depth;
         return 0xff000000 | ((int) (Math.min(1, r) * 255) << 16) | ((int) (Math.min(1, g) * 255) << 8) | (int) (Math.min(1, b) * 255);
     }
 
