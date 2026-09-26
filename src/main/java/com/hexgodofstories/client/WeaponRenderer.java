@@ -150,6 +150,8 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
             pose.translate(0,.45,0);
             pose.scale(.8f,.8f,.8f);
         }
+        // The stone as this frame draws it in a third-person hand: where the charge and the beam leave from.
+        if(third)ScepterFx.drawn(stack,pose.last().pose());
         ScepterModel.get().render(pose.last(),buffers,light,overlay,context==ItemDisplayContext.GUI,reveal,power,time,first);
         if(reveal<1)manifestScepter(pose,buffers,reveal);
         pose.popPose();

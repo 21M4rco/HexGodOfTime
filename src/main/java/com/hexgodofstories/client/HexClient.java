@@ -270,7 +270,7 @@ public final class HexClient {
             if(e.getOverlay().id().equals(net.minecraftforge.client.gui.overlay.VanillaGuiOverlay.HOTBAR.id()))HexHud.render(e.getGuiGraphics());
         }
         @SubscribeEvent public static void world(RenderLevelStageEvent e) {
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);BeamWounds.beginFrame(e);}
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);BeamWounds.beginFrame(e);ScepterFx.beginFrame(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES)WarpRenderer.renderRealm(e);
             // Forge's supported translucent-effects stage, paired with the wave's particles
             // target so Fabulous composites the swell correctly over the water and entities.
@@ -284,14 +284,14 @@ public final class HexClient {
             if(ErasureRenderer.consumed(e.getEntity())){e.setCanceled(true);return;}
             if(ClientState.data(e.getEntity().getId()).getLong("vanishUntil")>ClientState.now()){e.setCanceled(true);return;}
             DisguiseRenderer.render(e);
-            if(!e.isCanceled())WorldEffects.beforePlayer(e);
+            if(!e.isCanceled()){WorldEffects.beforePlayer(e);ScepterFx.drawing(e.getEntity());}
         }
         /** The same stand-down for every other living thing; players are answered above. */
         @SubscribeEvent public static void living(net.minecraftforge.client.event.RenderLivingEvent.Pre<?,?> e) {
             if(e.getEntity() instanceof net.minecraft.world.entity.player.Player)return;
             if(ErasureRenderer.consumed(e.getEntity()))e.setCanceled(true);
         }
-        @SubscribeEvent public static void playerEnd(RenderPlayerEvent.Post e){WorldEffects.afterPlayer(e);}
+        @SubscribeEvent public static void playerEnd(RenderPlayerEvent.Post e){WorldEffects.afterPlayer(e);ScepterFx.drawing(null);}
         /** Scepter wound rims go over the body once it has been drawn. */
         @SubscribeEvent public static void livingEnd(net.minecraftforge.client.event.RenderLivingEvent.Post<?,?> e) {
             BeamWounds.afterEntity(e.getEntity(),e.getMultiBufferSource(),e.getPackedLight());

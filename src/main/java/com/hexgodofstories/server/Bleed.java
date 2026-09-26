@@ -54,6 +54,8 @@ public final class Bleed {
             if(!victim.isAlive()||now>=wound.expires){WOUNDS.remove(id);notifyClients(victim,0);continue;}
             if(now<wound.next)continue;
             wound.next=now+INTERVAL;
+            // A body on its last breath bleeds without losing more: how long it stands is LastMoments' clock.
+            if(LastMoments.held(victim))continue;
             ServerPlayer owner=level.getServer().getPlayerList().getPlayer(wound.owner);
             // Bleeding out from a bite is still a kill by the thing that bit you, and still says so:
             // without this the last tick of a wound Hexor opened would be reported as plain magic.

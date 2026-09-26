@@ -1,5 +1,6 @@
 package com.hexgodofstories.client;
 
+import com.hexgodofstories.data.WoundGeometry;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.BufferUploader;
@@ -41,6 +42,11 @@ import java.util.Map;
  * depth test, so what shows through is whatever was already drawn behind the body. The glowing rim is
  * drawn after the body, additively. Openings are clipped to the cube face they sit on and shrink to fit
  * it, so a hole never cuts into the space beside a limb.
+ *
+ * <p>A body with no vanilla model part for the beam's line to meet (GeckoLib, Citadel, a mod's own
+ * renderer, or a line that only grazed the parts) is cut the same way from the surfaces it actually
+ * draws: {@link WoundSurface} notes them as they go by, and the openings are cut from the faces the line
+ * enters and leaves through, before that batch is drawn. A line that only enters leaves a deep pit.
  */
 public final class BeamWounds {
     private BeamWounds() { }
@@ -68,6 +74,11 @@ public final class BeamWounds {
         // This frame's rim, in view space, drawn after the body.
         float[] rim;
         float heat;
+        // Never pinned to a vanilla part after two draws: cut from the drawn surface instead.
+        int misses;
+        boolean surface;
+        /** Where the entry opening was last drawn, in the world, for blood to pour from. */
+        Vec3 mouth;
 
         Wound(Vec3 point, Vec3 direction, float radius, long start, int life) {
             this.point = point;
@@ -82,7 +93,7 @@ public final class BeamWounds {
 
     private static final Map<Integer, List<Wound>> WOUNDS = new HashMap<>();
     private static boolean world;
-    private static Matrix4f inverseView;
+    private static Matrix4f inverseView, view;
     private static Vec3 camera = Vec3.ZERO;
 
     public static void clear() {WOUNDS.clear();}
@@ -111,7 +122,8 @@ public final class BeamWounds {
 
     public static void beginFrame(RenderLevelStageEvent event) {
         world = true;
-        inverseView = new Matrix4f(event.getPoseStack().last().pose()).invert();
+        view = new Matrix4f(event.getPoseStack().last().pose());
+        inverseView = new Matrix4f(view).invert();
         camera = event.getCamera().getPosition();
     }
 
@@ -173,6 +185,130 @@ public final class BeamWounds {
         }
     }
 
+    /**
+     * The buffers a body should draw into: its own, or, when one of its wounds has nothing vanilla to pin
+     * to, a {@link WoundSurface} that notes where its surfaces are on the way through.
+     */
+    public static MultiBufferSource surface(Entity host, float partial, MultiBufferSource buffers, int light) {
+        if (!world || view == null) return buffers;
+        List<Wound> list = WOUNDS.get(host.getId());
+        if (list == null) return buffers;
+        for (Wound w : list) if (w.surface && w.part == null) return new WoundSurface(buffers, host, partial, light);
+        return buffers;
+    }
+
+    /** After the body's renderer returns: cut anything still waiting to be cut. */
+    public static void finish(MultiBufferSource buffers) {
+        if (buffers instanceof WoundSurface surface) surface.finish();
+    }
+
+    /** From WoundSurface, ahead of the body's batch: cut every surface wound, then lay its rim over the body. */
+    static void cutSurface(Entity host, float partial, WoundSurface surface, MultiBufferSource buffers, int light) {
+        List<Wound> list = WOUNDS.get(host.getId());
+        if (list == null || surface.faces() == 0 || view == null || inverseView == null) return;
+        VertexConsumer out = null;
+        for (Wound w : list) {
+            if (!w.surface || w.part != null || !drawSurface(w, host, partial, surface) || w.rim == null) continue;
+            if (out == null) out = buffers.getBuffer(ScepterRenderTypes.glass(WorldEffects.WHITE));
+            emitRim(out, w.rim, light);
+            w.rim = null;
+        }
+    }
+
+    /** Cuts one wound from the recorded faces, in view space. False when the line never meets the body. */
+    private static boolean drawSurface(Wound w, Entity host, float partial, WoundSurface surface) {
+        float r = radius(w, partial);
+        if (r < .004f) return false;
+        float[] faces = surface.packed();
+        byte[] corners = surface.cornerCounts();
+        int count = surface.faces();
+        // The beam's line through the body, as it struck, turned with the body and carried into view space.
+        Vec3 at = bodyToWorld(host, w.point, partial).subtract(camera);
+        Vec3 along = w.direction.yRot(-bodyYaw(host, partial) * Mth.DEG_TO_RAD);
+        Vector3f o = view.transformPosition(new Vector3f((float) at.x, (float) at.y, (float) at.z));
+        Vector3f d = view.transformDirection(new Vector3f((float) along.x, (float) along.y, (float) along.z)).normalize();
+        float reach = Math.max(2, host.getBbWidth() + host.getBbHeight()) * 2;
+        var hits = WoundGeometry.crossings(faces, corners, count, new Vector3f(o).sub(new Vector3f(d).mul(reach)), d, reach * 2);
+        if (hits.isEmpty()) {
+            // A beam that only grazed the body: move its line across onto the nearest part of it.
+            Vector3f shift = WoundGeometry.toward(faces, corners, count, o, d);
+            if (shift == null) return false;
+            o.add(shift);
+            hits = WoundGeometry.crossings(faces, corners, count, new Vector3f(o).sub(new Vector3f(d).mul(reach)), d, reach * 2);
+            if (hits.isEmpty()) return false;
+        }
+        Vector3f start = new Vector3f(o).sub(new Vector3f(d).mul(reach));
+        var first = hits.get(0);
+        var last = hits.get(hits.size() - 1);
+        Vector3f entry = new Vector3f(d).mul(first.t()).add(start);
+        Vector3f exit = new Vector3f(d).mul(last.t()).add(start);
+        boolean through = hits.size() > 1 && last.t() - first.t() > .02f;
+        Vector3f inNormal = WoundGeometry.normal(faces, first.face());
+        if (inNormal.dot(d) > 0) inNormal.negate();
+        Vector3f outNormal = through ? WoundGeometry.normal(faces, last.face()) : new Vector3f(inNormal).negate();
+        if (outNormal.dot(d) < 0) outNormal.negate();
+        // Fit each opening to the face it is on, but never below a third of its size on a finely cut mesh.
+        float room = WoundGeometry.room(faces, corners, first.face(), entry);
+        if (through) room = Math.min(room, WoundGeometry.room(faces, corners, last.face(), exit));
+        r = Math.min(r, Math.max(room * .95f, r * .35f));
+        if (!through) exit = new Vector3f(d).mul(Math.min(.3f, host.getBbWidth() * .45f)).add(entry);
+        float lift = armoured(host) ? .07f : .006f;
+        Vector3f u = new Vector3f(), v = new Vector3f();
+        perpendicular(d, u, v);
+        Vector3f[] in = slide(entry, d, u, v, r, inNormal);
+        Vector3f[] out = through ? slide(exit, d, u, v, r, outNormal) : shrink(slide(exit, d, u, v, r, outNormal), exit, .6f);
+        w.heat = Mth.clamp(1 - w.age(partial) * 1.6f, 0, 1);
+        w.mouth = world(entry);
+        cut(in, out, lifted(in, inNormal, lift), lifted(out, outNormal, lift), w.heat, through);
+        Vector3f[] inRim = lifted(in, inNormal, lift + .003f), inOuter = lifted(slide(entry, d, u, v, r * 1.75f, inNormal), inNormal, lift + .003f);
+        w.rim = through
+            ? rimOf(inRim, inOuter, lifted(out, outNormal, lift + .003f), lifted(slide(exit, d, u, v, r * 1.75f, outNormal), outNormal, lift + .003f))
+            : rimOf(inRim, inOuter);
+        w.seen = ClientState.now();
+        return true;
+    }
+
+    /** A ring about {@code centre} across the beam, laid onto the face through {@code centre}. */
+    private static Vector3f[] slide(Vector3f centre, Vector3f axis, Vector3f u, Vector3f v, float r, Vector3f normal) {
+        Vector3f[] out = new Vector3f[RING];
+        for (int k = 0; k < RING; k++) {
+            double angle = 2 * Math.PI * k / RING;
+            Vector3f p = new Vector3f(centre).add(new Vector3f(u).mul((float) (Math.cos(angle) * r)))
+                .add(new Vector3f(v).mul((float) (Math.sin(angle) * r)));
+            out[k] = WoundGeometry.onto(p, axis, centre, normal);
+        }
+        return out;
+    }
+
+    private static Vector3f[] shrink(Vector3f[] ring, Vector3f centre, float by) {
+        Vector3f[] out = new Vector3f[ring.length];
+        for (int k = 0; k < ring.length; k++) out[k] = new Vector3f(ring[k]).sub(centre).mul(by).add(centre);
+        return out;
+    }
+
+    /** Rim rings, inner then outer for each mouth, packed the way {@link #emitRim} reads them. */
+    private static float[] rimOf(Vector3f[]... rings) {
+        float[] rim = new float[RING * 6 * (rings.length / 2)];
+        int o = 0;
+        for (int m = 0; m + 1 < rings.length; m += 2)
+            for (int k = 0; k < RING; k++) {
+                rim[o++] = rings[m][k].x; rim[o++] = rings[m][k].y; rim[o++] = rings[m][k].z;
+                rim[o++] = rings[m + 1][k].x; rim[o++] = rings[m + 1][k].y; rim[o++] = rings[m + 1][k].z;
+            }
+        return rim;
+    }
+
+    /** Where blood leaves the newest hole in this body, in the world; null when it has none. */
+    public static Vec3 bleedPoint(Entity host) {
+        List<Wound> list = WOUNDS.get(host.getId());
+        if (list == null || list.isEmpty()) return null;
+        Wound w = list.get(list.size() - 1);
+        if (w.mouth != null && ClientState.now() - w.seen <= 2) return w.mouth;
+        // Not drawn lately: the point the beam struck, drawn in from the widened box it was tested against.
+        Vec3 at = bodyToWorld(host, w.point, 1);
+        return at.lerp(new Vec3(host.getX(), at.y, host.getZ()), .35);
+    }
+
     /** When the body has finished drawing: settle any pin found this frame. */
     static void endEntity(Entity host) {
         List<Wound> list = WOUNDS.get(host.getId());
@@ -194,6 +330,8 @@ public final class BeamWounds {
             w.candidateT = Float.POSITIVE_INFINITY;
             // A part that has stopped being drawn (armour taken off, a model swap) lets the wound re-pin.
             if (w.part != null && ClientState.now() - w.seen > 4) w.part = null;
+            if (w.part != null) {w.misses = 0; w.surface = false;}
+            else if (!w.surface && ++w.misses >= 2) w.surface = true;
         }
     }
 
@@ -254,6 +392,28 @@ public final class BeamWounds {
         Vector3f[] inLift = transform(pose, lifted(in, inNormal, lift)), outLift = transform(pose, lifted(out, outNormal, lift));
         w.heat = Mth.clamp(1 - age * 1.6f, 0, 1);
 
+        w.mouth = world(centre(inView));
+        cut(inView, outView, inLift, outLift, w.heat, true);
+        // The burning rim for after the body, both mouths.
+        float[] rim = new float[RING * 2 * 2 * 3];
+        int o = 0;
+        Vector3f[] inOuter = transform(pose, lifted(ring(w, w.entry, w.entryAxis, w.entrySide, u, v, r * 1.75f), inNormal, lift + .003f));
+        Vector3f[] outOuter = transform(pose, lifted(ring(w, w.exit, w.exitAxis, w.exitSide, u, v, r * 1.75f), outNormal, lift + .003f));
+        Vector3f[] inInner = transform(pose, lifted(in, inNormal, lift + .003f)), outInner = transform(pose, lifted(out, outNormal, lift + .003f));
+        for (Vector3f[][] pair : new Vector3f[][][]{{inInner, inOuter}, {outInner, outOuter}})
+            for (int k = 0; k < RING; k++) {
+                rim[o++] = pair[0][k].x; rim[o++] = pair[0][k].y; rim[o++] = pair[0][k].z;
+                rim[o++] = pair[1][k].x; rim[o++] = pair[1][k].y; rim[o++] = pair[1][k].z;
+            }
+        w.rim = rim;
+    }
+
+    /**
+     * Draws the tunnel walls right now, ahead of the body's own batch, then cuts the openings into the
+     * depth buffer. {@code through} is false for a pit the line only entered: its far end is a dark floor
+     * rather than a second opening.
+     */
+    private static void cut(Vector3f[] inView, Vector3f[] outView, Vector3f[] inLift, Vector3f[] outLift, float heat, boolean through) {
         BufferBuilder b = Tesselator.getInstance().getBuilder();
         try {
             RenderSystem.enableDepthTest();
@@ -270,37 +430,34 @@ public final class BeamWounds {
                     float a0 = s / (float) bands, a1 = (s + 1) / (float) bands;
                     Vector3f p00 = mix(inView[k], outView[k], a0), p01 = mix(inView[k1], outView[k1], a0);
                     Vector3f p10 = mix(inView[k], outView[k], a1), p11 = mix(inView[k1], outView[k1], a1);
-                    int c0 = tunnel(a0, w.heat), c1 = tunnel(a1, w.heat);
+                    int c0 = tunnel(a0, heat), c1 = tunnel(a1, heat);
                     vertex(b, p00, c0); vertex(b, p01, c0); vertex(b, p11, c1);
                     vertex(b, p00, c0); vertex(b, p11, c1); vertex(b, p10, c1);
                 }
             }
+            if (!through) fan(b, outView);
             BufferUploader.drawWithShader(b.end());
-            // Openings: depth only. Farther first, so the nearer one decides where they overlap.
+            // Openings: depth only, and only where nothing already drawn is nearer. Written unconditionally,
+            // they would erase a block standing in front of the body, and the body's own far side would
+            // then show through that block.
             RenderSystem.colorMask(false, false, false, false);
-            RenderSystem.depthFunc(GL11.GL_ALWAYS);
             b.begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
-            boolean entryNearer = centre(inLift).lengthSquared() < centre(outLift).lengthSquared();
-            fan(b, entryNearer ? outLift : inLift);
-            fan(b, entryNearer ? inLift : outLift);
+            if (through) {
+                boolean entryNearer = centre(inLift).lengthSquared() < centre(outLift).lengthSquared();
+                fan(b, entryNearer ? outLift : inLift);
+                fan(b, entryNearer ? inLift : outLift);
+            } else fan(b, inLift);
             BufferUploader.drawWithShader(b.end());
         } finally {
             RenderSystem.colorMask(true, true, true, true);
             RenderSystem.depthFunc(GL11.GL_LEQUAL);
             RenderSystem.enableCull();
         }
-        // The burning rim for after the body, both mouths.
-        float[] rim = new float[RING * 2 * 2 * 3];
-        int o = 0;
-        Vector3f[] inOuter = transform(pose, lifted(ring(w, w.entry, w.entryAxis, w.entrySide, u, v, r * 1.75f), inNormal, lift + .003f));
-        Vector3f[] outOuter = transform(pose, lifted(ring(w, w.exit, w.exitAxis, w.exitSide, u, v, r * 1.75f), outNormal, lift + .003f));
-        Vector3f[] inInner = transform(pose, lifted(in, inNormal, lift + .003f)), outInner = transform(pose, lifted(out, outNormal, lift + .003f));
-        for (Vector3f[][] pair : new Vector3f[][][]{{inInner, inOuter}, {outInner, outOuter}})
-            for (int k = 0; k < RING; k++) {
-                rim[o++] = pair[0][k].x; rim[o++] = pair[0][k].y; rim[o++] = pair[0][k].z;
-                rim[o++] = pair[1][k].x; rim[o++] = pair[1][k].y; rim[o++] = pair[1][k].z;
-            }
-        w.rim = rim;
+    }
+
+    private static Vec3 world(Vector3f viewPoint) {
+        Vector3f p = inverseView.transformPosition(new Vector3f(viewPoint));
+        return camera.add(p.x, p.y, p.z);
     }
 
     /** From the entity's post-render event: the rims, added over the body now that it is drawn. */
@@ -313,20 +470,25 @@ public final class BeamWounds {
             if (w.rim == null || w.seen != ClientState.now()) continue;
             // Blended, not added: a dark wet ring reads on pale skin and dark hide alike.
             if (out == null) out = buffers.getBuffer(ScepterRenderTypes.glass(WorldEffects.WHITE));
-            for (int mouth = 0; mouth < 2; mouth++) {
-                int base = mouth * RING * 6;
-                for (int k = 0; k < RING; k++) {
-                    int a = base + k * 6, b = base + ((k + 1) % RING) * 6;
-                    // Raw at the edge of the opening, fading into the skin around it.
-                    rimVertex(out, w.rim, a, true, light);
-                    rimVertex(out, w.rim, b, true, light);
-                    rimVertex(out, w.rim, b + 3, false, light);
-                    rimVertex(out, w.rim, a, true, light);
-                    rimVertex(out, w.rim, b + 3, false, light);
-                    rimVertex(out, w.rim, a + 3, false, light);
-                }
-            }
+            emitRim(out, w.rim, light);
             w.rim = null;
+        }
+    }
+
+    /** Every mouth in {@code rim}: raw at the edge of the opening, fading into the skin around it. */
+    private static void emitRim(VertexConsumer out, float[] rim, int light) {
+        int mouths = rim.length / (RING * 6);
+        for (int mouth = 0; mouth < mouths; mouth++) {
+            int base = mouth * RING * 6;
+            for (int k = 0; k < RING; k++) {
+                int a = base + k * 6, b = base + ((k + 1) % RING) * 6;
+                rimVertex(out, rim, a, true, light);
+                rimVertex(out, rim, b, true, light);
+                rimVertex(out, rim, b + 3, false, light);
+                rimVertex(out, rim, a, true, light);
+                rimVertex(out, rim, b + 3, false, light);
+                rimVertex(out, rim, a + 3, false, light);
+            }
         }
     }
 

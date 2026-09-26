@@ -36,6 +36,8 @@ public final class ScepterClient {
     private static final class State {
         /** Tick the current hold began, or -1 when nothing is held. */
         long charging = -1;
+        /** Whether this hold has already announced a full stone. */
+        boolean full;
         long shot = Long.MIN_VALUE / 2;
         float shotPower;
         float aim, aimPrev, recoil, recoilPrev, flash, flashPrev;
@@ -183,10 +185,13 @@ public final class ScepterClient {
             return true;
         });
         for (var entry : STATES.entrySet()) {
-            if (entry.getValue().charging < 0) continue;
-            float c = charge(entry.getValue(), 0);
+            State s = entry.getValue();
+            if (s.charging < 0) {s.full = false; continue;}
+            float c = charge(s, 0);
             Entity caster = mc.level.getEntity(entry.getKey());
             if (caster != null && c > 0) ScepterFx.charging(caster, c);
+            // Only a full stone unmakes what it kills, so the moment it fills is announced once.
+            if (c >= 1 && !s.full) {s.full = true; if (caster != null) ScepterFx.full(caster);}
             if (HUMS.containsKey(entry.getKey())) continue;
             Hum hum = new Hum(entry.getKey());
             HUMS.put(entry.getKey(), hum);
@@ -207,7 +212,15 @@ public final class ScepterClient {
 
     /** 0 at rest, 1 fully raised to aim. */
     public static float aim(ItemStack stack) {
-        State s = state(stack);
+        return aim(state(stack));
+    }
+
+    /** The same raise for a player by entity id: charging, and a moment after each shot. */
+    public static float aim(int entity) {
+        return aim(STATES.get(entity));
+    }
+
+    private static float aim(State s) {
         if (s == null) return 0;
         float a = Mth.lerp(partial(), s.aimPrev, s.aim);
         return a * a * (3 - 2 * a);

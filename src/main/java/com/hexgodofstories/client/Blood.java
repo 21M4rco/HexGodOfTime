@@ -33,7 +33,15 @@ public final class Blood {
     private static final int MAX_SPLATS=96,LIFE=320;
     private static final double RANGE=1024,SPREAD=.55;
 
-    public static void clear() {SPLATS.clear();LAST.clear();}
+    /** Bodies a partial Scepter beam left on their last breath, by id, with the tick they fall. */
+    private static final Map<Integer,Long> STANDING=new HashMap<>();
+
+    public static void clear() {SPLATS.clear();LAST.clear();STANDING.clear();}
+
+    public static void lastMoments(int entity,long until) {
+        if(until>ClientState.now()){if(STANDING.size()<128)STANDING.put(entity,until);}
+        else STANDING.remove(entity);
+    }
 
     /**
      * @param wounds embedded blades by the id of the body carrying them, gathered once by the caller's
@@ -43,6 +51,7 @@ public final class Blood {
         if(mc.level==null||mc.player==null)return;
         long now=ClientState.now();
         SPLATS.removeIf(s->now-s.start>s.life);
+        standing(mc,now);
         if(bleeding.isEmpty()){LAST.clear();return;}
         Vec3 eye=mc.player.getEyePosition();
         var random=mc.level.random;
@@ -72,6 +81,27 @@ public final class Blood {
             drop(mc,e,random.nextDouble()*.25+.2);
         }
         LAST.keySet().retainAll(seen);
+    }
+
+    /**
+     * A body on its last breath pours from the hole the beam left in it and pools where it stands, far
+     * faster than an ordinary wound, for as long as it stays on its feet.
+     */
+    private static void standing(Minecraft mc,long now) {
+        if(STANDING.isEmpty())return;
+        STANDING.entrySet().removeIf(entry->entry.getValue()<=now||mc.level.getEntity(entry.getKey())==null);
+        Vec3 eye=mc.player.getEyePosition();
+        var random=mc.level.random;
+        for(int id:STANDING.keySet()) {
+            Entity e=mc.level.getEntity(id);
+            if(e==null||e.position().distanceToSqr(eye)>RANGE)continue;
+            Vec3 at=BeamWounds.bleedPoint(e);
+            if(at==null)at=e.position().add(0,e.getBbHeight()*.6,0);
+            for(int i=0;i<2;i++)
+                Vfx.spark(HexGodOfStories.BLOOD.get(),at.add((random.nextDouble()-.5)*.08,(random.nextDouble()-.5)*.08,(random.nextDouble()-.5)*.08),
+                    new Vec3((random.nextDouble()-.5)*.05,-.02-random.nextDouble()*.04,(random.nextDouble()-.5)*.05));
+            if(random.nextInt(5)==0)drop(mc,e,random.nextDouble()*.3+.25);
+        }
     }
 
     /** Lays one pool on the surface below a body, following steps and slabs rather than assuming flat. */

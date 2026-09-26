@@ -31,6 +31,8 @@ public final class ServerEvents {
 
     /** Cancel the spawn itself, before pickup, hoppers or another mod can collect a dropped illusion. */
     @SubscribeEvent public static void conjuredDrop(net.minecraftforge.event.entity.EntityJoinLevelEvent e) {
+        // A body saved mid-stun or mid-stand: the stun comes off, and a stand is finished.
+        if(!e.getLevel().isClientSide&&e.getEntity() instanceof LivingEntity living){ScepterBlast.loaded(living);LastMoments.loaded(living);}
         if(!e.getLevel().isClientSide&&e.getEntity() instanceof net.minecraft.world.entity.item.ItemEntity item
             &&item.getItem().getItem() instanceof ConjuredWeapon) {e.setCanceled(true);item.discard();}
     }
@@ -106,7 +108,7 @@ public final class ServerEvents {
     @SubscribeEvent public static void leaving(net.minecraftforge.event.entity.EntityLeaveLevelEvent e){
         if(e.getLevel() instanceof ServerLevel level){
             Frostbite.clear(e.getEntity());
-            if(e.getEntity() instanceof LivingEntity living)ScepterBlast.clear(living);
+            if(e.getEntity() instanceof LivingEntity living){ScepterBlast.clear(living);LastMoments.forget(living);}
             com.hexgodofstories.warping.WarpEmergence.cancel(e.getEntity());
             var reason=e.getEntity().getRemovalReason();
             // Unloaded chunks still own their saved residents. Confirmed removal or transfer does
@@ -129,6 +131,7 @@ public final class ServerEvents {
         Bleed.clear(e.getEntity());
         Frostbite.clear(e.getEntity());
         ScepterBlast.clear(e.getEntity());
+        LastMoments.forget(e.getEntity());
         Threat.forget(e.getEntity());
         Decoy.release(e.getEntity());
         Starfall.forget(e.getEntity());
@@ -185,7 +188,13 @@ public final class ServerEvents {
             &&player.getMainHandItem().getItem() instanceof ConjuredWeapon sword&&sword.kind==1)
             // The wound ticks at +20; one extra tick of lifetime lets that single tick land.
             Bleed.apply(player,victim,1,21);
+        // Last, once every bonus above is in: a partial Scepter beam never lands the killing amount.
+        LastMoments.damage(e);
     }
+
+    /** Ahead of everything else, so nothing clears a body that a partial Scepter beam is leaving standing. */
+    @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.HIGHEST)
+    public static void lastBreath(LivingDeathEvent e) {LastMoments.death(e);}
 
     @SubscribeEvent public static void hurt(LivingHurtEvent e) {
         if(e.getSource().is(DamageTypes.GENERIC_KILL))return;

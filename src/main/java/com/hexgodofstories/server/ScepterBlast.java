@@ -44,6 +44,10 @@ import java.util.UUID;
  * is behind them. Either way a body the beam passes through keeps a cauterised hole in it that bleeds
  * and slowly closes, and whatever the beam finally reaches detonates.
  *
+ * <p>Only a {@link #full} stone unmakes what it kills. A lesser beam that would kill a creature leaves it
+ * standing on its last breath instead, holed and bleeding, until it dies the ordinary way; see
+ * {@link LastMoments}.
+ *
  * <p>Aim is always taken from the caster's eyes, so a shot lands on the crosshair; the stone's position
  * is only where the beam is drawn from. A charge the caster somehow never releases discharges on its own
  * after {@link #MAX_HOLD} ticks, so a lost release can never leave it held forever.
@@ -54,8 +58,8 @@ public final class ScepterBlast {
     public static final double RANGE = 100;
     /** Presses shorter than this are taps. */
     public static final int TAP = 6;
-    /** Ticks of holding past a tap for the stone to fill completely. */
-    public static final int FULL = 32;
+    /** Ticks of holding past a tap for the stone to fill completely: three seconds from the press. */
+    public static final int FULL = 54;
     public static final int QUICK_RECOVERY = 4, CHARGED_RECOVERY = 16, MAX_HOLD = 200;
     private static final int MAX_PIERCE = 6, MAX_STUNS = 192;
 
@@ -63,6 +67,9 @@ public final class ScepterBlast {
     public static float power(long held) {
         return held < TAP ? 0 : .25f + .75f * Mth.clamp((held - TAP) / (float) FULL, 0, 1);
     }
+
+    /** A stone filled all the way: the only shot that unmakes what it kills. */
+    public static boolean full(float power) {return power >= 1;}
 
     private record Stun(LivingEntity victim, long until, boolean hadNoAi) { }
     private record Hit(LivingEntity victim, Vec3 at, double distance) { }
@@ -219,12 +226,19 @@ public final class ScepterBlast {
         boolean charged = power > 0;
         // Taps come faster than vanilla's hurt immunity; each one still lands.
         victim.invulnerableTime = 0;
-        victim.hurt(caster.damageSources().indirectMagic(caster, caster), charged ? 12 + 20 * power : 6.5f);
+        var source = caster.damageSources().indirectMagic(caster, caster);
+        float damage = charged ? 12 + 20 * power : 6.5f;
+        // Anything short of a full stone that would kill a creature leaves it on its feet instead.
+        boolean held = false;
+        if (full(power)) victim.hurt(source, damage);
+        else held = LastMoments.hurt(victim, source, damage);
         victim.level().playSound(null, hit.at.x, hit.at.y, hit.at.z, HexGodOfStories.SCEPTER_BURN.get(), SoundSource.PLAYERS,
             1.2f, .9f + victim.getRandom().nextFloat() * .25f);
-        if (victim.isDeadOrDying()) {dissolve(victim, direction, power); return;}
+        if (victim.isDeadOrDying()) {if (full(power)) dissolve(victim, direction, power); return;}
         // A clean hole that stays open for most of a minute before it knits shut. Bleed, never fire.
         BeamWound.open(victim, hit.at, direction, charged ? .20f + .14f * power : .15f, charged ? 1200 : 900);
+        // Held on its last breath: it stays exactly where it was hit, bleeding, until it falls.
+        if (held) {LastMoments.hold(caster, victim); return;}
         Bleed.apply(caster, victim, charged ? 2 + Math.round(3 * power) : 1, charged ? 180 : 110);
         Vec3 push = direction.scale(charged ? 1.1 + 2.6 * power : .5).add(0, charged ? .3 + .4 * power : .16, 0);
         victim.setDeltaMovement(victim.getDeltaMovement().add(push));
@@ -233,9 +247,9 @@ public final class ScepterBlast {
     }
 
     /**
-     * A body the beam kills comes apart the way Time Branch Unleashing unmakes one, only far faster: the
-     * same fracturing surface, dust and threads, run inside vanilla's twenty-tick death so the last
-     * fragment goes as the body does. Bosses keep their own deaths.
+     * A body a full-charge beam kills comes apart the way Time Branch Unleashing unmakes one, only far
+     * faster: the same fracturing surface, dust and threads, run inside vanilla's twenty-tick death so
+     * the last fragment goes as the body does. Bosses keep their own deaths.
      */
     private static void dissolve(LivingEntity victim, Vec3 direction, float power) {
         if (victim.getType().is(net.minecraftforge.common.Tags.EntityTypes.BOSSES)) return;
@@ -262,7 +276,10 @@ public final class ScepterBlast {
             float falloff = (float) (1 - d / radius);
             victim.hurt(caster.damageSources().indirectMagic(caster, caster), damage * (.35f + .65f * falloff));
             Vec3 away = victim.getBoundingBox().getCenter().subtract(at);
-            if (victim.isDeadOrDying()) {dissolve(victim, away.lengthSqr() > 1e-6 ? away.normalize() : new Vec3(0, 1, 0), power); continue;}
+            if (victim.isDeadOrDying()) {
+                if (full(power)) dissolve(victim, away.lengthSqr() > 1e-6 ? away.normalize() : new Vec3(0, 1, 0), power);
+                continue;
+            }
             if (away.lengthSqr() > 1e-6) {
                 victim.setDeltaMovement(victim.getDeltaMovement().add(away.normalize().scale((charged ? .5 + power : .25) * falloff)).add(0, .2 * falloff, 0));
                 victim.hurtMarked = true;
@@ -277,13 +294,22 @@ public final class ScepterBlast {
         }
     }
 
-    private static void stun(LivingEntity victim, int ticks) {
+    /**
+     * Marks a mob this stun switched NoAI on for. NoAI is saved with the mob, so one unloaded or saved
+     * mid-stun would otherwise come back stunned for good; loading it with this tag undoes that.
+     */
+    static final String STUN_TAG = "hexgodofstoriesStunned";
+
+    static void stun(LivingEntity victim, int ticks) {
         if (STUNS.size() >= MAX_STUNS && !STUNS.containsKey(victim.getUUID())) return;
         Stun old = STUNS.get(victim.getUUID());
         boolean hadNoAi = old != null ? old.hadNoAi : victim instanceof Mob mob && mob.isNoAi();
         long until = Math.max(old == null ? 0 : old.until, victim.level().getGameTime() + ticks);
         STUNS.put(victim.getUUID(), new Stun(victim, until, hadNoAi));
-        if (victim instanceof Mob mob) mob.setNoAi(true);
+        if (victim instanceof Mob mob) {
+            mob.setNoAi(true);
+            if (!hadNoAi) victim.getPersistentData().putBoolean(STUN_TAG, true);
+        }
         victim.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, ticks, 255, false, true));
         victim.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, ticks, 255, false, true));
         CompoundTag state = new CompoundTag();
@@ -303,17 +329,30 @@ public final class ScepterBlast {
             if (victim.level() != level) continue;
             if (now >= stun.until || victim.isRemoved() || !victim.isAlive()) {
                 STUNS.remove(victim.getUUID(), stun);
-                if (victim instanceof Mob mob && !stun.hadNoAi) mob.setNoAi(false);
+                release(victim, stun);
                 CompoundTag state = new CompoundTag();
                 state.putLong("until", 0);
                 if (!victim.isRemoved()) HexNetwork.tracking(victim, new HexNetwork.Message(HexNetwork.STUN, victim.getId(), state));
             }
         }
+        LastMoments.tick(level);
+    }
+
+    private static void release(LivingEntity victim, Stun stun) {
+        if (victim instanceof Mob mob && !stun.hadNoAi) mob.setNoAi(false);
+        victim.getPersistentData().remove(STUN_TAG);
     }
 
     public static void clear(LivingEntity victim) {
         Stun stun = STUNS.remove(victim.getUUID());
-        if (stun != null && victim instanceof Mob mob && !stun.hadNoAi) mob.setNoAi(false);
+        if (stun != null) release(victim, stun);
+    }
+
+    /** A mob loaded with the stun tag was saved mid-stun. The stun did not survive the save, so neither does its NoAI. */
+    public static void loaded(LivingEntity victim) {
+        if (!victim.getPersistentData().getBoolean(STUN_TAG) || STUNS.containsKey(victim.getUUID())) return;
+        victim.getPersistentData().remove(STUN_TAG);
+        if (victim instanceof Mob mob) mob.setNoAi(false);
     }
 
     public static void track(ServerPlayer viewer, net.minecraft.world.entity.Entity entity) {
@@ -323,14 +362,16 @@ public final class ScepterBlast {
             HexNetwork.to(viewer, new HexNetwork.Message(HexNetwork.STUN, entity.getId(), state));
         }
         if (entity instanceof LivingEntity living) BeamWound.track(viewer, living);
+        LastMoments.track(viewer, entity);
     }
 
     public static void reset() {
-        for (Stun stun : STUNS.values()) if (stun.victim instanceof Mob mob && !stun.hadNoAi) mob.setNoAi(false);
+        for (Stun stun : STUNS.values()) release(stun.victim, stun);
         STUNS.clear();
         CHARGES.clear();
         READY.clear();
         QUEUED.clear();
         BeamWound.reset();
+        LastMoments.reset();
     }
 }

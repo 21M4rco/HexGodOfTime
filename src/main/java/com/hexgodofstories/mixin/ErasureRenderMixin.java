@@ -1,5 +1,6 @@
 package com.hexgodofstories.mixin;
 
+import com.hexgodofstories.client.BeamWounds;
 import com.hexgodofstories.client.ClientState;
 import com.hexgodofstories.client.ErasureRenderer;
 import com.hexgodofstories.client.WoundAnchor;
@@ -28,7 +29,9 @@ public abstract class ErasureRenderMixin {
         float instant=ClientState.suspended(entity)?1f:partial;
         WoundAnchor.beginEntity(entity,instant);
         try {
-            renderer.render(entity,yaw,instant,pose,ErasureRenderer.fadingBuffers(entity,instant,pose,buffers),light);
+            MultiBufferSource wounded=BeamWounds.surface(entity,instant,ErasureRenderer.fadingBuffers(entity,instant,pose,buffers),light);
+            renderer.render(entity,yaw,instant,pose,wounded,light);
+            BeamWounds.finish(wounded);
         } finally {WoundAnchor.endEntity();}
     }
 }
