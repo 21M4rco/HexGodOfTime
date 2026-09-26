@@ -15,6 +15,9 @@
 
 - **Hexor's exclusion from the recall, structurally.** `verifyHexor` reads `Warping.java` and fails the build unless there is exactly one server-side filter, it refuses the creature by class and by registered type, the queue is built through it, and the transfer asks it again at the moment it moves something. It also fails if Warping ever gains a line that spawns, discards, repositions or casts to the creature.
 
+- **The Scepter's model, offline.** `scripts/generate_scepter.py` regenerates it from the standard library alone, and its silhouette was overlaid on the reference render pixel for pixel. `tools/preview_scepter.py` renders it through the game's own first-person chain (the arm offset, the display transform, WeaponRenderer's pose, the 70 degree hand field of view) with the same per-vertex shading ScepterModel runs, which is how both poses were chosen. `tools/verify_scepter_pose.py` holds the third-person clips level through the full arm, item-layer and renderer chain in both hands, keeps the renderer's poses and the preview's identical, and checks that the caster's beam starts where the generated stone is drawn.
+- **Scepter sounds are all public domain.** `tools/import_scepter_audio.py` fetches each one from a pinned commit; every source and its CC0 notice is listed in `SCEPTER_AUDIO_CREDITS.md`.
+
 ## Not verified
 
 Everything below needs a recorded in-game session and **has not had one**. Nothing here should be described as working.
@@ -29,6 +32,9 @@ Everything below needs a recorded in-game session and **has not had one**. Nothi
 - **Watching the far side.** Whether a figure falling away down a drop in another dimension reads as the creature that just went through, and whether the handful of ticks around the transfer are covered well enough that nothing is ever seen to pop.
 - **The recall, end to end.** Whether 49 chunks and 44 ticks are enough to wake an unattended realm reliably; whether creatures emerging read as climbing out of the ground; whether ten of them at once is a spectacle or a pile; and what a recall from the Void Sea brings back now that the one thing in it is refused.
 
+- **The Scepter in game.** How the solid model, its per-vertex metal shading and the stone's glow actually look under real daylight, at night and in a cave; the first-person rest, aim, recoil and charge tremble at speed; the third-person clips; the GUI icon; and what the model costs per frame with several decoys holding it. The offline preview reproduces the shading model, not the game.
+- **The beam wound.** The see-through hole relies on writing the openings into the depth buffer before the body's batch is drawn. It has not been seen in game, on armoured bodies, on mobs with unusual models, with Fabulous graphics or with a shader pack.
+- **Stopped time.** The pinning and the fixed render instant are argued from the renderer's own interpolation; a stop full of walking mobs, dropped items and flying arrows has not been watched since.
 - Client shader loading and visual review.
 - Cape behaviour during sprinting, jumping, falling, landing, crouching, rapid rotation and teleportation, viewed from front, rear and sides.
 - First- and third-person weapon alignment, including the reverse off-hand grip and the GUI silhouette.

@@ -104,6 +104,7 @@ public final class HexClient {
                 // Locked means invisible and inert, not merely server-rejected. Swallow every mod input
                 // and close any mod-only screen immediately when access is revoked.
                 BranchKeyInput.cancel(false);
+                ScepterClient.input(false);
                 primaryLatched=primaryPhysicallyDown();
                 primaryDown=false;primaryWasHold=false;repeat=0;
                 selectDown=SELECT.isDown();
@@ -112,6 +113,7 @@ public final class HexClient {
                 drain();return;
             }
             if(mc.screen!=null) {
+                ScepterClient.input(false);
                 BranchKeyInput.cancel(true);
                 // Ending the hold here means the key is no longer "down" as far as this loop knows,
                 // so a key that is still physically held would read as a brand new press the moment
@@ -122,6 +124,8 @@ public final class HexClient {
                 drain();return;
             }
             while(MENU.consumeClick())mc.setScreen(new MasteryScreen(false));
+            // The Scepter's right click is read from the key itself: its hold is the charge.
+            ScepterClient.input(mc.options.keyUse.isDown());
 
             boolean select=SELECT.isDown();
             if(select&&!selectDown)QuickBar.openBar();
@@ -192,9 +196,9 @@ public final class HexClient {
             var mc=Minecraft.getInstance();
             if(mc.player==null||mc.screen!=null||!enabled())return;
             if(!(mc.player.getMainHandItem().getItem() instanceof ConjuredWeapon weapon)||!(e.isAttack()||e.isUseItem()))return;
-            // The sword uses vanilla left-click combat and its Item#use for the right-click cut.
-            // Only daggers and the time stick need the old custom input/packet path.
-            if(weapon.kind==1)return;
+            // The Scepter keeps vanilla left-click combat. Its right click is a press and hold that
+            // ScepterClient reads from the key each tick, so vanilla's own use (and its repeat) is off.
+            if(weapon.kind==1){if(e.isUseItem()){e.setCanceled(true);e.setSwingHand(false);}return;}
             e.setCanceled(true);e.setSwingHand(false);
             if(!ClientState.frozen(mc.player.getId()))HexNetwork.send(HexServer.WEAPON,e.isUseItem()?1:0);
         }
@@ -266,13 +270,13 @@ public final class HexClient {
             if(e.getOverlay().id().equals(net.minecraftforge.client.gui.overlay.VanillaGuiOverlay.HOTBAR.id()))HexHud.render(e.getGuiGraphics());
         }
         @SubscribeEvent public static void world(RenderLevelStageEvent e) {
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);}
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);BeamWounds.beginFrame(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES)WarpRenderer.renderRealm(e);
             // Forge's supported translucent-effects stage, paired with the wave's particles
             // target so Fabulous composites the swell correctly over the water and entities.
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES)VoidSeaWaveRenderer.render(e);
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES){WorldEffects.render(e);WarpRenderer.render(e);}
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL)TemporalScreen.render(e.getPartialTick());
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL){BeamWounds.endFrame();TemporalScreen.render(e.getPartialTick());}
         }
         @SubscribeEvent public static void player(RenderPlayerEvent.Pre e) {
             // Checked before anything pushes a pose: a cancelled pre-event never gets its post-event, so
@@ -288,7 +292,20 @@ public final class HexClient {
             if(ErasureRenderer.consumed(e.getEntity()))e.setCanceled(true);
         }
         @SubscribeEvent public static void playerEnd(RenderPlayerEvent.Post e){WorldEffects.afterPlayer(e);}
+        /** Scepter wound rims go over the body once it has been drawn. */
+        @SubscribeEvent public static void livingEnd(net.minecraftforge.client.event.RenderLivingEvent.Post<?,?> e) {
+            BeamWounds.afterEntity(e.getEntity(),e.getMultiBufferSource());
+        }
         /** Breaches, impacts and the standing tremor of something enormous passing underneath. */
-        @SubscribeEvent public static void pilgrimCamera(net.minecraftforge.client.event.ViewportEvent.ComputeCameraAngles e){com.hexgodofstories.client.leviathan.LeviathanEffects.camera(e);}
+        @SubscribeEvent public static void pilgrimCamera(net.minecraftforge.client.event.ViewportEvent.ComputeCameraAngles e){
+            com.hexgodofstories.client.leviathan.LeviathanEffects.camera(e);
+            // A player caught in stopped time sees exactly what they saw when it stopped: the mouse
+            // cannot turn a frozen view between the ticks that pin it.
+            var mc=Minecraft.getInstance();
+            if(mc.player!=null&&!e.getCamera().isDetached()&&e.getCamera().getEntity()==mc.player&&ClientState.frozen(mc.player.getId())) {
+                var n=ClientState.FROZEN.get(mc.player.getId());
+                e.setYaw(n.getFloat("yaw"));e.setPitch(n.getFloat("pitch"));
+            }
+        }
     }
 }

@@ -5,10 +5,13 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Shared world-space presentation points for the V4 Scepter.
+ * Shared world-space presentation points for the Scepter.
  *
  * The firing animation has the main arm extended toward the crosshair.  These offsets place the
- * muzzle at the blue crystal at the end of that pose rather than at the player's eyes or hand.
+ * muzzle at the stone of the third-person staff at the end of that pose (checked against the full
+ * arm, item-layer and renderer transform chain in tools/preview_scepter.py) rather than at the
+ * player's eyes or hand. The caster's own first-person view draws the beam from the stone in the
+ * hand instead; see ScepterFx.stone.
  */
 public final class ScepterPose {
     private ScepterPose() { }
@@ -21,8 +24,8 @@ public final class ScepterPose {
         else right=new Vec3(1,0,0);
         double side=caster.getMainArm()==HumanoidArm.RIGHT?1:-1;
         return caster.getEyePosition()
-            .add(forward.scale(1.10))
-            .add(right.scale(.28*side))
+            .add(forward.scale(1.12))
+            .add(right.scale(.37*side))
             .add(0,-.25,0);
     }
 }

@@ -521,5 +521,92 @@
         "stream": false
       }
     ]
+  },
+  "scepter_shot": {
+    "subtitle": "subtitles.hexgodofstories.scepter_shot",
+    "sounds": [
+      {
+        "name": "hexgodofstories:scepter/shot_0"
+      },
+      {
+        "name": "hexgodofstories:scepter/shot_1"
+      },
+      {
+        "name": "hexgodofstories:scepter/shot_2"
+      },
+      {
+        "name": "hexgodofstories:scepter/shot_3"
+      },
+      {
+        "name": "hexgodofstories:scepter/shot_4"
+      }
+    ]
+  },
+  "scepter_beam": {
+    "subtitle": "subtitles.hexgodofstories.scepter_beam",
+    "sounds": [
+      {
+        "name": "hexgodofstories:scepter/beam"
+      }
+    ]
+  },
+  "scepter_charge": {
+    "subtitle": "subtitles.hexgodofstories.scepter_charge",
+    "sounds": [
+      {
+        "name": "hexgodofstories:scepter/charge_loop"
+      }
+    ]
+  },
+  "scepter_impact": {
+    "subtitle": "subtitles.hexgodofstories.scepter_impact",
+    "sounds": [
+      {
+        "name": "hexgodofstories:scepter/impact_0"
+      },
+      {
+        "name": "hexgodofstories:scepter/impact_1"
+      },
+      {
+        "name": "hexgodofstories:scepter/impact_2"
+      },
+      {
+        "name": "hexgodofstories:scepter/impact_3"
+      },
+      {
+        "name": "hexgodofstories:scepter/impact_4"
+      }
+    ]
+  },
+  "scepter_boom": {
+    "sounds": [
+      {
+        "name": "hexgodofstories:scepter/boom_0"
+      },
+      {
+        "name": "hexgodofstories:scepter/boom_1"
+      }
+    ]
+  },
+  "scepter_blast": {
+    "sounds": [
+      {
+        "name": "hexgodofstories:scepter/blast"
+      }
+    ]
+  },
+  "scepter_burn": {
+    "subtitle": "subtitles.hexgodofstories.scepter_burn",
+    "sounds": [
+      {
+        "name": "hexgodofstories:scepter/burn_0"
+      },
+      {
+        "name": "hexgodofstories:scepter/burn_1"
+      },
+      {
+        "name": "hexgodofstories:scepter/burn_2"
+      }
+    ]
   }
 }

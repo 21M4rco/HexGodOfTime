@@ -70,6 +70,8 @@ public final class LeviathanEffects {
     }
 
     public static void scepterRecoil() { addShake(1.15f, .82f); }
+    /** A tap barely kicks; a full charge shoves the view. */
+    public static void scepterRecoil(float strength) { addShake(1.15f * strength, .80f); }
 
     private static void addShake(float amount, float decay) {
         if (amount <= shake && decay <= shakeDecay) return;

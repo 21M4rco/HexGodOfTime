@@ -26,6 +26,28 @@ public final class ClientState {
         return entity.isInvisible()||data(entity.getId()).getLong("vanishUntil")>now();
     }
     public static boolean frozen(int id){return FROZEN.containsKey(id);}
+    /** Held completely still by a stopped moment or a freeze: rendered at one fixed instant. */
+    public static boolean suspended(Entity e){return e!=null&&(FROZEN.containsKey(e.getId())||FrostClient.frozen(e.getId()));}
+    /**
+     * Pins a suspended body so nothing about it can move between frames. Its ticks are withheld, so
+     * every "previous tick" value the renderer interpolates from has to be made equal to the current
+     * one here — position (including the separate render copy, xOld), body and head turn, the attack
+     * swing, walking distance and view bob. Leaving any of them behind is what made stopped bodies
+     * slide a tick's worth of motion every tick and snap back: a visible vibration in place.
+     */
+    public static void pin(Entity e,double x,double y,double z,float yaw,float pitch) {
+        e.setPos(x,y,z);
+        e.setYRot(yaw);e.setXRot(pitch);
+        e.setDeltaMovement(Vec3.ZERO);
+        e.setOldPosAndRot();
+        e.walkDistO=e.walkDist;
+        if(e instanceof net.minecraft.world.entity.LivingEntity living) {
+            living.yBodyRotO=living.yBodyRot;living.yHeadRotO=living.yHeadRot;
+            living.oAttackAnim=living.attackAnim;
+        }
+        if(e instanceof net.minecraft.world.entity.player.Player player)player.oBob=player.bob;
+        if(e instanceof net.minecraft.client.player.LocalPlayer local){local.xBobO=local.xBob;local.yBobO=local.yBob;}
+    }
     /** Ticks this player has been holding Time Branch Unleashing, or -1 when they are not holding it. */
     public static int branchHeld(int id,float partial){return TimeBranchRenderer.held(id,partial);}
     /** Planted or being erased: either way this body takes no movement input of its own. */
@@ -57,6 +79,8 @@ public final class ClientState {
             case HexNetwork.WARP_EMERGE -> WarpEmergenceClient.receive(m.entity(),m.data());
             case HexNetwork.CANDY_BODY -> CandyCorruptionClient.receive(m.entity(),m.data());
             case HexNetwork.FROST -> FrostClient.receive(m.entity(),m.data());
+            case HexNetwork.SCEPTER -> ScepterClient.receive(m.entity(),m.data());
+            case HexNetwork.WOUND -> BeamWounds.receive(m.entity(),m.data());
             case HexNetwork.STUN -> {long until=m.data().getLong("until");if(until>now())STUNNED.put(m.entity(),until);else STUNNED.remove(m.entity());}
             case HexNetwork.PILGRIM_PATH -> {
                 var world = net.minecraft.client.Minecraft.getInstance().level;
@@ -103,6 +127,7 @@ public final class ClientState {
             WorldEffects.clear();HexSkin.clear();HexLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();FrostClient.clear();
             com.hexgodofstories.client.leviathan.LeviathanEffects.clear();
             TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();GripRenderer.clear();
+            ScepterClient.clear();BeamWounds.clear();
             HexClient.ForgeBus.releaseHeldCast();
             world=mc.level;
         }
@@ -110,14 +135,11 @@ public final class ClientState {
         WarpCrossingClient.tick();
         if(mc.level==null)return;
         FrostClient.tick();
+        ScepterClient.tick();
+        BeamWounds.tick();
         FROZEN.forEach((id,n)->{
             Entity e=mc.level.getEntity(id);
-            if(e==null)return;
-            e.setPos(n.getDouble("x"),n.getDouble("y"),n.getDouble("z"));
-            e.setYRot(n.getFloat("yaw"));e.setXRot(n.getFloat("pitch"));
-            e.setDeltaMovement(Vec3.ZERO);
-            e.xo=e.getX();e.yo=e.getY();e.zo=e.getZ();
-            e.yRotO=e.getYRot();e.xRotO=e.getXRot();
+            if(e!=null)pin(e,n.getDouble("x"),n.getDouble("y"),n.getDouble("z"),n.getFloat("yaw"),n.getFloat("pitch"));
         });
         if(now()%100==0) {
             PLAYERS.keySet().removeIf(id->mc.level.getEntity(id)==null);

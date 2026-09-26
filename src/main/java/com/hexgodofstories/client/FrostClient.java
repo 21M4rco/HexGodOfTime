@@ -63,15 +63,9 @@ public final class FrostClient {
         for(var entry:ICE.entrySet()) {
             Entity e=world.getEntity(entry.getKey());Ice ice=entry.getValue();
             if(e==null)continue;
-            if(e.position().distanceToSqr(ice.position)>1.0e-6)e.setPos(ice.position);
-            e.setYRot(ice.yaw);e.setXRot(ice.pitch);
-            e.setDeltaMovement(Vec3.ZERO);e.tickCount=ice.age;
-            e.xo=e.getX();e.yo=e.getY();e.zo=e.getZ();
-            e.yRotO=e.getYRot();e.xRotO=e.getXRot();
-            if(e instanceof LivingEntity living){
-                living.yHeadRot=ice.yaw;living.yHeadRotO=ice.yaw;
-                living.yBodyRot=ice.yaw;living.yBodyRotO=ice.yaw;
-            }
+            e.tickCount=ice.age;
+            if(e instanceof LivingEntity living){living.yHeadRot=ice.yaw;living.yBodyRot=ice.yaw;}
+            ClientState.pin(e,ice.position.x,ice.position.y,ice.position.z,ice.yaw,ice.pitch);
         }
         if(now%3==0)for(int id:SHIVER.keySet()) {
             if(ICE.containsKey(id))continue;

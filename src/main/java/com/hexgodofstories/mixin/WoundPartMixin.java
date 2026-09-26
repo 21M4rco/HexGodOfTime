@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.List;
 
-/** Observe the posed part only for a body carrying one of the keeper's embedded daggers. */
+/** Observe the posed part for a body carrying an embedded dagger or a Scepter wound. */
 @Mixin(ModelPart.class)
 public abstract class WoundPartMixin {
     @Shadow @Final private List<ModelPart.Cube> cubes;

@@ -61,6 +61,7 @@ public final class WoundAnchor {
     }
     public static void endEntity() {
         Active active=ACTIVE.pop();
+        BeamWounds.endEntity(active.host());
         for(ThrownDagger dagger:active.daggers()) {
             Pin pin=PINS.get(dagger.getUUID());
             if(pin.candidate==null)continue;
@@ -71,6 +72,7 @@ public final class WoundAnchor {
 
     /** Invoked only when an actual ModelPart emits its posed geometry, including walk/attack/scale. */
     public static void capturePart(Object part,PoseStack.Pose pose,List<ModelPart.Cube> cubes) {
+        if(!ACTIVE.isEmpty())BeamWounds.capture(ACTIVE.peek().host(),ACTIVE.peek().partial(),part,pose,cubes);
         if(ACTIVE.isEmpty()||ACTIVE.peek().daggers().isEmpty()||inverseView==null||cubes.isEmpty())return;
         Active active=ACTIVE.peek();
         Matrix4f matrix=new Matrix4f(inverseView).mul(pose.pose());

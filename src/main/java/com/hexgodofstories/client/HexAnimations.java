@@ -55,7 +55,7 @@ public final class HexAnimations {
             modifierlayer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(Math.max(0, fadeTicks), Ease.INOUTQUAD), null);
          } else {
             boolean left=abstractclientplayer.getMainArm()==net.minecraft.world.entity.HumanoidArm.LEFT;
-            if(left&&(name.equals("scepter_fire")||name.equals("scepter_manifest")))name+="_left";
+            if(left&&name.startsWith("scepter_"))name+="_left";
             boolean manifest=name.startsWith("scepter_manifest")||name.startsWith("scepter_fire");
             ResourceLocation resourcelocation = HexGodOfStories.id(name);
             KeyframeAnimation keyframeanimation = PlayerAnimationRegistry.getAnimation(resourcelocation);
@@ -68,7 +68,9 @@ public final class HexAnimations {
                   .setFirstPersonConfiguration(
                      new FirstPersonConfiguration().setShowRightArm(manifest&&!left).setShowLeftArm(manifest&&left).setShowRightItem(true).setShowLeftItem(true)
                   );
-               modifierlayer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(name.startsWith("scepter_fire")?0:Math.max(0, fadeTicks), Ease.INOUTQUAD), keyframeanimationplayer);
+               // Shots cut straight in so the kick lands on the tick it fires; raising to aim eases in.
+               int fade=name.startsWith("scepter_fire")||name.startsWith("scepter_shot")?0:name.startsWith("scepter_aim")?2:Math.max(0,fadeTicks);
+               modifierlayer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(fade, Ease.INOUTQUAD), keyframeanimationplayer);
             }
          }
       }

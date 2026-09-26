@@ -1,0 +1,86 @@
+{
+  "version": 3,
+  "name": "scepter_shot",
+  "author": "HexGodOfStories",
+  "description": "A tapped bolt: a ten degree kick of the muzzle, settle, then lower.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 18,
+    "stopTick": 18,
+    "isLoop": false,
+    "returnTick": 18,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "linear",
+        "rightArm": {
+          "pitch": -90,
+          "yaw": -4,
+          "roll": 0
+        },
+        "rightItem": {
+          "pitch": -70,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 1,
+        "easing": "easeoutquad",
+        "rightArm": {
+          "pitch": -96,
+          "yaw": -4,
+          "roll": 0
+        },
+        "rightItem": {
+          "pitch": -66,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 4,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -90,
+          "yaw": -4,
+          "roll": 0
+        },
+        "rightItem": {
+          "pitch": -70,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 10,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -90,
+          "yaw": -4,
+          "roll": 0
+        },
+        "rightItem": {
+          "pitch": -70,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 18,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "rightItem": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}

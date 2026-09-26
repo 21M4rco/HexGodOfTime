@@ -2,35 +2,21 @@
   "version": 3,
   "name": "scepter_fire",
   "author": "HexGodOfStories",
-  "description": "One extended arm with the staff held horizontally along it; arm and item rotate together.",
+  "description": "A charged discharge: the arm thrown up with a fourteen degree muzzle climb, recovered, then lowered.",
   "emote": {
     "beginTick": 0,
-    "endTick": 26,
-    "stopTick": 26,
+    "endTick": 30,
+    "stopTick": 30,
     "isLoop": false,
-    "returnTick": 9,
+    "returnTick": 30,
     "degrees": true,
     "moves": [
       {
         "tick": 0,
         "easing": "linear",
         "rightArm": {
-          "pitch": 0,
-          "yaw": 0,
-          "roll": 0
-        },
-        "rightItem": {
-          "pitch": 0,
-          "yaw": 0,
-          "roll": 0
-        }
-      },
-      {
-        "tick": 6,
-        "easing": "linear",
-        "rightArm": {
           "pitch": -90,
-          "yaw": 0,
+          "yaw": -4,
           "roll": 0
         },
         "rightItem": {
@@ -40,11 +26,39 @@
         }
       },
       {
-        "tick": 12,
-        "easing": "linear",
+        "tick": 1,
+        "easing": "easeoutquad",
+        "rightArm": {
+          "pitch": -102,
+          "yaw": -2,
+          "roll": -3
+        },
+        "rightItem": {
+          "pitch": -68,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 5,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -92,
+          "yaw": -4,
+          "roll": 0
+        },
+        "rightItem": {
+          "pitch": -71,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 14,
+        "easing": "inoutquad",
         "rightArm": {
           "pitch": -90,
-          "yaw": 0,
+          "yaw": -4,
           "roll": 0
         },
         "rightItem": {
@@ -54,8 +68,8 @@
         }
       },
       {
-        "tick": 26,
-        "easing": "linear",
+        "tick": 30,
+        "easing": "inoutquad",
         "rightArm": {
           "pitch": 0,
           "yaw": 0,

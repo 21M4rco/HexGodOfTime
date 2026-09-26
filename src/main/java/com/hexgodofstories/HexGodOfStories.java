@@ -109,6 +109,14 @@ public final class HexGodOfStories {
     public static final RegistryObject<SoundEvent> METEOR_BURN = sound("meteor_burn"), METEOR_ROAR = sound("meteor_roar"),
         METEOR_IMPACT = sound("meteor_impact");
     public static final RegistryObject<SoundEvent> GRIP_HOLD = sound("grip_hold"), EMERALD_CAST = sound("emerald_cast");
+    /**
+     * The Scepter, from public-domain recordings (see SCEPTER_AUDIO_CREDITS.md): a laser shot with five
+     * takes picked at random, a charged discharge, the hum of the stone filling, the crunch of what it
+     * hits with a sub-bass body under a charged impact, and the sizzle of it going through a body.
+     */
+    public static final RegistryObject<SoundEvent> SCEPTER_SHOT = sound("scepter_shot"), SCEPTER_BEAM = sound("scepter_beam"),
+        SCEPTER_CHARGE = sound("scepter_charge"), SCEPTER_IMPACT = sound("scepter_impact"), SCEPTER_BOOM = sound("scepter_boom"),
+        SCEPTER_BLAST = sound("scepter_blast"), SCEPTER_BURN = sound("scepter_burn");
     private static RegistryObject<SoundEvent> sound(String name) { return SOUNDS.register(name, () -> SoundEvent.createVariableRangeEvent(id(name))); }
 
     /**

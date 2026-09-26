@@ -53,10 +53,7 @@ public final class WorldEffects {
         String name=n.getString("effect");
         // All teleport destinations share the same quiet arrival; old effect names remain harmless.
         if(name.equals("arrive")||name.equals("arrive_realm")||name.equals("rift_cross"))name="nebula_arrival";
-        if(name.equals("scepter_charge")){FrostClient.cast(entity);ScepterFx.charge(entity);}
-        if(name.equals("scepter_blast"))ScepterFx.blast(entity,
-            new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z")),
-            new Vec3(n.getDouble("tx"),n.getDouble("ty"),n.getDouble("tz")),n.getBoolean("floor"),n.getBoolean("hit"));
+        if(name.equals("scepter_blast"))ScepterFx.blast(entity,n);
         if(name.equals("frost_burst"))CosmicNebula.frostBurst(
             new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z")),
             new Vec3(n.getDouble("dx"),n.getDouble("dy"),n.getDouble("dz")),n.getDouble("reach"));
@@ -246,13 +243,6 @@ public final class WorldEffects {
         ParticleOptions green=HexGodOfStories.EMBER.get(),gold=HexGodOfStories.GOLD_EMBER.get();
         ParticleOptions nebula=HexGodOfStories.NEBULA.get(),veil=HexGodOfStories.VEIL.get(),star=HexGodOfStories.STAR.get(),smoke=HexGodOfStories.SMOKE.get();
         switch(kind) {
-            case "scepter_charge" -> Vfx.bloom(entity,palm,look,8,(at,aim,t)->{
-                Vec3 forward=mc.level.getEntity(entity)==null?aim:mc.level.getEntity(entity).getLookAngle().normalize();
-                Vfx.cloud(FrostClient.BLUE,at.add(forward.scale(.8)),
-                    .35+.25*Vfx.ease(t),Vfx.count(2.5f*Vfx.swell(t)),.018);
-                Vfx.cone(FrostClient.PALE,at.add(forward.scale(1.1)),forward,
-                    Vfx.count(1.7f*Vfx.swell(t)),.035,.06);
-            });
             case "frost_shatter" -> Vfx.bloom(-1,pos.add(0,.9,0),look,9,(at,aim,t)->{
                 Vfx.cone(FrostClient.PALE,at,new Vec3(0,.2,0),Vfx.count(8*Vfx.swell(t)),.22,.38);
                 Vfx.cloud(FrostClient.BLUE,at,.7,Vfx.count(4*Vfx.swell(t)),.035);

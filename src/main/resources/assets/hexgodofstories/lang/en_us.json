@@ -74,5 +74,10 @@
   "subtitles.hexgodofstories.teleport": "Teleport",
   "subtitles.hexgodofstories.time_resume": "Time resumes",
   "subtitles.hexgodofstories.time_slip": "Time slips",
-  "subtitles.hexgodofstories.time_stop": "Time stops"
+  "subtitles.hexgodofstories.time_stop": "Time stops",
+  "subtitles.hexgodofstories.scepter_shot": "Scepter fires",
+  "subtitles.hexgodofstories.scepter_beam": "Scepter discharges",
+  "subtitles.hexgodofstories.scepter_charge": "Scepter stone fills",
+  "subtitles.hexgodofstories.scepter_impact": "Scepter blast lands",
+  "subtitles.hexgodofstories.scepter_burn": "Beam burns through"
 }

@@ -1,0 +1,58 @@
+{
+  "version": 3,
+  "name": "scepter_aim_left",
+  "author": "HexGodOfStories",
+  "description": "The arm out straight with the staff level along it, held while the stone fills.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 24,
+    "stopTick": 100000,
+    "isLoop": true,
+    "returnTick": 0,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "easeoutquad",
+        "leftArm": {
+          "pitch": -90,
+          "yaw": 4,
+          "roll": 0
+        },
+        "leftItem": {
+          "pitch": -70,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 12,
+        "easing": "inoutsine",
+        "leftArm": {
+          "pitch": -92,
+          "yaw": 5,
+          "roll": -1
+        },
+        "leftItem": {
+          "pitch": -72,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 24,
+        "easing": "inoutsine",
+        "leftArm": {
+          "pitch": -90,
+          "yaw": 4,
+          "roll": 0
+        },
+        "leftItem": {
+          "pitch": -70,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}
