@@ -22,6 +22,8 @@ public final class WoundAnchor {
     private static Matrix4f inverseView;
     private static Vec3 camera=Vec3.ZERO;
     private static Object world;
+    /** True while a living body's own model is being emitted (WoundBodyMixin), not its layers. */
+    private static boolean body;
     private record Active(Entity host,float partial,List<ThrownDagger> daggers) {}
     private static final class Pin {
         Object part,candidate;
@@ -50,7 +52,9 @@ public final class WoundAnchor {
         PINS.keySet().retainAll(alive);
     }
 
+    public static void body(boolean emitting){body=emitting;}
     public static void beginEntity(Entity host,float partial) {
+        body=false;
         List<ThrownDagger> daggers=BY_HOST.getOrDefault(host.getId(),List.of());
         ACTIVE.push(new Active(host,partial,daggers));
         for(ThrownDagger dagger:daggers) {
@@ -61,6 +65,7 @@ public final class WoundAnchor {
     }
     public static void endEntity() {
         Active active=ACTIVE.pop();
+        body=false;
         BeamWounds.endEntity(active.host());
         for(ThrownDagger dagger:active.daggers()) {
             Pin pin=PINS.get(dagger.getUUID());
@@ -72,7 +77,7 @@ public final class WoundAnchor {
 
     /** Invoked only when an actual ModelPart emits its posed geometry, including walk/attack/scale. */
     public static void capturePart(Object part,PoseStack.Pose pose,List<ModelPart.Cube> cubes) {
-        if(!ACTIVE.isEmpty())BeamWounds.capture(ACTIVE.peek().host(),ACTIVE.peek().partial(),part,pose,cubes);
+        if(!ACTIVE.isEmpty())BeamWounds.capture(ACTIVE.peek().host(),ACTIVE.peek().partial(),part,pose,cubes,body);
         if(ACTIVE.isEmpty()||ACTIVE.peek().daggers().isEmpty()||inverseView==null||cubes.isEmpty())return;
         Active active=ACTIVE.peek();
         Matrix4f matrix=new Matrix4f(inverseView).mul(pose.pose());

@@ -15,8 +15,8 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import org.joml.Matrix4f;
@@ -123,8 +123,12 @@ public final class BeamWounds {
         return w.radius * (1 - close * close * (3 - 2 * close));
     }
 
-    /** From WoundAnchor for every posed model part of the body being drawn. */
-    static void capture(Entity host, float partial, Object part, PoseStack.Pose pose, List<ModelPart.Cube> cubes) {
+    /**
+     * From WoundAnchor for every posed model part of the body being drawn. {@code body} is true only for
+     * the body's own model: a wound never pins to armour or another layer, which are drawn after the
+     * body's batch and so too late to open it. Worn armour is cut instead by lifting the opening past it.
+     */
+    static void capture(Entity host, float partial, Object part, PoseStack.Pose pose, List<ModelPart.Cube> cubes, boolean body) {
         if (!world || inverseView == null || cubes.isEmpty()) return;
         List<Wound> list = WOUNDS.get(host.getId());
         if (list == null || list.isEmpty()) return;
@@ -140,6 +144,7 @@ public final class BeamWounds {
                 continue;
             }
             // Not pinned yet: does the beam run through one of this part's cubes?
+            if (!body) continue;
             if (toPart == null) {
                 toPart = new Matrix4f(local).invert();
                 if (!Float.isFinite(toPart.determinant())) return;
@@ -221,6 +226,12 @@ public final class BeamWounds {
 
     private static float bodyYaw(Entity host, float partial) {return WoundAnchor.bodyYaw(host, partial);}
 
+    private static boolean armoured(Entity host) {
+        if (!(host instanceof LivingEntity living)) return false;
+        for (ItemStack armour : living.getArmorSlots()) if (!armour.isEmpty()) return true;
+        return false;
+    }
+
     /** Draws the tunnel and cuts both openings, right now, ahead of the body's own batch. */
     private static void draw(Wound w, Entity host, Matrix4f pose, float partial) {
         float r = radius(w, partial);
@@ -230,9 +241,9 @@ public final class BeamWounds {
         r = Math.min(r, fit(w.entry, w.entryAxis, w.face) * .92f);
         r = Math.min(r, fit(w.exit, w.exitAxis, w.face) * .92f);
         if (r < .004f) {w.rim = null; return;}
-        // Armour sits outside the body; an armoured body is cut from the armour's surface in.
-        float lift = host instanceof LivingEntity living && (!living.getItemBySlot(EquipmentSlot.CHEST).isEmpty()
-            || !living.getItemBySlot(EquipmentSlot.LEGS).isEmpty()) ? .07f : .006f;
+        // Armour sits up to a pixel outside the body and is drawn after it; an armoured body is cut from
+        // just beyond the armour's surface in, so the plate is holed along with the flesh under it.
+        float lift = armoured(host) ? .07f : .006f;
         Vector3f u = new Vector3f(), v = new Vector3f();
         perpendicular(w.axis, u, v);
         Vector3f[] in = opening(w, w.entry, w.entryAxis, w.entrySide, u, v, r);
