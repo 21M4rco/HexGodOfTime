@@ -299,11 +299,17 @@ public final class TemporalEngine {
 
     /** Pins a suspended body exactly where its moment caught it, orientation included. */
     private static void hold(Entity e,Frozen s,long now) {
-        e.setPos(s.position);e.setYRot(s.yaw);e.setXRot(s.pitch);e.setDeltaMovement(Vec3.ZERO);e.hurtMarked=true;
+        // Clients pin every held body themselves from the FROZEN record, so for anything but a player a
+        // velocity packet is only worth sending when something actually moved it. Marking every held body
+        // every tick sent one motion packet per body per tick to every viewer for the whole stop.
+        boolean moving=e.getDeltaMovement().lengthSqr()>1.0e-8;
+        e.setPos(s.position);e.setYRot(s.yaw);e.setXRot(s.pitch);e.setDeltaMovement(Vec3.ZERO);
+        if(moving||e instanceof ServerPlayer)e.hurtMarked=true;
         e.setOldPosAndRot();
         if(e instanceof LivingEntity l){l.setYHeadRot(s.yaw);l.yBodyRot=s.yaw;l.hurtTime=0;l.invulnerableTime=0;}
         if(e instanceof ServerPlayer p&&now%5==0)p.connection.teleport(s.position.x,s.position.y,s.position.z,s.yaw,s.pitch);
-        if(now%20==0)sync(s,true);
+        // Staggered by entity, so a crowded stop refreshes a few bodies a tick instead of all of them at once.
+        if(Math.floorMod(now+e.getId(),20L)==0)sync(s,true);
     }
 
     /**

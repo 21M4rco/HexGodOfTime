@@ -48,6 +48,8 @@ public final class WarpRealms {
      */
     private static final int PARADISE_LAYOUT=4;
     private record Job(ServerLevel level,Destination d,double cell,Iterator<RealmLayout.Voxel> blocks){}
+    /** Per realm per tick, the same four milliseconds the World Tree's builder allows itself. */
+    private static final long BUILD_NANOS=4_000_000L;
     private static final List<Job> JOBS=new ArrayList<>();
     private static final Map<UUID,ArrayDeque<Vec3>> HISTORY=new HashMap<>();
     private static Ledger ledger(ServerLevel l){return l.getDataStorage().computeIfAbsent(Ledger::load,Ledger::new,"warping_realms");}
@@ -290,8 +292,11 @@ public final class WarpRealms {
         Destination d=Destination.from(l);if(d==null)return;
         RadialRealmRules.clean(l);
         int budget=4096;
+        // Also bounded by time, like the World Tree's builder: a block landing in a chunk that has
+        // never been generated generates it on the spot, and several of those in one tick is a freeze.
+        long deadline=System.nanoTime()+BUILD_NANOS;
         for(var it=JOBS.iterator();it.hasNext()&&budget>0;){Job j=it.next();if(j.level!=l)continue;
-            while(j.blocks.hasNext()&&budget-->0){var v=j.blocks.next();if(j.d!=Destination.PARADISE||l.getBlockEntity(v.pos().offset((int)j.cell,0,0))==null)l.setBlock(v.pos().offset((int)j.cell,0,0),v.state(),2|16);}
+            while(j.blocks.hasNext()&&budget>0&&(budget==4096||System.nanoTime()<deadline)){budget--;var v=j.blocks.next();if(j.d!=Destination.PARADISE||l.getBlockEntity(v.pos().offset((int)j.cell,0,0))==null)l.setBlock(v.pos().offset((int)j.cell,0,0),v.state(),2|16);}
             if(!j.blocks.hasNext()){ledger(l).ready.add((long)j.cell);ledger(l).setDirty();populate(l,d,j.cell);it.remove();}
         }
         long now=l.getGameTime();

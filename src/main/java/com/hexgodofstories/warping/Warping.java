@@ -362,15 +362,19 @@ public final class Warping {
      * reads forty nine chunks — a hundred and twelve blocks square, centred on the realm's own
      * arrival point, which is where anything that was ever sent there was sent — and no more.
      *
-     * <p>It takes no ticket and forces nothing: these are ordinary reads, and the chunks fall out
-     * of memory again on their own once nobody is looking at them. It happens once per recall,
-     * behind a thirty second recovery, so the worst this can be asked to do is forty nine chunk
-     * loads every half minute per caster. The realm is not swept, scanned, ticked or held.
+     * <p>A short-lived ticket does the reading, so the chunks load off the main thread during the
+     * two seconds the break takes to form instead of stalling the server for all forty nine at once,
+     * and they fall out of memory again on their own when it lapses. It happens once per recall,
+     * behind a thirty second recovery. The realm is not swept, scanned or ticked.
      */
     private static void wake(ServerLevel target,Destination d){
         net.minecraft.world.level.ChunkPos centre=new net.minecraft.world.level.ChunkPos(BlockPos.containing(d.arrival));
-        for(int dx=-3;dx<=3;dx++)for(int dz=-3;dz<=3;dz++)target.getChunk(centre.x+dx,centre.z+dz);
+        target.getChunkSource().addRegionTicket(WAKE,centre,3,centre);
     }
+    /** Outlasts the forming break and a quick retry after an empty answer, then lets the realm sleep. */
+    private static final net.minecraft.server.level.TicketType<net.minecraft.world.level.ChunkPos> WAKE=
+        net.minecraft.server.level.TicketType.create("hexgodofstories:warp_recall",
+            java.util.Comparator.comparingLong(net.minecraft.world.level.ChunkPos::toLong),300);
 
     /**
      * What a realm has to give.

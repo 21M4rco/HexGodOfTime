@@ -31,6 +31,13 @@ public enum Destination {
     Destination(String title,String description,int color,Vec3 arrival,ResourceKey<Level> key,boolean managed) {
         this.title=title;this.description=description;this.color=color;this.arrival=arrival;this.key=key;this.managed=managed;
     }
-    public static Destination from(Level level){for(var d:values())if(d.managed&&d.key.equals(level.dimension()))return d;return null;}
-    public static Destination at(int id){return id>=0&&id<values().length?values()[id]:SUN;}
+    /**
+     * Asked from entity movement, bounding boxes, eye positions and every setBlock, on both sides.
+     * {@code values()} copies the array on each call, so the lookup is built once instead.
+     */
+    private static final Destination[] VALUES=values();
+    private static final java.util.Map<ResourceKey<Level>,Destination> MANAGED=new java.util.HashMap<>();
+    static{for(Destination d:VALUES)if(d.managed)MANAGED.put(d.key,d);}
+    public static Destination from(Level level){return MANAGED.get(level.dimension());}
+    public static Destination at(int id){return id>=0&&id<VALUES.length?VALUES[id]:SUN;}
 }

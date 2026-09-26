@@ -42,8 +42,10 @@ public final class WarpResidency extends SavedData {
     private static final UUID UNOWNED=new UUID(0L,0L);
     /** Radius three is the vanilla/Forge entity-ticking forced-chunk tier on 1.20.1. */
     private static final int TICKET_RADIUS=3;
+    // Tickets are re-added every tick, and each add compares against the chunk's existing tickets:
+    // UUID's own ordering, not a pair of freshly built strings per comparison.
     private static final TicketType<UUID> TICKET=TicketType.create(
-        "hexgodofstories_warp_resident", Comparator.comparing(UUID::toString)
+        "hexgodofstories_warp_resident", Comparator.<UUID>naturalOrder()
     );
     private static final Map<UUID,Integer> MISSING=new java.util.HashMap<>();
 
@@ -240,8 +242,10 @@ public final class WarpResidency extends SavedData {
             var entry=it.next();
             UUID id=entry.getKey();Resident resident=entry.getValue();
             ChunkPos recorded=new ChunkPos(resident.chunk());
+            // The ticket loads the chunk off the main thread. Forcing it here stalled the whole
+            // server for every resident at startup, and bought nothing: entities load
+            // asynchronously after the chunk either way.
             hold(level,id,recorded);
-            if(!level.getChunkSource().hasChunk(recorded.x,recorded.z))level.getChunk(recorded.x,recorded.z);
 
             ServerPlayer online=level.getServer().getPlayerList().getPlayer(id);
             if(online!=null&&online.serverLevel()!=level){
@@ -264,8 +268,10 @@ public final class WarpResidency extends SavedData {
                 continue;
             }
 
-            // The chunk is forced and synchronously available here. Give entity storage a short
-            // grace window after startup, then treat continued absence as death/despawn/removal.
+            // Absence only means something once the recorded chunk's entities are actually in
+            // memory. Until then the body is still on its way in from disk; after that, give it a
+            // short grace window, then treat continued absence as death/despawn/removal.
+            if(!level.areEntitiesLoaded(resident.chunk()))continue;
             int missing=MISSING.merge(id,1,Integer::sum);
             if(missing>200){
                 release(level,id,recorded);it.remove();MISSING.remove(id);dirty=true;
