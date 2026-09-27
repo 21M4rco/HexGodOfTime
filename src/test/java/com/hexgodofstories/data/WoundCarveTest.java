@@ -23,6 +23,7 @@ public final class WoundCarveTest {
         nothingOfAHoleIsEverOutsideTheLimb();
         theNearestPointOfALimbToABeam();
         aDrawnBodyIsCutTheSameWay();
+        aBlockFaceKeepsEverythingTheHoleLeaves();
         System.out.println("WoundCarveTest: holes are carved out of the limb, corners included, and never hang outside it.");
     }
 
@@ -182,6 +183,51 @@ public final class WoundCarveTest {
             if (opening != null) cut += area(opening);
         }
         require(near(cut, 2 * WHOLE / 4 + 2 * R, 1e-4f), "front, back and both sides are carved at the corner: " + cut);
+    }
+
+    /**
+     * A wall block's face is drawn less the hole, from pieces that carry the face's own colour, texture and
+     * light with them: the pieces and the opening must add up to the face exactly, never overlap, never
+     * reach into the hole, and blend what each corner carries as the face itself would.
+     */
+    private static void aBlockFaceKeepsEverythingTheHoleLeaves() {
+        Random random = new Random(20260927);
+        int stride = 5, carved = 0;
+        for (int trial = 0; trial < 3000; trial++) {
+            float r = .03f + random.nextFloat() * .45f;
+            WoundCarve.Cylinder c = new WoundCarve.Cylinder(-.3f + random.nextFloat() * 1.6f, -.3f + random.nextFloat() * 1.6f, -1,
+                (float) random.nextGaussian() * .6f, (float) random.nextGaussian() * .6f, 1, r);
+            // The block's front face, each corner carrying two made-up attributes that vary across it linearly.
+            float[] face = new float[4 * stride];
+            float[][] corners = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+            for (int i = 0; i < 4; i++) {
+                float x = corners[i][0], y = corners[i][1];
+                float[] point = {x, y, 0, 2 * x - 3 * y + 5, 7 * y + x * .5f};
+                System.arraycopy(point, 0, face, i * stride, stride);
+            }
+            float[] hole = WoundCarve.inside(face, stride, c);
+            java.util.List<float[]> left = WoundCarve.outside(face, stride, c);
+            float total = hole == null ? 0 : areaOf(hole, stride);
+            for (float[] piece : left) {
+                total += areaOf(piece, stride);
+                for (int i = 0; i < piece.length; i += stride) {
+                    float x = piece[i], y = piece[i + 1];
+                    require(x >= -EPS && x <= 1 + EPS && y >= -EPS && y <= 1 + EPS && near(piece[i + 2], 0, EPS), "a piece left the face");
+                    require(c.distance(x, y, piece[i + 2]) >= c.apothem - EPS, "a piece reaches into the hole");
+                    require(near(piece[i + 3], 2 * x - 3 * y + 5, 2e-3f) && near(piece[i + 4], 7 * y + x * .5f, 2e-3f),
+                        "what a corner carries is not blended the way the face blends it");
+                }
+            }
+            require(near(total, 1, 2e-4f), "the pieces and the opening do not make up the face: " + total);
+            if (hole != null && !left.isEmpty()) carved++;
+        }
+        require(carved > 500, "the random holes should cut plenty of faces partway: " + carved);
+    }
+
+    private static float areaOf(float[] p, int stride) {
+        float[] xyz = new float[p.length / stride * 3];
+        for (int i = 0, o = 0; i < p.length; i += stride, o += 3) {xyz[o] = p[i]; xyz[o + 1] = p[i + 1]; xyz[o + 2] = p[i + 2];}
+        return area(xyz);
     }
 
     private static void inCube(float[] points, int i, String what) {

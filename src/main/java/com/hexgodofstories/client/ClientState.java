@@ -145,7 +145,7 @@ public final class ClientState {
             WorldEffects.clear();HexSkin.clear();HexLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();FrostClient.clear();
             com.hexgodofstories.client.leviathan.LeviathanEffects.clear();
             TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();GripRenderer.clear();
-            ScepterClient.clear();BeamWounds.clear();
+            ScepterClient.clear();BeamWounds.clear();BlockWounds.clear();
             HexClient.ForgeBus.releaseHeldCast();
             world=mc.level;
         }
@@ -155,6 +155,7 @@ public final class ClientState {
         FrostClient.tick();
         ScepterClient.tick();
         BeamWounds.tick();
+        BlockWounds.tick();
         FROZEN.forEach((id,n)->{
             Entity e=mc.level.getEntity(id);
             if(e!=null)pin(e,n.getDouble("x"),n.getDouble("y"),n.getDouble("z"),n.getFloat("yaw"),n.getFloat("pitch"));

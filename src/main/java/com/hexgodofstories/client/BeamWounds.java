@@ -565,7 +565,7 @@ public final class BeamWounds {
      * carved edge still meet on screen, and none spills past its cut. At a glancing angle that would take it
      * a long way, so it goes no further than four lifts.
      */
-    private static float[] nearer(float[] polygon, float lift) {
+    static float[] nearer(float[] polygon, float lift) {
         float[] n = WoundCarve.normal(polygon), out = polygon.clone();
         for (int i = 0; i < out.length; i += 3) {
             float distance = (float) Math.sqrt(out[i] * out[i] + out[i + 1] * out[i + 1] + out[i + 2] * out[i + 2]);
@@ -579,7 +579,7 @@ public final class BeamWounds {
         return out;
     }
 
-    private static float[] transform(Matrix4f pose, float[] polygon) {
+    static float[] transform(Matrix4f pose, float[] polygon) {
         float[] out = new float[polygon.length];
         Vector3f p = new Vector3f();
         for (int i = 0; i < polygon.length; i += 3) {

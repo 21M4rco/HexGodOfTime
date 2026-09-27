@@ -1,6 +1,8 @@
 package com.hexgodofstories.data;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * The hole a Scepter beam cuts in a body, as geometry: the beam's cylinder, taken as the prism of
@@ -122,63 +124,97 @@ public final class WoundCarve {
     }
 
     /**
-     * Keeps the part of the convex polygon {@code in} ({@code n} points) where
-     * {@code nx x + ny y + nz z <= d}, written to {@code out}. Returns how many points are left.
+     * Keeps the part of the convex polygon {@code in} ({@code n} points of {@code stride} floats, x, y and z
+     * first) where {@code nx x + ny y + nz z <= d}, written to {@code out}; whatever else a point carries
+     * (colour, texture, light) is blended along with it where an edge is cut. Returns how many points are
+     * left.
      */
-    static int clip(float[] in, int n, float nx, float ny, float nz, float d, float[] out) {
+    static int clip(float[] in, int n, int stride, float nx, float ny, float nz, float d, float[] out) {
         if (n == 0) return 0;
-        int m = 0;
+        int m = 0, p = (n - 1) * stride;
         // A convex polygon gains at most one point per plane; anything that would outgrow the room is
         // numerical wreckage, and is dropped rather than drawn.
-        float px = in[n * 3 - 3], py = in[n * 3 - 2], pz = in[n * 3 - 1];
-        float pd = nx * px + ny * py + nz * pz - d;
+        float pd = nx * in[p] + ny * in[p + 1] + nz * in[p + 2] - d;
         for (int i = 0; i < n; i++) {
-            if ((m + 2) * 3 > out.length) return 0;
-            float x = in[i * 3], y = in[i * 3 + 1], z = in[i * 3 + 2];
-            float cd = nx * x + ny * y + nz * z - d;
+            if ((m + 2) * stride > out.length) return 0;
+            int c = i * stride;
+            float cd = nx * in[c] + ny * in[c + 1] + nz * in[c + 2] - d;
             if (cd <= 0) {
                 // Coming back inside: where the edge crosses, then the point itself.
-                if (pd > 0 && cd < 0) m = cross(out, m, px, py, pz, x, y, z, pd / (pd - cd));
-                out[m * 3] = x; out[m * 3 + 1] = y; out[m * 3 + 2] = z; m++;
-            } else if (pd < 0) m = cross(out, m, px, py, pz, x, y, z, pd / (pd - cd));
-            px = x; py = y; pz = z; pd = cd;
+                if (pd > 0 && cd < 0) m = cross(in, p, c, pd / (pd - cd), stride, out, m);
+                System.arraycopy(in, c, out, m * stride, stride);
+                m++;
+            } else if (pd < 0) m = cross(in, p, c, pd / (pd - cd), stride, out, m);
+            p = c;
+            pd = cd;
         }
         return m;
     }
 
-    private static int cross(float[] out, int m, float px, float py, float pz, float x, float y, float z, float t) {
-        out[m * 3] = px + (x - px) * t; out[m * 3 + 1] = py + (y - py) * t; out[m * 3 + 2] = pz + (z - pz) * t;
+    private static int cross(float[] in, int p, int c, float t, int stride, float[] out, int m) {
+        for (int j = 0, o = m * stride; j < stride; j++) out[o + j] = in[p + j] + (in[c + j] - in[p + j]) * t;
         return m + 1;
     }
 
-    /** The convex polygon kept inside every plane given, or null once nothing is left. */
-    private static float[] keep(float[] polygon, float[]... planes) {
+    /** The convex polygon of plain x, y, z points kept inside every plane given, or null once nothing is left. */
+    private static float[] keep(float[] polygon, float[]... planes) {return keep(polygon, 3, planes);}
+
+    /** The same, for points of {@code stride} floats. */
+    private static float[] keep(float[] polygon, int stride, float[]... planes) {
         float[][] scratch = SCRATCH.get();
-        int room = polygon.length + planes.length * 3 + 24;
-        if (scratch[0].length < room) scratch[0] = scratch[1] = null;
-        if (scratch[0] == null) {scratch[0] = new float[room * 2]; scratch[1] = new float[room * 2];}
+        int room = polygon.length + (planes.length + 8) * stride;
+        if (scratch[0].length < room) {scratch[0] = new float[room * 2]; scratch[1] = new float[room * 2];}
         float[] a = scratch[0], b = scratch[1];
         System.arraycopy(polygon, 0, a, 0, polygon.length);
-        int n = polygon.length / 3;
+        int n = polygon.length / stride;
         for (float[] p : planes) {
-            n = clip(a, n, p[0], p[1], p[2], p[3], b);
+            n = clip(a, n, stride, p[0], p[1], p[2], p[3], b);
             if (n < 3) return null;
             float[] t = a; a = b; b = t;
         }
         // What only touches a plane along a line is no piece of anything.
-        return area(a, n) < 1e-10f ? null : Arrays.copyOf(a, n * 3);
+        return area(a, n, stride) < 1e-10f ? null : Arrays.copyOf(a, n * stride);
     }
 
     /** A flat polygon's area, by Newell's method. */
-    private static float area(float[] p, int n) {
+    private static float area(float[] p, int n, int stride) {
         float x = 0, y = 0, z = 0;
         for (int i = 0; i < n; i++) {
-            int a = i * 3, b = (i + 1) % n * 3;
+            int a = i * stride, b = (i + 1) % n * stride;
             x += (p[a + 1] - p[b + 1]) * (p[a + 2] + p[b + 2]);
             y += (p[a + 2] - p[b + 2]) * (p[a] + p[b]);
             z += (p[a] - p[b]) * (p[a + 1] + p[b + 1]);
         }
         return (float) Math.sqrt(x * x + y * y + z * z) / 2;
+    }
+
+    /** The part of a convex polygon of points of {@code stride} floats inside the cylinder, or null if none is. */
+    public static float[] inside(float[] polygon, int stride, Cylinder c) {return keep(polygon, stride, c.sides);}
+
+    /**
+     * What the hole leaves of a convex polygon (points of {@code stride} floats): convex pieces that do not
+     * overlap and together cover all of it outside the cylinder. The polygon itself when the hole misses
+     * it, and none when the hole takes it all.
+     */
+    public static List<float[]> outside(float[] polygon, int stride, Cylinder c) {
+        int n = polygon.length / stride;
+        for (float[] side : c.sides) {
+            boolean beyond = true;
+            for (int i = 0; i < n && beyond; i++)
+                beyond = side[0] * polygon[i * stride] + side[1] * polygon[i * stride + 1] + side[2] * polygon[i * stride + 2] > side[3];
+            if (beyond) return List.of(polygon);
+        }
+        // Piece k: beyond side k, yet inside every side before it. Any point outside the cylinder is beyond
+        // at least one side, and so falls in exactly one piece: the one for the first side it is beyond.
+        List<float[]> pieces = new ArrayList<>();
+        float[][] planes = new float[SIDES][];
+        for (int k = 0; k < SIDES; k++) {
+            planes[0] = c.beyond[k];
+            for (int j = 0; j < k; j++) planes[j + 1] = c.sides[j];
+            float[] piece = keep(polygon, stride, Arrays.copyOf(planes, k + 1));
+            if (piece != null) pieces.add(piece);
+        }
+        return pieces;
     }
 
     /** The part of a convex face inside the cylinder: the opening the beam cuts in it. Null if it cuts none. */

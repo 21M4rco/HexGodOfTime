@@ -40,9 +40,10 @@ import java.util.UUID;
  * <p>A press starts holding the stone open; a release fires. Let go inside {@link #TAP} ticks and it is
  * a quick bolt that stops in the first body it meets. Hold longer and the stone fills over {@link #FULL}
  * ticks into a charged beam that burns through up to six bodies. Either one goes straight through
- * walls, up to {@link #WALLS} solid blocks of them, and leaves the same clean hole in each that it
- * leaves in a body: open to the air for most of a minute, then knitting back exactly as it was (see
- * {@link Nothingness#hole}). Nothing it reaches explodes.
+ * walls, up to {@link #WALLS} solid blocks of them, and holes each one the way it holes a body: a
+ * cauterised hole that can be seen through, open for most of a minute and then knitting shut. The blocks
+ * are never broken; the hole is only drawn, by every client in sight ({@code BlockWounds}). Nothing it
+ * reaches explodes.
  *
  * <p>The beam does not break a body; it holds one. It hits lightly, and every body it passes through is
  * stunned, reeling and blind for a moment, and keeps a cauterised hole that bleeds a heart a second,
@@ -192,7 +193,8 @@ public final class ScepterBlast {
         Vec3 muzzle = ScepterPose.stoneMuzzle(caster);
         // Straight through walls: nine solid blocks at most, and the tenth stops it.
         List<Wall> walls = new ArrayList<>();
-        Vec3 stop = stop(level, eye, eye.add(direction.scale(RANGE)), caster, walls);
+        Stop end = stop(level, eye, eye.add(direction.scale(RANGE)), caster, walls);
+        Vec3 stop = end.at();
 
         // The beam has width: a charged one is a hand across and more.
         double width = charged ? .30 + .55 * power : .26;
@@ -208,14 +210,14 @@ public final class ScepterBlast {
         Vec3 impact = stop;
         // A bolt stops in the first body; a charged beam stops in the last one it had strength for,
         // unless it came out the far side of every body in its path. Nothing it stops in explodes.
-        if (!struck.isEmpty() && (!charged || hits.size() > through)) impact = struck.get(struck.size() - 1).at;
+        boolean inBody = !struck.isEmpty() && (!charged || hits.size() > through);
+        if (inBody) impact = struck.get(struck.size() - 1).at;
 
         for (Hit hit : struck) strike(caster, hit, direction, power);
-        // Every wall it crossed before it stopped keeps the same clean hole a body does: open to the air
-        // and knitting back, exactly as it was, when a body's would. Past the body it stopped in, none.
+        // Every wall it crossed before it stopped is holed the way a body is, and for as long. Past the
+        // body it stopped in, none.
         double reach = eye.distanceToSqr(impact);
-        long close = level.getGameTime() + holeLife(power);
-        for (Wall wall : walls) if (wall.distance < reach) Nothingness.hole(level, wall.pos, close);
+        long[] holed = walls.stream().filter(wall -> wall.distance < reach).mapToLong(wall -> wall.pos.asLong()).toArray();
 
         // Everyone near hears the shot from the stone; the caster already heard it on release.
         float pitch = .94f + caster.getRandom().nextFloat() * .14f;
@@ -244,6 +246,17 @@ public final class ScepterBlast {
             pierced.add(DoubleTag.valueOf(hit.at.z));
         }
         fx.put("through", pierced);
+        if (holed.length > 0) {
+            // The holes in the walls are drawn by each client, down the same line the walls were found on.
+            fx.putLongArray("walls", holed);
+            fx.putDouble("ex", eye.x); fx.putDouble("ey", eye.y); fx.putDouble("ez", eye.z);
+            fx.putDouble("dx", direction.x); fx.putDouble("dy", direction.y); fx.putDouble("dz", direction.z);
+            fx.putFloat("hr", holeRadius(power));
+            fx.putLong("hs", level.getGameTime());
+            fx.putInt("hl", holeLife(power));
+            // The block that stopped it is not holed, only met: the tunnel ends against it.
+            if (!inBody && end.block() != null) fx.putLong("stop", end.block().asLong());
+        }
         HexNetwork.near(level, muzzle, 160, new HexNetwork.Message(HexNetwork.FX, caster.getId(), fx));
     }
 
@@ -263,7 +276,7 @@ public final class ScepterBlast {
             1.2f, .9f + victim.getRandom().nextFloat() * .25f);
         if (victim.isDeadOrDying()) {if (full(power)) dissolve(victim, direction, power); return;}
         // A clean hole that stays open for most of a minute before it knits shut. Bleed, never fire.
-        BeamWound.open(victim, hit.at, direction, charged ? .20f + .14f * power : .15f, holeLife(power));
+        BeamWound.open(victim, hit.at, direction, holeRadius(power), holeLife(power));
         // Held on its last breath: it stays exactly where it was hit, bleeding, until it falls.
         if (held) {LastMoments.hold(caster, victim); return;}
         // The hole pours a heart a second, through armour, for as long as the stone was held.
@@ -309,6 +322,9 @@ public final class ScepterBlast {
     /** A solid block a shot passed through, and the squared distance from the eye at which it went in. */
     private record Wall(BlockPos pos, double distance) { }
 
+    /** Where a shot ends, and the block that ended it, when one did. */
+    private record Stop(Vec3 at, BlockPos block) { }
+
     /**
      * Where a shot from {@code from} toward {@code to} is stopped, collecting every wall it passed through
      * on the way into {@code walls}. It stops where it enters the solid block after the {@link #WALLS}th,
@@ -316,7 +332,8 @@ public final class ScepterBlast {
      * short of {@code to}. Every block whose collision shape the line actually crosses counts once, slabs
      * and panes included; nothing that can be walked through counts, fluids among it.
      */
-    private static Vec3 stop(ServerLevel level, Vec3 from, Vec3 to, ServerPlayer caster, List<Wall> walls) {
+    private static Stop stop(ServerLevel level, Vec3 from, Vec3 to, ServerPlayer caster, List<Wall> walls) {
+        BlockPos[] stopper = new BlockPos[1];
         ClipContext context = new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, caster);
         Vec3 stopped = BlockGetter.traverseBlocks(from, to, context, (c, pos) -> {
             // Never load a chunk to find out what is in it: the shot ends where the loaded world does.
@@ -327,15 +344,21 @@ public final class ScepterBlast {
             BlockState state = level.getBlockState(pos);
             BlockHitResult hit = c.getBlockShape(state, level, pos).clip(from, to, pos);
             if (hit == null) return null;
-            if (walls.size() >= WALLS || state.getDestroySpeed(level, pos) < 0) return hit.getLocation();
+            if (walls.size() >= WALLS || state.getDestroySpeed(level, pos) < 0) {
+                stopper[0] = pos.immutable();
+                return hit.getLocation();
+            }
             walls.add(new Wall(pos.immutable(), from.distanceToSqr(hit.getLocation())));
             return null;
         }, c -> null);
-        return stopped == null ? to : stopped;
+        return new Stop(stopped == null ? to : stopped, stopper[0]);
     }
 
     /** How long a hole stays open, in a body or a wall, before it knits shut: most of a minute. */
     private static int holeLife(float power) {return power > 0 ? 1200 : 900;}
+
+    /** How wide a hole is, in a body or a wall: a hand across for a tap, wider the more the stone was held. */
+    private static float holeRadius(float power) {return power > 0 ? .20f + .14f * power : .15f;}
 
     /**
      * Marks a mob this stun switched NoAI on for. NoAI is saved with the mob, so one unloaded or saved

@@ -308,6 +308,8 @@ public final class ScepterFx {
     public static void blast(int entity,CompoundTag n) {
         var level=Minecraft.getInstance().level;
         if(level==null)return;
+        // The walls it went through are holed however short the beam is drawn.
+        BlockWounds.open(n);
         Vec3 origin=new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z"));
         Vec3 destination=new Vec3(n.getDouble("tx"),n.getDouble("ty"),n.getDouble("tz"));
         float power=n.getFloat("power");

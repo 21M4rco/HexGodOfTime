@@ -9,12 +9,10 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.minecraft.world.phys.AABB;
 import java.util.*;
 
 /**
@@ -59,11 +57,9 @@ public final class Nothingness extends SavedData {
         final BlockPos pos;final CompoundTag state;final CompoundTag blockEntity;
         /** Beam wounds must restore exactly even if fluid flowed in or something was placed meanwhile. */
         final boolean beam;
-        /** A hole that stays open for as long as anything alive is standing in it; see {@link #hole}. */
-        final boolean yielding;
         long due;int waited;
-        Wound(BlockPos pos,CompoundTag state,CompoundTag blockEntity,long due,int waited,boolean beam,boolean yielding) {
-            this.pos=pos;this.state=state;this.blockEntity=blockEntity;this.due=due;this.waited=waited;this.beam=beam;this.yielding=yielding;
+        Wound(BlockPos pos,CompoundTag state,CompoundTag blockEntity,long due,int waited,boolean beam) {
+            this.pos=pos;this.state=state;this.blockEntity=blockEntity;this.due=due;this.waited=waited;this.beam=beam;
         }
     }
     /** Insertion ordered, so a tunnel knits back the way it was carved. */
@@ -84,7 +80,7 @@ public final class Nothingness extends SavedData {
      * Legacy/full Nothingness replacement used by callers that genuinely want the whole position black.
      */
     public static boolean take(ServerLevel level,BlockPos pos,long due) {
-        return takeInternal(level,pos,due,true,false,false);
+        return takeInternal(level,pos,due,true,false);
     }
 
     /**
@@ -94,19 +90,10 @@ public final class Nothingness extends SavedData {
      * @return true when this call recorded and replaced the original position.
      */
     public static boolean takeBeam(ServerLevel level,BlockPos pos,long due,boolean shell) {
-        return takeInternal(level,pos,due,shell,true,false);
+        return takeInternal(level,pos,due,shell,true);
     }
 
-    /**
-     * A Scepter beam's hole through a wall: opened to the air and put back exactly, like the Time Branch
-     * core, but held open for as long as anything alive is standing in it. The hole lasts most of a
-     * minute and a shaft shot straight down is one a body can fall into; it must never close on one.
-     */
-    public static boolean hole(ServerLevel level,BlockPos pos,long due) {
-        return takeInternal(level,pos,due,false,true,true);
-    }
-
-    private static boolean takeInternal(ServerLevel level,BlockPos pos,long due,boolean black,boolean beam,boolean yielding) {
+    private static boolean takeInternal(ServerLevel level,BlockPos pos,long due,boolean black,boolean beam) {
         if(!level.hasChunkAt(pos))return false;
         Nothingness data=of(level);
         Wound existing=data.wounds.get(pos.asLong());
@@ -137,7 +124,7 @@ public final class Nothingness extends SavedData {
             ?HexGodOfStories.NOTHINGNESS.get().defaultBlockState()
             :net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
         level.setBlock(pos,replacement,FLAGS);
-        data.wounds.put(pos.asLong(),new Wound(pos.immutable(),saved,entity,due,0,beam,yielding));
+        data.wounds.put(pos.asLong(),new Wound(pos.immutable(),saved,entity,due,0,beam));
         data.setDirty();
         return true;
     }
@@ -162,18 +149,10 @@ public final class Nothingness extends SavedData {
                 w.due=now+CADENCE*4;
                 continue;
             }
-            if(occupied(level,w)){w.due=now+CADENCE*4;continue;}
             data.restore(level,w);
             data.wounds.remove(w.pos.asLong());
         }
         data.setDirty();
-    }
-
-    /** A yielding hole with something alive standing in it: it waits, rather than closing on them. */
-    private static boolean occupied(ServerLevel level,Wound w) {
-        if(!w.yielding||!level.hasChunkAt(w.pos))return false;
-        return !level.getEntitiesOfClass(LivingEntity.class,new AABB(w.pos.getX(),w.pos.getY(),w.pos.getZ(),
-            w.pos.getX()+1,w.pos.getY()+1,w.pos.getZ()+1)).isEmpty();
     }
 
     /**
@@ -189,8 +168,6 @@ public final class Nothingness extends SavedData {
             // and is restored, overdue, the next time that chunk loads — dropping it here because the
             // server happened to be closing is exactly the permanent loss this class exists to prevent.
             if(!level.hasChunkAt(w.pos))continue;
-            // Nor what someone is standing in: its record is on disk, and it closes once they have left.
-            if(occupied(level,w))continue;
             data.restore(level,w);
             data.wounds.remove(w.pos.asLong());
         }
@@ -204,7 +181,7 @@ public final class Nothingness extends SavedData {
         Nothingness data=of(level);boolean changed=false;
         for(BlockPos pos:positions){
             Wound wound=data.wounds.get(pos.asLong());
-            if(wound==null||wound.due>level.getGameTime()||!level.hasChunkAt(pos)||occupied(level,wound))continue;
+            if(wound==null||wound.due>level.getGameTime()||!level.hasChunkAt(pos))continue;
             data.restore(level,wound);data.wounds.remove(pos.asLong());changed=true;
         }
         if(changed)data.setDirty();
@@ -219,10 +196,6 @@ public final class Nothingness extends SavedData {
         // explicitly temporary world surgery: they must return the exact original state even if water
         // flowed into the cavity or somebody placed a block during the four-second window.
         if(!w.beam&&!current.is(HexGodOfStories.NOTHINGNESS.get())&&!current.isAir())return;
-        // A Scepter hole stays open for most of a minute, long enough for someone to fill it with a block
-        // of their own. That block, and whatever is in it, is theirs now and is never deleted; only air,
-        // or a fluid that ran in, is displaced by the wall coming back.
-        if(w.yielding&&!current.isAir()&&!(current.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock))return;
         if(w.beam) {
             BlockEntity displaced=level.getBlockEntity(w.pos);
             if(displaced!=null)level.removeBlockEntity(w.pos);
@@ -263,7 +236,7 @@ public final class Nothingness extends SavedData {
             BlockPos pos=BlockPos.of(entry.getLong("pos"));
             data.wounds.put(pos.asLong(),new Wound(pos,entry.getCompound("state"),
                 entry.contains("entity")?entry.getCompound("entity"):null,
-                entry.getLong("due"),entry.getInt("waited"),entry.getBoolean("beam"),entry.getBoolean("yield")));
+                entry.getLong("due"),entry.getInt("waited"),entry.getBoolean("beam")));
         }
         return data;
     }
@@ -278,7 +251,6 @@ public final class Nothingness extends SavedData {
             entry.putLong("due",w.due);
             entry.putInt("waited",w.waited);
             entry.putBoolean("beam",w.beam);
-            if(w.yielding)entry.putBoolean("yield",true);
             list.add(entry);
         }
         tag.put("wounds",list);
