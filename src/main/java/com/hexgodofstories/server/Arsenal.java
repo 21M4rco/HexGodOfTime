@@ -366,7 +366,7 @@ public final class Arsenal {
             // Once a second under fire, a tiny hole where a round went in, and it bleeds a little.
             if (entry != null && now - crown.holed.getOrDefault(owed.getKey(), Long.MIN_VALUE / 2) >= HOLE_EVERY) {
                 crown.holed.put(owed.getKey(), now);
-                BeamWound.open(body, entry[0], entry[1], HOLE, HOLE_LIFE);
+                BeamWound.open(body, entry[0], entry[1], HOLE, HOLE_LIFE, true);
                 Bleed.apply(p, body, Bleed.stacks(body) < BLEED_STACKS ? 1 : 0, BLEED);
             }
         }
@@ -657,7 +657,7 @@ public final class Arsenal {
         // Jolted forward, the way the round went, not away from the caster.
         body.setDeltaMovement(body.getDeltaMovement().add(direction.x * .3, .08, direction.z * .3));
         body.hurtMarked = true;
-        BeamWound.open(body, in.get(), direction, GOTCHA_HOLE, HOLE_LIFE);
+        BeamWound.open(body, in.get(), direction, GOTCHA_HOLE, HOLE_LIFE, true);
         Bleed.flow(caster, body, GOTCHA_BLEED);
     }
 

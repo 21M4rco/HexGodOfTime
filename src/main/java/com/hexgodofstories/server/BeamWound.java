@@ -27,7 +27,10 @@ public final class BeamWound {
     private record Open(CompoundTag data, long until) { }
     private static final Map<UUID, List<Open>> OPEN = new HashMap<>();
 
-    public static void open(LivingEntity victim, Vec3 at, Vec3 direction, float radius, int life) {
+    public static void open(LivingEntity victim, Vec3 at, Vec3 direction, float radius, int life) {open(victim, at, direction, radius, life, false);}
+
+    /** The same hole, {@code quiet}: no fire is heard in it while it glows (a bullet's, not a beam's). */
+    public static void open(LivingEntity victim, Vec3 at, Vec3 direction, float radius, int life, boolean quiet) {
         long now = victim.level().getGameTime();
         CompoundTag n = new CompoundTag();
         n.putDouble("x", at.x); n.putDouble("y", at.y); n.putDouble("z", at.z);
@@ -37,6 +40,7 @@ public final class BeamWound {
         n.putFloat("r", radius);
         n.putLong("start", now);
         n.putInt("life", life);
+        if (quiet) n.putBoolean("quiet", true);
         List<Open> list = OPEN.get(victim.getUUID());
         if (list == null) {
             if (OPEN.size() >= MAX_BODIES) OPEN.entrySet().removeIf(e -> e.getValue().stream().allMatch(o -> o.until <= now));

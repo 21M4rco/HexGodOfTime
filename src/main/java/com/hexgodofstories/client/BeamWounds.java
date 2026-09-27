@@ -117,15 +117,17 @@ public final class BeamWounds {
         /** This frame's hole in view space, at its full width, for what is drawn over the body; and the frame it is for. */
         WoundCarve.Cylinder cut;
         long cutFrame = -1;
-        /** Its sizzle while it is hot, as long as it can be heard. */
+        /** Its sizzle while it is hot, as long as it can be heard; never, for a quiet hole (a bullet's). */
         HoleSizzle sizzle;
+        final boolean quiet;
 
-        Wound(Vec3 point, Vec3 direction, float radius, long start, int life) {
+        Wound(Vec3 point, Vec3 direction, float radius, long start, int life, boolean quiet) {
             this.point = point;
             this.direction = direction;
             this.radius = radius;
             this.start = start;
             this.life = life;
+            this.quiet = quiet;
         }
 
         float age(float partial) {return ClientState.since(start, partial) / life;}
@@ -152,7 +154,7 @@ public final class BeamWounds {
         List<Wound> list = WOUNDS.computeIfAbsent(entity, k -> new ArrayList<>());
         if (list.size() >= 8) list.remove(0);
         if (WOUNDS.size() > 256) WOUNDS.clear();
-        list.add(new Wound(point, direction, n.getFloat("r"), n.getLong("start"), Math.max(1, n.getInt("life"))));
+        list.add(new Wound(point, direction, n.getFloat("r"), n.getLong("start"), Math.max(1, n.getInt("life")), n.getBoolean("quiet")));
     }
 
     public static void tick() {
@@ -169,7 +171,7 @@ public final class BeamWounds {
             for (Wound w : entry.getValue()) {
                 float age = ClientState.since(w.start, 0);
                 if (HoleHeat.cold(age, HoleHeat.BODY, 0)) continue;
-                if (w.sizzle == null || !w.sizzle.heard()) {
+                if (!w.quiet && (w.sizzle == null || !w.sizzle.heard())) {
                     int id = entry.getKey();
                     w.sizzle = HoleSizzle.start(() -> heardFrom(id, w), () -> HoleHeat.coldAt(HoleHeat.BODY, 0) - ClientState.since(w.start, 0));
                 }
