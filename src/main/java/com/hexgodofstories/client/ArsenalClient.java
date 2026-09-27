@@ -80,8 +80,6 @@ public final class ArsenalClient {
     private static final double REACH = 128;
     /** Ticks the guns trail the mark by as it moves: enough to give them weight, too few to miss by. */
     private static final double AIM_LAG = 1.2;
-    /** How far a round strays from the mark, in radians, as the server's do. */
-    private static final double SPREAD = .011;
     /** A round in flight: its speed and the length of its streak, in blocks a tick and blocks. */
     private static final double TRACER_SPEED = 16, TRACER_TRAIL = 4.5;
     private static final int MOST_TRACERS = 320;
@@ -126,6 +124,8 @@ public final class ArsenalClient {
         int kind;
         BlockState block;
         Direction face = Direction.UP;
+        /** The body the mark is on, as the rounds meet it; null when it is on none. */
+        AABB box;
         long lastHit = Long.MIN_VALUE / 2;
         /** The point the guns aim at, trailing the mark, and the render time it was last moved at. */
         Vec3 aim;
@@ -443,16 +443,18 @@ public final class ArsenalClient {
         Vec3 stop = wall ? block.getLocation() : end;
         int kind = wall ? 1 : 0;
         double nearest = eye.distanceToSqr(stop);
-        AABB along = new AABB(eye, stop).inflate(1);
+        AABB along = new AABB(eye, stop).inflate(1), box = null;
         for (Entity body : level.getEntities(caster, along, e -> e instanceof LivingEntity && e.isAlive() && !e.isSpectator())) {
             Optional<Vec3> hit = body.getBoundingBox().inflate(.3).clip(eye, stop);
             if (hit.isPresent() && eye.distanceToSqr(hit.get()) < nearest) {
                 nearest = eye.distanceToSqr(hit.get());
                 kind = 2;
+                box = body.getBoundingBox().inflate(.1);
             }
         }
         c.reach = Math.max(1, Math.sqrt(nearest));
         c.kind = kind;
+        c.box = box;
         c.block = kind == 1 ? level.getBlockState(block.getBlockPos()) : null;
         c.face = block.getDirection();
     }
@@ -682,7 +684,8 @@ public final class ArsenalClient {
             if (reveal <= .001f) {c.guns[g] = null; continue;}
             // However it comes apart, it comes apart where it is: its pose holds from the moment its fire stopped.
             float formed = ArsenalLayout.formed(g, (float) Math.min(t, Math.min(stop, ArsenalLayout.FIRE_END)));
-            ArsenalLayout.Pose p = ArsenalLayout.pose(f.slot(g), ArsenalLayout.out(g), aim, formed, aiming);
+            // Each gun sprays about the mark its own way, as the server's do.
+            ArsenalLayout.Pose p = ArsenalLayout.pose(f.slot(g), ArsenalLayout.out(g), ArsenalLayout.aimOf(g, aim, fire), formed, aiming);
             Vec3 right = f.axis(p.right()), up = f.axis(p.up()), forward = f.axis(p.forward());
             double since = t > stop + 1 ? -1 : ArsenalLayout.sinceShot(g, fire);
             float flash = since < 0 ? 0 : (float) Math.max(0, 1 - since / 1.2), kick = since < 0 ? 0 : (float) Math.max(0, 1 - since / 1.8);
@@ -731,30 +734,45 @@ public final class ArsenalClient {
     /** Each round a crown's guns have fired since the last frame: a tracer from its muzzle, and now and then a casing. */
     private static void rounds(Crown c, double t) {
         double fire = Math.min(t, c.stopped());
-        RandomSource random = Minecraft.getInstance().level.random;
+        ClientLevel level = Minecraft.getInstance().level;
+        RandomSource random = level.random;
         Vec3 eye = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        double spread = ArsenalLayout.SPREAD;
         for (int g = 0; g < ArsenalLayout.GUNS; g++) {
             long now = (long) Math.floor(ArsenalLayout.rounds(g, fire)), from = c.counted[g] + 1;
             if (now < from) continue;
             c.counted[g] = now;
             Gun gun = c.guns[g];
             if (gun == null || c.aim == null) continue;
-            double period = 1200 / ArsenalLayout.RPM[gun.type()];
             boolean near = gun.muzzle().distanceToSqr(eye) < DETAIL_RANGE * DETAIL_RANGE;
+            double distance = c.aim.distanceTo(gun.muzzle());
+            if (distance < .75) continue;
             // A hitch drops the rounds it missed rather than firing them all at once.
             for (long k = Math.max(from, now - 2); k <= now; k++) {
-                Vec3 to = c.aim.subtract(gun.muzzle());
-                double distance = to.length();
-                if (distance < .75) continue;
-                Vec3 direction = to.scale(1 / distance).add(random.nextGaussian() * SPREAD, random.nextGaussian() * SPREAD, random.nextGaussian() * SPREAD)
+                // Down its own gun, which points at its own spot about the mark, and straying from that.
+                Vec3 direction = gun.forward().add(random.nextGaussian() * spread, random.nextGaussian() * spread, random.nextGaussian() * spread)
                     .normalize();
-                double born = c.start + ArsenalLayout.FIRE_START + (k - ArsenalLayout.phase(g)) * period;
-                TRACERS.add(new Tracer(gun.muzzle(), direction, distance, born, k % 2 == 0, c.kind, c.block, c.face));
+                TRACERS.add(tracer(c, level, gun.muzzle(), direction, distance, c.start + ArsenalLayout.shotTime(g, k), k % 2 == 0));
                 if (near && k % CASING_EVERY == 0) casing(gun, random);
             }
         }
         while (TRACERS.size() > MOST_TRACERS) TRACERS.remove(0);
         while (CASINGS.size() > MOST_CASINGS) CASINGS.remove(0);
+    }
+
+    /**
+     * A round's streak, to where it lands: into the body the mark is on if it meets it; if it misses, on past it, as
+     * the server's rounds do, to whatever block stops it or nowhere.
+     */
+    private static Tracer tracer(Crown c, ClientLevel level, Vec3 from, Vec3 direction, double distance, double born, boolean bright) {
+        if (c.kind != 2 || c.box == null) return new Tracer(from, direction, distance, born, bright, c.kind, c.block, c.face);
+        Vec3 end = from.add(direction.scale(distance + ArsenalLayout.PAST));
+        Optional<Vec3> in = c.box.clip(from, end);
+        if (in.isPresent()) return new Tracer(from, direction, from.distanceTo(in.get()), born, bright, 2, null, c.face);
+        BlockHitResult wall = level.clip(new ClipContext(from, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null));
+        if (wall.getType() == HitResult.Type.MISS) return new Tracer(from, direction, distance + ArsenalLayout.PAST, born, bright, 0, null, c.face);
+        return new Tracer(from, direction, from.distanceTo(wall.getLocation()), born, bright, 1, level.getBlockState(wall.getBlockPos()),
+            wall.getDirection());
     }
 
     /** A spent case out of a gun's ejection port: out to its right and up (the M249 drops its own), tumbling. */

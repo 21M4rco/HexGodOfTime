@@ -30,6 +30,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -43,39 +44,56 @@ import java.util.UUID;
  *
  * <p>Held. Both arms go up, and machine guns form one after another in an arch over the caster, the top one first
  * and then outward down both sides; formed, they fire at whatever the caster looks at, turning to follow the look,
- * for as long as the key is held, up to twenty seconds. Let go before that and the guns simply come apart. Hold it
- * to the end and the arms are thrown down, and two missiles that formed beside the head fly, slowly and never
- * straight, to the point aimed at, and blow a crater there that knits itself back together a block at a time.
+ * each in its own ragged bursts and spraying about the mark its own way, for as long as the key is held, until the
+ * missiles are called at thirteen seconds. Let go before that and the guns simply come apart. Hold it to the end
+ * and the arms are thrown down, and two missiles that formed beside the head fly, slowly and never straight, to
+ * the point aimed at, and blow a crater there that knits itself back together a block at a time.
  *
  * <p>Nothing is an entity and nothing is an item. The guns exist only on the clients, who draw them from {@link
  * ArsenalLayout}'s numbers; the rounds are the server's own instant rays, from the same muzzles to the same mark;
  * the missiles fly the same {@link ArsenalLayout.Flight} here and on every client, with a single message at launch
  * and a single message where each lands. The whole of it costs the server a handful of rays a tick.
  *
- * <p>Damage. A round is half a heart. A body takes at most one round a tick however many are aimed at it, dealt
- * four ticks' worth at a time so that it is not made to cry out twenty times a second, and never knocked about by
- * it. A missile is thirty hearts to anything within five blocks of where it bursts, less to the edge of its nine,
- * and sets it burning.
+ * <p>Damage. The rounds hold; the missiles kill. A round stuns for a second, begun again by every round after it,
+ * so a body kept under fire is held for as long as it is, and one still held when the fire ends stays held until the
+ * missiles are there. A round goes through every body in its way (up to {@link #PIERCE}) but never through a block,
+ * and stings for a twentieth of a heart; each second a body is under fire it takes a tiny hole where a round went
+ * in, and bleeds a little from it. A body takes at most one round a tick however many are aimed at it, dealt four
+ * ticks' worth at a time so that it is not made to cry out twenty times a second, and never knocked about by it.
+ * A missile is forty hearts to the body it strikes, thirty to anything else within five blocks of where it bursts,
+ * less to the edge of its nine, and sets it burning.
  */
 @Mod.EventBusSubscriber(modid = HexGodOfStories.ID)
 public final class Arsenal {
     private Arsenal() { }
 
-    /** A round: half a heart. */
-    static final float ROUND = 1;
+    /** A round: a twentieth of a heart. The rounds hold a body; the missiles are what kill it. */
+    static final float ROUND = .1f;
     /** Ticks a body's owed rounds are gathered over before they are dealt. */
     static final int DEAL_EVERY = 4;
+    /** A round's stun, in ticks: a second, begun again by every round after it. */
+    static final int STUN = 20;
+    /** Bodies one round goes through, at most; a block always stops it. */
+    static final int PIERCE = 4;
+    /** A round's hole: its radius, far smaller than the Scepter's least, how long it stays open, and how often a body under fire is holed afresh. */
+    static final float HOLE = .05f;
+    static final int HOLE_LIFE = 600, HOLE_EVERY = 20;
+    /** The bleeding the holes leave: stacks at most, and the ticks it runs on after the latest hole. */
+    static final int BLEED_STACKS = 2, BLEED = 60;
     /** How far the crown sees to aim, and how far the missiles are thrown when there is nothing to see. */
     static final double REACH = 128, THROW_REACH = 90, NEAREST_MARK = 6;
-    /** How far a round strays from the mark, in radians: a burst, not a laser. */
-    static final double SPREAD = .011;
-    /** A missile: its blast, the reach of that blast at full strength and at all, its burn, and its crater's power. */
-    static final float BLAST = 60, BURN_SECONDS = 8, CRATER = 6;
+    /**
+     * A missile: forty hearts to the body it strikes, its blast to everything else, the reach of that blast at full
+     * strength and at all, its burn, and its crater's power.
+     */
+    static final float DIRECT = 80, BLAST = 60, BURN_SECONDS = 8, CRATER = 6;
     static final double BLAST_CORE = 5, BLAST_REACH = 9;
     /** How long a crater stays open before the first block comes back, and over how long the rest follow: Paradise's own. */
     static final int KNIT_DELAY = 170, KNIT_SCATTER = 190;
     /** Recovery after the crown ends: the whole of it, or a short one when let go before a round was fired. */
     static final int SHORT_RECOVERY = 200;
+    /** The longest a body still held when the fire ends is kept held for the missiles, in ticks from their launch. */
+    static final int PIN_MOST = 120;
 
     private static final class Crown {
         final long start;
@@ -85,6 +103,11 @@ public final class Arsenal {
         final Map<Integer, Float> owed = new HashMap<>();
         final Map<Integer, Long> dealt = new HashMap<>();
         final Map<Integer, Long> struck = new HashMap<>();
+        /** Where the latest round went into each body and which way, for its hole; and when each was last holed. */
+        final Map<Integer, Vec3[]> entry = new HashMap<>();
+        final Map<Integer, Long> holed = new HashMap<>();
+        /** The bodies the fire was still holding when it ended: held on until the missiles are there. */
+        final List<Integer> pinned = new ArrayList<>();
 
         Crown(long start) {this.start = start;}
     }
@@ -107,6 +130,9 @@ public final class Arsenal {
             this.last = vec(flight.at(0));
         }
     }
+
+    /** A body a round went into, where, and how far along the round (squared). */
+    private record Hit(Entity body, Vec3 at, double distance) { }
 
     private static final Map<UUID, Crown> CROWNS = new HashMap<>();
     private static final List<Missile> MISSILES = new ArrayList<>();
@@ -186,12 +212,18 @@ public final class Arsenal {
         if (t >= ArsenalLayout.FIRE_START && t < ArsenalLayout.FIRE_END) fire(p, crown, t, now);
         if (t == ArsenalLayout.FIRE_END) {
             settle(p, crown, true);
+            // The fire leads up to the missiles: whatever it was still holding stays held while they form.
+            for (Map.Entry<Integer, Long> s : crown.struck.entrySet())
+                if (now - s.getValue() <= STUN && p.serverLevel().getEntity(s.getKey()) instanceof LivingEntity body && body.isAlive()) {
+                    crown.pinned.add(s.getKey());
+                    ScepterBlast.stun(body, ArsenalLayout.LAUNCH - ArsenalLayout.FIRE_END + 2);
+                }
             HexData.get(p).putString("arsenalEnding", "finale");
             state(p, "finale", now);
         }
         if (t == ArsenalLayout.THROW) HexNetwork.animate(p, "arsenal_throw");
         if (t >= ArsenalLayout.LAUNCH) {
-            launch(p, now);
+            launch(p, crown, now);
             end(p, crown, now, "launched");
             return;
         }
@@ -240,36 +272,49 @@ public final class Arsenal {
         ServerLevel level = p.serverLevel();
         crown.mark = mark(p, REACH);
         double[] aim = body(p, crown.mark);
-        Vec3 eye = p.getEyePosition();
-        // Everything any round this tick could reach: once, not once a round.
-        List<Entity> bodies = level.getEntities(p, new AABB(eye, crown.mark).inflate(3), e -> e instanceof LivingEntity && HexServer.validTarget(p, e));
+        Vec3 eye = p.getEyePosition(), look = crown.mark.subtract(eye);
+        double reach = look.length();
+        // The rounds fly on past the mark, through whatever bodies they meet there, until a block stops them.
+        Vec3 far = reach < 1e-3 ? crown.mark : eye.add(look.scale((reach + ArsenalLayout.PAST) / reach));
+        // Everything any round this tick could reach: once, not once a round. Nothing to reach, nothing to trace.
+        List<Entity> bodies = level.getEntities(p, new AABB(eye, far).inflate(3), e -> e instanceof LivingEntity && HexServer.validTarget(p, e));
+        if (bodies.isEmpty()) return;
+        List<Hit> through = new ArrayList<>();
         for (int gun = 0; gun < ArsenalLayout.GUNS; gun++) {
             if (ArsenalLayout.shots(gun, t) == 0) continue;
-            ArsenalLayout.Pose pose = ArsenalLayout.pose(ArsenalLayout.slot(gun), ArsenalLayout.out(gun), aim, 1, 1);
+            // Each gun sprays about the mark its own way, and each round strays from where its gun points.
+            double[] own = ArsenalLayout.aimOf(gun, aim, t);
+            ArsenalLayout.Pose pose = ArsenalLayout.pose(ArsenalLayout.slot(gun), ArsenalLayout.out(gun), own, 1, 1);
             Vec3 muzzle = world(p, pose.point(ArsenalLayout.MUZZLE[ArsenalLayout.type(gun)], ArsenalLayout.GUN_SCALE));
-            Vec3 to = crown.mark.subtract(muzzle);
+            Vec3 to = world(p, own).subtract(muzzle);
             double distance = to.length();
             if (distance < .5) continue;
-            Vec3 direction = to.scale(1 / distance).add(p.getRandom().nextGaussian() * SPREAD, p.getRandom().nextGaussian() * SPREAD,
-                p.getRandom().nextGaussian() * SPREAD).normalize();
-            Vec3 end = muzzle.add(direction.scale(distance + 3));
+            double spread = ArsenalLayout.SPREAD;
+            Vec3 direction = to.scale(1 / distance).add(p.getRandom().nextGaussian() * spread, p.getRandom().nextGaussian() * spread,
+                p.getRandom().nextGaussian() * spread).normalize();
+            Vec3 end = muzzle.add(direction.scale(distance + ArsenalLayout.PAST));
             BlockHitResult wall = level.clip(new ClipContext(muzzle, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, p));
             Vec3 stop = wall.getType() == HitResult.Type.MISS ? end : wall.getLocation();
-            Entity hit = null;
-            double nearest = Double.MAX_VALUE;
+            // Through every body in its way short of the block that stops it, nearest first.
+            through.clear();
             for (Entity e : bodies) {
                 var at = e.getBoundingBox().inflate(.1).clip(muzzle, stop);
-                if (at.isEmpty()) continue;
-                double d = muzzle.distanceToSqr(at.get());
-                if (d < nearest) {nearest = d; hit = e;}
+                if (at.isPresent()) through.add(new Hit(e, at.get(), muzzle.distanceToSqr(at.get())));
             }
-            if (hit == null) continue;
-            // One round a tick for any one body, however many barrels are on it.
-            if (crown.struck.getOrDefault(hit.getId(), -1L) == now) continue;
-            crown.struck.put(hit.getId(), now);
-            crown.owed.merge(hit.getId(), ROUND, Float::sum);
-            crown.dealt.putIfAbsent(hit.getId(), now);
+            through.sort(Comparator.comparingDouble(Hit::distance));
+            for (int i = 0; i < Math.min(PIERCE, through.size()); i++) strike(crown, through.get(i), direction, now);
         }
+    }
+
+    /** A round into a body: owed its sting, and where it went in kept for its hole. One round a tick for any one body. */
+    private static void strike(Crown crown, Hit hit, Vec3 direction, long now) {
+        int id = hit.body().getId();
+        if (crown.struck.getOrDefault(id, -1L) == now) return;
+        crown.struck.put(id, now);
+        crown.owed.merge(id, ROUND, Float::sum);
+        crown.entry.put(id, new Vec3[]{hit.at(), direction});
+        // The first round into a body not already held lands at once: one round stops it where it stands.
+        crown.dealt.putIfAbsent(id, hit.body() instanceof LivingEntity body && ScepterBlast.stunned(body) ? now : now - DEAL_EVERY);
     }
 
     /** Deals every body what it is owed, once it has been owed for {@link #DEAL_EVERY} ticks, or everything, now. */
@@ -283,6 +328,7 @@ public final class Arsenal {
             if (!all && now - since < DEAL_EVERY) continue;
             it.remove();
             crown.dealt.remove(owed.getKey());
+            Vec3[] entry = crown.entry.remove(owed.getKey());
             if (!(p.serverLevel().getEntity(owed.getKey()) instanceof LivingEntity body) || !body.isAlive()) continue;
             body.invulnerableTime = 0;
             striking = true;
@@ -291,8 +337,18 @@ public final class Arsenal {
             } finally {
                 striking = false;
             }
+            if (body.isDeadOrDying()) continue;
+            // Held where it stands for a second from its latest round: under steady fire, held for good.
+            ScepterBlast.stun(body, STUN);
+            // Once a second under fire, a tiny hole where a round went in, and it bleeds a little.
+            if (entry != null && now - crown.holed.getOrDefault(owed.getKey(), Long.MIN_VALUE / 2) >= HOLE_EVERY) {
+                crown.holed.put(owed.getKey(), now);
+                BeamWound.open(body, entry[0], entry[1], HOLE, HOLE_LIFE);
+                Bleed.apply(p, body, Bleed.stacks(body) < BLEED_STACKS ? 1 : 0, BLEED);
+            }
         }
         if (crown.struck.size() > 64) crown.struck.values().removeIf(t -> now - t > 20);
+        if (crown.holed.size() > 64) crown.holed.values().removeIf(t -> now - t > HOLE_EVERY);
     }
 
     /** The crown's rounds sting; they do not shove. */
@@ -302,7 +358,7 @@ public final class Arsenal {
 
     // ------------------------------------------------------------------ the missiles
 
-    private static void launch(ServerPlayer p, long now) {
+    private static void launch(ServerPlayer p, Crown crown, long now) {
         ServerLevel level = p.serverLevel();
         Vec3 eye = p.getEyePosition(), look = p.getLookAngle();
         Vec3 mark = mark(p, REACH);
@@ -315,9 +371,11 @@ public final class Arsenal {
         n.putLong("at", now);
         ListTag list = new ListTag();
         long seed = now * 7919 + p.getId();
+        int longest = 0;
         for (int side = -1; side <= 1; side += 2) {
             Vec3 start = world(p, new double[]{side * ArsenalLayout.MISSILE_SIDE, ArsenalLayout.MISSILE_HEIGHT, .05});
             ArsenalLayout.Flight flight = new ArsenalLayout.Flight(array(start), array(mark), right, side, seed);
+            longest = Math.max(longest, flight.duration);
             Missile missile = new Missile(level, p, ++nextMissile, flight, now);
             MISSILES.add(missile);
             CompoundTag m = new CompoundTag();
@@ -331,6 +389,10 @@ public final class Arsenal {
         }
         n.put("missiles", list);
         HexNetwork.near(level, eye, 256, new HexNetwork.Message(HexNetwork.ARSENAL, p.getId(), n));
+        // Whatever the fire held to the end is held on until the missiles are there, however long they wander.
+        for (int id : crown.pinned)
+            if (level.getEntity(id) instanceof LivingEntity body && body.isAlive() && ScepterBlast.stunned(body))
+                ScepterBlast.stun(body, Math.min(PIN_MOST, longest + 3));
     }
 
     /** Every tick of a level: each missile in it flies on, and bursts on whatever it meets or where it was sent. */
@@ -348,6 +410,7 @@ public final class Arsenal {
             if (!level.hasChunkAt(BlockPos.containing(at))) {it.remove(); continue;}
             ServerPlayer caster = level.getServer().getPlayerList().getPlayer(m.caster);
             Vec3 burst = null;
+            Entity struck = null;
             if (m.last.distanceToSqr(at) > 1e-8) {
                 BlockHitResult wall = level.clip(new ClipContext(m.last, at, ClipContext.Block.COLLIDER, ClipContext.Fluid.ANY, null));
                 if (wall.getType() != HitResult.Type.MISS) burst = wall.getLocation();
@@ -359,6 +422,7 @@ public final class Arsenal {
                     if (hit.isPresent() && m.last.distanceToSqr(hit.get()) < nearest) {
                         nearest = m.last.distanceToSqr(hit.get());
                         burst = hit.get();
+                        struck = e;
                     }
                 }
             }
@@ -366,14 +430,16 @@ public final class Arsenal {
             m.last = at;
             if (burst == null) continue;
             it.remove();
-            explode(level, burst, caster, m);
+            explode(level, burst, caster, m, struck);
         }
     }
 
-    private static void explode(ServerLevel level, Vec3 at, ServerPlayer caster, Missile m) {
+    /** A missile bursting at {@code at}, on {@code struck} if it flew into a body and null if not. */
+    private static void explode(ServerLevel level, Vec3 at, ServerPlayer caster, Missile m, Entity struck) {
         DamageSource source = caster != null ? level.damageSources().explosion(caster, caster) : level.damageSources().explosion(null, null);
         crater(level, at, caster, source);
-        // Every body within reach: thirty hearts at the heart of it, less toward the edge, and burning.
+        // Forty hearts to the body it flew into; to every other body within reach thirty at the heart of it, less toward
+        // the edge; and all of them burning.
         for (Entity e : level.getEntities((Entity) null, new AABB(at, at).inflate(BLAST_REACH), e -> e instanceof LivingEntity
             && e.isAlive() && !e.isSpectator() && !e.getUUID().equals(m.caster) && (caster == null || HexServer.validTarget(caster, e)))) {
             Vec3 middle = e.getBoundingBox().getCenter();
@@ -381,7 +447,7 @@ public final class Arsenal {
             if (distance > BLAST_REACH) continue;
             float strength = distance <= BLAST_CORE ? 1 : (float) (1 - .65 * (distance - BLAST_CORE) / (BLAST_REACH - BLAST_CORE));
             e.invulnerableTime = 0;
-            e.hurt(source, BLAST * strength);
+            e.hurt(source, e == struck ? DIRECT : BLAST * strength);
             e.setSecondsOnFire((int) BURN_SECONDS);
             Vec3 away = middle.subtract(at);
             away = away.lengthSqr() < 1e-6 ? new Vec3(0, 1, 0) : away.normalize();

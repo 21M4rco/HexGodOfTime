@@ -26,8 +26,13 @@ public final class ArsenalLayout {
      * #STAGGER} ticks later, and each gun takes {@link #REVEAL} ticks to form.
      */
     public static final int FIRST_GUN = 6, STAGGER = 5, REVEAL = 26;
-    /** Every gun formed, and firing: from here for {@link #FIRE} ticks, twenty seconds, for as long as it is held. */
-    public static final int FIRE_START = FIRST_GUN + (GUNS / 2) * STAGGER + REVEAL, FIRE = 400, FIRE_END = FIRE_START + FIRE;
+    /** A hold held to the end, from the press to the missiles leaving: thirteen seconds. */
+    public static final int HOLD = 260;
+    /**
+     * Every gun formed, and firing: from here for {@link #FIRE} ticks, a little over eight seconds, for as long as it
+     * is held, until the missiles are called for the last second and a bit of the hold.
+     */
+    public static final int FIRE_START = FIRST_GUN + (GUNS / 2) * STAGGER + REVEAL, FIRE_END = HOLD - 26, FIRE = FIRE_END - FIRE_START;
     /**
      * Held to the end: the guns come apart while the two missiles form beside the head, over {@link
      * #MISSILE_REVEAL} ticks; the arms are thrown down at {@link #THROW}, and the missiles go at {@link #LAUNCH}.
@@ -56,26 +61,101 @@ public final class ArsenalLayout {
     /** Rounds a minute for each make, as TACZ gives them: the M249's 750, the RPK's 630, the Evolys's 750. */
     public static final float[] RPM = {750, 630, 750};
 
-    /** Where in its cycle a gun starts, so that fifteen guns never fire in step: spread by the golden ratio. */
-    public static double phase(int gun) {return gun * .6180339887 % 1;}
+    /**
+     * Each gun is its own gunner: it opens up to {@link #OPENING} ticks after the firing begins, then fires in bursts
+     * of {@link #BURST_LEAST} to {@link #BURST_MOST} ticks with pauses of {@link #PAUSE_LEAST} to {@link
+     * #PAUSE_MOST} between them, every burst and pause its own length, at its make's rate give or take {@link
+     * #RATE_JITTER}. Fifteen of them never fire in step, and never all fall silent at once.
+     */
+    public static final int OPENING = 14, BURST_LEAST = 7, BURST_MOST = 20, PAUSE_LEAST = 2, PAUSE_MOST = 9;
+    public static final double RATE_JITTER = .08;
 
-    /** Rounds a gun has fired by {@code t} ticks into the hold, counting fractions: 0 before the firing begins. */
+    /** A number from 0 to 1, fixed for a gun, a key and a salt: the same on the server and on every client. */
+    static double noise(int gun, int key, int salt) {
+        long h = gun * 0x9E3779B97F4A7C15L + key * 0xC2B2AE3D27D4EB4FL + salt * 0x165667B19E3779F9L;
+        h = (h ^ h >>> 33) * 0xFF51AFD7ED558CCDL;
+        h = (h ^ h >>> 33) * 0xC4CEB9FE1A85EC53L;
+        return ((h ^ h >>> 33) >>> 11) * 0x1.0p-53;
+    }
+
+    /** A gun's own rate, in rounds a tick: under one, so no gun fires twice in a tick. */
+    public static double rate(int gun) {return RPM[type(gun)] / 1200 * (1 + RATE_JITTER * (2 * noise(gun, 0, 1) - 1));}
+
+    /** The tick of the hold a gun's first burst begins. */
+    public static int opens(int gun) {return FIRE_START + (int) (noise(gun, 0, 2) * (OPENING + 1));}
+
+    private static int burst(int gun, int k) {return BURST_LEAST + (int) (noise(gun, k, 3) * (BURST_MOST - BURST_LEAST + 1));}
+
+    private static int pause(int gun, int k) {return PAUSE_LEAST + (int) (noise(gun, k, 4) * (PAUSE_MOST - PAUSE_LEAST + 1));}
+
+    /** Where in its cycle a gun's trigger catches, so its first round is not on the tick its first burst begins. */
+    public static double phase(int gun) {return noise(gun, 0, 5);}
+
+    /** Ticks a gun has spent firing by {@code t} ticks into the hold: its bursts, not the pauses between them. */
+    static double firing(int gun, double t) {
+        double until = Math.min(t, FIRE_END), at = opens(gun), spent = 0;
+        for (int k = 0; at < until; k++) {
+            int on = burst(gun, k);
+            spent += Math.min(on, until - at);
+            at += on + pause(gun, k);
+        }
+        return spent;
+    }
+
+    /** Rounds a gun has fired by {@code t} ticks into the hold, counting fractions: 0 before its first burst. */
     public static double rounds(int gun, double t) {
-        double since = Math.min(t, FIRE_END) - FIRE_START;
-        return since <= 0 ? 0 : since * RPM[type(gun)] / 1200 + phase(gun);
+        double spent = firing(gun, t);
+        return spent <= 0 ? 0 : spent * rate(gun) + phase(gun);
     }
 
     /** Rounds a gun fires in tick {@code tick} of the hold (from it to the next): 0 or 1, as none fires faster than once a tick. */
     public static int shots(int gun, int tick) {return (int) (Math.floor(rounds(gun, tick + 1)) - Math.floor(rounds(gun, tick)));}
 
+    /** The moment, in ticks into the hold and fractions of one, a gun fires its {@code round}th round (from 1). */
+    public static double shotTime(int gun, long round) {
+        double need = (round - phase(gun)) / rate(gun), at = opens(gun);
+        for (int k = 0; k < 4096; k++) {
+            int on = burst(gun, k);
+            if (need <= on) return at + need;
+            need -= on;
+            at += on + pause(gun, k);
+        }
+        return at;
+    }
+
     /**
      * How long ago, in ticks, a gun last fired at {@code t} ticks into the hold, or -1 if it has not fired yet: what a
-     * muzzle flash and a recoil are timed from.
+     * muzzle flash and a recoil are timed from. It grows on through a pause, so a gun between bursts goes dark.
      */
     public static double sinceShot(int gun, double t) {
-        double r = rounds(gun, t);
-        if (Math.floor(r) < 1 || t > FIRE_END + 2) return -1;
-        return (r - Math.floor(r)) * 1200 / RPM[type(gun)];
+        long last = (long) Math.floor(rounds(gun, t));
+        if (last < 1 || t > FIRE_END + 2) return -1;
+        return Math.max(0, t - shotTime(gun, last));
+    }
+
+    // ------------------------------------------------------------------ where the rounds go
+
+    /** How far a round strays from where its gun points, in radians (one standard deviation, each way across): a spray, not a laser. */
+    public static final double SPREAD = .026;
+    /** How far a gun's aim wanders off the mark, in radians at most, each way across: each sprays about it its own way. */
+    public static final double WANDER = .02;
+    /** How far past the mark a round flies on, in blocks, through whatever bodies it meets: only a block stops it. */
+    public static final double PAST = 16;
+
+    /** How far off the mark a gun points {@code t} ticks into the hold, in radians: to the right, and up. Slow, and every gun its own. */
+    public static double[] wander(int gun, double t) {
+        double a = noise(gun, 0, 6) * Math.PI * 2, b = noise(gun, 0, 7) * Math.PI * 2;
+        double f = .09 + .06 * noise(gun, 0, 8), g = .07 + .05 * noise(gun, 0, 9);
+        return new double[]{WANDER * (.65 * Math.sin(t * f + a) + .35 * Math.sin(t * f * 2.3 + b)),
+            WANDER * (.65 * Math.sin(t * g + b) + .35 * Math.sin(t * g * 1.9 + a))};
+    }
+
+    /** The point a gun aims at: {@code aim}, the mark in its slot's frame, moved off by the gun's {@link #wander}; null for none. */
+    public static double[] aimOf(int gun, double[] aim, double t) {
+        if (aim == null) return null;
+        double d = len(aim);
+        double[] w = wander(gun, t);
+        return new double[]{aim[0] + w[0] * d, aim[1] + w[1] * d, aim[2]};
     }
 
     // ------------------------------------------------------------------ where the guns hang

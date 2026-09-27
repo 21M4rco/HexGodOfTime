@@ -142,7 +142,7 @@ public final class HexHud {
             case THREADS -> "Bind your target in time.";
             case ASCENSION -> "Toggle your final transformation.";
             case TIME_BRANCH -> "Tap: right fist. Hold/release: beam.";
-            case ARSENAL -> "Hold: the crown fires. Hold 20s: missiles.";
+            case ARSENAL -> "Hold: the crown fires and stuns. Hold 13s: missiles.";
         };
     }
     private static String alternate(Ability a) {

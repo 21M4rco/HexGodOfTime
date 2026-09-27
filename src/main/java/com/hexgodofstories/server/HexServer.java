@@ -153,7 +153,7 @@ public final class HexServer {
         if(a==Ability.DAGGERS||a==Ability.TWIN_DAGGERS||a==Ability.LAEVATEINN){dismissWeapons(p);return true;}
         // The ultimate has no alternate action, and says so rather than falling through to the cast path.
         if(a==Ability.TIME_BRANCH){notice(p,"Tap for a charged right fist; hold and release for the torrent.");return true;}
-        if(a==Ability.ARSENAL){notice(p,"Hold the cast key: the crown fires while you hold, and throws its missiles at twenty seconds.");return true;}
+        if(a==Ability.ARSENAL){notice(p,"Hold the cast key: the crown fires while you hold, and throws its missiles at thirteen seconds.");return true;}
         return false;
     }
 

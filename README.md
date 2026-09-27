@@ -6,18 +6,25 @@
   burning edge. Fifteen of them: TACZ's M249, RPK and FN Evolys, alternating down each side so the arch
   mirrors. No item is given, and nothing ever enters your inventory.
 - **They fire where you look.** Once all are formed they charge their handles and swing onto whatever you
-  are looking at, following your aim as you turn, and fire for as long as you hold, up to twenty seconds:
-  each at its own real rate (750, 630 and 750 rounds a minute), well over a hundred and fifty rounds a
-  second between them, half a heart each. Tracers, muzzle flashes, a stream of brass, smoke off the barrels,
-  dust and sparks where the rounds land. A body takes at most one round a tick however many barrels are on
-  it (ten hearts a second), and is never knocked about by them. You walk at a third of your pace meanwhile
-  and cannot jump or sprint.
+  are looking at, following your aim as you turn, and fire for as long as you hold, a little over eight
+  seconds: each gun its own gunner, opening up a moment after the others and firing ragged bursts of its own
+  length at about its real rate (750, 630 and 750 rounds a minute, give or take), each spraying about the
+  mark its own way with every round straying further. Tracers, muzzle flashes, a stream of brass, smoke off
+  the barrels, dust and sparks where the rounds land.
+- **The rounds hold; the missiles kill.** A round barely stings (a twentieth of a heart) but stuns for a
+  second, and every round after it starts that second again, so a body kept under fire is held for as long
+  as it is. Rounds go through up to four bodies but never through a block, and once a second a body under
+  fire takes a tiny hole where a round went in (open thirty seconds at most) and bleeds a little. A body
+  takes at most one round a tick however many barrels are on it, and is never knocked about by them. You
+  walk at a third of your pace meanwhile and cannot jump or sprint.
 - **Let go and it ends.** Released early, the guns simply come apart where they hang and the recovery is
   short (ten seconds, or a full minute once they have fired).
-- **Hold to the end.** At twenty seconds the guns come apart as two big missiles form beside your head; you
-  throw your arms down and they go — slowly, pushed by their fire, never straight: each climbs out to its own
-  side, swings across the other's path and corkscrews down onto the point you aimed at, trailing smoke. The
-  blast is thirty hearts to anything within five blocks, less out to nine, and sets it burning; it blows a
+- **Hold to the end.** The guns come apart as two big missiles form beside your head, and at thirteen seconds
+  you throw your arms down and they go — slowly, pushed by their fire, never straight: each climbs out to its
+  own side, swings across the other's path and corkscrews down onto the point you aimed at, trailing smoke.
+  Whatever your fire was still holding when it stopped stays held until they land (six seconds at most). A
+  missile is forty hearts to the body it strikes; its blast is thirty to anything else within five blocks,
+  less out to nine, and sets it burning; it blows a
   crater (a power-6 explosion's worth, asked of every mod that guards the world first) that knits itself shut
   a block at a time, the way Paradise's ground does, starting some eight seconds later. Nothing drops and
   nothing is lost.
@@ -334,7 +341,7 @@ The four time controls are not shortcuts and never enter the quick bar. They are
 - **Masquerade** — wear any living thing in the game, vanilla or modded, keeping that individual creature's variant, colour, size and carried gear rather than its species' default. Creatures read the shape and mostly ignore it, until you attack one.
 - **Stillness** — local suspension that decelerates into and out of a stop rather than snapping, and holds bodies, shots, loose items, falling blocks and the weather alike. Harm you deal to a suspended body is banked and lands the instant time resumes.
 - **Dilation** — everything nearby runs at roughly a third speed, smoothly. Movement, attacks and arcing shots slow together; nothing stutters.
-- **Crown of Barrels** — hold to raise fifteen machine guns in an arch over you that fire wherever you look for up to twenty seconds; hold to the end and two missiles wander to the mark and blow a crater that grows back. Nothing is put in your hands.
+- **Crown of Barrels** — hold to raise fifteen machine guns in an arch over you that fire ragged bursts wherever you look, stunning, piercing bodies and leaving tiny bleeding holes; hold thirteen seconds and two missiles wander to the mark, forty hearts each on a direct hit, and blow a crater that grows back. Nothing is put in your hands.
 
 ## Development commands
 

@@ -11,19 +11,22 @@ public final class ArsenalLayoutTest {
         theTimelineRunsInOrder();
         everyGunIsFormedBeforeItFires();
         eachGunFiresAtItsOwnRate();
+        theGunsFireOutOfStepInRaggedBursts();
+        theRoundsSprayAboutTheMark();
         theArchIsSymmetricAndUncrowded();
         missilesFlyFromWhereTheyFormToWhereTheyAreSent();
         missilesWanderAndDoNotFlyTogether();
         missilesAreSlowAndSpeedUpSmoothly();
         gunsFormOutwardAndAimTrue();
         muzzlesAreWhereTheModelsSayTheyAre();
-        System.out.println("ArsenalLayoutTest: the crown forms, fires at its own rates and lets its missiles wander to the mark.");
+        System.out.println("ArsenalLayoutTest: the crown forms, fires out of step in ragged bursts about the mark and lets its missiles wander to it.");
     }
 
     private static void theTimelineRunsInOrder() {
         require(ArsenalLayout.FIRST_GUN < ArsenalLayout.RAISE, "the first gun forms while the arms are still rising");
         require(ArsenalLayout.FIRE_START > ArsenalLayout.RAISE, "the guns fire only once the arms are up");
-        require(ArsenalLayout.FIRE_END - ArsenalLayout.FIRE_START == 400, "twenty seconds of fire");
+        require(ArsenalLayout.LAUNCH == ArsenalLayout.HOLD && ArsenalLayout.HOLD == 260, "the missiles go at thirteen seconds");
+        require(ArsenalLayout.FIRE == ArsenalLayout.FIRE_END - ArsenalLayout.FIRE_START && ArsenalLayout.FIRE > 160, "eight seconds and more of fire");
         require(ArsenalLayout.FIRE_END < ArsenalLayout.THROW && ArsenalLayout.THROW < ArsenalLayout.LAUNCH, "fire, then the throw, then the launch");
         require(ArsenalLayout.LAUNCH - ArsenalLayout.FIRE_END >= ArsenalLayout.MISSILE_REVEAL, "the missiles are whole before they go");
     }
@@ -48,6 +51,7 @@ public final class ArsenalLayoutTest {
     private static void eachGunFiresAtItsOwnRate() {
         int total = 0;
         for (int gun = 0; gun < ArsenalLayout.GUNS; gun++) {
+            require(ArsenalLayout.rate(gun) < 1, "no gun fires twice in a tick");
             int fired = 0;
             for (int tick = 0; tick < ArsenalLayout.FIRE_END + 40; tick++) {
                 int n = ArsenalLayout.shots(gun, tick);
@@ -55,18 +59,87 @@ public final class ArsenalLayoutTest {
                 require(n == 0 || tick >= ArsenalLayout.FIRE_START && tick < ArsenalLayout.FIRE_END, "rounds only while firing");
                 fired += n;
             }
-            double expected = ArsenalLayout.FIRE * ArsenalLayout.RPM[ArsenalLayout.type(gun)] / 1200;
+            double expected = ArsenalLayout.firing(gun, ArsenalLayout.FIRE_END) * ArsenalLayout.rate(gun);
             require(Math.abs(fired - expected) <= 1, "gun " + gun + " fires " + fired + " rounds, not about " + expected);
             total += fired;
             require(ArsenalLayout.sinceShot(gun, ArsenalLayout.FIRE_START - 1) == -1, "no flash before the first round");
+            // Every round is fired when the count says it is, and a flash is timed from it.
+            for (long k = 1; k <= fired; k++) {
+                double at = ArsenalLayout.shotTime(gun, k);
+                require(at >= ArsenalLayout.FIRE_START && at < ArsenalLayout.FIRE_END, "round " + k + " of gun " + gun + " within the fire");
+                require(Math.floor(ArsenalLayout.rounds(gun, at + 1e-6)) == k && Math.floor(ArsenalLayout.rounds(gun, at - 1e-6)) == k - 1,
+                    "round " + k + " of gun " + gun + " is fired at " + at);
+                require(Math.abs(ArsenalLayout.sinceShot(gun, at + .5)) - .5 < 1e-6, "a flash is timed from its round");
+            }
         }
-        // Every tick of the firing, something fires: the barrage never stutters to a stop.
-        for (int tick = ArsenalLayout.FIRE_START; tick < ArsenalLayout.FIRE_END; tick++) {
+        // Once every gun has opened up, no tick of the firing passes silent, and no two together are thin: ragged, but
+        // the barrage never stutters to a stop.
+        int last = -1;
+        for (int tick = ArsenalLayout.FIRE_START + ArsenalLayout.OPENING + 1; tick < ArsenalLayout.FIRE_END; tick++) {
             int now = 0;
             for (int gun = 0; gun < ArsenalLayout.GUNS; gun++) now += ArsenalLayout.shots(gun, tick);
-            require(now >= 3, "at least three rounds every tick of the barrage, not " + now + " at " + tick);
+            require(now >= 1, "a round every tick of the barrage, not none at " + tick);
+            require(last < 0 || last + now >= 4, "at least four rounds every two ticks of the barrage, not " + (last + now) + " at " + tick);
+            last = now;
         }
-        require(total > 3000, "a barrage: " + total + " rounds in twenty seconds");
+        require(total > 900, "a barrage: " + total + " rounds in eight seconds");
+    }
+
+    private static void theGunsFireOutOfStepInRaggedBursts() {
+        java.util.Set<Integer> openings = new java.util.HashSet<>();
+        java.util.Set<String> rhythms = new java.util.HashSet<>();
+        for (int gun = 0; gun < ArsenalLayout.GUNS; gun++) {
+            openings.add(ArsenalLayout.opens(gun));
+            require(ArsenalLayout.opens(gun) >= ArsenalLayout.FIRE_START && ArsenalLayout.opens(gun) <= ArsenalLayout.FIRE_START + ArsenalLayout.OPENING,
+                "gun " + gun + " opens up soon after the firing begins");
+            // Bursts: stretches of the fire in which a gun fires nothing for a few ticks together.
+            StringBuilder rhythm = new StringBuilder();
+            int silent = 0, pauses = 0;
+            for (int tick = ArsenalLayout.opens(gun); tick < ArsenalLayout.FIRE_END; tick++) {
+                int n = ArsenalLayout.shots(gun, tick);
+                rhythm.append(n);
+                silent = n == 0 ? silent + 1 : 0;
+                if (silent == 4) pauses++;
+            }
+            require(pauses >= 3, "gun " + gun + " fires in bursts, not " + pauses + " pauses");
+            rhythms.add(rhythm.toString());
+            double still = ArsenalLayout.sinceShot(gun, ArsenalLayout.FIRE_END - 1);
+            require(still >= 0, "gun " + gun + " has fired by the end");
+        }
+        require(openings.size() >= 6, "the guns open up one after another, not " + openings.size() + " at once");
+        require(rhythms.size() == ArsenalLayout.GUNS, "no two guns keep the same rhythm");
+        // How many guns fire in a tick changes all the time: never a steady drum.
+        int least = Integer.MAX_VALUE, most = 0;
+        for (int tick = ArsenalLayout.FIRE_START + ArsenalLayout.OPENING + 1; tick < ArsenalLayout.FIRE_END; tick++) {
+            int now = 0;
+            for (int gun = 0; gun < ArsenalLayout.GUNS; gun++) now += ArsenalLayout.shots(gun, tick);
+            least = Math.min(least, now);
+            most = Math.max(most, now);
+        }
+        require(most - least >= 5, "the barrage swells and thins, from " + least + " to " + most + " rounds a tick");
+    }
+
+    private static void theRoundsSprayAboutTheMark() {
+        require(ArsenalLayout.SPREAD >= .02, "a round strays well off its line");
+        double[] aim = {0, 1.6, 20};
+        java.util.Set<String> spots = new java.util.HashSet<>();
+        for (int gun = 0; gun < ArsenalLayout.GUNS; gun++) {
+            double widest = 0;
+            double[] last = ArsenalLayout.wander(gun, ArsenalLayout.FIRE_START);
+            for (double t = ArsenalLayout.FIRE_START; t < ArsenalLayout.FIRE_END; t += .5) {
+                double[] w = ArsenalLayout.wander(gun, t);
+                require(Math.abs(w[0]) <= ArsenalLayout.WANDER + 1e-9 && Math.abs(w[1]) <= ArsenalLayout.WANDER + 1e-9, "a gun wanders only so far");
+                require(Math.abs(w[0] - last[0]) < .004 && Math.abs(w[1] - last[1]) < .004, "a gun's aim drifts, it does not jump");
+                widest = Math.max(widest, Math.hypot(w[0], w[1]));
+                last = w;
+            }
+            require(widest > ArsenalLayout.WANDER * .4, "gun " + gun + " sprays about the mark");
+            double[] own = ArsenalLayout.aimOf(gun, aim, ArsenalLayout.FIRE_START + 30);
+            require(Math.abs(own[2] - aim[2]) < 1e-9 && distance(own, aim) < aim[2] * ArsenalLayout.WANDER * 1.5, "gun " + gun + " aims near the mark");
+            spots.add(Math.round(own[0] * 20) + "," + Math.round(own[1] * 20));
+        }
+        require(spots.size() >= 10, "the guns do not all aim at one point, only " + spots.size() + " spots");
+        require(ArsenalLayout.aimOf(0, null, 0) == null, "nothing to aim at, nothing aimed at");
     }
 
     private static void theArchIsSymmetricAndUncrowded() {
