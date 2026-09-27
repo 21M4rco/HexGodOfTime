@@ -1,8 +1,10 @@
-"""Prepare the Scepter's charge and fire sounds from the recordings supplied for them.
+"""Prepare the Scepter's charge, fire and sizzle sounds from the recordings supplied for them.
 
 Sources, as supplied (tools/audio_sources/scepter/):
 * charge.mp3: the stone filling, ending in a low drop, the "final sound".
 * fire.mp3: the shot.
+* sizzle.mp3 (supplied as dragon-studio-fire-sounds-405444.mp3): a fire crackling, heard from every hot hole
+  for as long as it glows.
 
 The charge takes ten seconds, and the stone fires itself the moment it is full: the drop has to land on
 that moment. In the recording it begins 6.12 s in, after 0.3 s of silence, so the build-up before it is
@@ -14,10 +16,21 @@ its pitch and texture. The opening swell and the drop itself are left exactly as
 Both are otherwise only prepared for Minecraft, as tools/import_scepter_audio.py does: mono (OpenAL only
 positions mono sources), leading silence trimmed, peak-normalised to -1 dBFS, a short tail fade, Ogg Vorbis.
 
+The sizzle plays for as long as a hole glows, up to seventeen seconds, so it is a loop, and it is its
+recording's own: from 16 s on, the recording is one twelve-second stretch and then that stretch again from
+its start. One period of it is taken, from a moment in, and the recording's own continuation past the period
+(the stretch's start again) is crossfaded into the loop's head, so the loop runs out of its end into its start
+exactly as the recording runs on. As recorded it is a quiet fizz under sharp crackles, over 20 dB quieter than
+the Scepter's other sounds for all that its crackles reach full scale: it is brought up to SIZZLE_LOUDNESS,
+the crackles held under the ceiling by a look-ahead limiter fast enough to take only them. Loudness is
+measured as BS.1770 does (K-weighted, 400 ms at a time), round the loop.
+
 Requires numpy and soundfile (pip install numpy soundfile). Run from the repository root:
-    python tools/prepare_scepter_voice.py
+    python tools/prepare_scepter_voice.py          (every sound)
+    python tools/prepare_scepter_voice.py sizzle   (only the named ones)
 """
 from pathlib import Path
+import sys
 
 import numpy as np
 import soundfile as sf
@@ -133,7 +146,109 @@ def fire():
     print(f"fire.ogg: {len(out) / rate:.2f}s")
 
 
+# Where in the recording the sizzle's loop is taken from, in seconds, and about how long its period is.
+LOOP_FROM, PERIOD = 16.2, 12.0
+# How loud the sizzle is: the median of its momentary loudness, in LUFS. A few dB under the impacts, and
+# heard through the whole of a hole's cooling.
+SIZZLE_LOUDNESS = -18
+# The ceiling its crackles are held under, and how soon before a crackle and how long after it the limiter acts.
+CEILING, ATTACK, RELEASE = 10 ** (-1.5 / 20), .0015, .012
+
+
+def period(x, rate):
+    """The recording's period of repetition near PERIOD, to the sample: where a second from LOOP_FROM + PERIOD on is found again."""
+    a = x[int((LOOP_FROM + PERIOD) * rate):][:rate]
+    lo = int((LOOP_FROM - .5) * rate)
+    b = x[lo:lo + 2 * rate]
+    n = len(a) + len(b)
+    c = np.fft.irfft(np.fft.rfft(b, n) * np.conj(np.fft.rfft(a, n)), n)[:len(b) - len(a) + 1]
+    energy = np.sqrt(np.convolve(b ** 2, np.ones(len(a)), mode="valid") * np.sum(a ** 2))
+    best = int(np.argmax(c / np.maximum(energy, 1e-12)))
+    match = c[best] / energy[best]
+    assert match > .9, f"the recording does not repeat near {PERIOD} s (best match {match:.2f})"
+    return int((LOOP_FROM + PERIOD) * rate) - (lo + best)
+
+
+def k_weighted(x, rate):
+    """{@code x} through BS.1770's K-weighting (its high shelf and its high-pass), round the loop.
+
+    Applied as its magnitude only, which leaves the power, all loudness measures, exactly as the filters would.
+    """
+    z = np.exp(-2j * np.pi * np.fft.rfftfreq(len(x), 1 / rate) / rate)
+
+    def biquad(b, a):
+        return np.abs((b[0] + b[1] * z + b[2] * z * z) / (a[0] + a[1] * z + a[2] * z * z))
+
+    k = np.tan(np.pi * 1681.974450955533 / rate)
+    q, vh = .7071752369554196, 10 ** (3.999843853973347 / 20)
+    vb, a0 = vh ** .4996667741545416, 1 + k / q + k * k
+    shelf = biquad([(vh + vb * k / q + k * k) / a0, 2 * (k * k - vh) / a0, (vh - vb * k / q + k * k) / a0],
+                   [1, 2 * (k * k - 1) / a0, (1 - k / q + k * k) / a0])
+    k, q = np.tan(np.pi * 38.13547087602444 / rate), .5003270373238773
+    a0 = 1 + k / q + k * k
+    highpass = biquad([1, -2, 1], [1, 2 * (k * k - 1) / a0, (1 - k / q + k * k) / a0])
+    return np.fft.irfft(np.fft.rfft(x) * shelf * highpass, len(x))
+
+
+def momentary(x, rate):
+    """The loop's momentary loudness (BS.1770: 400 ms at a time, every 100 ms, round the loop), in LUFS."""
+    k = k_weighted(x, rate) ** 2
+    w, hop = int(.4 * rate), int(.1 * rate)
+    ring = np.concatenate([k, k[:w]])
+    sums = np.cumsum(np.concatenate([[0], ring]))
+    starts = np.arange(0, len(x), hop)
+    return -.691 + 10 * np.log10((sums[starts + w] - sums[starts]) / w + 1e-20)
+
+
+def limit(x, rate):
+    """{@code x}, a loop, held under CEILING: the gain each crackle needs is reached over ATTACK before it and let
+    go over RELEASE after it, round the loop, so the loop stays seamless."""
+    n, span = len(x), max(1, int(ATTACK * rate))
+    need = np.minimum(1, CEILING / np.maximum(np.abs(x), 1e-12))
+    windows = np.lib.stride_tricks.sliding_window_view
+    # The least gain needed over the attack ahead, then ramped down over the attack: never more than is needed.
+    ahead = windows(np.concatenate([need, need[:span - 1]]), span).min(axis=1)
+    ramp = windows(np.concatenate([ahead[n - span + 1:], ahead]), span).mean(axis=1)
+    alpha, gain, g = np.exp(-1 / (RELEASE * rate)), np.empty(n), 1.0
+    for _ in range(2):  # twice round, so the release carries on across the loop's end into its start
+        for i in range(n):
+            g = min(ramp[i], 1 - (1 - g) * alpha)
+            gain[i] = g
+    return x * gain
+
+
+def sizzle():
+    x, rate = mono(SOURCES / "sizzle.mp3")
+    n, start, seam = period(x, rate), int(LOOP_FROM * rate), int(rate * SEAM)
+    loop = x[start:start + n].copy()
+    # Its end runs on, in the recording, into the stretch's start again: that is crossfaded into the loop's head.
+    fade = .5 - .5 * np.cos(np.pi * np.arange(seam) / seam)
+    loop[:seam] = x[start + n:start + n + seam] * (1 - fade) + loop[:seam] * fade
+    # Brought up by the gain that puts its median momentary loudness at SIZZLE_LOUDNESS, found by halving.
+    lo, hi = 0., 48.
+    for _ in range(16):
+        mid = (lo + hi) / 2
+        if np.median(momentary(limit(loop * 10 ** (mid / 20), rate), rate)) < SIZZLE_LOUDNESS:
+            lo = mid
+        else:
+            hi = mid
+    out = limit(loop * 10 ** (hi / 20), rate).astype(np.float32)
+    sf.write(OUT / "sizzle.ogg", out, rate, format="OGG", subtype="VORBIS")
+    # As the game will hear it: decoded, and looped.
+    heard, _ = sf.read(OUT / "sizzle.ogg")
+    steps = np.abs(np.diff(heard))
+    wrap, loudness = abs(heard[0] - heard[-1]), np.median(momentary(heard, rate))
+    print(f"sizzle.ogg: {len(heard) / rate:.3f}s loop (the recording repeats every {n / rate:.4f}s), brought up "
+          f"{hi:.1f} dB to {loudness:.1f} LUFS, peak {20 * np.log10(np.abs(heard).max()):.2f} dBFS; its end runs into "
+          f"its start by a step of {wrap:.4f}, where one sample runs into the next by {np.median(steps):.4f} at the median")
+    assert len(heard) == n, "the loop must decode to exactly one period"
+    assert wrap <= np.percentile(steps, 99), "the loop's end must run into its start as smoothly as the rest of it runs on"
+    assert abs(loudness - SIZZLE_LOUDNESS) < .5 and np.abs(heard).max() < 1, "the sizzle must be as loud as meant, and never clip"
+
+
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
-    charge()
-    fire()
+    only = set(sys.argv[1:])
+    for name, make in (("charge", charge), ("fire", fire), ("sizzle", sizzle)):
+        if not only or name in only:
+            make()

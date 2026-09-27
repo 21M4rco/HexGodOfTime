@@ -84,7 +84,7 @@ import java.util.function.UnaryOperator;
  * through orange to a dim yellowish glow before it goes out, a while after a hole in a body would, the inside
  * of the tunnel last ({@link HoleHeat}). The glow is light added over the tunnel, round each mouth and on the
  * face the hole ends against; and while it lasts, every mouth that opens onto the air smokes a little, now
- * and then a molten drop runs off its lower edge, and the hole sizzles, quieter as it cools ({@link HoleSizzle}).
+ * and then a molten drop runs off its lower edge, and fire crackles in the hole ({@link HoleSizzle}).
  */
 public final class BlockWounds {
     private BlockWounds() { }
@@ -126,8 +126,8 @@ public final class BlockWounds {
             return radius * (1 - close * close * (3 - 2 * close));
         }
 
-        /** How hot it is at its hottest, deep inside, from 0 to 1. */
-        float heat() {return HoleHeat.heat(ClientState.since(start, 0), HoleHeat.WALL, 1, 0);}
+        /** Ticks before the last of its glow goes out. */
+        float left() {return HoleHeat.coldAt(HoleHeat.WALL, (float) (leave - enter)) - ClientState.since(start, 0);}
 
         boolean cold() {return HoleHeat.cold(ClientState.since(start, 0), HoleHeat.WALL, (float) (leave - enter));}
 
@@ -584,8 +584,8 @@ public final class BlockWounds {
 
     /**
      * A little smoke off every mouth of a hole still hot, and now and then a molten drop running off its lower
-     * edge, while the block it opens from is still holed; and the hole sizzling for as long as any of it glows
-     * and any block of it is still holed ({@link HoleSizzle}). The drops go as the heat does, and soonest.
+     * edge, while the block it opens from is still holed; and fire crackling in the hole for as long as any of it
+     * glows and any block of it is still holed ({@link HoleSizzle}). The drops go as the heat does, and soonest.
      */
     private static void smoulder(ClientLevel level) {
         HOLES.removeIf(Hole::cold);
@@ -595,7 +595,7 @@ public final class BlockWounds {
         for (Hole hole : HOLES) {
             hole.standing = standing.contains(hole);
             // Started once it is holed, and again whenever it has stopped being heard (out of earshot, no room).
-            if (hole.standing && (hole.sizzle == null || !hole.sizzle.heard())) hole.sizzle = HoleSizzle.start(hole::heardFrom, hole::heat);
+            if (hole.standing && (hole.sizzle == null || !hole.sizzle.heard())) hole.sizzle = HoleSizzle.start(hole::heardFrom, hole::left);
             float age = ClientState.since(hole.start, 0);
             for (double[] mouth : hole.mouths) {
                 float heat = HoleHeat.heat(age, HoleHeat.WALL, 0, (float) mouth[6]);

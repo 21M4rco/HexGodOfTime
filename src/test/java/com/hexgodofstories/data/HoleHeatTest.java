@@ -54,6 +54,13 @@ public final class HoleHeatTest {
                     for (float depth = 0; depth <= 1; depth += .25f)
                         require(HoleHeat.heat(t, HoleHeat.WALL, depth, along) == 0, "nothing of a hole called cold is still hot");
             }
+        // The sizzle dies away as the last of the glow does, ending when the hole is called cold: never long after.
+        for (float cooling : new float[]{HoleHeat.BODY, HoleHeat.WALL})
+            for (float run : new float[]{0, 1, 9, 16}) {
+                float end = HoleHeat.coldAt(cooling, run);
+                require(HoleHeat.cold(end, cooling, run) && !HoleHeat.cold(end - 1e-3f, cooling, run), "cold from coldAt on, and not before");
+                require(HoleHeat.heat(end - 4, cooling, 1, run / 2) > 0, "the middle of the hole still glows a few ticks before it is called cold");
+            }
     }
 
     private static void aBodyCoolsSoonerThanAWall() {

@@ -56,7 +56,12 @@ public final class HoleHeat {
 
     /** Whether every point of a hole whose mouths cool in {@code cooling} ticks, down a tunnel {@code run} blocks long, is cold at {@code age}. */
     public static boolean cold(float age, float cooling, float run) {
-        return age >= Math.max(0, run) * SWEEP + RISE + cooling * (1 + DEEP);
+        return age >= coldAt(cooling, run);
+    }
+
+    /** The age at which the last of such a hole goes cold: its glow gone, and every point of it {@link #cold}. */
+    public static float coldAt(float cooling, float run) {
+        return Math.max(0, run) * SWEEP + RISE + cooling * (1 + DEEP);
     }
 
     /**

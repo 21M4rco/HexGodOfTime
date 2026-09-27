@@ -64,8 +64,8 @@ import java.util.Map;
  *
  * <p>A fresh hole is red-hot, and cools through orange to a dim yellowish glow before it goes out, sooner
  * than a hole in a wall does and its inside last ({@link HoleHeat}): the heat is in the tunnel's colour and
- * is light added over the rim, and while it lasts the hole smokes a little from each mouth and sizzles,
- * quieter as it cools ({@link HoleSizzle}).
+ * is light added over the rim, and while it lasts the hole smokes a little from each mouth and fire crackles
+ * in it ({@link HoleSizzle}).
  */
 public final class BeamWounds {
     private BeamWounds() { }
@@ -163,7 +163,7 @@ public final class BeamWounds {
             e.getValue().removeIf(w -> now > w.start + w.life);
             return e.getValue().isEmpty() || level.getEntity(e.getKey()) == null;
         });
-        // A hole still hot sizzles, started again whenever it has stopped being heard (out of earshot, no room);
+        // Fire crackles in a hole still hot, started again whenever it has stopped being heard (out of earshot, no room);
         // and a little smoke rises from each of its mouths, where it was drawn a moment ago.
         for (Map.Entry<Integer, List<Wound>> entry : WOUNDS.entrySet())
             for (Wound w : entry.getValue()) {
@@ -171,7 +171,7 @@ public final class BeamWounds {
                 if (HoleHeat.cold(age, HoleHeat.BODY, 0)) continue;
                 if (w.sizzle == null || !w.sizzle.heard()) {
                     int id = entry.getKey();
-                    w.sizzle = HoleSizzle.start(() -> heardFrom(id, w), () -> HoleHeat.heat(ClientState.since(w.start, 0), HoleHeat.BODY, 1, 0));
+                    w.sizzle = HoleSizzle.start(() -> heardFrom(id, w), () -> HoleHeat.coldAt(HoleHeat.BODY, 0) - ClientState.since(w.start, 0));
                 }
                 float heat = HoleHeat.heat(age, HoleHeat.BODY, 0, 0);
                 if (heat <= 0 || w.way == null || now - w.seen > 2) continue;

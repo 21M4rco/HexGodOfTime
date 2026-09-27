@@ -236,13 +236,7 @@ public final class ScepterBlast {
         // body it stopped in, none.
         double reach = eye.distanceToSqr(impact);
         long[] holed = walls.stream().filter(wall -> wall.distance < reach).mapToLong(wall -> wall.pos.asLong()).toArray();
-        // Where it went into a wall, and where a block stopped it, the stone hisses hot.
-        if (holed.length > 0) {
-            Vec3 in = eye.add(direction.scale(Math.sqrt(walls.get(0).distance)));
-            level.playSound(null, in.x, in.y, in.z, HexGodOfStories.SCEPTER_SIZZLE.get(), SoundSource.PLAYERS, 1.1f, .86f + caster.getRandom().nextFloat() * .14f);
-        }
-        if (!inBody && end.block() != null)
-            level.playSound(null, stop.x, stop.y, stop.z, HexGodOfStories.SCEPTER_SIZZLE.get(), SoundSource.PLAYERS, 1.1f, .86f + caster.getRandom().nextFloat() * .14f);
+        // Every hole it leaves crackles hot for as long as it glows: each client hears that from the hole it draws.
 
         // Everyone near hears the shot from the stone; the caster already heard it on release.
         level.playSound(caster, muzzle.x, muzzle.y, muzzle.z, HexGodOfStories.SCEPTER_SHOT.get(), SoundSource.PLAYERS, shotVolume(power),
@@ -297,9 +291,6 @@ public final class ScepterBlast {
         else held = LastMoments.hurt(victim, source, damage);
         victim.level().playSound(null, hit.at.x, hit.at.y, hit.at.z, HexGodOfStories.SCEPTER_BURN.get(), SoundSource.PLAYERS,
             1.2f, .9f + victim.getRandom().nextFloat() * .25f);
-        // And the seared flesh hisses.
-        victim.level().playSound(null, hit.at.x, hit.at.y, hit.at.z, HexGodOfStories.SCEPTER_SIZZLE.get(), SoundSource.PLAYERS,
-            1f, .92f + victim.getRandom().nextFloat() * .16f);
         if (victim.isDeadOrDying()) {if (full(power)) dissolve(victim, direction, power); return;}
         // A clean hole that stays open for a minute or more before it knits shut. Bleed, never fire.
         BeamWound.open(victim, hit.at, direction, holeRadius(power), holeLife(power));

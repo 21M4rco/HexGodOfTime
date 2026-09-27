@@ -593,24 +593,7 @@
     "subtitle": "subtitles.hexgodofstories.scepter_sizzle",
     "sounds": [
       {
-        "name": "hexgodofstories:scepter/sizzle_0",
-        "attenuation_distance": 24
-      },
-      {
-        "name": "hexgodofstories:scepter/sizzle_1",
-        "attenuation_distance": 24
-      },
-      {
-        "name": "hexgodofstories:scepter/sizzle_2",
-        "attenuation_distance": 24
-      }
-    ]
-  },
-  "scepter_sizzle_loop": {
-    "subtitle": "subtitles.hexgodofstories.scepter_sizzle_loop",
-    "sounds": [
-      {
-        "name": "hexgodofstories:scepter/sizzle_loop",
+        "name": "hexgodofstories:scepter/sizzle",
         "attenuation_distance": 24
       }
     ]

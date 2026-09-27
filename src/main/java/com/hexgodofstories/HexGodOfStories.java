@@ -110,14 +110,14 @@ public final class HexGodOfStories {
         METEOR_IMPACT = sound("meteor_impact");
     public static final RegistryObject<SoundEvent> GRIP_HOLD = sound("grip_hold"), EMERALD_CAST = sound("emerald_cast");
     /**
-     * The Scepter, from public-domain recordings (see SCEPTER_AUDIO_CREDITS.md): a laser shot with five
-     * takes picked at random, a charged discharge, the hum of the stone filling, the crunch of what it
-     * hits with a sub-bass body under a charged impact, and the sizzle of it going through a body.
+     * The Scepter (see SCEPTER_AUDIO_CREDITS.md): its shot and its stone filling, from recordings supplied for
+     * it; the crunch of what it hits, with a sub-bass body under a charged impact, and the burn of it going
+     * through a body, from public-domain recordings; and fire crackling in every hole it leaves, for as long as
+     * the hole glows, from a recording supplied for it (heard from each hole by the client, {@code HoleSizzle}).
      */
     public static final RegistryObject<SoundEvent> SCEPTER_SHOT = sound("scepter_shot"),
         SCEPTER_CHARGE = sound("scepter_charge"), SCEPTER_IMPACT = sound("scepter_impact"), SCEPTER_BOOM = sound("scepter_boom"),
-        SCEPTER_BLAST = sound("scepter_blast"), SCEPTER_BURN = sound("scepter_burn"), SCEPTER_SIZZLE = sound("scepter_sizzle"),
-        SCEPTER_SIZZLE_LOOP = sound("scepter_sizzle_loop");
+        SCEPTER_BLAST = sound("scepter_blast"), SCEPTER_BURN = sound("scepter_burn"), SCEPTER_SIZZLE = sound("scepter_sizzle");
     private static RegistryObject<SoundEvent> sound(String name) { return SOUNDS.register(name, () -> SoundEvent.createVariableRangeEvent(id(name))); }
 
     /**
