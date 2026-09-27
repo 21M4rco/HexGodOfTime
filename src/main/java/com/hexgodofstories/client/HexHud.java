@@ -162,7 +162,7 @@ public final class HexHud {
             case SELECTIVE_STOP -> "Exempt an ally";
             case THREADS -> "Pull bound target";
             case TIME_BRANCH -> "None — release the cast key to fire";
-            case ARSENAL -> "Gotcha! — a gun forms behind the body you look at and shoots it in the back";
+            case ARSENAL -> "Gotcha!";
             default -> "Same action";
         };
     }
