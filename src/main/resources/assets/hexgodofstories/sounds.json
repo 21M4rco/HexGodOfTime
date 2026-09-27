@@ -597,5 +597,116 @@
         "attenuation_distance": 24
       }
     ]
+  },
+  "arsenal_m249": {
+    "subtitle": "subtitles.hexgodofstories.arsenal_fire",
+    "sounds": [
+      {
+        "name": "hexgodofstories:arsenal/m249_shoot",
+        "attenuation_distance": 48
+      }
+    ]
+  },
+  "arsenal_rpk": {
+    "subtitle": "subtitles.hexgodofstories.arsenal_fire",
+    "sounds": [
+      {
+        "name": "hexgodofstories:arsenal/rpk_shoot",
+        "attenuation_distance": 48
+      }
+    ]
+  },
+  "arsenal_evolys": {
+    "subtitle": "subtitles.hexgodofstories.arsenal_fire",
+    "sounds": [
+      {
+        "name": "hexgodofstories:arsenal/evolys_shoot",
+        "attenuation_distance": 48
+      }
+    ]
+  },
+  "arsenal_form": {
+    "subtitle": "subtitles.hexgodofstories.arsenal_form",
+    "sounds": [
+      {
+        "name": "hexgodofstories:arsenal/evolys_draw",
+        "attenuation_distance": 24
+      }
+    ]
+  },
+  "arsenal_ready": {
+    "subtitle": "subtitles.hexgodofstories.arsenal_ready",
+    "sounds": [
+      {
+        "name": "hexgodofstories:arsenal/m249_charge_pull",
+        "attenuation_distance": 24
+      }
+    ]
+  },
+  "arsenal_ready_close": {
+    "subtitle": "subtitles.hexgodofstories.arsenal_ready",
+    "sounds": [
+      {
+        "name": "hexgodofstories:arsenal/m249_charge_push",
+        "attenuation_distance": 24
+      }
+    ]
+  },
+  "arsenal_hit": {
+    "subtitle": "subtitles.hexgodofstories.arsenal_hit",
+    "sounds": [
+      {
+        "name": "hexgodofstories:arsenal/flesh_hit",
+        "attenuation_distance": 20
+      }
+    ]
+  },
+  "arsenal_missile_form": {
+    "subtitle": "subtitles.hexgodofstories.arsenal_missile_form",
+    "sounds": [
+      {
+        "name": "hexgodofstories:arsenal/rpg7_draw"
+      }
+    ]
+  },
+  "arsenal_missile_launch": {
+    "subtitle": "subtitles.hexgodofstories.arsenal_missile_launch",
+    "sounds": [
+      {
+        "name": "hexgodofstories:arsenal/rpg7_shoot"
+      }
+    ]
+  },
+  "arsenal_explosion": {
+    "subtitle": "subtitles.hexgodofstories.arsenal_explosion",
+    "sounds": [
+      {
+        "name": "hexgodofstories:scepter/blast",
+        "attenuation_distance": 72
+      }
+    ]
+  },
+  "arsenal_explosion_far": {
+    "subtitle": "subtitles.hexgodofstories.arsenal_explosion",
+    "sounds": [
+      {
+        "name": "hexgodofstories:scepter/boom_0",
+        "attenuation_distance": 160
+      },
+      {
+        "name": "hexgodofstories:scepter/boom_1",
+        "attenuation_distance": 160
+      }
+    ]
+  },
+  "arsenal_missile_flight": {
+    "subtitle": "subtitles.hexgodofstories.arsenal_missile_flight",
+    "sounds": [
+      {
+        "name": "hexgodofstories:scepter/sizzle",
+        "attenuation_distance": 40,
+        "pitch": 0.72
+      }
+    ]
   }
 }

@@ -34,6 +34,7 @@ public final class MasteryScreen extends Screen {
     static boolean unlocked(CompoundTag n,Ability a) {
         if(a==Ability.SLOW_FIELD)return false;
         if(n.getBoolean("unlock_"+a.name()))return true;
+        if(a==Ability.ARSENAL&&!unlocked(n,Ability.LAEVATEINN))return false;
         int sum=0;
         for(Discipline d:Discipline.values())if(d.ordinal()<4)sum+=mastery(n,d);
         return mastery(n,a.discipline)>=a.level

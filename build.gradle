@@ -179,6 +179,16 @@ tasks.register('verifyHoleHeat', JavaExec) {
 }
 tasks.named('check') { dependsOn 'verifyHoleHeat' }
 
+// The Crown of Barrels: its timeline, its guns' rates and arch, how they are posed and aimed, and the missiles'
+// crooked, slow and deterministic flights; the muzzles checked against the imported models. No Minecraft needed.
+tasks.register('verifyArsenalLayout', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.hexgodofstories.data.ArsenalLayoutTest'
+    enableAssertions = true
+}
+tasks.named('check') { dependsOn 'verifyArsenalLayout' }
+
 // Ship the unmodified Photon runtime beside the mod, so the Actions download is installable.
 configurations { photonRuntime }
 dependencies {

@@ -208,6 +208,12 @@ public final class HexClient {
          * mouse is left alone, so a planted caster can still aim what they are about to fire.
          */
         @SubscribeEvent public static void movement(MovementInputUpdateEvent e) {
+            // Both arms up and the crown firing over them: a slow, deliberate walk, and the feet stay on the ground.
+            if(ArsenalClient.channeling(e.getEntity())) {
+                var input=e.getInput();
+                input.forwardImpulse*=.35f;input.leftImpulse*=.35f;input.jumping=false;
+                e.getEntity().setSprinting(false);
+            }
             if(!ClientState.immobile(e.getEntity()))return;
             var input=e.getInput();
             input.forwardImpulse=0;input.leftImpulse=0;
@@ -271,11 +277,11 @@ public final class HexClient {
         }
         @SubscribeEvent public static void world(RenderLevelStageEvent e) {
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);BeamWounds.beginFrame(e);ScepterFx.beginFrame(e);}
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES){WarpRenderer.renderRealm(e);BlockWounds.render(e);}
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES){WarpRenderer.renderRealm(e);BlockWounds.render(e);ArsenalClient.render(e);}
             // Forge's supported translucent-effects stage, paired with the wave's particles
             // target so Fabulous composites the swell correctly over the water and entities.
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES)VoidSeaWaveRenderer.render(e);
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES){WorldEffects.render(e);WarpRenderer.render(e);}
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES){WorldEffects.render(e);WarpRenderer.render(e);ArsenalClient.renderLight(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL){BeamWounds.endFrame();TemporalScreen.render(e.getPartialTick());}
         }
         @SubscribeEvent public static void player(RenderPlayerEvent.Pre e) {

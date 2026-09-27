@@ -98,6 +98,7 @@ public final class ClientState {
             case HexNetwork.FROST -> FrostClient.receive(m.entity(),m.data());
             case HexNetwork.SCEPTER -> ScepterClient.receive(m.entity(),m.data());
             case HexNetwork.WOUND -> BeamWounds.receive(m.entity(),m.data());
+            case HexNetwork.ARSENAL -> ArsenalClient.receive(m.entity(),m.data());
             case HexNetwork.STUN -> {long until=m.data().getLong("until");if(until>now())STUNNED.put(m.entity(),until);else STUNNED.remove(m.entity());}
             case HexNetwork.PILGRIM_PATH -> {
                 var world = net.minecraft.client.Minecraft.getInstance().level;
@@ -145,7 +146,7 @@ public final class ClientState {
             WorldEffects.clear();HexSkin.clear();HexLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();FrostClient.clear();
             com.hexgodofstories.client.leviathan.LeviathanEffects.clear();
             TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();GripRenderer.clear();
-            ScepterClient.clear();BeamWounds.clear();BlockWounds.clear();
+            ScepterClient.clear();BeamWounds.clear();BlockWounds.clear();ArsenalClient.clear();
             HexClient.ForgeBus.releaseHeldCast();
             world=mc.level;
         }
@@ -154,6 +155,7 @@ public final class ClientState {
         if(mc.level==null)return;
         FrostClient.tick();
         ScepterClient.tick();
+        ArsenalClient.tick();
         BeamWounds.tick();
         BlockWounds.tick();
         FROZEN.forEach((id,n)->{

@@ -1,0 +1,130 @@
+{
+  "version": 3,
+  "name": "arsenal_throw",
+  "author": "HexGodOfStories",
+  "description": "From both arms high, thrown suddenly down and forward, the body folding after them, as the two missiles are sent; then back to rest.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 26,
+    "stopTick": 26,
+    "isLoop": false,
+    "returnTick": 0,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -162,
+          "yaw": -4,
+          "roll": -38
+        },
+        "leftArm": {
+          "pitch": -162,
+          "yaw": 4,
+          "roll": 38
+        },
+        "torso": {
+          "pitch": -5,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 2,
+        "easing": "inquad",
+        "rightArm": {
+          "pitch": -100,
+          "yaw": -2,
+          "roll": -20
+        },
+        "leftArm": {
+          "pitch": -100,
+          "yaw": 2,
+          "roll": 20
+        },
+        "torso": {
+          "pitch": 3,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 4,
+        "easing": "outquad",
+        "rightArm": {
+          "pitch": -26,
+          "yaw": 0,
+          "roll": -10
+        },
+        "leftArm": {
+          "pitch": -26,
+          "yaw": 0,
+          "roll": 10
+        },
+        "torso": {
+          "pitch": 14,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 7,
+        "easing": "outquad",
+        "rightArm": {
+          "pitch": -12,
+          "yaw": 0,
+          "roll": -6
+        },
+        "leftArm": {
+          "pitch": -12,
+          "yaw": 0,
+          "roll": 6
+        },
+        "torso": {
+          "pitch": 16,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 16,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -6,
+          "yaw": 0,
+          "roll": -3
+        },
+        "leftArm": {
+          "pitch": -6,
+          "yaw": 0,
+          "roll": 3
+        },
+        "torso": {
+          "pitch": 6,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 26,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}

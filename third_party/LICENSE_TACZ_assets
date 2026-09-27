@@ -1,0 +1,23 @@
+Timeless and Classics Guns Zero (TACZ) — default gun pack assets
+================================================================
+
+Copyright (c) the TACZ Dev Team (artists NekoCrane, Receke and Pos_2333;
+programmers 286799714, TartaricAcid, F1zeiL, xjqsh and ClumsyAlien).
+https://github.com/MCModderAnchor/TACZ
+
+The models, textures and sounds listed in ARSENAL_CREDITS.md are taken from
+TACZ at commit b43eb84c38e9768d8e73c8b14f0b845669704b38 and are licensed under
+the Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International
+Public License (CC BY-NC-ND 4.0):
+
+    https://creativecommons.org/licenses/by-nc-nd/4.0/
+    https://creativecommons.org/licenses/by-nc-nd/4.0/legalcode
+
+They are shared unaltered. Textures and sounds are byte-for-byte copies; models
+are converted from TACZ's Bedrock geometry to this mod's quad-list format with
+no change to their geometry or texture mapping, a technical modification the
+licence permits and does not count as adapted material (section 2(a)(4)).
+
+They may not be used for commercial purposes. No endorsement by the TACZ Dev
+Team is implied. This licence covers those assets only; TACZ's code (GPL-3.0)
+is not used, and the rest of this mod is under its own terms.

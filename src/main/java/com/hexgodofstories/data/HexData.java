@@ -33,6 +33,8 @@ public final class HexData {
         if(a==Ability.SLOW_FIELD)return false;
         if(!access(p))return false;
         if(get(p).getBoolean("unlock_"+a.name()))return true;
+        // The Crown of Barrels comes after the Scepter, whatever the mastery.
+        if(a==Ability.ARSENAL&&!unlocked(p,Ability.LAEVATEINN))return false;
         int total=0;for(Discipline d:Discipline.values())if(d!=Discipline.TEMPORAL&&d!=Discipline.PURPOSE)total+=mastery(p,d);
         if(a.discipline==Discipline.TEMPORAL&&total<600)return false;
         if(a.discipline==Discipline.PURPOSE&&mastery(p,Discipline.TEMPORAL)<800)return false;
@@ -109,6 +111,7 @@ public final class HexData {
 
     public static void clearTransient(Player p,boolean death) {
         CompoundTag d=get(p);d.remove("disguise");d.remove("vanishUntil");d.remove("wardUntil");d.remove("held");d.remove("transformStart");d.remove("grip");d.remove("stopWindup");d.remove("timeStopped");
+        d.remove("arsenalStart");d.remove("arsenalEnd");d.remove("arsenalEnding");
         d.remove(BranchFistState.UNTIL);d.remove(BranchFistState.START);d.remove(BranchFistState.IMPACT);
         if(death){
             d.putBoolean("ascended",false);

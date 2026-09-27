@@ -78,14 +78,17 @@ public final class HexServer {
         if(TimeBranch.charging(p)){if(action==UTILITY)TimeBranch.cancel(p);return;}
         // Tapped as fast as a finger allows, so it sits ahead of the shared input throttle; the
         // Scepter's own recovery decides how fast it can actually fire.
-        if(action==SCEPTER_PRESS){ScepterBlast.press(p);return;}
+        if(action==SCEPTER_PRESS){if(!Arsenal.active(p))ScepterBlast.press(p);return;}
         if(action==SCROLL){Telekinesis.adjust(p,Math.max(-4,Math.min(4,value-8)));return;}
         if(action==HOLD_END){
+            if(Arsenal.active(p)){Arsenal.release(p);return;}
             if(Warping.charging(p)){Warping.release(p);return;}
             UUID id=RIFTS.get(p.getUUID());
             if(id!=null&&p.serverLevel().getEntity(id) instanceof RiftEntity rift)rift.releaseCharge();
             Architecture.commit(p);return;
         }
+        // Both arms are up and the crown is firing: nothing else is cast until it ends. The utility key lets it go.
+        if(Arsenal.active(p)){if(action==UTILITY)Arsenal.release(p);return;}
         // M is independent of the selected spell and must register even immediately after another key.
         if(action==BRANCH_TAP){BranchFist.arm(p);return;}
         if(action==BRANCH_BEGIN){branchBegin(p);return;}
@@ -115,6 +118,8 @@ public final class HexServer {
         if(HexData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return;}
         if(HexData.energy(p)<a.cost){notice(p,"Not enough Temporal Energy.");return;}
         if(a==Ability.WARPING){if(action==HOLD_BEGIN||action==CAST)Warping.begin(p);return;}
+        // Held or nothing: a plain press never starts the crown, which would then fire itself out unheld.
+        if(a==Ability.ARSENAL){if(action==HOLD_BEGIN&&Arsenal.begin(p))HexData.spend(p,a.cost);HexNetwork.sync(p);return;}
         if(action==HOLD_BEGIN) {
             if(!a.hold)return;
             if(Architecture.begin(p))HexData.spend(p,a.cost);
@@ -148,6 +153,7 @@ public final class HexServer {
         if(a==Ability.DAGGERS||a==Ability.TWIN_DAGGERS||a==Ability.LAEVATEINN){dismissWeapons(p);return true;}
         // The ultimate has no alternate action, and says so rather than falling through to the cast path.
         if(a==Ability.TIME_BRANCH){notice(p,"Tap for a charged right fist; hold and release for the torrent.");return true;}
+        if(a==Ability.ARSENAL){notice(p,"Hold the cast key: the crown fires while you hold, and throws its missiles at twenty seconds.");return true;}
         return false;
     }
 
@@ -401,10 +407,11 @@ public final class HexServer {
 
     public static void tick(ServerPlayer p) {
         long now=HexData.now(p);CompoundTag d=HexData.get(p);
-        if(!p.isAlive()){ScepterBlast.cancel(p);Transformation.strip(p);return;}
-        if(!HexData.access(p)){ScepterBlast.cancel(p);Transformation.strip(p);CosmicFlight.revoke(p);dismissWeapons(p);return;}
+        if(!p.isAlive()){ScepterBlast.cancel(p);Arsenal.forget(p);Transformation.strip(p);return;}
+        if(!HexData.access(p)){ScepterBlast.cancel(p);Arsenal.forget(p);Transformation.strip(p);CosmicFlight.revoke(p);dismissWeapons(p);return;}
         PersonalRewind.record(p);
         ScepterBlast.tick(p);
+        Arsenal.tick(p);
         // The mantle is armour, so it is maintained where the mantle is: every tick, granted and
         // renewed while it is worn and taken off the instant it is not.
         Transformation.sustain(p);
@@ -472,6 +479,7 @@ public final class HexServer {
         Bleed.tick(level);
         Frostbite.tick(level);
         ScepterBlast.tick(level);
+        Arsenal.tickLevel(level);
         Threat.tick(now);
         Decoy.tick(now);
         Telekinesis.tickSlams(level);
@@ -618,6 +626,7 @@ public final class HexServer {
         // The charge, the erasure hold and the granted armour all go together; none of them may outlive
         // a death, a logout or a crossing.
         TimeBranch.forget(p);BranchFist.clear(p);Erasure.forget(p);Transformation.strip(p);
+        Arsenal.forget(p);
         HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());ScepterBlast.forget(p);INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         HexData.clearTransient(p,death);
     }
@@ -626,6 +635,6 @@ public final class HexServer {
         HISTORY.clear();CHARMS.clear();STRIKES.clear();INPUT.clear();TRAINING.clear();ILLUSIONS.clear();WATCHED.clear();RIFTS.clear();
         Warping.reset();
         Telekinesis.reset();Architecture.reset();Bleed.reset();Frostbite.reset();ScepterBlast.reset();PocketRealm.reset();TemporalEngine.reset();
-        Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();
+        Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();Arsenal.reset();
     }
 }

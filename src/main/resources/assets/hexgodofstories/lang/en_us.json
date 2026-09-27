@@ -79,5 +79,13 @@
   "subtitles.hexgodofstories.scepter_charge": "Scepter stone fills",
   "subtitles.hexgodofstories.scepter_impact": "Scepter blast lands",
   "subtitles.hexgodofstories.scepter_burn": "Beam burns through",
-  "subtitles.hexgodofstories.scepter_sizzle": "Hot hole crackles"
+  "subtitles.hexgodofstories.scepter_sizzle": "Hot hole crackles",
+  "subtitles.hexgodofstories.arsenal_fire": "Machine guns fire",
+  "subtitles.hexgodofstories.arsenal_form": "A gun takes shape",
+  "subtitles.hexgodofstories.arsenal_ready": "Machine guns ready",
+  "subtitles.hexgodofstories.arsenal_hit": "Rounds strike flesh",
+  "subtitles.hexgodofstories.arsenal_missile_form": "Missiles take shape",
+  "subtitles.hexgodofstories.arsenal_missile_launch": "Missiles launch",
+  "subtitles.hexgodofstories.arsenal_explosion": "Missile explodes",
+  "subtitles.hexgodofstories.arsenal_missile_flight": "Missile roars past"
 }

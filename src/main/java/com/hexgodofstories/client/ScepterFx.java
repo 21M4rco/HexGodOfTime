@@ -81,6 +81,9 @@ public final class ScepterFx {
     /** From the field-of-view event: what the world ({@code world}) or the hand was drawn with, sprinting, potions and all. */
     public static void fov(double fov,boolean world){if(world)worldFov=fov;else handFov=fov;}
 
+    /** The field of view the world was last drawn with; the setting itself until a frame has reported one. */
+    static double worldFov(){return worldFov>0?worldFov:Minecraft.getInstance().options.fov().get();}
+
     /** From WeaponRenderer: our own Scepter has just been drawn in the first-person hand. */
     static void drawnFirstPerson(){firstDrawn=frame;}
 

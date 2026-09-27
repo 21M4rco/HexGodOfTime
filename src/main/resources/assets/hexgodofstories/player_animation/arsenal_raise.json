@@ -1,0 +1,130 @@
+{
+  "version": 3,
+  "name": "arsenal_raise",
+  "author": "HexGodOfStories",
+  "description": "Both arms lifted high and wide over the head and held there, the chest opened a little back: the crown is summoned and fires for as long as they stay up.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 64,
+    "stopTick": 100000,
+    "isLoop": true,
+    "returnTick": 16,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 6,
+        "easing": "inquad",
+        "rightArm": {
+          "pitch": -72,
+          "yaw": 0,
+          "roll": -8
+        },
+        "leftArm": {
+          "pitch": -72,
+          "yaw": 0,
+          "roll": 8
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 12,
+        "easing": "outquad",
+        "rightArm": {
+          "pitch": -170,
+          "yaw": -4,
+          "roll": -30
+        },
+        "leftArm": {
+          "pitch": -170,
+          "yaw": 4,
+          "roll": 30
+        },
+        "torso": {
+          "pitch": -7,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 16,
+        "easing": "inoutsine",
+        "rightArm": {
+          "pitch": -162,
+          "yaw": -4,
+          "roll": -38
+        },
+        "leftArm": {
+          "pitch": -162,
+          "yaw": 4,
+          "roll": 38
+        },
+        "torso": {
+          "pitch": -5,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 40,
+        "easing": "inoutsine",
+        "rightArm": {
+          "pitch": -166,
+          "yaw": -4,
+          "roll": -36
+        },
+        "leftArm": {
+          "pitch": -166,
+          "yaw": 4,
+          "roll": 36
+        },
+        "torso": {
+          "pitch": -6,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 64,
+        "easing": "inoutsine",
+        "rightArm": {
+          "pitch": -162,
+          "yaw": -4,
+          "roll": -38
+        },
+        "leftArm": {
+          "pitch": -162,
+          "yaw": 4,
+          "roll": 38
+        },
+        "torso": {
+          "pitch": -5,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}

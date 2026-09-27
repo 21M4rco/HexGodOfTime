@@ -142,6 +142,7 @@ public final class HexHud {
             case THREADS -> "Bind your target in time.";
             case ASCENSION -> "Toggle your final transformation.";
             case TIME_BRANCH -> "Tap: right fist. Hold/release: beam.";
+            case ARSENAL -> "Hold: the crown fires. Hold 20s: missiles.";
         };
     }
     private static String alternate(Ability a) {
@@ -161,6 +162,7 @@ public final class HexHud {
             case SELECTIVE_STOP -> "Exempt an ally";
             case THREADS -> "Pull bound target";
             case TIME_BRANCH -> "None — release the cast key to fire";
+            case ARSENAL -> "None — keep holding the cast key";
             default -> "Same action";
         };
     }

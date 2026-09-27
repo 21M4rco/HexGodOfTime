@@ -42,6 +42,12 @@ import java.util.*;
  *     rather than merely careful. A second torrent through the same wall extends the wait instead of
  *     recording the void as the thing to put back.
  * </ul>
+ *
+ * <p>A crater (the Crown of Barrels' missiles, {@link #takeCrater}) is the same record put to a gentler use: the
+ * ground is simply gone, open to anyone, and grows back the way Paradise's does, one block at a time, each with a
+ * gathering of light the moment before it returns and a glint and a whisper of its own sound when it does. Unlike a
+ * torrent's cavity it does not return through somebody standing in it: it waits for them to move, and past all
+ * patience lifts them clear as it closes.
  */
 public final class Nothingness extends SavedData {
     private static final String NAME="hexgodofstories_nothingness",LEGACY_NAME="loki_nothingness";
@@ -51,15 +57,19 @@ public final class Nothingness extends SavedData {
     private static final int PER_PASS=400,CADENCE=5;
     /** Passes a position may wait for its chunk before the restore is forced through regardless. */
     private static final int PATIENCE=900;
+    /** Ticks before a crater's block returns that light begins gathering where it will be; and passes it waits for a body in its way. */
+    private static final int GATHER=24,CRATER_PATIENCE=40;
 
     /** One position taken out of the world, and everything needed to put it back. */
     private static final class Wound {
         final BlockPos pos;final CompoundTag state;final CompoundTag blockEntity;
         /** Beam wounds must restore exactly even if fluid flowed in or something was placed meanwhile. */
         final boolean beam;
-        long due;int waited;
-        Wound(BlockPos pos,CompoundTag state,CompoundTag blockEntity,long due,int waited,boolean beam) {
-            this.pos=pos;this.state=state;this.blockEntity=blockEntity;this.due=due;this.waited=waited;this.beam=beam;
+        /** A crater's: it gathers before it returns, waits for whoever stands in it, and shows itself returning. */
+        final boolean crater;
+        long due;int waited;boolean gathering;
+        Wound(BlockPos pos,CompoundTag state,CompoundTag blockEntity,long due,int waited,boolean beam,boolean crater) {
+            this.pos=pos;this.state=state;this.blockEntity=blockEntity;this.due=due;this.waited=waited;this.beam=beam;this.crater=crater;
         }
     }
     /** Insertion ordered, so a tunnel knits back the way it was carved. */
@@ -90,10 +100,20 @@ public final class Nothingness extends SavedData {
      * @return true when this call recorded and replaced the original position.
      */
     public static boolean takeBeam(ServerLevel level,BlockPos pos,long due,boolean shell) {
-        return takeInternal(level,pos,due,shell,true);
+        return takeInternal(level,pos,due,shell,true,false);
     }
 
-    private static boolean takeInternal(ServerLevel level,BlockPos pos,long due,boolean black,boolean beam) {
+    /**
+     * A block blown out of a crater: gone, open air, until {@code due}, when it grows back exactly as it was,
+     * contents and all. Nothing drops.
+     *
+     * @return true when this call recorded and removed the original position.
+     */
+    public static boolean takeCrater(ServerLevel level,BlockPos pos,long due) {
+        return takeInternal(level,pos,due,false,true,true);
+    }
+
+    private static boolean takeInternal(ServerLevel level,BlockPos pos,long due,boolean black,boolean beam,boolean crater) {
         if(!level.hasChunkAt(pos))return false;
         Nothingness data=of(level);
         Wound existing=data.wounds.get(pos.asLong());
@@ -110,6 +130,8 @@ public final class Nothingness extends SavedData {
         // Free-standing fluids are not terrain for this effect. In particular, never create a row of
         // Nothingness cubes through water; the beam simply travels through the fluid untouched.
         if(beam&&!state.getFluidState().isEmpty()&&state.getCollisionShape(level,pos).isEmpty())return false;
+        // Nothing unbreakable is ever taken, whatever asks.
+        if(crater&&state.getDestroySpeed(level,pos)<0)return false;
 
         CompoundTag saved=NbtUtils.writeBlockState(state);
         CompoundTag entity=null;
@@ -124,7 +146,7 @@ public final class Nothingness extends SavedData {
             ?HexGodOfStories.NOTHINGNESS.get().defaultBlockState()
             :net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
         level.setBlock(pos,replacement,FLAGS);
-        data.wounds.put(pos.asLong(),new Wound(pos.immutable(),saved,entity,due,0,beam));
+        data.wounds.put(pos.asLong(),new Wound(pos.immutable(),saved,entity,due,0,beam,crater));
         data.setDirty();
         return true;
     }
@@ -137,9 +159,9 @@ public final class Nothingness extends SavedData {
         long now=level.getGameTime();
         List<Wound> ready=new ArrayList<>();
         for(Wound w:data.wounds.values()) {
-            if(w.due>now)continue;
+            if(w.crater&&!w.gathering&&w.due-GATHER<=now&&level.hasChunkAt(w.pos)){w.gathering=true;gather(level,w.pos);}
+            if(w.due>now||ready.size()>=PER_PASS)continue;
             ready.add(w);
-            if(ready.size()>=PER_PASS)break;
         }
         if(ready.isEmpty())return;
         for(Wound w:ready) {
@@ -149,10 +171,43 @@ public final class Nothingness extends SavedData {
                 w.due=now+CADENCE*4;
                 continue;
             }
+            if(w.crater&&occupied(level,w.pos)&&++w.waited<CRATER_PATIENCE) {
+                // Somebody is standing where it would return. It waits for them, gathering again when it is ready.
+                w.due=now+CADENCE*2;
+                w.gathering=false;
+                continue;
+            }
             data.restore(level,w);
+            if(w.crater)mended(level,w.pos);
             data.wounds.remove(w.pos.asLong());
         }
         data.setDirty();
+    }
+
+    /** Light drawing itself together where a crater's block is about to be. */
+    private static void gather(ServerLevel level,BlockPos pos) {
+        level.sendParticles(HexGodOfStories.GOLD_EMBER.get(),pos.getX()+.5,pos.getY()+.5,pos.getZ()+.5,4,.45,.45,.45,.005);
+    }
+
+    /** Whether anything alive stands in the block at {@code pos}. */
+    private static boolean occupied(ServerLevel level,BlockPos pos) {
+        return !level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,new net.minecraft.world.phys.AABB(pos),e->e.isAlive()&&!e.isSpectator()).isEmpty();
+    }
+
+    /** A crater's block back in place: a glint, now and then a whisper of its own sound, and anybody still in it lifted clear. */
+    private static void mended(ServerLevel level,BlockPos pos) {
+        double x=pos.getX()+.5,y=pos.getY()+.5,z=pos.getZ()+.5;
+        level.sendParticles(HexGodOfStories.GOLD_EMBER.get(),x,y,z,5,.36,.36,.36,.03);
+        level.sendParticles(net.minecraft.core.particles.ParticleTypes.END_ROD,x,y,z,1,.25,.25,.25,.01);
+        BlockState state=level.getBlockState(pos);
+        if(level.random.nextInt(3)==0) {
+            var sound=state.getSoundType(level,pos,null);
+            level.playSound(null,pos,sound.getPlaceSound(),net.minecraft.sounds.SoundSource.BLOCKS,.3f*sound.getVolume(),sound.getPitch()*(.9f+level.random.nextFloat()*.2f));
+        }
+        var shape=state.getCollisionShape(level,pos);
+        if(shape.isEmpty())return;
+        for(var e:level.getEntitiesOfClass(net.minecraft.world.entity.Entity.class,shape.bounds().move(pos),e->!e.isSpectator()))
+            e.setPos(e.getX(),pos.getY()+shape.max(net.minecraft.core.Direction.Axis.Y)+1e-3,e.getZ());
     }
 
     /**
@@ -196,6 +251,9 @@ public final class Nothingness extends SavedData {
         // explicitly temporary world surgery: they must return the exact original state even if water
         // flowed into the cavity or somebody placed a block during the four-second window.
         if(!w.beam&&!current.is(HexGodOfStories.NOTHINGNESS.get())&&!current.isAir())return;
+        // A crater is open ground, and whatever somebody built into it in the meantime is theirs: it comes out as
+        // it would if they broke it, contents and all, before the ground returns.
+        if(w.crater&&!current.isAir()&&!current.canBeReplaced())level.destroyBlock(w.pos,true);
         if(w.beam) {
             BlockEntity displaced=level.getBlockEntity(w.pos);
             if(displaced!=null)level.removeBlockEntity(w.pos);
@@ -236,7 +294,7 @@ public final class Nothingness extends SavedData {
             BlockPos pos=BlockPos.of(entry.getLong("pos"));
             data.wounds.put(pos.asLong(),new Wound(pos,entry.getCompound("state"),
                 entry.contains("entity")?entry.getCompound("entity"):null,
-                entry.getLong("due"),entry.getInt("waited"),entry.getBoolean("beam")));
+                entry.getLong("due"),entry.getInt("waited"),entry.getBoolean("beam"),entry.getBoolean("crater")));
         }
         return data;
     }
@@ -251,6 +309,7 @@ public final class Nothingness extends SavedData {
             entry.putLong("due",w.due);
             entry.putInt("waited",w.waited);
             entry.putBoolean("beam",w.beam);
+            if(w.crater)entry.putBoolean("crater",true);
             list.add(entry);
         }
         tag.put("wounds",list);

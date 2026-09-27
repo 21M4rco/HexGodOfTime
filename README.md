@@ -1,3 +1,34 @@
+## The Crown of Barrels — Loki's last conjuration
+
+- **Nothing in the hand.** Conjuration at 620 mastery, once the Scepter is unlocked; 200 Temporal Energy.
+  Hold the cast key and both arms go up and stay up, and machine guns form one after another in an arch over
+  you — the top one first, then outward down both sides — each built from its stock to its muzzle behind a
+  burning edge. Fifteen of them: TACZ's M249, RPK and FN Evolys, alternating down each side so the arch
+  mirrors. No item is given, and nothing ever enters your inventory.
+- **They fire where you look.** Once all are formed they charge their handles and swing onto whatever you
+  are looking at, following your aim as you turn, and fire for as long as you hold, up to twenty seconds:
+  each at its own real rate (750, 630 and 750 rounds a minute), well over a hundred and fifty rounds a
+  second between them, half a heart each. Tracers, muzzle flashes, a stream of brass, smoke off the barrels,
+  dust and sparks where the rounds land. A body takes at most one round a tick however many barrels are on
+  it (ten hearts a second), and is never knocked about by them. You walk at a third of your pace meanwhile
+  and cannot jump or sprint.
+- **Let go and it ends.** Released early, the guns simply come apart where they hang and the recovery is
+  short (ten seconds, or a full minute once they have fired).
+- **Hold to the end.** At twenty seconds the guns come apart as two big missiles form beside your head; you
+  throw your arms down and they go — slowly, pushed by their fire, never straight: each climbs out to its own
+  side, swings across the other's path and corkscrews down onto the point you aimed at, trailing smoke. The
+  blast is thirty hearts to anything within five blocks, less out to nine, and sets it burning; it blows a
+  crater (a power-6 explosion's worth, asked of every mod that guards the world first) that knits itself shut
+  a block at a time, the way Paradise's ground does, starting some eight seconds later. Nothing drops and
+  nothing is lost.
+- **Light to run.** The guns exist only on each client, drawn from the same numbers the server fires by
+  (`ArsenalLayout`): a crown costs no network traffic while it fires, and the server only a handful of rays
+  a tick. Each model is one draw from the GPU; flashes, tracers, flames and rings are a few quads each; sound,
+  tracers, brass and landings are all capped.
+- **TACZ's work, credited.** The guns, rocket, casings, muzzle flash and gun sounds are TACZ's own, unaltered
+  (CC BY-NC-ND 4.0 — non-commercial, credit given, no modification); see `ARSENAL_CREDITS.md`. TACZ is not a
+  dependency.
+
 ## 0.6.2 — The Scepter, remade, and stopped time that actually stops
 
 - **A real staff instead of a cut-out.** The old Scepter was a flat tracing, a few millimetres of
@@ -303,6 +334,7 @@ The four time controls are not shortcuts and never enter the quick bar. They are
 - **Masquerade** — wear any living thing in the game, vanilla or modded, keeping that individual creature's variant, colour, size and carried gear rather than its species' default. Creatures read the shape and mostly ignore it, until you attack one.
 - **Stillness** — local suspension that decelerates into and out of a stop rather than snapping, and holds bodies, shots, loose items, falling blocks and the weather alike. Harm you deal to a suspended body is banked and lands the instant time resumes.
 - **Dilation** — everything nearby runs at roughly a third speed, smoothly. Movement, attacks and arcing shots slow together; nothing stutters.
+- **Crown of Barrels** — hold to raise fifteen machine guns in an arch over you that fire wherever you look for up to twenty seconds; hold to the end and two missiles wander to the mark and blow a crater that grows back. Nothing is put in your hands.
 
 ## Development commands
 

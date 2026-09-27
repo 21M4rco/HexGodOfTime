@@ -28,7 +28,10 @@ with Path('frost-client-smoke.log').open('w') as log:
             try: line=lines.get(timeout=1)
             except queue.Empty: continue
             log.write(line);log.flush();print(line,end='',flush=True)
-            if re.search(r'MixinApplyError|Critical injection failure|Exception caught during firing event|Failed to create window',line):
+            # The Crown of Barrels' core shader is named in the log only when something is wrong with it: a failed
+            # compile or link, or a sampler or uniform its JSON declares that the program does not have.
+            if re.search(r'MixinApplyError|Critical injection failure|Exception caught during firing event|Failed to create window'
+                         r'|Crown of Barrels shader failed|hexgodofstories:arsenal_gun',line):
                 failed=True;break
             if 'Reloading ResourceManager' in line:ready_at=time.monotonic()
     finally:

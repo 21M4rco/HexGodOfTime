@@ -22,7 +22,9 @@ public final class HexNetwork {
         /** A hole a Scepter beam burned through a body. */
         WOUND=27,
         /** A body a partial Scepter beam would have killed, standing on its last breath until it falls. */
-        LAST_MOMENTS=28;
+        LAST_MOMENTS=28,
+        /** The Crown of Barrels beginning, ending, throwing its missiles, and each missile bursting. */
+        ARSENAL=29;
     public record Input(int action,int value) {}
     /** A deliberate Fracture selection: a catalogue index and, where the mode needs one, a target. */
     public record Choice(int mode,java.util.UUID target) {}

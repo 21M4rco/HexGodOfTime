@@ -118,6 +118,16 @@ public final class HexGodOfStories {
     public static final RegistryObject<SoundEvent> SCEPTER_SHOT = sound("scepter_shot"),
         SCEPTER_CHARGE = sound("scepter_charge"), SCEPTER_IMPACT = sound("scepter_impact"), SCEPTER_BOOM = sound("scepter_boom"),
         SCEPTER_BLAST = sound("scepter_blast"), SCEPTER_BURN = sound("scepter_burn"), SCEPTER_SIZZLE = sound("scepter_sizzle");
+    /**
+     * The Crown of Barrels (see ARSENAL_CREDITS.md): TACZ's own machine gun, missile and hit sounds, unaltered, for
+     * the guns forming, readying, firing and striking and the missiles forming and leaving. A missile's motor is the
+     * hole sizzle's fire recording pitched down, and its blast the Scepter's: the crack near, the boom far.
+     */
+    public static final RegistryObject<SoundEvent> ARSENAL_M249 = sound("arsenal_m249"), ARSENAL_RPK = sound("arsenal_rpk"),
+        ARSENAL_EVOLYS = sound("arsenal_evolys"), ARSENAL_FORM = sound("arsenal_form"), ARSENAL_READY = sound("arsenal_ready"),
+        ARSENAL_READY_CLOSE = sound("arsenal_ready_close"), ARSENAL_HIT = sound("arsenal_hit"), ARSENAL_MISSILE_FORM = sound("arsenal_missile_form"),
+        ARSENAL_MISSILE_LAUNCH = sound("arsenal_missile_launch"), ARSENAL_MISSILE_FLIGHT = sound("arsenal_missile_flight"),
+        ARSENAL_EXPLOSION = sound("arsenal_explosion"), ARSENAL_EXPLOSION_FAR = sound("arsenal_explosion_far");
     private static RegistryObject<SoundEvent> sound(String name) { return SOUNDS.register(name, () -> SoundEvent.createVariableRangeEvent(id(name))); }
 
     /**
