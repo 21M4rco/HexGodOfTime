@@ -19,11 +19,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * Leaves a block with a Scepter hole through it out of its chunk's mesh while the hole is open: BlockWounds
  * draws it instead, carved. This is the call vanilla chunk building makes for every block it meshes; it
  * is Forge's overload, which keeps its own name at runtime, so it is not remapped.
+ *
+ * <p>Optional on purpose, like WoundBodyMixin: should another mod take this call over, or a client name it
+ * differently, the game must still start. BlockWounds never sees a block left out, and draws its holes as
+ * scorch marks instead.
  */
 @Mixin(BlockRenderDispatcher.class)
 public abstract class BlockMeshMixin {
     @Inject(method = "renderBatched(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/BlockAndTintGetter;Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;ZLnet/minecraft/util/RandomSource;Lnet/minecraftforge/client/model/data/ModelData;Lnet/minecraft/client/renderer/RenderType;)V",
-        at = @At("HEAD"), cancellable = true, remap = false)
+        at = @At("HEAD"), cancellable = true, remap = false, require = 0)
     private void hgos$holed(BlockState state, BlockPos pos, BlockAndTintGetter level, PoseStack pose, VertexConsumer consumer, boolean sides,
                             RandomSource random, ModelData data, RenderType type, CallbackInfo ci) {
         if (BlockWounds.hidden(pos)) ci.cancel();
