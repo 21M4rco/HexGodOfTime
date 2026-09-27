@@ -66,7 +66,7 @@ public final class HexHud {
         if(!hint.isEmpty())g.drawString(mc.font,(a==Ability.TIME_BRANCH?"":secondary+"  ")+hint,7,54,fracture?0xc0b184:0x9cb6a6,false);
         String select=HexClient.SELECT.getTranslatedKeyMessage().getString();
         g.drawString(mc.font,select+" + scroll: choose ability",7,67,0x779d87,false);
-        float max=100+MasteryScreen.mastery(d,Discipline.TEMPORAL)*.2f+(d.getBoolean("ascended")?150:0),energy=d.getFloat("energy");
+        float max=HexData.MAX_ENERGY,energy=d.getFloat("energy");
         String value="Energy "+Math.round(energy)+" / "+Math.round(max);
         g.drawString(mc.font,value,7,82,0xb3cbbd,false);
         int start=mc.font.width(value)+14;

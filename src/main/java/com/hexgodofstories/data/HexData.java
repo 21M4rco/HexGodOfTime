@@ -15,7 +15,7 @@ public final class HexData {
             // A save written under the old name is carried across rather than reset: the rebrand costs
             // nobody their mastery, their unlocks or their quick bar.
             if(parent.contains(LEGACY_TAG))parent.put(TAG,parent.getCompound(LEGACY_TAG).copy());
-            else {CompoundTag n=new CompoundTag();n.putFloat("energy",100);parent.put(TAG,n);}
+            else {CompoundTag n=new CompoundTag();n.putFloat("energy",MAX_ENERGY);parent.put(TAG,n);}
         }
         return parent.getCompound(TAG);
     }
@@ -38,7 +38,9 @@ public final class HexData {
         if(a.discipline==Discipline.PURPOSE&&mastery(p,Discipline.TEMPORAL)<800)return false;
         return mastery(p,a.discipline)>=a.level;
     }
-    public static float maxEnergy(Player p) {return 100+mastery(p,Discipline.TEMPORAL)*.2f+(get(p).getBoolean("ascended")?150:0);}
+    /** The most Temporal Energy anyone holds; a new traveller starts full. */
+    public static final float MAX_ENERGY=1000;
+    public static float maxEnergy(Player p) {return MAX_ENERGY;}
     public static float energy(Player p) {return Math.max(0,Math.min(maxEnergy(p),get(p).getFloat("energy")));}
     public static void energy(Player p,float v) {get(p).putFloat("energy",Math.max(0,Math.min(maxEnergy(p),v)));}
     public static boolean spend(Player p,float v) {if(energy(p)<v)return false;energy(p,energy(p)-v);return true;}
