@@ -90,7 +90,7 @@ public final class Nothingness extends SavedData {
      * Legacy/full Nothingness replacement used by callers that genuinely want the whole position black.
      */
     public static boolean take(ServerLevel level,BlockPos pos,long due) {
-        return takeInternal(level,pos,due,true,false);
+        return takeInternal(level,pos,due,true,false,false);
     }
 
     /**
