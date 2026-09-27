@@ -125,7 +125,10 @@ public final class WorldEffects {
         return false;
     }
 
-    public static void bleeding(int entity,int stacks) {if(stacks<=0)BLEEDING.remove(entity);else BLEEDING.put(entity,stacks);}
+    public static void bleeding(int entity,int stacks,boolean pouring) {
+        if(stacks<=0)BLEEDING.remove(entity);else BLEEDING.put(entity,stacks);
+        Blood.pouring(entity,stacks>0&&pouring);
+    }
     public static void memory(int entity,CompoundTag n) {
         int count=Math.min(24,n.getInt("count"));
         for(int i=0;i<count;i+=2) {

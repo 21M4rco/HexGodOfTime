@@ -121,7 +121,7 @@ public final class ClientState {
             case HexNetwork.THREADS -> THREADS.put(m.entity(),new ThreadLink(m.data().getInt("target"),m.data().getLong("until")));
             case HexNetwork.SLOWED -> {if(m.data().getBoolean("slowed"))SLOWED.add(m.entity());else SLOWED.remove(m.entity());}
             case HexNetwork.ARCHITECTURE -> WorldEffects.architecture(m.entity(),m.data());
-            case HexNetwork.BLEED -> WorldEffects.bleeding(m.entity(),m.data().getInt("stacks"));
+            case HexNetwork.BLEED -> WorldEffects.bleeding(m.entity(),m.data().getInt("stacks"),m.data().getBoolean("pouring"));
             case HexNetwork.LAST_MOMENTS -> Blood.lastMoments(m.entity(),m.data().getLong("until"));
             case HexNetwork.FIELD -> WorldEffects.field(m.entity(),m.data());
             case HexNetwork.BRANCH -> TimeBranchRenderer.charge(m.entity(),m.data());

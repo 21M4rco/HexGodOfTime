@@ -52,7 +52,7 @@ public final class Bleed {
             wound.stacks=Math.min(MAX_STACKS,wound.stacks+stacks);
             wound.expires=Math.max(wound.expires,now+duration);
         }
-        notifyClients(victim,shown(wound,now));
+        notifyClients(victim,wound,now);
     }
 
     /**
@@ -72,7 +72,7 @@ public final class Bleed {
         // One tick past the end, so the last second's heart lands whatever beat the wound is already on.
         wound.flowing=Math.max(wound.flowing,now+duration+1);
         wound.flowOwner=owner.getUUID();
-        notifyClients(victim,shown(wound,now));
+        notifyClients(victim,wound,now);
     }
 
     public static void tick(ServerLevel level) {
@@ -83,12 +83,12 @@ public final class Bleed {
             Wound wound=WOUNDS.get(id);
             if(wound==null)continue;
             if(!(level.getEntity(id) instanceof LivingEntity victim))continue;
-            if(!victim.isAlive()||now>=wound.expires&&now>=wound.flowing){WOUNDS.remove(id);notifyClients(victim,0);continue;}
+            if(!victim.isAlive()||now>=wound.expires&&now>=wound.flowing){WOUNDS.remove(id);notifyClients(victim,0,false);continue;}
             if(now<wound.next)continue;
             wound.next=now+INTERVAL;
             boolean flowing=now<wound.flowing;
             // The blades have closed; a beam's hole goes on pouring by itself.
-            if(now>=wound.expires&&wound.stacks>0){wound.stacks=0;notifyClients(victim,shown(wound,now));}
+            if(now>=wound.expires&&wound.stacks>0){wound.stacks=0;notifyClients(victim,wound,now);}
             // A body on its last breath bleeds without losing more: how long it stands is LastMoments' clock.
             if(LastMoments.held(victim))continue;
             float amount=PER_STACK*wound.stacks+(flowing?FLOW:0);
@@ -105,7 +105,7 @@ public final class Bleed {
             else source=level.damageSources().magic();
             victim.hurt(source,amount);
             if(owner!=null)HexServer.reward(owner,Discipline.CONJURATION,20);
-            if(WOUNDS.containsKey(id))notifyClients(victim,shown(wound,now));
+            if(WOUNDS.containsKey(id))notifyClients(victim,wound,now);
         }
     }
 
@@ -114,10 +114,13 @@ public final class Bleed {
         return Math.max(now<wound.expires?wound.stacks:0,now<wound.flowing?FLOW_SHOWN:0);
     }
 
-    private static void notifyClients(LivingEntity victim,int stacks) {
-        CompoundTag n=new CompoundTag();n.putInt("stacks",stacks);
+    private static void notifyClients(LivingEntity victim,Wound wound,long now) {notifyClients(victim,shown(wound,now),now<wound.flowing);}
+
+    /** Also whether a beam's hole is what is pouring: clients draw that far heavier than a blade's wound. */
+    private static void notifyClients(LivingEntity victim,int stacks,boolean pouring) {
+        CompoundTag n=new CompoundTag();n.putInt("stacks",stacks);n.putBoolean("pouring",pouring);
         HexNetwork.tracking(victim,new HexNetwork.Message(HexNetwork.BLEED,victim.getId(),n));
     }
-    public static void clear(LivingEntity e) {if(WOUNDS.remove(e.getUUID())!=null)notifyClients(e,0);}
+    public static void clear(LivingEntity e) {if(WOUNDS.remove(e.getUUID())!=null)notifyClients(e,0,false);}
     public static void reset() {WOUNDS.clear();}
 }
