@@ -20,6 +20,7 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
@@ -73,7 +74,8 @@ import java.util.function.UnaryOperator;
  * <p>A hole comes up red-hot as the beam goes through, running down the tunnel the way the beam did, and cools
  * through orange to a dim yellowish glow before it goes out, a while after a hole in a body would, the inside
  * of the tunnel last ({@link HoleHeat}). The glow is light added over the tunnel, round each mouth and on the
- * face the hole ends against; and while it lasts, every mouth that opens onto the air smokes a little.
+ * face the hole ends against; and while it lasts, every mouth that opens onto the air smokes a little, and
+ * now and then a molten drop runs off its lower edge.
  */
 public final class BlockWounds {
     private BlockWounds() { }
@@ -396,7 +398,7 @@ public final class BlockWounds {
     public static void tick() {
         ClientLevel level = Minecraft.getInstance().level;
         if (level == null) {clear(); return;}
-        smoke();
+        smoulder(level);
         if (SPOTS.isEmpty()) return;
         long now = ClientState.now();
         boolean changed = false;
@@ -437,8 +439,11 @@ public final class BlockWounds {
         if (changed) refresh();
     }
 
-    /** A little smoke off every mouth of a hole still hot, while the block it opens from is still holed. */
-    private static void smoke() {
+    /**
+     * A little smoke off every mouth of a hole still hot, and now and then a molten drop running off its lower
+     * edge, while the block it opens from is still holed. The drops go as the heat does, and soonest.
+     */
+    private static void smoulder(ClientLevel level) {
         HOLES.removeIf(hole -> HoleHeat.cold(ClientState.since(hole.start, 0), HoleHeat.WALL, (float) (hole.leave - hole.enter)));
         for (Hole hole : HOLES) {
             float age = ClientState.since(hole.start, 0);
@@ -448,8 +453,40 @@ public final class BlockWounds {
                 Spot spot = SPOTS.get(BlockPos.containing(mouth[0] - mouth[3] * .05, mouth[1] - mouth[4] * .05, mouth[2] - mouth[5] * .05).asLong());
                 if (spot == null || !spot.holes.contains(hole)) continue;
                 ScepterFx.holeSmoke(mouth[0], mouth[1], mouth[2], mouth[3], mouth[4], mouth[5], hole.radius, heat);
+                if (level.random.nextFloat() < .05f * heat * heat) drip(level, mouth, hole.radius);
             }
         }
+    }
+
+    /**
+     * A drop of lava hanging off a hot mouth, then falling: from the lowest point of the hole's edge, where the
+     * mouth meets the face it opens in, just out in the air. Vanilla's own drip, which cools as it hangs.
+     */
+    private static void drip(ClientLevel level, double[] mouth, float radius) {
+        double px = mouth[0], py = mouth[1], pz = mouth[2], ax = mouth[3], ay = mouth[4], az = mouth[5];
+        // The face the mouth is in: the one whose plane the point lies on, facing the way out.
+        double[] off = {Math.abs(px - Math.rint(px)), Math.abs(py - Math.rint(py)), Math.abs(pz - Math.rint(pz))};
+        int k = off[0] <= off[1] && off[0] <= off[2] ? 0 : off[1] <= off[2] ? 1 : 2;
+        double[] way = {ax, ay, az}, n = new double[3];
+        n[k] = way[k] < 0 ? -1 : 1;
+        // Down across the hole: the lowest point of its edge. A hole running straight up or down has none, so any.
+        double dx = ay * ax, dy = -1 + ay * ay, dz = ay * az, dl = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dl < .2) {
+            double angle = level.random.nextDouble() * Math.PI * 2;
+            double ux = Math.abs(ay) < .9 ? -az : 0, uy = Math.abs(ay) < .9 ? 0 : az, uz = Math.abs(ay) < .9 ? ax : -ay;
+            double ul = Math.sqrt(ux * ux + uy * uy + uz * uz);
+            ux /= ul; uy /= ul; uz /= ul;
+            double vx = ay * uz - az * uy, vy = az * ux - ax * uz, vz = ax * uy - ay * ux;
+            dx = ux * Math.cos(angle) + vx * Math.sin(angle);
+            dy = uy * Math.cos(angle) + vy * Math.sin(angle);
+            dz = uz * Math.cos(angle) + vz * Math.sin(angle);
+            dl = 1;
+        }
+        double qx = px + dx / dl * radius * .9, qy = py + dy / dl * radius * .9, qz = pz + dz / dl * radius * .9;
+        // Along the hole's side back onto the face, and a hair out of it.
+        double across = way[k] * n[k];
+        double t = Math.abs(across) < 1e-3 ? 0 : -((qx - px) * n[0] + (qy - py) * n[1] + (qz - pz) * n[2]) / across;
+        level.addParticle(ParticleTypes.DRIPPING_LAVA, qx + ax * t + n[0] * .03, qy + ay * t + n[1] * .03, qz + az * t + n[2] * .03, 0, 0, 0);
     }
 
     /** Every frame, once the entities are drawn: the carved blocks, their tunnels, what they open onto, the scorch and the heat. */

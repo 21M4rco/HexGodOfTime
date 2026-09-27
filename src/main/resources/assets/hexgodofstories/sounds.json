@@ -608,5 +608,19 @@
         "name": "hexgodofstories:scepter/burn_2"
       }
     ]
+  },
+  "scepter_sizzle": {
+    "subtitle": "subtitles.hexgodofstories.scepter_sizzle",
+    "sounds": [
+      {
+        "name": "hexgodofstories:scepter/sizzle_0"
+      },
+      {
+        "name": "hexgodofstories:scepter/sizzle_1"
+      },
+      {
+        "name": "hexgodofstories:scepter/sizzle_2"
+      }
+    ]
   }
 }

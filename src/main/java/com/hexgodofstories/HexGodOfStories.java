@@ -116,7 +116,7 @@ public final class HexGodOfStories {
      */
     public static final RegistryObject<SoundEvent> SCEPTER_SHOT = sound("scepter_shot"), SCEPTER_BEAM = sound("scepter_beam"),
         SCEPTER_CHARGE = sound("scepter_charge"), SCEPTER_IMPACT = sound("scepter_impact"), SCEPTER_BOOM = sound("scepter_boom"),
-        SCEPTER_BLAST = sound("scepter_blast"), SCEPTER_BURN = sound("scepter_burn");
+        SCEPTER_BLAST = sound("scepter_blast"), SCEPTER_BURN = sound("scepter_burn"), SCEPTER_SIZZLE = sound("scepter_sizzle");
     private static RegistryObject<SoundEvent> sound(String name) { return SOUNDS.register(name, () -> SoundEvent.createVariableRangeEvent(id(name))); }
 
     /**
