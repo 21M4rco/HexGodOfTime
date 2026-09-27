@@ -24,8 +24,11 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.decoration.HangingEntity;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
@@ -71,6 +74,12 @@ import java.util.function.UnaryOperator;
  * whole. A renderer that does neither is never shown a carved block over a whole one: its holes are scorch
  * marks, a charred disc with the scorch round it.
  *
+ * <p>What has no model of its own in the chunk is cut as it is drawn instead ({@link QuadCarver}): a block its
+ * block entity draws (a chest, a bed), from that renderer's own buffers; a hanging thing the beam went
+ * through (an item frame and what is in it, a painting), from the entity's. Grass, flowers and anything else
+ * soft in the beam's way, which never stops it and so is never among its walls, is cut away where the beam
+ * went, and nothing more: no tunnel, no scorch, no heat.
+ *
  * <p>A hole comes up red-hot as the beam goes through, running down the tunnel the way the beam did, and cools
  * through orange to a dim yellowish glow before it goes out, a while after a hole in a body would, the inside
  * of the tunnel last ({@link HoleHeat}). The glow is light added over the tunnel, round each mouth and on the
@@ -85,8 +94,8 @@ public final class BlockWounds {
     private static final float MOUTH = .72f, DEEP = .3f;
     /** A face the hole meets at its end or its side, seared by the beam that stopped against it. */
     private static final float SEARED = .45f;
-    /** What a quad's corner carries here: x, y, z, red, green, blue, alpha, u, v, block light, sky light. */
-    private static final int STRIDE = 11;
+    /** What a quad's corner carries here: see {@link QuadCarver#STRIDE}. */
+    private static final int STRIDE = QuadCarver.STRIDE;
     private static final float[] FULL = {0, 0, 0, 1, 1, 1};
 
     /** One shot's hole down a run of walls. */
@@ -156,6 +165,10 @@ public final class BlockWounds {
         final List<Hole> holes = new ArrayList<>();
         /** Beside a hole, not in it: only scorched where the scorch round a mouth runs over onto it, never carved. */
         boolean scorched;
+        /** Soft, a plant or the like the beam went through without being stopped: only cut, nothing more. */
+        boolean soft;
+        /** Drawn by its block entity (a chest, a bed), never by its chunk: carved as that draws it, from the start. */
+        boolean entity;
         /** The frame a chunk build was first seen leaving it out; -1 while its chunk still draws it. */
         int out = -1;
         /** Once its holes have closed: the tick they did, and the frame a build was seen taking it back. */
@@ -182,6 +195,8 @@ public final class BlockWounds {
     private static final Map<BakedModel, HoleModel> WRAPPED = new ConcurrentHashMap<>();
     /** Every shot's holes while they are still hot, for their smoke. */
     private static final List<Hole> HOLES = new ArrayList<>();
+    /** Hanging things the beam went through (item frames, paintings), by entity id, with the holes through them. */
+    private static final Map<Integer, List<Hole>> THROUGH = new HashMap<>();
     /**
      * This frame's glow, gathered while the blocks are drawn and added over them once they all are: polygons of
      * {@link #LIT} floats a corner, x, y and z in view space and the red, green and blue light it gives off.
@@ -194,6 +209,7 @@ public final class BlockWounds {
     public static void clear() {
         SPOTS.clear();
         HOLES.clear();
+        THROUGH.clear();
         GLOW.clear();
         hidden = LongSets.EMPTY_SET;
         returning = LongSets.EMPTY_SET;
@@ -226,14 +242,26 @@ public final class BlockWounds {
         return WRAPPED.computeIfAbsent(original, HoleModel::new);
     }
 
-    /** A shot's holes, from its blast: the walls it went through and the line it went down. */
+    /**
+     * A shot's holes, from its blast: the line it went down, as far as it went, and the walls it went through
+     * on the way; and anything soft or hanging in its way.
+     */
     public static void open(CompoundTag n) {
         ClientLevel level = Minecraft.getInstance().level;
         long[] walls = n.getLongArray("walls");
         Vec3 along = new Vec3(n.getDouble("dx"), n.getDouble("dy"), n.getDouble("dz"));
-        if (level == null || walls.length == 0 || along.lengthSqr() < 1e-8) return;
+        if (level == null || !n.contains("hr") || along.lengthSqr() < 1e-8) return;
         Hole hole = new Hole(new Vec3(n.getDouble("ex"), n.getDouble("ey"), n.getDouble("ez")), along.normalize(), n.getFloat("hr"),
             n.getLong("hs"), Math.max(1, n.getInt("hl")));
+        double reach = new Vec3(n.getDouble("tx"), n.getDouble("ty"), n.getDouble("tz")).subtract(hole.from).dot(hole.along);
+        softs(level, hole, reach);
+        hangings(level, hole, reach);
+        if (walls.length > 0) run(level, hole, walls, n);
+        refresh();
+    }
+
+    /** The walls a shot went through: the run of them it holed, the blocks beside its edges, and the scorch round its mouths. */
+    private static void run(ClientLevel level, Hole hole, long[] walls, CompoundTag n) {
         // Where the run of walls begins and ends along the line: its first way in and its last way out.
         hole.enter = Double.POSITIVE_INFINITY;
         hole.leave = Double.NEGATIVE_INFINITY;
@@ -271,7 +299,7 @@ public final class BlockWounds {
         LongSet run = new LongOpenHashSet(walls), tried = new LongOpenHashSet();
         boolean stopped = n.contains("stop");
         long stop = n.getLong("stop");
-        for (long wall : walls) carve(level, hole, BlockPos.of(wall));
+        for (long wall : walls) carve(level, hole, BlockPos.of(wall), false);
         // A hole near a block's edge runs on into the block beside it, as it would through a body; never
         // into the block that stopped it, which it only met.
         for (long wall : walls)
@@ -279,11 +307,11 @@ public final class BlockWounds {
                 BlockPos next = BlockPos.of(wall).relative(d);
                 long key = next.asLong();
                 if (run.contains(key) || stopped && key == stop || !tried.add(key)) continue;
-                if (reaches(level, hole, next, hole.radius)) carve(level, hole, next);
+                if (reaches(level, hole, next, hole.radius)) carve(level, hole, next, false);
             }
         // And the scorch round a mouth runs over onto the faces of the blocks beside it, carved or not.
         List<BlockPos> holed = new ArrayList<>();
-        for (Spot spot : SPOTS.values()) if (!spot.scorched && spot.holes.contains(hole)) holed.add(spot.pos);
+        for (Spot spot : SPOTS.values()) if (!spot.scorched && !spot.soft && spot.holes.contains(hole)) holed.add(spot.pos);
         for (BlockPos pos : holed)
             for (Direction d : Direction.values()) {
                 BlockPos next = pos.relative(d);
@@ -291,7 +319,90 @@ public final class BlockWounds {
                 if (there != null && !there.scorched || stopped && next.asLong() == stop) continue;
                 if (reaches(level, hole, next, hole.radius * WoundCarve.RIM)) scorched(level, hole, next);
             }
-        refresh();
+    }
+
+    /**
+     * Everything soft the beam went through, as far as it went: a block nothing collides with (grass, a
+     * flower, a sapling) whose outline its cylinder cuts. Sampled down the line, a quarter block at a time,
+     * across the whole width of the hole.
+     */
+    private static void softs(ClientLevel level, Hole hole, double reach) {
+        LongSet tried = new LongOpenHashSet();
+        double r = hole.radius;
+        for (double t = 0; t <= reach; t += .25)
+            for (int i = 0; i < 27; i++) {
+                BlockPos pos = BlockPos.containing(hole.from.x + hole.along.x * t + (i % 3 - 1) * r, hole.from.y + hole.along.y * t + (i / 3 % 3 - 1) * r,
+                    hole.from.z + hole.along.z * t + (i / 9 - 1) * r);
+                if (!tried.add(pos.asLong())) continue;
+                BlockState state = level.getBlockState(pos);
+                if (state.isAir() || state.getRenderShape() != RenderShape.MODEL || !state.getFluidState().isEmpty()
+                    || !state.getCollisionShape(level, pos).isEmpty()) continue;
+                WoundCarve.Cylinder line = hole.local(pos, hole.radius);
+                double base = hole.along(pos, .5, .5, .5);
+                for (AABB box : state.getShape(level, pos).toAabbs()) {
+                    float[] b = box(box);
+                    float[] q = WoundCarve.nearest(b, line.cx, line.cy, line.cz, line.ax, line.ay, line.az);
+                    double at = base + line.along(q[0], q[1], q[2]);
+                    if (q[3] < r && at > -r && at < reach + r) {carve(level, hole, pos, true); break;}
+                }
+            }
+    }
+
+    /** The hanging things the beam went through, as far as it went: item frames and paintings, holed as they are drawn. */
+    private static void hangings(ClientLevel level, Hole hole, double reach) {
+        Vec3 end = hole.from.add(hole.along.scale(Math.max(0, reach)));
+        for (HangingEntity e : level.getEntitiesOfClass(HangingEntity.class, new AABB(hole.from, end).inflate(hole.radius + 1))) {
+            AABB b = e.getBoundingBox();
+            float[] box = {(float) (b.minX - hole.from.x), (float) (b.minY - hole.from.y), (float) (b.minZ - hole.from.z),
+                (float) (b.maxX - hole.from.x), (float) (b.maxY - hole.from.y), (float) (b.maxZ - hole.from.z)};
+            float[] q = WoundCarve.nearest(box, 0, 0, 0, (float) hole.along.x, (float) hole.along.y, (float) hole.along.z);
+            double at = q[0] * hole.along.x + q[1] * hole.along.y + q[2] * hole.along.z;
+            if (q[3] >= hole.radius || at < -hole.radius || at > reach + hole.radius) continue;
+            List<Hole> holes = THROUGH.computeIfAbsent(e.getId(), k -> new ArrayList<>());
+            if (holes.size() >= 8) holes.remove(0);
+            holes.add(hole);
+        }
+    }
+
+    /**
+     * From the entity render dispatcher, for every entity drawn: its buffers, carved if the beam went through
+     * it and the hole is still open. Only hanging things are ever holed this way.
+     */
+    public static MultiBufferSource hanging(Entity entity, MultiBufferSource buffers) {
+        if (THROUGH.isEmpty()) return buffers;
+        List<Hole> holes = THROUGH.get(entity.getId());
+        Matrix4f view = BeamWounds.view();
+        if (holes == null || view == null) return buffers;
+        Vec3 camera = BeamWounds.camera();
+        float partial = Minecraft.getInstance().getFrameTime();
+        List<WoundCarve.Cylinder> cuts = new ArrayList<>(holes.size());
+        for (Hole hole : holes) {
+            float r = hole.radius(partial);
+            if (r < .004f) continue;
+            Vector3f p = view.transformPosition(new Vector3f((float) (hole.from.x - camera.x), (float) (hole.from.y - camera.y), (float) (hole.from.z - camera.z)));
+            Vector3f a = view.transformDirection(new Vector3f((float) hole.along.x, (float) hole.along.y, (float) hole.along.z));
+            cuts.add(new WoundCarve.Cylinder(p.x, p.y, p.z, a.x, a.y, a.z, r));
+        }
+        return cuts.isEmpty() ? buffers : QuadCarver.carve(buffers, () -> cuts, () -> true);
+    }
+
+    /**
+     * From the block entity render dispatcher, for every block entity drawn, its pose already at the block:
+     * its buffers, carved if a hole is open through the block (a chest, a bed, or whatever else a block entity
+     * draws over a holed block).
+     */
+    public static MultiBufferSource entityBuffers(BlockPos pos, PoseStack pose, MultiBufferSource buffers) {
+        if (SPOTS.isEmpty()) return buffers;
+        Spot spot = SPOTS.get(pos.asLong());
+        if (spot == null || spot.soft || !spot.carved()) return buffers;
+        float partial = Minecraft.getInstance().getFrameTime();
+        Matrix4f m = pose.last().pose();
+        List<WoundCarve.Cylinder> cuts = new ArrayList<>(spot.holes.size());
+        for (Hole hole : spot.holes) {
+            float r = hole.radius(partial);
+            if (r >= .004f) cuts.add(inView(hole.local(spot.pos, r), m));
+        }
+        return cuts.isEmpty() ? buffers : QuadCarver.carve(buffers, () -> cuts, () -> true);
     }
 
     /** Notes a mouth of the hole {@code at} along its line, opening {@code way} along it, if the air is just past it there. */
@@ -323,20 +434,26 @@ public final class BlockWounds {
         return false;
     }
 
-    private static void carve(ClientLevel level, Hole hole, BlockPos pos) {
+    private static void carve(ClientLevel level, Hole hole, BlockPos pos, boolean soft) {
         BlockState state = level.getBlockState(pos);
-        // Only a block drawn from its model can be drawn carved; a chest or a bed keeps its own renderer.
-        if (state.getRenderShape() != RenderShape.MODEL || state.getShape(level, pos).isEmpty()) return;
+        // A block drawn from its model is carved from it; one its block entity draws (a chest, a bed) is carved as that draws it.
+        boolean entity = state.getRenderShape() == RenderShape.ENTITYBLOCK_ANIMATED && level.getBlockEntity(pos) != null;
+        if (!entity && state.getRenderShape() != RenderShape.MODEL || state.getShape(level, pos).isEmpty()) return;
         long key = pos.asLong();
         Spot spot = SPOTS.get(key);
         if (spot == null || spot.state != state) {
             spot = new Spot(pos.immutable(), state);
+            spot.soft = soft;
+            spot.entity = entity;
+            // Never in its chunk's mesh, so there is nothing to wait for: carved from the first frame.
+            if (entity) spot.out = frame;
             SPOTS.put(key, spot);
             forget(key);
         } else if (spot.scorched) {
             // Only scorched until now: from here it leaves its mesh like any other.
             spot.scorched = false;
-            spot.out = -1;
+            spot.entity = entity;
+            spot.out = entity ? frame : -1;
             spot.closed = -1;
             forget(key);
         } else if (spot.closed >= 0) {
@@ -349,6 +466,7 @@ public final class BlockWounds {
             spot.closed = -1;
             spot.back = -1;
             TAKEN_BACK.remove(key);
+            if (spot.entity) spot.out = frame;
         }
         if (!spot.holes.contains(hole)) spot.holes.add(hole);
     }
@@ -356,7 +474,8 @@ public final class BlockWounds {
     /** Marks a block beside a hole for the scorch that runs over onto it, unless it is already holed. */
     private static void scorched(ClientLevel level, Hole hole, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
-        if (state.getShape(level, pos).isEmpty()) return;
+        // Scorch is burnt onto something solid; a plant beside a hole would only wear a floating ring.
+        if (state.getShape(level, pos).isEmpty() || state.getCollisionShape(level, pos).isEmpty()) return;
         long key = pos.asLong();
         Spot spot = SPOTS.get(key);
         if (spot == null || spot.state != state) {
@@ -377,7 +496,7 @@ public final class BlockWounds {
         LongSet out = new LongOpenHashSet(), back = new LongOpenHashSet();
         Set<BlockState> states = new HashSet<>();
         for (Spot spot : SPOTS.values()) {
-            if (spot.scorched) continue;
+            if (spot.scorched || spot.entity) continue;
             (spot.closed < 0 ? out : back).add(spot.pos.asLong());
             states.add(spot.state);
         }
@@ -399,8 +518,13 @@ public final class BlockWounds {
         ClientLevel level = Minecraft.getInstance().level;
         if (level == null) {clear(); return;}
         smoulder(level);
-        if (SPOTS.isEmpty()) return;
         long now = ClientState.now();
+        if (!THROUGH.isEmpty())
+            THROUGH.entrySet().removeIf(entry -> {
+                entry.getValue().removeIf(hole -> now >= hole.start + hole.life);
+                return entry.getValue().isEmpty() || level.getEntity(entry.getKey()) == null;
+            });
+        if (SPOTS.isEmpty()) return;
         boolean changed = false;
         for (Iterator<Spot> it = SPOTS.values().iterator(); it.hasNext(); ) {
             Spot spot = it.next();
@@ -430,7 +554,7 @@ public final class BlockWounds {
                 changed = true;
             }
             // Back in its mesh, or never out of it, or its chunk has gone: nothing is left to draw here.
-            if (spot.closed >= 0 && (spot.out < 0 || spot.back >= 0 && frame - spot.back >= 3 || now - spot.closed > 100)) {
+            if (spot.closed >= 0 && (spot.entity || spot.out < 0 || spot.back >= 0 && frame - spot.back >= 3 || now - spot.closed > 100)) {
                 forget(key);
                 it.remove();
                 changed = true;
@@ -516,7 +640,7 @@ public final class BlockWounds {
             try {
                 if (spot.closed >= 0) {
                     // Closed, and waiting for its chunk to take it back: drawn whole meanwhile.
-                    if (spot.out >= 0) model(level, spot.state, spot.pos, pose, buffers, used, true, UnaryOperator.identity());
+                    if (spot.out >= 0 && !spot.entity) model(level, spot.state, spot.pos, pose, buffers, used, true, UnaryOperator.identity());
                 } else {
                     List<Cut> cuts = new ArrayList<>(spot.holes.size());
                     for (Hole hole : spot.holes) {
@@ -524,7 +648,10 @@ public final class BlockWounds {
                         if (r >= .004f) cuts.add(new Cut(hole, hole.local(spot.pos, r), hole.along(spot.pos, .5, .5, .5), ClientState.since(hole.start, partial)));
                     }
                     if (spot.scorched) scorch(level, spot, cuts, pose.last().pose(), buffers, used, Mark.BESIDE);
-                    else if (spot.out >= 0) carved(level, spot, cuts, pose, buffers, used);
+                    else if (spot.soft) {
+                        // A plant is only cut away; left in its chunk, it is simply left whole.
+                        if (spot.out >= 0) model(level, spot.state, spot.pos, pose, buffers, used, true, out -> new QuadCarver.Carved(out, seen(cuts, pose)));
+                    } else if (spot.out >= 0) carved(level, spot, cuts, pose, buffers, used);
                     else scorch(level, spot, cuts, pose.last().pose(), buffers, used, Mark.DISC);
                 }
             } catch (Throwable t) {
@@ -555,12 +682,22 @@ public final class BlockWounds {
         refresh();
     }
 
-    /** A block left out of its mesh, drawn less its holes, with their walls, what they open onto, and the scorch. */
-    private static void carved(ClientLevel level, Spot spot, List<Cut> cuts, PoseStack pose, MultiBufferSource buffers, Set<RenderType> used) {
+    /** The cuts in view space, for quads that arrive there. */
+    private static List<WoundCarve.Cylinder> seen(List<Cut> cuts, PoseStack pose) {
         Matrix4f m = pose.last().pose();
         List<WoundCarve.Cylinder> seen = new ArrayList<>(cuts.size());
         for (Cut cut : cuts) seen.add(inView(cut.local, m));
-        model(level, spot.state, spot.pos, pose, buffers, used, true, out -> new Carved(out, seen));
+        return seen;
+    }
+
+    /**
+     * A block left out of its mesh, drawn less its holes, with their walls, what they open onto, and the scorch.
+     * A block its block entity draws is carved as that draws it; here it only gets the rest.
+     */
+    private static void carved(ClientLevel level, Spot spot, List<Cut> cuts, PoseStack pose, MultiBufferSource buffers, Set<RenderType> used) {
+        Matrix4f m = pose.last().pose();
+        List<WoundCarve.Cylinder> seen = seen(cuts, pose);
+        if (!spot.entity) model(level, spot.state, spot.pos, pose, buffers, used, true, out -> new QuadCarver.Carved(out, seen));
         if (cuts.isEmpty()) return;
         walls(level, spot, cuts, pose, buffers, used);
         for (Direction d : Direction.values()) {
@@ -612,7 +749,8 @@ public final class BlockWounds {
     private static void walls(ClientLevel level, Spot spot, List<Cut> cuts, PoseStack pose, MultiBufferSource buffers, Set<RenderType> used) {
         BakedModel model = Minecraft.getInstance().getBlockRenderer().getBlockModel(spot.state);
         TextureAtlasSprite sprite = model.getParticleIcon(model.getModelData(level, spot.pos, spot.state, ModelData.EMPTY));
-        int tint = Minecraft.getInstance().getBlockColors().getColor(spot.state, level, spot.pos, 0);
+        // Tinted as the block is, except a grass block: its inside is dirt, which vanilla never tints either.
+        int tint = spot.state.is(Blocks.GRASS_BLOCK) ? -1 : Minecraft.getInstance().getBlockColors().getColor(spot.state, level, spot.pos, 0);
         float tr = tint == -1 ? 1 : (tint >> 16 & 255) / 255f, tg = tint == -1 ? 1 : (tint >> 8 & 255) / 255f, tb = tint == -1 ? 1 : (tint & 255) / 255f;
         int light = light(level, spot.pos);
         Matrix4f m = pose.last().pose();
@@ -628,7 +766,7 @@ public final class BlockWounds {
                     if (wall == null) continue;
                     // No wall stands where another hole has taken the block away.
                     List<float[]> pieces = List.of(wall);
-                    for (Cut other : cuts) if (other != cut) pieces = minus(pieces, 3, other.local);
+                    for (Cut other : cuts) if (other != cut) pieces = QuadCarver.minus(pieces, 3, other.local);
                     for (float[] piece : pieces) {
                         wall(out, piece, cut, sprite, tr, tg, tb, light, m, normals);
                         glow(BeamWounds.nearer(BeamWounds.transform(m, piece), .003f), heat(piece, cut, null));
@@ -663,7 +801,7 @@ public final class BlockWounds {
             polygon[o + 10] = light >>> 16;
         }
         Vector3f normal = normals.transform(new Vector3f(nx, ny, nz));
-        quads(out, polygon, OverlayTexture.NO_OVERLAY, normal.x, normal.y, normal.z);
+        QuadCarver.quads(out, polygon, OverlayTexture.NO_OVERLAY, normal.x, normal.y, normal.z);
     }
 
     /** What is burnt onto a face: the scorch round a mouth; that and a charred disc for the hole; or the scorch run over from beside. */
@@ -707,7 +845,7 @@ public final class BlockWounds {
                         if (piece == null) continue;
                         // Not across another hole's opening.
                         List<float[]> pieces = List.of(piece);
-                        for (Cut other : cuts) if (other != cut) pieces = minus(pieces, 3, other.local);
+                        for (Cut other : cuts) if (other != cut) pieces = QuadCarver.minus(pieces, 3, other.local);
                         for (float[] kept : pieces) {
                             float[] depth = new float[kept.length / 3];
                             for (int i = 0; i < depth.length; i++) depth[i] = WoundCarve.rimDepth(cut.local, k, kept[i * 3], kept[i * 3 + 1], kept[i * 3 + 2]);
@@ -772,24 +910,6 @@ public final class BlockWounds {
             }
     }
 
-    /** What every cut leaves of each polygon (points of {@code stride} floats). */
-    private static List<float[]> minus(List<float[]> polygons, int stride, WoundCarve.Cylinder cut) {
-        List<float[]> out = new ArrayList<>();
-        for (float[] polygon : polygons) out.addAll(WoundCarve.outside(polygon, stride, cut));
-        return out;
-    }
-
-    /** A polygon of {@link #STRIDE}-float corners, as the quads a block's buffer takes: a fan, the odd triangle a quad with a corner twice. */
-    private static void quads(VertexConsumer out, float[] p, int overlay, float nx, float ny, float nz) {
-        int n = p.length / STRIDE;
-        for (int i = 1; i + 1 < n; i += 2)
-            for (int corner : new int[]{0, i, i + 1, Math.min(i + 2, n - 1)}) {
-                int o = corner * STRIDE;
-                out.vertex(p[o], p[o + 1], p[o + 2], p[o + 3], p[o + 4], p[o + 5], p[o + 6], p[o + 7], p[o + 8], overlay,
-                    (Math.round(p[o + 9]) & 0xFFFF) | Math.round(p[o + 10]) << 16, nx, ny, nz);
-            }
-    }
-
     /** The light a hole's walls are seen in: the brightest of what lies around the block. */
     private static int light(ClientLevel level, BlockPos pos) {
         int block = 0, sky = 0;
@@ -822,62 +942,8 @@ public final class BlockWounds {
         return new float[]{(float) b.minX, (float) b.minY, (float) b.minZ, (float) b.maxX, (float) b.maxY, (float) b.maxZ};
     }
 
-    /** Takes a block's quads as its model renderer hands them over, four corners at a time, and passes each on as {@link #finish} decides. */
-    private abstract static class Quads implements VertexConsumer {
-        final VertexConsumer out;
-        final float[] quad = new float[4 * STRIDE];
-        int corners, overlay, light;
-        float nx, ny, nz, x, y, z, r = 1, g = 1, b = 1, a = 1, u, v;
-
-        Quads(VertexConsumer out) {this.out = out;}
-
-        abstract void finish(float[] quad);
-
-        @Override public void vertex(float x, float y, float z, float red, float green, float blue, float alpha, float u, float v,
-                                     int overlay, int light, float nx, float ny, float nz) {
-            int o = corners * STRIDE;
-            quad[o] = x; quad[o + 1] = y; quad[o + 2] = z;
-            quad[o + 3] = red; quad[o + 4] = green; quad[o + 5] = blue; quad[o + 6] = alpha;
-            quad[o + 7] = u; quad[o + 8] = v;
-            quad[o + 9] = light & 0xFFFF; quad[o + 10] = light >>> 16;
-            this.overlay = overlay;
-            this.nx = nx; this.ny = ny; this.nz = nz;
-            if (++corners == 4) {
-                corners = 0;
-                finish(quad.clone());
-            }
-        }
-
-        // For anything that builds its vertices a call at a time: gathered, then handled the same way.
-        @Override public VertexConsumer vertex(double x, double y, double z) {this.x = (float) x; this.y = (float) y; this.z = (float) z; return this;}
-        @Override public VertexConsumer color(int r, int g, int b, int a) {this.r = r / 255f; this.g = g / 255f; this.b = b / 255f; this.a = a / 255f; return this;}
-        @Override public VertexConsumer uv(float u, float v) {this.u = u; this.v = v; return this;}
-        @Override public VertexConsumer overlayCoords(int u, int v) {this.overlay = u & 0xFFFF | v << 16; return this;}
-        @Override public VertexConsumer uv2(int u, int v) {this.light = u & 0xFFFF | v << 16; return this;}
-        @Override public VertexConsumer normal(float x, float y, float z) {this.nx = x; this.ny = y; this.nz = z; return this;}
-        @Override public void endVertex() {vertex(x, y, z, r, g, b, a, u, v, overlay, light, nx, ny, nz);}
-        @Override public void defaultColor(int r, int g, int b, int a) { }
-        @Override public void unsetDefaultColor() { }
-    }
-
-    /** A carved block's own quads: what the holes leave of each, in pieces. */
-    private static final class Carved extends Quads {
-        private final List<WoundCarve.Cylinder> cuts;
-
-        Carved(VertexConsumer out, List<WoundCarve.Cylinder> cuts) {
-            super(out);
-            this.cuts = cuts;
-        }
-
-        @Override void finish(float[] quad) {
-            List<float[]> pieces = List.of(quad);
-            for (WoundCarve.Cylinder cut : cuts) pieces = minus(pieces, STRIDE, cut);
-            for (float[] piece : pieces) quads(out, piece, overlay, nx, ny, nz);
-        }
-    }
-
     /** A neighbour's face turned to a carved block: only where a hole opens onto it, seared, and as hot as the hole is there. */
-    private static final class Cap extends Quads {
+    private static final class Cap extends QuadCarver.Quads {
         private final List<WoundCarve.Cylinder> cuts;
         private final Vector3f facing;
         /** The light each hole gives off where it meets this face. */
@@ -905,7 +971,7 @@ public final class BlockWounds {
                     System.arraycopy(piece, o, at, i * 3, 3);
                     System.arraycopy(heat.get(k), 0, lit, i * 3, 3);
                 }
-                quads(out, piece, overlay, nx, ny, nz);
+                QuadCarver.quads(out, piece, overlay, nx, ny, nz);
                 // Only noted here: this is the middle of drawing the block, and the glow is drawn once every block is.
                 glow(BeamWounds.nearer(at, .003f), lit);
             }

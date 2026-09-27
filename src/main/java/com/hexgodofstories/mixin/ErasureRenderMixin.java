@@ -1,6 +1,7 @@
 package com.hexgodofstories.mixin;
 
 import com.hexgodofstories.client.BeamWounds;
+import com.hexgodofstories.client.BlockWounds;
 import com.hexgodofstories.client.ClientState;
 import com.hexgodofstories.client.ErasureRenderer;
 import com.hexgodofstories.client.WoundAnchor;
@@ -19,6 +20,9 @@ import org.spongepowered.asm.mixin.injection.*;
  * between ticks — limb swing, idle motion, a dropped item's spin and bob, wings, tails, keyframed
  * animations — is interpolated with the partial tick, and with the body's ticks withheld that
  * interpolation would replay the same fraction of motion every tick. A constant partial tick holds it.
+ *
+ * <p>Scepter holes are cut out of what an entity draws here too: a wounded body's layers (its armour) and a
+ * hanging thing the beam went through (an item frame and its item, a painting).
  */
 @Mixin(EntityRenderDispatcher.class)
 public abstract class ErasureRenderMixin {
@@ -29,7 +33,8 @@ public abstract class ErasureRenderMixin {
         float instant=ClientState.suspended(entity)?1f:partial;
         WoundAnchor.beginEntity(entity,instant);
         try {
-            MultiBufferSource wounded=BeamWounds.surface(entity,instant,ErasureRenderer.fadingBuffers(entity,instant,pose,buffers),light);
+            MultiBufferSource holed=BlockWounds.hanging(entity,BeamWounds.layers(entity,ErasureRenderer.fadingBuffers(entity,instant,pose,buffers)));
+            MultiBufferSource wounded=BeamWounds.surface(entity,instant,holed,light);
             renderer.render(entity,yaw,instant,pose,wounded,light);
             BeamWounds.finish(wounded);
         } finally {WoundAnchor.endEntity();}

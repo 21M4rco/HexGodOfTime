@@ -268,14 +268,15 @@ public final class ScepterBlast {
             pierced.add(DoubleTag.valueOf(hit.at.z));
         }
         fx.put("through", pierced);
+        // The holes are drawn by each client, down the same line the walls were found on: through the walls, and
+        // through whatever soft or hanging things were in its way, which never stop it and so are never among them.
+        fx.putDouble("ex", eye.x); fx.putDouble("ey", eye.y); fx.putDouble("ez", eye.z);
+        fx.putDouble("dx", direction.x); fx.putDouble("dy", direction.y); fx.putDouble("dz", direction.z);
+        fx.putFloat("hr", holeRadius(power));
+        fx.putLong("hs", level.getGameTime());
+        fx.putInt("hl", holeLife(power));
         if (holed.length > 0) {
-            // The holes in the walls are drawn by each client, down the same line the walls were found on.
             fx.putLongArray("walls", holed);
-            fx.putDouble("ex", eye.x); fx.putDouble("ey", eye.y); fx.putDouble("ez", eye.z);
-            fx.putDouble("dx", direction.x); fx.putDouble("dy", direction.y); fx.putDouble("dz", direction.z);
-            fx.putFloat("hr", holeRadius(power));
-            fx.putLong("hs", level.getGameTime());
-            fx.putInt("hl", holeLife(power));
             // The block that stopped it is not holed, only met: the tunnel ends against it.
             if (!inBody && end.block() != null) fx.putLong("stop", end.block().asLong());
         }

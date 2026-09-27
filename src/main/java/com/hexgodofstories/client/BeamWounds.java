@@ -57,6 +57,11 @@ import java.util.Map;
  * the same way from the surfaces it actually draws: {@link WoundSurface} notes them as they go by, and
  * each one within reach of the beam is cut before that batch is drawn.
  *
+ * <p>Everything drawn over the body's own model afterwards — worn armour, a held item, any layer — is cut as
+ * it is drawn ({@link QuadCarver}) by the same hole at its full width, so a plate or a sleeve is holed with
+ * the limb under it. Where the wound had to be moved in to bite a thin part (an armour stand's frame), what is
+ * worn over it is cut down the line the beam really took.
+ *
  * <p>A fresh hole is red-hot, and cools through orange to a dim yellowish glow before it goes out, sooner
  * than a hole in a wall does and its inside last ({@link HoleHeat}): the heat is in the tunnel's colour and
  * is light added over the rim, and while it lasts the hole smokes a little from each mouth.
@@ -106,6 +111,11 @@ public final class BeamWounds {
         Vec3 exit, way;
         /** The light its mouths gave off when it was last drawn: red, green and blue. */
         final float[] glow = new float[3];
+        /** Pinned where the beam's line passed beside its part, and moved in to bite it. */
+        boolean grazed;
+        /** This frame's hole in view space, at its full width, for what is drawn over the body; and the frame it is for. */
+        WoundCarve.Cylinder cut;
+        long cutFrame = -1;
 
         Wound(Vec3 point, Vec3 direction, float radius, long start, int life) {
             this.point = point;
@@ -120,6 +130,8 @@ public final class BeamWounds {
 
     private static final Map<Integer, List<Wound>> WOUNDS = new HashMap<>();
     private static boolean world;
+    /** Frames drawn, counted, so a hole in view space is only ever used in the frame it was worked out for. */
+    private static long frames;
     private static Matrix4f inverseView, view;
     private static Vec3 camera = Vec3.ZERO;
 
@@ -158,12 +170,54 @@ public final class BeamWounds {
 
     public static void beginFrame(RenderLevelStageEvent event) {
         world = true;
+        frames++;
         view = new Matrix4f(event.getPoseStack().last().pose());
         inverseView = new Matrix4f(view).invert();
         camera = event.getCamera().getPosition();
     }
 
     public static void endFrame() {world = false;}
+
+    /** The world's view this frame, while the world is being drawn; null otherwise (an inventory's figure). */
+    static Matrix4f view() {return world ? view : null;}
+
+    static Vec3 camera() {return camera;}
+
+    /**
+     * A body's buffers with everything drawn over its own model carved by its wounds as it is drawn: armour,
+     * held and worn items, every layer. Its own model passes untouched, cut the usual way.
+     */
+    public static MultiBufferSource layers(Entity host, MultiBufferSource buffers) {
+        if (!world) return buffers;
+        List<Wound> list = WOUNDS.get(host.getId());
+        if (list == null || list.isEmpty()) return buffers;
+        return QuadCarver.carve(buffers, () -> cuts(list), () -> !WoundAnchor.emittingBody());
+    }
+
+    /** The holes worked out this frame for a body's wounds pinned to its model. */
+    private static List<WoundCarve.Cylinder> cuts(List<Wound> list) {
+        List<WoundCarve.Cylinder> out = new ArrayList<>(list.size());
+        for (Wound w : list) if (w.part != null && w.cut != null && w.cutFrame == frames) out.add(w.cut);
+        return out;
+    }
+
+    /**
+     * A wound's hole in view space at its full width, for what is drawn over the body: down its part, so it
+     * swings with the limb; or, if it was moved in to bite a thin part, down the line the beam really took.
+     */
+    private static WoundCarve.Cylinder layerCut(Wound w, Entity host, Matrix4f pose, float partial) {
+        float r = radius(w, partial);
+        if (w.grazed) {
+            Vec3 at = bodyToWorld(host, w.point, partial).subtract(camera);
+            Vec3 along = w.direction.yRot(-bodyYaw(host, partial) * Mth.DEG_TO_RAD);
+            Vector3f o = view.transformPosition(new Vector3f((float) at.x, (float) at.y, (float) at.z));
+            Vector3f d = view.transformDirection(new Vector3f((float) along.x, (float) along.y, (float) along.z));
+            return new WoundCarve.Cylinder(o.x, o.y, o.z, d.x, d.y, d.z, r);
+        }
+        Vector3f c = pose.transformPosition(new Vector3f(w.through)), a = pose.transformDirection(new Vector3f(w.axis));
+        float scale = a.length();
+        return scale > 1e-6f ? new WoundCarve.Cylinder(c.x, c.y, c.z, a.x, a.y, a.z, r * scale) : null;
+    }
 
     private static float radius(Wound w, float partial) {
         float age = w.age(partial);
@@ -384,6 +438,7 @@ public final class BeamWounds {
                 w.through.set(w.candidateThrough);
                 w.axis.set(w.candidateAxis);
                 w.box = w.candidateBox;
+                w.grazed = w.candidateRank == 1;
                 w.seen = ClientState.now();
             }
             w.candidate = null;
@@ -413,6 +468,9 @@ public final class BeamWounds {
         w.rim = null;
         float r = radius(w, partial);
         if (r < .004f) return;
+        // For what is drawn over the body afterwards, carved as it is drawn.
+        w.cut = layerCut(w, host, pose, partial);
+        w.cutFrame = frames;
         Matrix4f toPart = new Matrix4f(pose).invert();
         if (!Float.isFinite(toPart.determinant())) return;
         // The camera, in the part's own space: only a face turned to it gets a rim.

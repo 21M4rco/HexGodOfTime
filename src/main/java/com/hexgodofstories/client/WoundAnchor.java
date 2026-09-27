@@ -55,6 +55,8 @@ public final class WoundAnchor {
     }
 
     public static void body(boolean emitting){body=emitting;bodyKnown|=emitting;}
+    /** Whether a living body's own model is being emitted right now, rather than one of its layers. */
+    public static boolean emittingBody(){return body;}
     public static void beginEntity(Entity host,float partial) {
         body=false;
         List<ThrownDagger> daggers=BY_HOST.getOrDefault(host.getId(),List.of());
