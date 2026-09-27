@@ -18,7 +18,7 @@
   takes at most one round a tick however many barrels are on it, and is never knocked about by them. You
   walk at a third of your pace meanwhile and cannot jump or sprint.
 - **Let go and it ends.** Released early, the guns simply come apart where they hang and the recovery is
-  short (ten seconds, or a full minute once they have fired).
+  short (ten seconds, or twenty once they have fired).
 - **Hold to the end.** The guns come apart as two big missiles form beside your head, and at thirteen seconds
   you throw your arms down and they go — slowly, pushed by their fire, never straight: each climbs out to its
   own side, swings across the other's path and corkscrews down onto the point you aimed at, trailing smoke.
