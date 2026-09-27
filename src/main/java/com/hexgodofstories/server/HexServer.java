@@ -153,7 +153,14 @@ public final class HexServer {
         if(a==Ability.DAGGERS||a==Ability.TWIN_DAGGERS||a==Ability.LAEVATEINN){dismissWeapons(p);return true;}
         // The ultimate has no alternate action, and says so rather than falling through to the cast path.
         if(a==Ability.TIME_BRANCH){notice(p,"Tap for a charged right fist; hold and release for the torrent.");return true;}
-        if(a==Ability.ARSENAL){notice(p,"Hold the cast key: the crown fires while you hold, and throws its missiles at thirteen seconds.");return true;}
+        // Gotcha!: the crown's tap of this key. It shares the crown's recovery, and asks nothing else of the caster.
+        if(a==Ability.ARSENAL){
+            if(!HexData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return true;}
+            if(HexData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return true;}
+            String refused=Arsenal.gotcha(p);
+            if(refused!=null)notice(p,refused);
+            return true;
+        }
         return false;
     }
 

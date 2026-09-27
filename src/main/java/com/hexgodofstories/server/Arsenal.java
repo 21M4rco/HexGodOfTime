@@ -94,6 +94,9 @@ public final class Arsenal {
     static final int SHORT_RECOVERY = 200;
     /** The longest a body still held when the fire ends is kept held for the missiles, in ticks from their launch. */
     static final int PIN_MOST = 120;
+    /** Gotcha!: its one round, ten hearts; its hole, bigger than a round's; and the ticks its hole pours, five seconds. */
+    static final float GOTCHA = 20, GOTCHA_HOLE = .12f;
+    static final int GOTCHA_BLEED = 100;
 
     private static final class Crown {
         final long start;
@@ -134,9 +137,28 @@ public final class Arsenal {
     /** A body a round went into, where, and how far along the round (squared). */
     private record Hit(Entity body, Vec3 at, double distance) { }
 
+    /** Gotcha!'s gun: where it hangs, the body it is on the back of, and when it began to form. */
+    private static final class Sneak {
+        final ServerLevel level;
+        final UUID caster;
+        final int id, target;
+        final Vec3 at;
+        final long start;
+
+        Sneak(ServerLevel level, UUID caster, int id, int target, Vec3 at, long start) {
+            this.level = level;
+            this.caster = caster;
+            this.id = id;
+            this.target = target;
+            this.at = at;
+            this.start = start;
+        }
+    }
+
     private static final Map<UUID, Crown> CROWNS = new HashMap<>();
     private static final List<Missile> MISSILES = new ArrayList<>();
-    private static int nextMissile;
+    private static final List<Sneak> SNEAKS = new ArrayList<>();
+    private static int nextMissile, nextSneak;
     /** True only while one of the crown's own rounds is being dealt, so that it knocks nobody about. */
     private static boolean striking;
 
@@ -175,6 +197,7 @@ public final class Arsenal {
     public static void reset() {
         CROWNS.clear();
         MISSILES.clear();
+        SNEAKS.clear();
     }
 
     private static void end(ServerPlayer p, Crown crown, long now, String how) {
@@ -397,6 +420,7 @@ public final class Arsenal {
 
     /** Every tick of a level: each missile in it flies on, and bursts on whatever it meets or where it was sent. */
     public static void tickLevel(ServerLevel level) {
+        if (!SNEAKS.isEmpty()) sneaks(level);
         if (MISSILES.isEmpty()) return;
         long now = level.getGameTime();
         for (Iterator<Missile> it = MISSILES.iterator(); it.hasNext(); ) {
@@ -518,6 +542,123 @@ public final class Arsenal {
                     }
                 }
         return taken;
+    }
+
+    // ------------------------------------------------------------------ Gotcha!
+
+    /**
+     * Gotcha!: the alternate key tapped with the crown chosen. A single gun forms, without a sound, a little way
+     * behind the body the caster looks at, turned on its back the whole while, and shoots it once in the back: ten
+     * hearts, a bigger hole than a round's and five seconds of pouring. It leaves the same recovery as a crown held
+     * to its missiles. Nothing happens, and nothing is spent, when there is no body in the look or no room behind it.
+     *
+     * @return why it could not be done, or null once it has begun
+     */
+    public static String gotcha(ServerPlayer p) {
+        if (active(p) || p.isPassenger() || p.isSpectator() || SNEAKS.size() >= 64) return "Not now.";
+        LivingEntity body = looked(p, REACH);
+        if (body == null) return "Look at a body: Gotcha! puts a gun behind it.";
+        ServerLevel level = p.serverLevel();
+        Vec3 at = behind(level, body);
+        if (at == null) return "There is no room behind it for a gun.";
+        long now = HexData.now(p);
+        Sneak sneak = new Sneak(level, p.getUUID(), ++nextSneak, body.getId(), at, now);
+        SNEAKS.add(sneak);
+        HexData.get(p).putLong("cd_" + Ability.ARSENAL.name(), now + Ability.ARSENAL.cooldown);
+        Vec3 aim = body.getBoundingBox().getCenter();
+        CompoundTag n = new CompoundTag();
+        n.putString("state", "gotcha");
+        n.putInt("id", sneak.id);
+        n.putInt("target", body.getId());
+        n.putLong("start", now);
+        n.putDouble("x", at.x); n.putDouble("y", at.y); n.putDouble("z", at.z);
+        n.putDouble("tx", aim.x); n.putDouble("ty", aim.y); n.putDouble("tz", aim.z);
+        HexNetwork.near(level, at, 160, new HexNetwork.Message(HexNetwork.ARSENAL, p.getId(), n));
+        return null;
+    }
+
+    /** The body the caster looks at, as the crown finds its mark: the nearest along the look, short of any block. */
+    private static LivingEntity looked(ServerPlayer p, double reach) {
+        Vec3 eye = p.getEyePosition(), end = eye.add(p.getLookAngle().scale(reach));
+        BlockHitResult block = p.level().clip(new ClipContext(eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, p));
+        Vec3 stop = block.getType() == HitResult.Type.MISS ? end : block.getLocation();
+        double nearest = eye.distanceToSqr(stop);
+        LivingEntity best = null;
+        for (Entity e : p.level().getEntities(p, new AABB(eye, stop).inflate(1), e -> e instanceof LivingEntity && HexServer.validTarget(p, e))) {
+            var hit = e.getBoundingBox().inflate(.3).clip(eye, stop);
+            if (hit.isPresent() && eye.distanceToSqr(hit.get()) < nearest) {
+                nearest = eye.distanceToSqr(hit.get());
+                best = (LivingEntity) e;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Where Gotcha!'s gun hangs: a little way straight back from the way the body faces and just above its chest, or
+     * nearer, or turned a little to either side, wherever it first has room to form and a clear shot at the back.
+     */
+    private static Vec3 behind(ServerLevel level, LivingEntity body) {
+        Vec3 chest = new Vec3(body.getX(), body.getY() + body.getBbHeight() * .62, body.getZ());
+        double yaw = body.yBodyRot * Mth.DEG_TO_RAD, far = body.getBbWidth() / 2 + ArsenalLayout.SNEAK_BACK;
+        for (double d : new double[]{far, far - .8, far - 1.5})
+            for (int turn : new int[]{0, 1, -1, 2, -2}) {
+                double a = yaw + turn * Math.toRadians(28);
+                // A body faces (-sin, cos) of its turn; its back is the other way.
+                Vec3 at = chest.add(Math.sin(a) * d, ArsenalLayout.SNEAK_RISE, -Math.cos(a) * d);
+                if (!level.hasChunkAt(BlockPos.containing(at)) || !level.noCollision(new AABB(at, at).inflate(.45))) continue;
+                if (level.clip(new ClipContext(at, chest, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null)).getType() != HitResult.Type.MISS)
+                    continue;
+                return at;
+            }
+        return null;
+    }
+
+    /** Every Gotcha! gun in this level that has come to its moment fires. */
+    private static void sneaks(ServerLevel level) {
+        long now = level.getGameTime();
+        for (Iterator<Sneak> it = SNEAKS.iterator(); it.hasNext(); ) {
+            Sneak s = it.next();
+            if (s.level != level) {
+                if (s.level.getServer() != level.getServer()) it.remove();
+                continue;
+            }
+            if (now - s.start < ArsenalLayout.SNEAK_FIRE) continue;
+            it.remove();
+            shoot(level, s);
+        }
+    }
+
+    /**
+     * Gotcha!'s one round, from its muzzle into the body's back wherever the body is now: none if the body is gone, has
+     * moved out of the line, or has put a block between them.
+     */
+    private static void shoot(ServerLevel level, Sneak s) {
+        ServerPlayer caster = level.getServer().getPlayerList().getPlayer(s.caster);
+        if (caster == null || !(level.getEntity(s.target) instanceof LivingEntity body) || !body.isAlive() || !HexServer.validTarget(caster, body)) return;
+        Vec3 aim = body.getBoundingBox().getCenter();
+        ArsenalLayout.Pose pose = ArsenalLayout.aimed(array(s.at), array(aim));
+        Vec3 muzzle = vec(pose.point(ArsenalLayout.MUZZLE[ArsenalLayout.SNEAK_TYPE], ArsenalLayout.GUN_SCALE));
+        Vec3 direction = aim.subtract(muzzle);
+        if (direction.lengthSqr() < 1e-6) return;
+        direction = direction.normalize();
+        Vec3 end = aim.add(direction.scale(2));
+        BlockHitResult wall = level.clip(new ClipContext(muzzle, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null));
+        var in = body.getBoundingBox().inflate(.1).clip(muzzle, wall.getType() == HitResult.Type.MISS ? end : wall.getLocation());
+        if (in.isEmpty()) return;
+        body.invulnerableTime = 0;
+        striking = true;
+        try {
+            body.hurt(caster.damageSources().mobProjectile(caster, caster), GOTCHA);
+        } finally {
+            striking = false;
+        }
+        if (body.isDeadOrDying()) return;
+        // Jolted forward, the way the round went, not away from the caster.
+        body.setDeltaMovement(body.getDeltaMovement().add(direction.x * .3, .08, direction.z * .3));
+        body.hurtMarked = true;
+        BeamWound.open(body, in.get(), direction, GOTCHA_HOLE, HOLE_LIFE);
+        Bleed.flow(caster, body, GOTCHA_BLEED);
     }
 
     private static Vec3 vec(double[] v) {return new Vec3(v[0], v[1], v[2]);}

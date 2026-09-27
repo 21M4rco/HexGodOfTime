@@ -28,6 +28,11 @@
   crater (a power-6 explosion's worth, asked of every mod that guards the world first) that knits itself shut
   a block at a time, the way Paradise's ground does, starting some eight seconds later. Nothing drops and
   nothing is lost.
+- **Gotcha!** Tap the alternate key while looking at a body and a single gun forms without a sound a little
+  way behind its back (or to one side of it, or nearer, if that is where there is room and a clear shot),
+  turns on it, and shoots it once in the back: ten hearts, a hole bigger than a round's (open thirty seconds
+  at most) and five seconds of pouring. No energy; it leaves the same twenty-second recovery as the missiles.
+  Nothing happens and nothing is spent with no body in the look or no room behind it.
 - **Light to run.** The guns exist only on each client, drawn from the same numbers the server fires by
   (`ArsenalLayout`): a crown costs no network traffic while it fires, and the server only a handful of rays
   a tick. Each model is one draw from the GPU; flashes, tracers, flames and rings are a few quads each; sound,

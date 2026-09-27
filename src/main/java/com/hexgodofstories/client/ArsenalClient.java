@@ -267,12 +267,31 @@ public final class ArsenalClient {
 
     private record Wave(Vec3 at, long born) { }
 
+    /** Gotcha!'s gun: where it hangs, the body whose back it is turned on, where that back was last seen, and this frame's gun. */
+    private static final class Sneak {
+        final int target;
+        final long start;
+        final Vec3 at;
+        Vec3 aim;
+        Gun gun;
+        long drawn = Long.MIN_VALUE / 2;
+        boolean fired;
+
+        Sneak(int target, long start, Vec3 at, Vec3 aim) {
+            this.target = target;
+            this.start = start;
+            this.at = at;
+            this.aim = aim;
+        }
+    }
+
     private static final Map<Integer, Crown> CROWNS = new HashMap<>();
     private static final Map<Integer, Missile> MISSILES = new HashMap<>();
     private static final List<Tracer> TRACERS = new ArrayList<>();
     private static final List<Casing> CASINGS = new ArrayList<>();
     private static final List<Wave> WAVES = new ArrayList<>();
     private static final List<SoundInstance> SHOTS = new ArrayList<>();
+    private static final Map<Integer, Sneak> SNEAKS = new HashMap<>();
     /** Frames drawn, counted by the solid pass: what "drawn this frame" is measured against. */
     private static long frame;
     private static boolean failed;
@@ -286,6 +305,7 @@ public final class ArsenalClient {
         CASINGS.clear();
         WAVES.clear();
         SHOTS.clear();
+        SNEAKS.clear();
         ArsenalFx.clear();
     }
 
@@ -311,6 +331,13 @@ public final class ArsenalClient {
             }
             case "launch" -> launch(entity, data);
             case "impact" -> impact(data);
+            case "gotcha" -> {
+                ArsenalMeshes.preload(FLASH, FLARE);
+                SNEAKS.put(data.getInt("id"), new Sneak(data.getInt("target"), data.getLong("start"),
+                    new Vec3(data.getDouble("x"), data.getDouble("y"), data.getDouble("z")),
+                    new Vec3(data.getDouble("tx"), data.getDouble("ty"), data.getDouble("tz"))));
+                while (SNEAKS.size() > 32) SNEAKS.remove(SNEAKS.keySet().iterator().next());
+            }
             default -> { }
         }
     }
@@ -387,6 +414,16 @@ public final class ArsenalClient {
             if (frame - c.drawn <= 3) {
                 sparks(c, level.random);
                 smoke(c, t, level);
+            }
+        }
+        for (Iterator<Sneak> it = SNEAKS.values().iterator(); it.hasNext(); ) {
+            Sneak s = it.next();
+            double t = now - s.start;
+            if (t > ArsenalLayout.SNEAK_GONE + ArsenalLayout.UNFORM + 2 || t < -40) {it.remove(); continue;}
+            if (!s.fired && t >= ArsenalLayout.SNEAK_FIRE) {s.fired = true; gotcha(s, level);}
+            if (frame - s.drawn <= 3 && s.gun != null && s.gun.reveal() < .99f && level.random.nextFloat() < .55f) {
+                ArsenalMeshes.Mesh mesh = ArsenalMeshes.get(ArsenalMeshes.GUNS[s.gun.type()]);
+                if (mesh != null) spark(mesh, s.gun.middle(), s.gun.right(), s.gun.up(), s.gun.forward(), s.gun.scale(), s.gun.reveal(), level.random);
             }
         }
         for (Missile m : MISSILES.values()) trail(m, now, level.random);
@@ -606,7 +643,7 @@ public final class ArsenalClient {
 
     public static void render(RenderLevelStageEvent e) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || failed || CROWNS.isEmpty() && MISSILES.isEmpty() && CASINGS.isEmpty()) return;
+        if (mc.level == null || failed || CROWNS.isEmpty() && MISSILES.isEmpty() && CASINGS.isEmpty() && SNEAKS.isEmpty()) return;
         frame++;
         float partial = e.getPartialTick();
         double time = ClientState.time(partial);
@@ -639,6 +676,18 @@ public final class ArsenalClient {
                     if (r != null) draw(rocket, view, projection, eye, r.middle(), r.right(), r.up(), r.forward(), r.scale(), r.reveal(), 0, lit(light),
                         MISSILE_RIM);
                 rounds(c, ClientState.since(c.start, partial));
+            }
+            for (Sneak s : SNEAKS.values()) {
+                if (s.at.distanceToSqr(eye) > DRAW_RANGE * DRAW_RANGE) {s.gun = null; continue;}
+                double t = ClientState.since(s.start, partial);
+                // Turned on the body's back until it fires, and held where it fired from as it comes apart.
+                Entity target = mc.level.getEntity(s.target);
+                if (target != null && t < ArsenalLayout.SNEAK_FIRE) s.aim = target.getPosition(partial).add(0, target.getBbHeight() / 2, 0);
+                s.gun = sneak(s, t);
+                s.drawn = frame;
+                ArsenalMeshes.Mesh mesh = s.gun == null ? null : ArsenalMeshes.get(ArsenalMeshes.GUNS[s.gun.type()]);
+                if (mesh != null) draw(mesh, view, projection, eye, s.gun.middle(), s.gun.right(), s.gun.up(), s.gun.forward(), s.gun.scale(),
+                    s.gun.reveal(), s.gun.flash(), LevelRenderer.getLightColor(mc.level, BlockPos.containing(s.at)), GUN_RIM);
             }
             if (rocket != null) for (Missile m : MISSILES.values()) {
                 Rocket r = m.pose(ClientState.since(m.launch, partial));
@@ -775,6 +824,47 @@ public final class ArsenalClient {
             wall.getDirection());
     }
 
+    /** Gotcha!'s gun {@code t} ticks after it began: forming, turned on the back it will shoot, its one flash and kick, coming apart. */
+    private static Gun sneak(Sneak s, double t) {
+        float reveal = (float) Mth.clamp(t / ArsenalLayout.SNEAK_FORM, 0, 1);
+        if (t >= ArsenalLayout.SNEAK_GONE) reveal = Math.min(reveal, ArsenalLayout.unformed((float) (t - ArsenalLayout.SNEAK_GONE)));
+        if (reveal <= .001f) return null;
+        ArsenalLayout.Pose p = ArsenalLayout.aimed(new double[]{s.at.x, s.at.y, s.at.z}, new double[]{s.aim.x, s.aim.y, s.aim.z});
+        Vec3 right = vec(p.right()), up = vec(p.up()), forward = vec(p.forward());
+        double since = t - ArsenalLayout.SNEAK_FIRE;
+        float flash = since < 0 ? 0 : (float) Math.max(0, 1 - since / 1.2), kick = since < 0 ? 0 : (float) Math.max(0, 1 - since / 1.8);
+        float scale = (float) ArsenalLayout.GUN_SCALE * (.9f + .1f * reveal);
+        Vec3 middle = s.at.subtract(forward.scale(.055 * kick * kick));
+        double[] m = ArsenalLayout.MUZZLE[ArsenalLayout.SNEAK_TYPE];
+        Vec3 muzzle = middle.add(right.scale(m[0] * scale)).add(up.scale(m[1] * scale)).subtract(forward.scale(m[2] * scale));
+        return new Gun(middle, right, up, forward, muzzle, scale, reveal, flash * flash, ArsenalLayout.SNEAK_TYPE, s.start);
+    }
+
+    /** Gotcha!'s one round: the crack of it, its tracer into the back (or the block in the way), the thud, and a casing. */
+    private static void gotcha(Sneak s, ClientLevel level) {
+        Entity target = level.getEntity(s.target);
+        if (target != null) s.aim = target.getBoundingBox().getCenter();
+        Gun gun = sneak(s, ArsenalLayout.SNEAK_FIRE);
+        if (gun == null) return;
+        Vec3 to = s.aim.subtract(gun.muzzle());
+        double distance = to.length();
+        if (distance < .3) return;
+        Vec3 direction = to.scale(1 / distance), end = s.aim.add(direction.scale(2));
+        double born = s.start + ArsenalLayout.SNEAK_FIRE;
+        BlockHitResult wall = level.clip(new ClipContext(gun.muzzle(), end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null));
+        Vec3 stop = wall.getType() == HitResult.Type.MISS ? end : wall.getLocation();
+        Optional<Vec3> in = target == null ? Optional.empty() : target.getBoundingBox().inflate(.1).clip(gun.muzzle(), stop);
+        if (in.isPresent()) TRACERS.add(new Tracer(gun.muzzle(), direction, gun.muzzle().distanceTo(in.get()), born, true, 2, null, Direction.UP));
+        else if (wall.getType() != HitResult.Type.MISS)
+            TRACERS.add(new Tracer(gun.muzzle(), direction, gun.muzzle().distanceTo(stop), born, true, 1, level.getBlockState(wall.getBlockPos()),
+                wall.getDirection()));
+        else TRACERS.add(new Tracer(gun.muzzle(), direction, distance + 2, born, true, 0, null, Direction.UP));
+        play(HexGodOfStories.ARSENAL_RPK.get(), gun.muzzle(), 1, .96f + level.random.nextFloat() * .08f);
+        if (in.isPresent()) play(HexGodOfStories.ARSENAL_HIT.get(), in.get(), .9f, .9f + level.random.nextFloat() * .2f);
+        Vec3 eye = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        if (gun.muzzle().distanceToSqr(eye) < DETAIL_RANGE * DETAIL_RANGE) casing(gun, level.random);
+    }
+
     /** A spent case out of a gun's ejection port: out to its right and up (the M249 drops its own), tumbling. */
     private static void casing(Gun gun, RandomSource random) {
         ArsenalMeshes.Mesh body = ArsenalMeshes.get(ArsenalMeshes.GUNS[gun.type()]);
@@ -859,7 +949,7 @@ public final class ArsenalClient {
 
     public static void renderLight(RenderLevelStageEvent e) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || failed || CROWNS.isEmpty() && MISSILES.isEmpty() && TRACERS.isEmpty() && WAVES.isEmpty()) return;
+        if (mc.level == null || failed || CROWNS.isEmpty() && MISSILES.isEmpty() && TRACERS.isEmpty() && WAVES.isEmpty() && SNEAKS.isEmpty()) return;
         float partial = e.getPartialTick();
         double time = ClientState.time(partial);
         Vec3 camera = e.getCamera().getPosition();
@@ -872,6 +962,7 @@ public final class ArsenalClient {
             if (c.drawn != frame) continue;
             for (Gun g : c.guns) if (g != null && g.flash() > .01f) flash(out, view, camera, g);
         }
+        for (Sneak s : SNEAKS.values()) if (s.drawn == frame && s.gun != null && s.gun.flash() > .01f) flash(out, view, camera, s.gun);
         buffers.endBatch(type);
 
         type = ArsenalRenderTypes.light(FLARE);
@@ -886,6 +977,9 @@ public final class ArsenalClient {
                 if (r != null && r.reveal() < 1)
                     billboard(out, at(view, camera, r.middle()), 1.3f * r.scale(), 0, 1, .55f, .25f, .5f * (1 - r.reveal()));
         }
+        for (Sneak s : SNEAKS.values())
+            if (s.drawn == frame && s.gun != null && s.gun.flash() > .01f)
+                billboard(out, at(view, camera, s.gun.muzzle()), .5f, 0, 1, .62f, .28f, .55f * s.gun.flash());
         for (Tracer tr : TRACERS) {
             double s = (time - tr.born) * TRACER_SPEED;
             if (s <= 0) continue;

@@ -278,6 +278,27 @@ public final class ArsenalLayout {
     /** Eased in and out. */
     static double smooth(double x) {return x * x * (3 - 2 * x);}
 
+    // ------------------------------------------------------------------ Gotcha!
+
+    /**
+     * Gotcha!, the alternate key tapped with the crown chosen: one gun forms without a sound a little way behind the
+     * body the caster looks at, over {@link #SNEAK_FORM} ticks, turned on its back the whole while; it fires once at
+     * {@link #SNEAK_FIRE}, and comes apart from {@link #SNEAK_GONE}. It is always an RPK ({@link #SNEAK_TYPE}).
+     */
+    public static final int SNEAK_FORM = 14, SNEAK_FIRE = 18, SNEAK_GONE = 24, SNEAK_TYPE = 1;
+    /** How far behind a body's back its gun hangs, past the body's own half-width, and how far above its chest. */
+    public static final double SNEAK_BACK = 3, SNEAK_RISE = .35;
+
+    /** Gotcha!'s gun hung at {@code at} with its muzzle toward {@code aim}, both in the world's own coordinates. */
+    public static Pose aimed(double[] at, double[] aim) {
+        double[] forward = norm(sub(aim, at));
+        if (len(forward) < .5) forward = new double[]{0, 0, 1};
+        // The world is right-handed: facing south, forward crossed with up points west, which is the right hand.
+        double[] right = cross(forward, new double[]{0, 1, 0});
+        right = len(right) < 1e-6 ? new double[]{1, 0, 0} : norm(right);
+        return new Pose(at.clone(), forward, norm(cross(right, forward)), right);
+    }
+
     // ------------------------------------------------------------------ the missiles
 
     /** How far out beside the head the two missiles form (the caster's right, times -1 or 1), and how high. */

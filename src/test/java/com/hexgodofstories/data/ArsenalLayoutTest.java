@@ -19,6 +19,7 @@ public final class ArsenalLayoutTest {
         missilesAreSlowAndSpeedUpSmoothly();
         gunsFormOutwardAndAimTrue();
         muzzlesAreWhereTheModelsSayTheyAre();
+        gotchasGunFacesTheBackItShoots();
         System.out.println("ArsenalLayoutTest: the crown forms, fires out of step in ragged bursts about the mark and lets its missiles wander to it.");
     }
 
@@ -247,6 +248,28 @@ public final class ArsenalLayoutTest {
                 lastRight = p.right();
             }
         }
+    }
+
+    private static void gotchasGunFacesTheBackItShoots() {
+        require(0 < ArsenalLayout.SNEAK_FORM && ArsenalLayout.SNEAK_FORM <= ArsenalLayout.SNEAK_FIRE
+            && ArsenalLayout.SNEAK_FIRE < ArsenalLayout.SNEAK_GONE, "Gotcha!'s gun is whole before it fires, and fires before it goes");
+        double[][] aims = {{0, 1, 5}, {4, 0, -3}, {-2, 3, 1}, {0, -6, 0}, {0, 6, .001}};
+        for (double[] aim : aims) {
+            ArsenalLayout.Pose pose = ArsenalLayout.aimed(new double[]{0, 0, 0}, aim);
+            double[] to = aim.clone();
+            double l = Math.sqrt(dot(to, to));
+            require(Math.abs(dot(pose.forward(), to) / l - 1) < 1e-9, "Gotcha!'s gun points at the back it shoots");
+            require(Math.abs(dot(pose.forward(), pose.up())) < 1e-9 && Math.abs(dot(pose.forward(), pose.right())) < 1e-9
+                && Math.abs(dot(pose.up(), pose.right())) < 1e-9, "its axes are square to each other");
+            require(Math.abs(dot(pose.up(), pose.up()) - 1) < 1e-9 && Math.abs(dot(pose.right(), pose.right()) - 1) < 1e-9, "and of unit length");
+            // In the world's right-handed coordinates a right hand is the muzzle's way crossed with the top's.
+            require(close(cross(pose.forward(), pose.up()), pose.right(), 1e-9), "its right side is a true right side");
+            double[] muzzle = pose.point(ArsenalLayout.MUZZLE[ArsenalLayout.SNEAK_TYPE], ArsenalLayout.GUN_SCALE);
+            require(dot(muzzle, to) / l > .4, "its muzzle is the end nearer the back");
+        }
+        // Facing south with the top up, a right hand points west.
+        ArsenalLayout.Pose south = ArsenalLayout.aimed(new double[]{0, 0, 0}, new double[]{0, 0, 10});
+        require(close(south.right(), new double[]{-1, 0, 0}, 1e-9) && close(south.up(), new double[]{0, 1, 0}, 1e-9), "upright, right hand west");
     }
 
     private static void muzzlesAreWhereTheModelsSayTheyAre() {
