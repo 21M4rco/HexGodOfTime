@@ -282,6 +282,33 @@ public final class ScepterFx {
     }
 
     /**
+     * A wisp of smoke off a hot Scepter hole, in a wall or a body: from anywhere across a mouth at {@code x, y,
+     * z}, {@code radius} across and opening along {@code ox, oy, oz}, drifting out of it and rising. Vanilla
+     * smoke, a middling grey. Thin, and thinner as the hole cools, {@code heat} running from 1 down to 0.
+     * Called once a tick per mouth.
+     */
+    public static void holeSmoke(double x,double y,double z,double ox,double oy,double oz,float radius,float heat) {
+        Minecraft mc=Minecraft.getInstance();
+        if(mc.level==null||!(heat>0))return;
+        ParticleStatus setting=mc.options.particles().get();
+        if(setting==ParticleStatus.MINIMAL)return;
+        var random=mc.level.random;
+        if(random.nextFloat()>.3f*(float)Math.sqrt(heat)*(setting==ParticleStatus.DECREASED?.5f:1))return;
+        if(camera.distanceToSqr(x,y,z)>48*48)return;
+        // Anywhere across the mouth, and just out of it.
+        double jx=random.nextGaussian()*radius*.4,jy=random.nextGaussian()*radius*.4,jz=random.nextGaussian()*radius*.4;
+        double across=jx*ox+jy*oy+jz*oz;
+        jx-=ox*across;jy-=oy*across;jz-=oz*across;
+        double out=.008+random.nextDouble()*.012;
+        net.minecraft.client.particle.Particle puff=mc.particleEngine.createParticle(ParticleTypes.SMOKE,
+            x+jx+ox*.06,y+jy+oy*.06,z+jz+oz*.06,
+            ox*out+random.nextGaussian()*.003,oy*out+.01+random.nextDouble()*.01,oz*out+random.nextGaussian()*.003);
+        if(puff==null)return;
+        float grey=.36f+random.nextFloat()*.2f;
+        puff.setColor(grey,grey,grey);
+    }
+
+    /**
      * The stone for smoke to rise from, or null when nobody can see it. Our own first-person stone counts
      * only once the hand has settled: not mid-swing, and not still coming up after a switch, when it is
      * somewhere the steady pose does not describe. Anyone else's counts only if their staff was drawn this

@@ -1,5 +1,6 @@
 package com.hexgodofstories.client;
 
+import com.hexgodofstories.data.HoleHeat;
 import com.hexgodofstories.data.WoundCarve;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -12,6 +13,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.Mth;
@@ -54,6 +56,10 @@ import java.util.Map;
  * <p>A body with no vanilla model part to pin to (GeckoLib, Citadel, a mod's own renderer) is carved
  * the same way from the surfaces it actually draws: {@link WoundSurface} notes them as they go by, and
  * each one within reach of the beam is cut before that batch is drawn.
+ *
+ * <p>A fresh hole is red-hot, and cools through orange to a dim yellowish glow before it goes out, sooner
+ * than a hole in a wall does and its inside last ({@link HoleHeat}): the heat is in the tunnel's colour and
+ * is light added over the rim, and while it lasts the hole smokes a little from each mouth.
  */
 public final class BeamWounds {
     private BeamWounds() { }
@@ -94,8 +100,12 @@ public final class BeamWounds {
         // Never pinned to a vanilla part after two draws: cut from the drawn surface instead.
         int misses;
         boolean surface;
-        /** Where the entry opening was last drawn, in the world, for blood to pour from. */
+        /** Where the entry opening was last drawn, in the world, for blood to pour from, and smoke. */
         Vec3 mouth;
+        /** The way out on the far side, when the hole goes through, and the beam's way through the limb, both in the world, for the smoke. */
+        Vec3 exit, way;
+        /** The light its mouths gave off when it was last drawn: red, green and blue. */
+        final float[] glow = new float[3];
 
         Wound(Vec3 point, Vec3 direction, float radius, long start, int life) {
             this.point = point;
@@ -135,6 +145,15 @@ public final class BeamWounds {
             e.getValue().removeIf(w -> now > w.start + w.life);
             return e.getValue().isEmpty() || level.getEntity(e.getKey()) == null;
         });
+        // A little smoke from each mouth of a hole still hot, where it was drawn a moment ago.
+        for (List<Wound> list : WOUNDS.values())
+            for (Wound w : list) {
+                float heat = HoleHeat.heat(ClientState.since(w.start, 0), HoleHeat.BODY, 0, 0);
+                if (heat <= 0 || w.way == null || now - w.seen > 2) continue;
+                float r = w.radius;
+                if (w.mouth != null) ScepterFx.holeSmoke(w.mouth.x, w.mouth.y, w.mouth.z, -w.way.x, -w.way.y, -w.way.z, r, heat);
+                if (w.exit != null) ScepterFx.holeSmoke(w.exit.x, w.exit.y, w.exit.z, w.way.x, w.way.y, w.way.z, r, heat);
+            }
     }
 
     public static void beginFrame(RenderLevelStageEvent event) {
@@ -239,17 +258,17 @@ public final class BeamWounds {
     static void cutSurface(Entity host, float partial, WoundSurface surface, MultiBufferSource buffers, int light) {
         List<Wound> list = WOUNDS.get(host.getId());
         if (list == null || surface.faces() == 0 || view == null || inverseView == null) return;
-        VertexConsumer out = null;
+        // Every opening is cut before any rim is asked for: asking for the rims' buffer sends the body's batch.
+        List<Wound> rimmed = new ArrayList<>();
         for (Wound w : list) {
             if (!w.surface || w.part != null) continue;
             Carving carving = new Carving();
             if (!drawSurface(w, host, partial, surface, carving)) continue;
             carving.cut();
-            float[] rim = carving.rim();
-            if (rim == null) continue;
-            if (out == null) out = buffers.getBuffer(ScepterRenderTypes.glass(WorldEffects.WHITE));
-            emitRim(out, rim, light);
+            w.rim = carving.rim();
+            if (w.rim != null) rimmed.add(w);
         }
+        rims(rimmed, buffers, light);
     }
 
     /** Carves one wound out of the recorded faces, in view space. False when the beam cuts none of them. */
@@ -265,6 +284,7 @@ public final class BeamWounds {
         Vector3f o = view.transformPosition(new Vector3f((float) at.x, (float) at.y, (float) at.z));
         Vector3f d = view.transformDirection(new Vector3f((float) along.x, (float) along.y, (float) along.z)).normalize();
         WoundCarve.Cylinder hole = new WoundCarve.Cylinder(o.x, o.y, o.z, d.x, d.y, d.z, r);
+        float age = ClientState.since(w.start, partial);
         int[] near = WoundCarve.near(faces, corners, count, hole);
         if (WoundCarve.through(faces, corners, near, o.x, o.y, o.z, d.x, d.y, d.z) == null) {
             // A beam whose line passed beside the body: move it across toward the body's nearest corner
@@ -283,7 +303,7 @@ public final class BeamWounds {
         for (int k = 0; k < WoundCarve.SIDES; k++) ends[k] = span(faces, corners, near, hole, k, 0, line);
         for (int k = 0; k < WoundCarve.SIDES; k++) {
             float[] a = ends[k], b = ends[(k + 1) % WoundCarve.SIDES];
-            if (a != null && b != null) {wall(carving, hole, k, 0, a, 1, b); continue;}
+            if (a != null && b != null) {wall(carving, hole, k, 0, a, 1, b, age); continue;}
             if (a == null && b == null) continue;
             // Narrow in on the last point along the side still inside the body.
             float in = a != null ? 0 : 1, out = 1 - in;
@@ -293,12 +313,13 @@ public final class BeamWounds {
                 float[] s = span(faces, corners, near, hole, k, mid, line);
                 if (s != null) {in = mid; kept = s;} else out = mid;
             }
-            if (a != null) wall(carving, hole, k, 0, a, in, kept);
-            else wall(carving, hole, k, in, kept, 1, b);
+            if (a != null) wall(carving, hole, k, 0, a, in, kept, age);
+            else wall(carving, hole, k, in, kept, 1, b, age);
         }
         // The openings, and the rim around each. A face seen from inside the body keeps its rim too: the
         // body's front hides it, and which side a mod's face is wound to show is not known here.
-        float lift = armoured(host) ? .07f : .006f, mouth = Float.POSITIVE_INFINITY;
+        float lift = armoured(host) ? .07f : .006f, mouth = Float.POSITIVE_INFINITY, exit = Float.NEGATIVE_INFINITY;
+        Vec3 exitAt = null;
         for (int f : near) {
             float[] face = WoundCarve.face(faces, corners, f);
             float[] opening = WoundCarve.opening(face, hole);
@@ -307,12 +328,16 @@ public final class BeamWounds {
             float[] centre = WoundCarve.centre(opening);
             float depth = hole.along(centre[0], centre[1], centre[2]);
             if (depth < mouth) {mouth = depth; w.mouth = world(new Vector3f(centre[0], centre[1], centre[2]));}
+            if (depth > exit) {exit = depth; exitAt = world(new Vector3f(centre[0], centre[1], centre[2]));}
             for (int k = 0; k < WoundCarve.SIDES; k++) {
                 float[] piece = WoundCarve.rim(face, hole, k);
                 if (piece != null) carving.rim(nearer(piece, lift + .003f), out(hole, k, piece));
             }
         }
         if (mouth == Float.POSITIVE_INFINITY) return false;
+        w.exit = exit > mouth + 1e-3f ? exitAt : null;
+        w.way = along.normalize();
+        HoleHeat.glow(age, HoleHeat.BODY, 0, 0, w.glow);
         w.seen = ClientState.now();
         return true;
     }
@@ -324,8 +349,8 @@ public final class BeamWounds {
         return span == null || span[1] - span[0] < 1e-4f ? null : span;
     }
 
-    /** A strip of tunnel wall on side {@code k}, between two lines down it that each run from {@code a[0]} to {@code a[1]}. */
-    private static void wall(Carving carving, WoundCarve.Cylinder hole, int k, float s0, float[] a, float s1, float[] b) {
+    /** A strip of tunnel wall on side {@code k}, between two lines down it that each run from {@code a[0]} to {@code a[1]}, {@code age} ticks after the shot. */
+    private static void wall(Carving carving, WoundCarve.Cylinder hole, int k, float s0, float[] a, float s1, float[] b, float age) {
         float[] strip = new float[12];
         for (int band = 0; band < BANDS; band++) {
             float f0 = band / (float) BANDS, f1 = (band + 1) / (float) BANDS;
@@ -333,7 +358,7 @@ public final class BeamWounds {
             hole.onSide(k, s1, Mth.lerp(f0, b[0], b[1]), strip, 3);
             hole.onSide(k, s1, Mth.lerp(f1, b[0], b[1]), strip, 6);
             hole.onSide(k, s0, Mth.lerp(f1, a[0], a[1]), strip, 9);
-            int near = tunnel(1 - Math.abs(f0 * 2 - 1)), far = tunnel(1 - Math.abs(f1 * 2 - 1));
+            int near = tunnel(1 - Math.abs(f0 * 2 - 1), age), far = tunnel(1 - Math.abs(f1 * 2 - 1), age);
             carving.wall(strip.clone(), new int[]{near, near, far, far});
         }
     }
@@ -400,6 +425,7 @@ public final class BeamWounds {
         }
         float[] planes = WoundCarve.boxPlanes(w.box);
         Carving carving = new Carving();
+        float age = ClientState.since(w.start, partial);
         // The tunnel: each side of the hole where it runs inside the cube, raw at the mouths and dark within.
         float reach = WoundCarve.reach(w.box, hole);
         for (int k = 0; k < WoundCarve.SIDES; k++) {
@@ -415,14 +441,15 @@ public final class BeamWounds {
                 float[] piece = WoundCarve.band(wall, hole, Mth.lerp(band / (float) BANDS, lo, hi), Mth.lerp((band + 1) / (float) BANDS, lo, hi));
                 if (piece == null) continue;
                 int[] colours = new int[piece.length / 3];
-                for (int i = 0; i < colours.length; i++) colours[i] = tunnel(WoundCarve.depth(planes, hole, piece[i * 3], piece[i * 3 + 1], piece[i * 3 + 2]));
+                for (int i = 0; i < colours.length; i++) colours[i] = tunnel(WoundCarve.depth(planes, hole, piece[i * 3], piece[i * 3 + 1], piece[i * 3 + 2]), age);
                 carving.wall(transform(pose, piece), colours);
             }
         }
         // Each opening is written just nearer than its face. Armour sits up to a pixel outside the body and
         // is drawn after it; an armoured body is cut from just beyond the armour's surface, so the plate is
         // holed along with the flesh under it.
-        float lift = armoured(host) ? .07f : .006f, mouth = Float.POSITIVE_INFINITY;
+        float lift = armoured(host) ? .07f : .006f, mouth = Float.POSITIVE_INFINITY, exit = Float.NEGATIVE_INFINITY;
+        Vec3 exitAt = null;
         for (int f = 0; f < 6; f++) {
             float[] face = WoundCarve.boxFace(w.box, f);
             float[] opening = WoundCarve.opening(face, hole);
@@ -431,6 +458,7 @@ public final class BeamWounds {
             float[] centre = WoundCarve.centre(opening);
             float depth = hole.along(centre[0], centre[1], centre[2]);
             if (depth < mouth) {mouth = depth; w.mouth = world(pose.transformPosition(new Vector3f(centre[0], centre[1], centre[2])));}
+            if (depth > exit) {exit = depth; exitAt = world(pose.transformPosition(new Vector3f(centre[0], centre[1], centre[2])));}
             // A face seen from inside the body is behind its front; its rim would never show.
             if (planes[f * 4] * (eye.x - face[0]) + planes[f * 4 + 1] * (eye.y - face[1]) + planes[f * 4 + 2] * (eye.z - face[2]) <= 0) continue;
             for (int k = 0; k < WoundCarve.SIDES; k++) {
@@ -440,6 +468,11 @@ public final class BeamWounds {
         }
         carving.cut();
         w.rim = carving.rim();
+        if (mouth == Float.POSITIVE_INFINITY) return;
+        w.exit = exit > mouth + 1e-3f ? exitAt : null;
+        Vector3f way = inverseView.transformDirection(pose.transformDirection(new Vector3f(hole.ax, hole.ay, hole.az)));
+        w.way = way.lengthSquared() > 1e-12f ? new Vec3(way.x, way.y, way.z).normalize() : null;
+        HoleHeat.glow(age, HoleHeat.BODY, 0, 0, w.glow);
     }
 
     /** One wound's carving for this frame, collected in view space, then drawn in one go. */
@@ -513,14 +546,27 @@ public final class BeamWounds {
         if (!world) return;
         List<Wound> list = WOUNDS.get(host.getId());
         if (list == null) return;
-        VertexConsumer out = null;
-        for (Wound w : list) {
-            if (w.rim == null || w.seen != ClientState.now()) continue;
-            // Blended, not added: a dark wet ring reads on pale skin and dark hide alike.
-            if (out == null) out = buffers.getBuffer(ScepterRenderTypes.glass(WorldEffects.WHITE));
-            emitRim(out, w.rim, light);
-            w.rim = null;
+        List<Wound> rimmed = new ArrayList<>();
+        for (Wound w : list) if (w.rim != null && w.seen == ClientState.now()) rimmed.add(w);
+        rims(rimmed, buffers, light);
+    }
+
+    /**
+     * The wounds' rims, laid over the body, and then the heat still in them added over those. One buffer after
+     * the other, never back and forth: asking for a different buffer sends the one before it.
+     */
+    private static void rims(List<Wound> rimmed, MultiBufferSource buffers, int light) {
+        if (rimmed.isEmpty()) return;
+        // Blended, not added: a dark wet ring reads on pale skin and dark hide alike.
+        VertexConsumer out = buffers.getBuffer(ScepterRenderTypes.glass(WorldEffects.WHITE));
+        for (Wound w : rimmed) emitRim(out, w.rim, light);
+        out = null;
+        for (Wound w : rimmed) {
+            if (w.glow[0] + w.glow[1] + w.glow[2] < .004f) continue;
+            if (out == null) out = buffers.getBuffer(ScepterRenderTypes.glow(WorldEffects.WHITE));
+            glowRim(out, w.rim, w.glow);
         }
+        for (Wound w : rimmed) w.rim = null;
     }
 
     /** A rim's triangles: raw at the edge of the opening, fading into the skin around it. */
@@ -532,6 +578,15 @@ public final class BeamWounds {
         }
     }
 
+    /** A rim's heat, as light added over it: brightest at the edge of the opening, gone by the rim's outer edge. */
+    private static void glowRim(VertexConsumer out, float[] rim, float[] rgb) {
+        for (int i = 0; i + 3 < rim.length; i += 4) {
+            float fade = (1 - rim[i + 3]) * (1 - rim[i + 3]);
+            out.vertex(rim[i], rim[i + 1], rim[i + 2], rgb[0] * fade, rgb[1] * fade, rgb[2] * fade, 1,
+                .5f, .5f, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, LightTexture.FULL_BRIGHT, 0, 0, 1);
+        }
+    }
+
     /** How far out through the rim each corner of a piece lies, 0 at the opening's edge. */
     private static float[] out(WoundCarve.Cylinder hole, int k, float[] piece) {
         float[] out = new float[piece.length / 3];
@@ -539,9 +594,16 @@ public final class BeamWounds {
         return out;
     }
 
-    /** The tunnel's flesh, raw red at a mouth ({@code depth} 0) and darkening to the middle (1). */
-    private static int tunnel(float depth) {
-        float r = .52f - .36f * depth, g = .06f - .045f * depth, b = .06f - .04f * depth;
+    /** Scratch for the heat of one corner of tunnel at a time; only ever used on the render thread. */
+    private static final float[] HEAT = new float[3];
+
+    /**
+     * The tunnel's flesh, raw red at a mouth ({@code depth} 0) and darkening to the middle (1), with the heat
+     * still in it {@code age} ticks after the shot added: red-hot, then orange, then yellowish, then gone.
+     */
+    private static int tunnel(float depth, float age) {
+        HoleHeat.glow(age, HoleHeat.BODY, depth, 0, HEAT);
+        float r = .52f - .36f * depth + HEAT[0], g = .06f - .045f * depth + HEAT[1], b = .06f - .04f * depth + HEAT[2];
         return 0xff000000 | ((int) (Math.min(1, r) * 255) << 16) | ((int) (Math.min(1, g) * 255) << 8) | (int) (Math.min(1, b) * 255);
     }
 

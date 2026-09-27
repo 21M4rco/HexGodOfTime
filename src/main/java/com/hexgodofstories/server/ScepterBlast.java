@@ -40,16 +40,17 @@ import java.util.UUID;
  * <p>A press starts holding the stone open; a release fires. Let go inside {@link #TAP} ticks and it is
  * a quick bolt that stops in the first body it meets. Hold longer and the stone fills over {@link #FULL}
  * ticks into a charged beam that burns through up to six bodies. Either one goes straight through
- * walls, up to {@link #WALLS} solid blocks of them, and holes each one the way it holes a body: a
- * cauterised hole that can be seen through, open for most of a minute and then knitting shut. The blocks
- * are never broken; the hole is only drawn, by every client in sight ({@code BlockWounds}). Nothing it
- * reaches explodes.
+ * walls, {@link #WALLS} solid blocks of them for a tap, rising to {@link #FULL_WALLS} the longer the stone
+ * was held, and holes each one the way it holes a body: a cauterised hole that can be seen through, open
+ * for a minute or more and then knitting shut. The blocks are never broken; the hole is only drawn, by
+ * every client in sight ({@code BlockWounds}). Nothing it reaches explodes.
  *
  * <p>The beam does not break a body; it holds one. It hits lightly, and every body it passes through is
- * stunned, reeling and blind for a moment, and keeps a cauterised hole that bleeds a heart a second,
- * through armour, for ten to thirty seconds by how long the stone was held; see {@link Bleed#flow}.
+ * stunned, reeling and blind for a moment, slowed for {@link #SLOW} ticks after that, and keeps a
+ * cauterised hole that bleeds a heart a second, through armour, for ten to thirty seconds by how long the
+ * stone was held; see {@link Bleed#flow}.
  *
- * <p>Every shot leaves the stone recovering for five to ten seconds, again by how long it was held. It
+ * <p>Every shot leaves the stone recovering for ten to twenty seconds, again by how long it was held. It
  * smokes the whole time and takes no right click at all until it has cooled. The recovery is kept in the
  * player's saved data, like every other cooldown, so no death, relog or crossing cools it early, and
  * clients read it from that same data: that is how everyone watching sees the stone smoke.
@@ -66,21 +67,25 @@ public final class ScepterBlast {
     private ScepterBlast() { }
 
     public static final double RANGE = 100;
-    /** Solid blocks a shot passes through; the next one stops it. */
-    public static final int WALLS = 9;
+    /** Solid blocks a shot passes through, the next one stopping it: nine for a tap, rising to sixteen for a full stone. */
+    public static final int WALLS = 9, FULL_WALLS = 16;
     /** Presses shorter than this are taps. */
     public static final int TAP = 6;
     /** Ticks of holding past a tap for the stone to fill completely: three seconds from the press. */
     public static final int FULL = 54;
     public static final int MAX_HOLD = 200;
-    /** Recovery after a shot, in ticks: five seconds for a tap, rising to ten for a full stone. */
-    public static final int COOLDOWN = 100, FULL_COOLDOWN = 200;
+    /** Recovery after a shot, in ticks: ten seconds for a tap, rising to twenty for a full stone. */
+    public static final int COOLDOWN = 200, FULL_COOLDOWN = 400;
     /** How long a hole bleeds, in ticks: ten seconds for a tap, rising to thirty for a full stone. */
     public static final int BLEED = 200, FULL_BLEED = 600;
+    /** How long a hole lasts, in ticks, knitting shut included: a minute for a tap, rising to a minute and a half for a full stone. */
+    public static final int HOLE_LIFE = 1200, FULL_HOLE_LIFE = 1800;
     /** The stun, in ticks: two seconds for a tap, rising to four for a full stone. */
     public static final int STUN = 40, FULL_STUN = 80;
     /** Nausea and blindness, whatever the charge: two seconds. */
     public static final int DAZE = 40;
+    /** Slowness, whatever the charge: fifteen seconds, running on under the stun and past it. */
+    public static final int SLOW = 300;
     /** Where the recovery lives in the player's saved data: the tick the stone has cooled. */
     public static final String READY = "scepterReady";
     /** A press this few ticks before the stone has cooled still counts: a client's clock can run a little ahead. */
@@ -103,6 +108,9 @@ public final class ScepterBlast {
     private static int bleed(float power) {return BLEED + Math.round((FULL_BLEED - BLEED) * fill(power));}
 
     private static int stunFor(float power) {return STUN + Math.round((FULL_STUN - STUN) * fill(power));}
+
+    /** How many solid blocks a shot goes through before the next one stops it. */
+    private static int wallDepth(float power) {return WALLS + Math.round((FULL_WALLS - WALLS) * fill(power));}
 
     /** A heart for a tap, one and a half to three for a charged beam. The bleed does the rest. */
     private static float damage(float power) {return power > 0 ? 2 + 4 * power : 2;}
@@ -191,9 +199,9 @@ public final class ScepterBlast {
         Vec3 eye = caster.getEyePosition();
         Vec3 direction = caster.getLookAngle().normalize();
         Vec3 muzzle = ScepterPose.stoneMuzzle(caster);
-        // Straight through walls: nine solid blocks at most, and the tenth stops it.
+        // Straight through walls: nine solid blocks for a tap, up to sixteen for a full stone, and the next stops it.
         List<Wall> walls = new ArrayList<>();
-        Stop end = stop(level, eye, eye.add(direction.scale(RANGE)), caster, walls);
+        Stop end = stop(level, eye, eye.add(direction.scale(RANGE)), caster, wallDepth(power), walls);
         Vec3 stop = end.at();
 
         // The beam has width: a charged one is a hand across and more.
@@ -260,7 +268,7 @@ public final class ScepterBlast {
         HexNetwork.near(level, muzzle, 160, new HexNetwork.Message(HexNetwork.FX, caster.getId(), fx));
     }
 
-    /** A body the beam passes through: lightly burned, holed, thrown, stunned and reeling, then bleeding a long while. */
+    /** A body the beam passes through: lightly burned, holed, thrown, stunned and reeling, then slowed and bleeding a long while. */
     private static void strike(ServerPlayer caster, Hit hit, Vec3 direction, float power) {
         LivingEntity victim = hit.victim;
         boolean charged = power > 0;
@@ -275,7 +283,7 @@ public final class ScepterBlast {
         victim.level().playSound(null, hit.at.x, hit.at.y, hit.at.z, HexGodOfStories.SCEPTER_BURN.get(), SoundSource.PLAYERS,
             1.2f, .9f + victim.getRandom().nextFloat() * .25f);
         if (victim.isDeadOrDying()) {if (full(power)) dissolve(victim, direction, power); return;}
-        // A clean hole that stays open for most of a minute before it knits shut. Bleed, never fire.
+        // A clean hole that stays open for a minute or more before it knits shut. Bleed, never fire.
         BeamWound.open(victim, hit.at, direction, holeRadius(power), holeLife(power));
         // Held on its last breath: it stays exactly where it was hit, bleeding, until it falls.
         if (held) {LastMoments.hold(caster, victim); return;}
@@ -286,6 +294,8 @@ public final class ScepterBlast {
         victim.hurtMarked = true;
         stun(victim, stunFor(power));
         daze(victim);
+        // Slowness I: the stun's own slowdown is stronger and shorter, so this waits under it and then runs on.
+        victim.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, SLOW, 0, false, true));
     }
 
     /** Two seconds of the world reeling and going dark, whatever the charge. */
@@ -327,12 +337,12 @@ public final class ScepterBlast {
 
     /**
      * Where a shot from {@code from} toward {@code to} is stopped, collecting every wall it passed through
-     * on the way into {@code walls}. It stops where it enters the solid block after the {@link #WALLS}th,
+     * on the way into {@code walls}. It stops where it enters the solid block after the {@code most}th,
      * at any block nothing can break (bedrock, a barrier), at the edge of the loaded world, or nowhere
      * short of {@code to}. Every block whose collision shape the line actually crosses counts once, slabs
      * and panes included; nothing that can be walked through counts, fluids among it.
      */
-    private static Stop stop(ServerLevel level, Vec3 from, Vec3 to, ServerPlayer caster, List<Wall> walls) {
+    private static Stop stop(ServerLevel level, Vec3 from, Vec3 to, ServerPlayer caster, int most, List<Wall> walls) {
         BlockPos[] stopper = new BlockPos[1];
         ClipContext context = new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, caster);
         Vec3 stopped = BlockGetter.traverseBlocks(from, to, context, (c, pos) -> {
@@ -344,7 +354,7 @@ public final class ScepterBlast {
             BlockState state = level.getBlockState(pos);
             BlockHitResult hit = c.getBlockShape(state, level, pos).clip(from, to, pos);
             if (hit == null) return null;
-            if (walls.size() >= WALLS || state.getDestroySpeed(level, pos) < 0) {
+            if (walls.size() >= most || state.getDestroySpeed(level, pos) < 0) {
                 stopper[0] = pos.immutable();
                 return hit.getLocation();
             }
@@ -354,8 +364,8 @@ public final class ScepterBlast {
         return new Stop(stopped == null ? to : stopped, stopper[0]);
     }
 
-    /** How long a hole stays open, in a body or a wall, before it knits shut: most of a minute. */
-    private static int holeLife(float power) {return power > 0 ? 1200 : 900;}
+    /** How long a hole stays open, in a body or a wall, knitting shut included: a minute for a tap, rising to a minute and a half for a full stone. */
+    private static int holeLife(float power) {return HOLE_LIFE + Math.round((FULL_HOLE_LIFE - HOLE_LIFE) * fill(power));}
 
     /** How wide a hole is, in a body or a wall: a hand across for a tap, wider the more the stone was held. */
     private static float holeRadius(float power) {return power > 0 ? .20f + .14f * power : .15f;}

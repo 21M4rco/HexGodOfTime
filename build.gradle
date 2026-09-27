@@ -169,6 +169,16 @@ tasks.register('verifyWoundCarve', JavaExec) {
 }
 tasks.named('check') { dependsOn 'verifyWoundCarve' }
 
+// A Scepter hole comes up red-hot and cools through orange to yellowish, a body sooner than a wall and the
+// inside of a hole last. Numbers only; no Minecraft needed.
+tasks.register('verifyHoleHeat', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.hexgodofstories.data.HoleHeatTest'
+    enableAssertions = true
+}
+tasks.named('check') { dependsOn 'verifyHoleHeat' }
+
 // Ship the unmodified Photon runtime beside the mod, so the Actions download is installable.
 configurations { photonRuntime }
 dependencies {
