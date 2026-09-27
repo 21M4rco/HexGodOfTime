@@ -2,16 +2,19 @@ package com.hexgodofstories.server;
 
 import com.hexgodofstories.data.HexData;
 import com.hexgodofstories.network.HexNetwork;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 
 /**
  * Grants vanilla server-authorized flight, and the mantle is the whole of the permission.
  *
  * <p>0.5.6 confined this to the fracture world, on the argument that a realm you can rise out of
- * is scenery. The mantle is the answer to that: it is the one state in the mod that is supposed to
- * put its wearer above the rules of the place they are standing in, so it now carries flight into
- * every dimension — the realms, the sea, the overworld, anywhere. Take the mantle off and the
- * ground is exactly as dangerous as it was.
+ * is scenery; later it was carried into every dimension. It now flies everywhere but the Overworld —
+ * the realms, the sea, the Nether, the End — because in the world everyone else lives in, a mantle
+ * that also rules the sky left nothing able to stand against its wearer. In the Overworld it keeps its
+ * armour and its strength and walks. Flying costs the mantle more, too: see {@link Transformation#FLYING_DRAIN}.
+ * Take the mantle off and the ground is exactly as dangerous as it was.
  *
  * <p>Nothing else grants it. Sovereignty does not, a destination does not, and a player who has
  * never transformed is on foot everywhere, which is what keeps the hazards meaning something for
@@ -24,9 +27,11 @@ public final class CosmicFlight {
     private CosmicFlight() {}
     /** The mantle, and nothing else, is what this mod hands flight to. */
     public static boolean mantled(ServerPlayer p){return HexData.access(p)&&HexData.get(p).getBoolean("ascended");}
+    /** Every dimension but the Overworld. */
+    public static boolean skyOpen(ServerPlayer p){return !p.level().dimension().equals(Level.OVERWORLD);}
     public static void tick(ServerPlayer p) {
         var d=HexData.get(p);var a=p.getAbilities();
-        boolean allowed=HexData.access(p)&&p.isAlive()&&d.getBoolean("ascended")&&!p.isSpectator();
+        boolean allowed=HexData.access(p)&&p.isAlive()&&d.getBoolean("ascended")&&!p.isSpectator()&&skyOpen(p);
         if(!allowed){revoke(p);return;}
         if(!d.getBoolean("flightGranted")) {
             d.putBoolean("flightHadMayfly",a.mayfly&&!p.isCreative());
@@ -42,6 +47,7 @@ public final class CosmicFlight {
     }
     public static void toggle(ServerPlayer p) {
         if(!HexData.access(p)||!HexData.get(p).getBoolean("ascended")||p.isSpectator()||p.isPassenger()||TemporalEngine.frozen(p))return;
+        if(!skyOpen(p)){p.displayClientMessage(Component.literal("The mantle does not fly in the Overworld."),true);return;}
         tick(p);
         p.getAbilities().flying=!p.getAbilities().flying;
         p.resetFallDistance();p.onUpdateAbilities();

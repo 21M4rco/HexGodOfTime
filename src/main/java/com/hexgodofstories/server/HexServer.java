@@ -106,6 +106,11 @@ public final class HexServer {
         // out follows whatever the owner's saved mode currently points at.
         if(a==Ability.WARPING&&(action==CAST||action==HOLD_BEGIN)&&Warping.leave(p))return;
         if(action==ALTERNATE&&secondary(p,a)){HexNetwork.sync(p);return;}
+        // Taking the mantle off is always free and always allowed: it drains energy while it is worn, and a
+        // wearer too low to pay for a cast, or still inside its recovery, must never be kept in it.
+        if(a==Ability.ASCENSION&&(action==TRANSFORM||action==CAST||action==ALTERNATE)&&HexData.get(p).getBoolean("ascended")){
+            dismissMantle(p);HexNetwork.sync(p);return;
+        }
         if(!HexData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return;}
         if(HexData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return;}
         if(HexData.energy(p)<a.cost){notice(p,"Not enough Temporal Energy.");return;}
@@ -229,9 +234,17 @@ public final class HexServer {
                 HexNetwork.tracking(p,new HexNetwork.Message(HexNetwork.THREADS,p.getId(),n));
                 gesture(p,"threads","bind",HexGodOfStories.SORCERY.get());return true;
             }
-            case ASCENSION -> {boolean on=!HexData.get(p).getBoolean("ascended");HexData.get(p).putBoolean("ascended",on);HexData.get(p).putLong("transformStart",now);if(!on){CosmicFlight.revoke(p);TimeBranch.cancel(p);Transformation.strip(p);}else Transformation.sustain(p);HexNetwork.fx(p,on?"ascend":"dismiss");p.level().playSound(null,p.blockPosition(),HexGodOfStories.ASCEND.get(),SoundSource.PLAYERS,.75f,1);return true;}
+            // Worn, it is taken off before any cast is paid for (see the action handler); never charged for here.
+            case ASCENSION -> {if(HexData.get(p).getBoolean("ascended")){dismissMantle(p);HexNetwork.sync(p);return false;}HexData.get(p).putBoolean("ascended",true);HexData.get(p).putLong("transformStart",now);Transformation.sustain(p);HexNetwork.fx(p,"ascend");p.level().playSound(null,p.blockPosition(),HexGodOfStories.ASCEND.get(),SoundSource.PLAYERS,.75f,1);return true;}
             default -> {return false;}
         }
+    }
+
+    /** Takes the mantle off: its flight, the branch and everything it granted go with it. */
+    static void dismissMantle(ServerPlayer p) {
+        HexData.get(p).putBoolean("ascended",false);HexData.get(p).putLong("transformStart",HexData.now(p));
+        CosmicFlight.revoke(p);TimeBranch.cancel(p);Transformation.strip(p);
+        HexNetwork.fx(p,"dismiss");p.level().playSound(null,p.blockPosition(),HexGodOfStories.ASCEND.get(),SoundSource.PLAYERS,.75f,1);
     }
 
     /** The pull mode: a doorway on a tap, a five-block vacuum when the key is held. */
@@ -404,7 +417,15 @@ public final class HexServer {
         if(now%200==0&&temporal<160&&HexData.unlocked(p,Ability.TIME_SLIP)&&!TemporalEngine.frozen(p)&&!p.isPassenger()&&p.getRandom().nextInt(5)==0&&HexData.energy(p)>=15&&HexData.cooldown(p,Ability.TIME_SLIP)==0) {
             if(cast(p,Ability.TIME_SLIP,false)){HexData.spend(p,15);d.putLong("cd_TIME_SLIP",now+400);reward(p,Discipline.TEMPORAL,120);}
         }
-        if(now%20==0){if(!TemporalEngine.sustaining(p))HexData.energy(p,HexData.energy(p)+(d.getBoolean("ascended")?4:2));HexNetwork.sync(p);}
+        if(now%20==0){
+            if(d.getBoolean("ascended")) {
+                // The mantle is paid for as it is worn, and nothing comes back while it is on. Worn to nothing, it falls away.
+                float left=HexData.energy(p)-(d.getBoolean("cosmicFlying")?Transformation.FLYING_DRAIN:Transformation.DRAIN);
+                HexData.energy(p,left);
+                if(left<=0){notice(p,"Your Temporal Energy is spent, and the mantle falls away.");dismissMantle(p);}
+            } else if(!TemporalEngine.sustaining(p))HexData.energy(p,HexData.energy(p)+2);
+            HexNetwork.sync(p);
+        }
         if(d.contains("disguise")&&d.getCompound("disguise").getLong("end")<now){Masquerade.drop(p);HexNetwork.sync(p);}
         if(now%5==0) {
             for(LivingEntity e:p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(12),LivingEntity::isAlive)) {

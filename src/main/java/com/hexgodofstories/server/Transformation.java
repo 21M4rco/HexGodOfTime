@@ -16,7 +16,11 @@ import java.util.UUID;
  * feeds, from the same numbers, with no separate damage hook to disagree with it. Nothing needs to be
  * equipped and no armour slot is touched, so the transformation model is never covered.
  *
- * <p>Resistance and fire resistance are refreshed on a short duration rather than granted once for the
+ * <p>On top of the armour it gives Strength I, and it is paid for as it is worn: {@link #DRAIN} Temporal
+ * Energy a second, {@link #FLYING_DRAIN} while flying, with none coming back until it is off. Worn down to
+ * nothing, it falls away (see {@code HexServer}).
+ *
+ * <p>Resistance, fire resistance and strength are refreshed on a short duration rather than granted once for the
  * whole transformation. That is deliberate: a short lease that is renewed while the mantle is worn
  * cannot outlive it. Even if a crash, a dimension change or an unforeseen path skips the teardown
  * below, the effects lapse within a few seconds instead of leaving somebody permanently armoured.
@@ -31,6 +35,8 @@ public final class Transformation {
     private static final double ARMOUR_POINTS=20,TOUGHNESS_POINTS=8;
     /** Renewed every second on a five-second lease, so the grant always trails the mantle. */
     private static final int LEASE=100,RENEW=20;
+    /** What the mantle costs, in Temporal Energy a second: worn, and worn in flight. */
+    public static final int DRAIN=2,FLYING_DRAIN=5;
 
     public static boolean transformed(ServerPlayer p) {return HexData.access(p)&&HexData.get(p).getBoolean("ascended");}
 
@@ -44,6 +50,7 @@ public final class Transformation {
         // the owner the protection is live without touching the model at all.
         renew(p,new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE,LEASE,1,false,false,true));
         renew(p,new MobEffectInstance(MobEffects.FIRE_RESISTANCE,LEASE,2,false,false,true));
+        renew(p,new MobEffectInstance(MobEffects.DAMAGE_BOOST,LEASE,0,false,false,true));
     }
 
     /** Removes everything the mantle granted. Safe to call on a player who never had it. */
@@ -52,6 +59,7 @@ public final class Transformation {
         revoke(p.getAttribute(Attributes.ARMOR_TOUGHNESS),TOUGHNESS);
         clear(p,MobEffects.DAMAGE_RESISTANCE,1);
         clear(p,MobEffects.FIRE_RESISTANCE,2);
+        clear(p,MobEffects.DAMAGE_BOOST,0);
     }
 
     private static void grant(AttributeInstance attribute,UUID id,String name,double amount) {

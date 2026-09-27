@@ -75,7 +75,9 @@ public final class HexHud {
         controls(g,d,energy,94);
         if(QuickBar.open())QuickBar.renderChoices(g,0,-QuickBar.height()-4,WIDTH);
         else if(d.getBoolean("ascended")) {
-            String flight=HexClient.FLIGHT.getTranslatedKeyMessage().getString()+": "+(d.getBoolean("cosmicFlying")?"flying (Space / crouch)":"flight");
+            boolean flying=d.getBoolean("cosmicFlying"),grounded=mc.level!=null&&mc.level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD);
+            String flight=HexClient.FLIGHT.getTranslatedKeyMessage().getString()+": "+(grounded?"no flight in the Overworld":flying?"flying (Space / crouch)":"flight")
+                +"  |  mantle -"+(flying?com.hexgodofstories.server.Transformation.FLYING_DRAIN:com.hexgodofstories.server.Transformation.DRAIN)+" energy/s";
             g.drawString(mc.font,flight,3,-12,0xaadabd,false);
         }
         g.pose().popPose();
