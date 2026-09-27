@@ -18,7 +18,10 @@ tick the stone is full, ten seconds in.
 Every other Scepter sound is a published public-domain (CC0 1.0 Universal) recording. None was synthesised
 for the mod. `tools/import_scepter_audio.py` downloads each file from a pinned commit and only
 prepares it: mono down-mix (so it is positioned in the world), leading-silence trim, peak
-normalisation to -1 dBFS, a 12 ms tail fade, and Ogg Vorbis encoding.
+normalisation to -1 dBFS, a 12 ms tail fade, and Ogg Vorbis encoding. The sizzles are also gently
+soft-limited, so their loudest second sits at -16 dBFS; and the sizzle a hot hole keeps up while it
+cools is re-assembled from short grains of the three sizzle recordings' steady stretches, laid round a
+seamless four-second loop.
 
 | Mod sound | Source file | Author / pack | License |
 |---|---|---|---|
@@ -27,6 +30,7 @@ normalisation to -1 dBFS, a 12 ms tail fade, and Ogg Vorbis encoding.
 | `scepter/blast` | `rocket_strong_explosion.ogg` | Team Forbidden, Warfork (warfork_assets_cc0.txt) | CC0 1.0 |
 | `scepter/burn_0..2` | `laser_hit0..2.ogg` | Team Forbidden, Warfork | CC0 1.0 |
 | `scepter/sizzle_0..2` | `spell_fire_02..04.ogg` | "80 CC0 RPG SFX", in lavenderdotpet/CC0-Public-Domain-Sounds (CC0 as a whole, see its LICENSE) | CC0 1.0 |
+| `scepter/sizzle_loop` | grains of `spell_fire_02..04.ogg` | "80 CC0 RPG SFX", as above | CC0 1.0 |
 
 Mirrors used (pinned in the import tool): Kenney files from
 https://github.com/Mcamento8/open-game-sfx-index (commit 34bbe8b), Warfork files from

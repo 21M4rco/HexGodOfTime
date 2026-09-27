@@ -64,7 +64,8 @@ import java.util.Map;
  *
  * <p>A fresh hole is red-hot, and cools through orange to a dim yellowish glow before it goes out, sooner
  * than a hole in a wall does and its inside last ({@link HoleHeat}): the heat is in the tunnel's colour and
- * is light added over the rim, and while it lasts the hole smokes a little from each mouth.
+ * is light added over the rim, and while it lasts the hole smokes a little from each mouth and sizzles,
+ * quieter as it cools ({@link HoleSizzle}).
  */
 public final class BeamWounds {
     private BeamWounds() { }
@@ -116,6 +117,8 @@ public final class BeamWounds {
         /** This frame's hole in view space, at its full width, for what is drawn over the body; and the frame it is for. */
         WoundCarve.Cylinder cut;
         long cutFrame = -1;
+        /** Its sizzle while it is hot, as long as it can be heard. */
+        HoleSizzle sizzle;
 
         Wound(Vec3 point, Vec3 direction, float radius, long start, int life) {
             this.point = point;
@@ -135,7 +138,10 @@ public final class BeamWounds {
     private static Matrix4f inverseView, view;
     private static Vec3 camera = Vec3.ZERO;
 
-    public static void clear() {WOUNDS.clear();}
+    public static void clear() {
+        for (List<Wound> list : WOUNDS.values()) for (Wound w : list) if (w.sizzle != null) w.sizzle.end();
+        WOUNDS.clear();
+    }
 
     public static void receive(int entity, CompoundTag n) {
         // Body space at the instant of the hit: relative to the body, turned back by its facing.
@@ -157,10 +163,17 @@ public final class BeamWounds {
             e.getValue().removeIf(w -> now > w.start + w.life);
             return e.getValue().isEmpty() || level.getEntity(e.getKey()) == null;
         });
-        // A little smoke from each mouth of a hole still hot, where it was drawn a moment ago.
-        for (List<Wound> list : WOUNDS.values())
-            for (Wound w : list) {
-                float heat = HoleHeat.heat(ClientState.since(w.start, 0), HoleHeat.BODY, 0, 0);
+        // A hole still hot sizzles, started again whenever it has stopped being heard (out of earshot, no room);
+        // and a little smoke rises from each of its mouths, where it was drawn a moment ago.
+        for (Map.Entry<Integer, List<Wound>> entry : WOUNDS.entrySet())
+            for (Wound w : entry.getValue()) {
+                float age = ClientState.since(w.start, 0);
+                if (HoleHeat.cold(age, HoleHeat.BODY, 0)) continue;
+                if (w.sizzle == null || !w.sizzle.heard()) {
+                    int id = entry.getKey();
+                    w.sizzle = HoleSizzle.start(() -> heardFrom(id, w), () -> HoleHeat.heat(ClientState.since(w.start, 0), HoleHeat.BODY, 1, 0));
+                }
+                float heat = HoleHeat.heat(age, HoleHeat.BODY, 0, 0);
                 if (heat <= 0 || w.way == null || now - w.seen > 2) continue;
                 float r = w.radius;
                 if (w.mouth != null) ScepterFx.holeSmoke(w.mouth.x, w.mouth.y, w.mouth.z, -w.way.x, -w.way.y, -w.way.z, r, heat);
@@ -415,6 +428,19 @@ public final class BeamWounds {
             int near = tunnel(1 - Math.abs(f0 * 2 - 1), age), far = tunnel(1 - Math.abs(f1 * 2 - 1), age);
             carving.wall(strip.clone(), new int[]{near, near, far, far});
         }
+    }
+
+    /**
+     * Where a hot wound is heard from: its mouth, where it was drawn a moment ago, or else the point the beam
+     * struck; null once it is cold, or gone, or its body is.
+     */
+    private static Vec3 heardFrom(int id, Wound w) {
+        var level = Minecraft.getInstance().level;
+        List<Wound> list = WOUNDS.get(id);
+        if (level == null || list == null || !list.contains(w) || HoleHeat.cold(ClientState.since(w.start, 0), HoleHeat.BODY, 0)) return null;
+        Entity host = level.getEntity(id);
+        if (host == null) return null;
+        return w.mouth != null && ClientState.now() - w.seen <= 2 ? w.mouth : bodyToWorld(host, w.point, 1);
     }
 
     /** Where blood leaves the newest hole in this body, in the world; null when it has none. */

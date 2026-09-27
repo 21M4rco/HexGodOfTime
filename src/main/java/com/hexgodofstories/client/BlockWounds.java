@@ -83,8 +83,8 @@ import java.util.function.UnaryOperator;
  * <p>A hole comes up red-hot as the beam goes through, running down the tunnel the way the beam did, and cools
  * through orange to a dim yellowish glow before it goes out, a while after a hole in a body would, the inside
  * of the tunnel last ({@link HoleHeat}). The glow is light added over the tunnel, round each mouth and on the
- * face the hole ends against; and while it lasts, every mouth that opens onto the air smokes a little, and
- * now and then a molten drop runs off its lower edge.
+ * face the hole ends against; and while it lasts, every mouth that opens onto the air smokes a little, now
+ * and then a molten drop runs off its lower edge, and the hole sizzles, quieter as it cools ({@link HoleSizzle}).
  */
 public final class BlockWounds {
     private BlockWounds() { }
@@ -108,6 +108,9 @@ public final class BlockWounds {
         double enter, leave;
         /** Where the hole opens onto the air, for its smoke: x, y, z, the way out, and how far down the run it is. */
         final List<double[]> mouths = new ArrayList<>();
+        /** Whether any block of it is still holed, as of this tick; and its sizzle, while it can be heard. */
+        boolean standing;
+        HoleSizzle sizzle;
 
         Hole(Vec3 from, Vec3 along, float radius, long start, int life) {
             this.from = from;
@@ -121,6 +124,21 @@ public final class BlockWounds {
         float radius(float partial) {
             float close = Mth.clamp((ClientState.since(start, partial) / life - .75f) / .25f, 0, 1);
             return radius * (1 - close * close * (3 - 2 * close));
+        }
+
+        /** How hot it is at its hottest, deep inside, from 0 to 1. */
+        float heat() {return HoleHeat.heat(ClientState.since(start, 0), HoleHeat.WALL, 1, 0);}
+
+        boolean cold() {return HoleHeat.cold(ClientState.since(start, 0), HoleHeat.WALL, (float) (leave - enter));}
+
+        /**
+         * Where it is heard from: the point of its run of walls nearest the listener, while any of it is still
+         * hot and any block of it still holed; null after that.
+         */
+        Vec3 heardFrom() {
+            if (!standing || cold()) return null;
+            Vec3 ear = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+            return from.add(along.scale(Mth.clamp(ear.subtract(from).dot(along), enter, leave)));
         }
 
         /** How far along the line a point of the block at {@code pos} lies. */
@@ -207,6 +225,7 @@ public final class BlockWounds {
     private static boolean warned;
 
     public static void clear() {
+        for (Hole hole : HOLES) if (hole.sizzle != null) hole.sizzle.end();
         SPOTS.clear();
         HOLES.clear();
         THROUGH.clear();
@@ -565,11 +584,18 @@ public final class BlockWounds {
 
     /**
      * A little smoke off every mouth of a hole still hot, and now and then a molten drop running off its lower
-     * edge, while the block it opens from is still holed. The drops go as the heat does, and soonest.
+     * edge, while the block it opens from is still holed; and the hole sizzling for as long as any of it glows
+     * and any block of it is still holed ({@link HoleSizzle}). The drops go as the heat does, and soonest.
      */
     private static void smoulder(ClientLevel level) {
-        HOLES.removeIf(hole -> HoleHeat.cold(ClientState.since(hole.start, 0), HoleHeat.WALL, (float) (hole.leave - hole.enter)));
+        HOLES.removeIf(Hole::cold);
+        if (HOLES.isEmpty()) return;
+        Set<Hole> standing = new HashSet<>();
+        for (Spot spot : SPOTS.values()) if (!spot.scorched && !spot.soft) standing.addAll(spot.holes);
         for (Hole hole : HOLES) {
+            hole.standing = standing.contains(hole);
+            // Started once it is holed, and again whenever it has stopped being heard (out of earshot, no room).
+            if (hole.standing && (hole.sizzle == null || !hole.sizzle.heard())) hole.sizzle = HoleSizzle.start(hole::heardFrom, hole::heat);
             float age = ClientState.since(hole.start, 0);
             for (double[] mouth : hole.mouths) {
                 float heat = HoleHeat.heat(age, HoleHeat.WALL, 0, (float) mouth[6]);
