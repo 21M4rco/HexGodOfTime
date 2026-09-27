@@ -25,12 +25,17 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * The Scepter's right click, seen from the client: tap for a shot, hold to charge the stone.
+ * The Scepter's right click, seen from the client: hold to charge the stone, at least a second, and let go
+ * to fire; held the full ten seconds, it fires itself.
  *
  * <p>The server decides whether anything fires and how hard; this only presents it. The local
  * player's own press and release are shown the tick they happen rather than a round trip later, and
  * every other player is driven by the server's charge and shot messages. Aim and recoil are springs
  * stepped once a tick and interpolated per frame, so a hold and a release mid-raise blend without a pop.
+ *
+ * <p>The charge is heard from the press: one recording, made so that its last drop falls on the tick the
+ * stone is full and fires itself. Whenever a hold ends — let go, dropped, fired — it fades out over a few
+ * ticks rather than being cut.
  *
  * <p>After every shot the stone recovers, and smokes while it does, in every hand that carries one; a
  * recovering stone takes no right click at all. When it cools comes from the server, with the shot and
@@ -42,8 +47,8 @@ public final class ScepterClient {
     private static final class State {
         /** Tick the current hold began, or -1 when nothing is held. */
         long charging = -1;
-        /** Whether this hold has already announced a full stone. */
-        boolean full;
+        /** Our own hold filled and was shown firing itself: the server fires it on its own, so no release is sent. */
+        boolean fullShot;
         long shot = Long.MIN_VALUE / 2;
         float shotPower;
         float aim, aimPrev, recoil, recoilPrev, flash, flashPrev;
@@ -52,7 +57,9 @@ public final class ScepterClient {
     }
 
     private static final Map<Integer, State> STATES = new HashMap<>();
-    private static final Map<Integer, Hum> HUMS = new HashMap<>();
+    private static final Map<Integer, ChargeSound> SOUNDS = new HashMap<>();
+    /** A charge heard this late (another player's, told late) would be out of step with its own drop: it is not played. */
+    private static final int LATE = 10;
     private static boolean useDown;
     private static float attackLift, attackLiftPrev;
     private static int attackLiftTicks;
@@ -75,8 +82,8 @@ public final class ScepterClient {
 
     public static void clear() {
         var manager = Minecraft.getInstance().getSoundManager();
-        HUMS.values().forEach(h -> {h.retire(); manager.stop(h);});
-        HUMS.clear();
+        SOUNDS.values().forEach(manager::stop);
+        SOUNDS.clear();
         STATES.clear();
         useDown = false;
         attackLift = attackLiftPrev = 0;
@@ -101,8 +108,8 @@ public final class ScepterClient {
             case "cooling" -> {s.charging = -1; s.ready = data.getLong("ready");}
             case "shot" -> {
                 float power = data.getFloat("power");
-                // Our own shots were already shown on release, unless the server let go of a hold we still
-                // thought was open (the hold limit); that one is shown now.
+                // Our own shots were already shown on release or on filling, unless the server fired a hold we
+                // still thought was open; that one is shown now.
                 if (!self || s.charging >= 0) {
                     shoot(s, power);
                     if (self) ScepterFx.fired(mc.player, power);
@@ -181,17 +188,31 @@ public final class ScepterClient {
         if (down && !useDown) {
             HexNetwork.send(HexServer.SCEPTER_PRESS, 0);
             s.charging = now;
+            s.fullShot = false;
+        } else if (down && s.charging >= 0 && now - s.charging >= ScepterBlast.FULL_HOLD) {
+            // Full: it fires itself, here the tick it fills, as the server's own hold does. The server needs no
+            // release for it, and must not get one early: that would be a shot a tick short of full.
+            fired(player, s, ScepterBlast.power(now - s.charging), now);
+            s.fullShot = true;
         } else if (!down && useDown) {
-            HexNetwork.send(HexServer.SCEPTER_RELEASE, 0);
+            if (!s.fullShot) HexNetwork.send(HexServer.SCEPTER_RELEASE, 0);
+            s.fullShot = false;
             if (s.charging >= 0) {
-                float power = ScepterBlast.power(now - s.charging);
-                shoot(s, power);
-                ScepterFx.fired(player, power);
-                // The same recovery the server is starting; its own word follows with the shot.
-                s.ready = now + ScepterBlast.cooldown(power);
+                long held = now - s.charging;
+                // Short of a second nothing fires: the hold is dropped, here as on the server.
+                if (held >= ScepterBlast.MIN_HOLD) fired(player, s, ScepterBlast.power(held), now);
+                else s.charging = -1;
             }
         }
         useDown = down;
+    }
+
+    /** Our own shot, shown the tick it happens: the recoil, the sound, and the same recovery the server starts. */
+    private static void fired(Player player, State s, float power, long now) {
+        shoot(s, power);
+        ScepterFx.fired(player, power);
+        // Its own word follows with the shot.
+        s.ready = now + ScepterBlast.cooldown(power);
     }
 
     public static void tick() {
@@ -231,24 +252,20 @@ public final class ScepterClient {
             // Kept while the stone cools: this is where our own shot's recovery lives until the server's word.
             return !raised && s.aim == 0 && s.recoil < .001f && s.flash < .001f && s.charging < 0 && now >= s.ready;
         });
-        HUMS.entrySet().removeIf(entry -> {
-            if (charging(entry.getKey()) && !entry.getValue().isStopped()) return false;
-            entry.getValue().retire();
-            manager.stop(entry.getValue());
-            return true;
-        });
+        // A charge sound whose hold is over fades itself out; once it has, it is forgotten.
+        SOUNDS.values().removeIf(ChargeSound::isStopped);
         for (var entry : STATES.entrySet()) {
             State s = entry.getValue();
-            if (s.charging < 0) {s.full = false; continue;}
+            if (s.charging < 0) continue;
             float c = charge(s, 0);
             Entity caster = mc.level.getEntity(entry.getKey());
             if (caster != null && c > 0) ScepterFx.charging(caster, c);
-            // Only a full stone unmakes what it kills, so the moment it fills is announced once.
-            if (c >= 1 && !s.full) {s.full = true; if (caster != null) ScepterFx.full(caster);}
-            if (HUMS.containsKey(entry.getKey())) continue;
-            Hum hum = new Hum(entry.getKey());
-            HUMS.put(entry.getKey(), hum);
-            manager.play(hum);
+            ChargeSound playing = SOUNDS.get(entry.getKey());
+            if (playing != null && playing.hold == s.charging || now - s.charging > LATE) continue;
+            // A new hold: whatever is left of the last one's sound goes on fading by itself.
+            ChargeSound sound = new ChargeSound(entry.getKey(), s.charging);
+            SOUNDS.put(entry.getKey(), sound);
+            manager.play(sound);
         }
     }
 
@@ -295,11 +312,10 @@ public final class ScepterClient {
         return s == null ? 0 : charge(s, partial);
     }
 
-    /** 0..1 over the charge window, rising only once the hold outlasts a tap. */
+    /** 0..1 over the whole hold, from the press to the full stone. */
     private static float charge(State s, float partial) {
         if (s.charging < 0) return 0;
-        float held = ClientState.since(s.charging, partial);
-        return Mth.clamp((held - ScepterBlast.TAP) / ScepterBlast.FULL, 0, 1);
+        return Mth.clamp(ClientState.since(s.charging, partial) / ScepterBlast.FULL_HOLD, 0, 1);
     }
 
     /** The conjurer's interpolated vertical look, which the raised staff follows in third person. */
@@ -315,6 +331,12 @@ public final class ScepterClient {
         return s != null && s.charging >= 0;
     }
 
+    /** The tick this player's current hold began, or -1. */
+    private static long hold(int entity) {
+        State s = STATES.get(entity);
+        return s == null ? -1 : s.charging;
+    }
+
     /** How hard the stone burns: resting glow, a charge building in it, a flash on release. */
     public static float power(ItemStack stack) {
         State s = state(stack);
@@ -323,33 +345,46 @@ public final class ScepterClient {
         return 1 + 1.9f * charge(s, p) + 2.2f * Mth.lerp(p, s.flashPrev, s.flash) * (.45f + .55f * s.shotPower);
     }
 
-    /** The charge hum: the Warfork lasergun loop, rising in pitch and weight as the stone fills. */
-    private static final class Hum extends AbstractTickableSoundInstance {
+    /**
+     * One hold's charge, heard from the stone: the recording plays once through, its build carrying the
+     * stone's filling and its last drop landing on the full stone. The moment the hold is over, however it
+     * ended, it fades out over {@link #FADE} ticks along a quarter cosine, so a release never cuts it off.
+     */
+    private static final class ChargeSound extends AbstractTickableSoundInstance {
+        private static final int FADE = 5;
         private final int caster;
-        private boolean retired;
+        /** The hold this sound belongs to: a new press is a new sound, and this one goes on fading. */
+        final long hold;
+        private int fading = -1;
 
-        Hum(int caster) {
+        ChargeSound(int caster, long hold) {
             super(HexGodOfStories.SCEPTER_CHARGE.get(), SoundSource.PLAYERS, SoundInstance.createUnseededRandom());
             this.caster = caster;
-            looping = true;
+            this.hold = hold;
+            looping = false;
             delay = 0;
-            volume = .001f;
-            pitch = .7f;
+            volume = 1;
+            pitch = 1;
             attenuation = SoundInstance.Attenuation.LINEAR;
+            follow();
         }
 
-        void retire() {retired = true;}
-
-        @Override public void tick() {
+        private void follow() {
             var mc = Minecraft.getInstance();
             Entity source = mc.level == null ? null : mc.level.getEntity(caster);
-            if (retired || source == null || !charging(caster)) {volume = 0; stop(); return;}
+            if (source == null) return;
             x = source.getX();
             y = source.getEyeY();
             z = source.getZ();
-            float c = charge(caster, 0);
-            volume = .18f + .62f * c;
-            pitch = .62f + .95f * c + (c >= 1 ? (float) Math.sin(ClientState.now() * 1.3) * .03f : 0);
+        }
+
+        @Override public void tick() {
+            if (fading < 0 && hold(caster) != hold) fading = 0;
+            follow();
+            if (fading < 0) return;
+            if (++fading >= FADE) {volume = 0; stop(); return;}
+            float left = (float) Math.cos(fading / (float) FADE * Math.PI / 2);
+            volume = left * left;
         }
     }
 

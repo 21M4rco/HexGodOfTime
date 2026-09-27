@@ -526,27 +526,7 @@
     "subtitle": "subtitles.hexgodofstories.scepter_shot",
     "sounds": [
       {
-        "name": "hexgodofstories:scepter/shot_0"
-      },
-      {
-        "name": "hexgodofstories:scepter/shot_1"
-      },
-      {
-        "name": "hexgodofstories:scepter/shot_2"
-      },
-      {
-        "name": "hexgodofstories:scepter/shot_3"
-      },
-      {
-        "name": "hexgodofstories:scepter/shot_4"
-      }
-    ]
-  },
-  "scepter_beam": {
-    "subtitle": "subtitles.hexgodofstories.scepter_beam",
-    "sounds": [
-      {
-        "name": "hexgodofstories:scepter/beam"
+        "name": "hexgodofstories:scepter/fire"
       }
     ]
   },
@@ -554,7 +534,7 @@
     "subtitle": "subtitles.hexgodofstories.scepter_charge",
     "sounds": [
       {
-        "name": "hexgodofstories:scepter/charge_loop"
+        "name": "hexgodofstories:scepter/charge"
       }
     ]
   },

@@ -1,5 +1,8 @@
 """Fetch and prepare the Scepter's public-domain (CC0) sound effects.
 
+The shot and the charge are not among them: they are recordings supplied for the mod, prepared by
+tools/prepare_scepter_voice.py.
+
 Nothing here is synthesised. Every file is a published CC0 recording, downloaded from a pinned
 commit so the result is reproducible, then only prepared for Minecraft:
 
@@ -35,12 +38,6 @@ RPG = "https://raw.githubusercontent.com/lavenderdotpet/CC0-Public-Domain-Sounds
 
 # output name -> (source url, keep leading silence, loop)
 FILES = {
-    # Tapped shots: five takes of the same large laser, picked at random per shot.
-    **{f"shot_{i}": (KENNEY + f"laserLarge_00{i}.ogg", False, False) for i in range(5)},
-    # A charged release: the Electrobolt's full discharge.
-    "beam": (WARFORK + "electrobolt_strong.ogg", False, False),
-    # Held charge: the lasergun's sustained hum. Authored as a seamless loop, so it is kept whole.
-    "charge_loop": (WARFORK + "laser_strong_hum.ogg", True, True),
     # Contact: crunching energy detonations, plus a sub-bass body for charged impacts.
     **{f"impact_{i}": (KENNEY + f"explosionCrunch_00{i}.ogg", False, False) for i in range(5)},
     **{f"boom_{i}": (KENNEY + f"lowFrequency_explosion_00{i}.ogg", False, False) for i in range(2)},

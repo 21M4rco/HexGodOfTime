@@ -37,11 +37,12 @@ import java.util.UUID;
 /**
  * The Scepter's right click, owned by the server.
  *
- * <p>A press starts holding the stone open; a release fires. Let go inside {@link #TAP} ticks and it is
- * a quick bolt that stops in the first body it meets. Hold longer and the stone fills over {@link #FULL}
- * ticks into a charged beam that burns through up to six bodies. Either one goes straight through
- * walls, {@link #WALLS} solid blocks of them for a tap, rising to {@link #FULL_WALLS} the longer the stone
- * was held, and holes each one the way it holes a body: a cauterised hole that can be seen through, open
+ * <p>A press starts holding the stone open; a release fires. Let go inside {@link #MIN_HOLD} ticks, a
+ * second, and nothing fires at all: the stone has not taken yet, and needs no recovery. Held longer, it
+ * fills over {@link #FULL_HOLD} ticks, ten seconds, from a quarter of its power to all of it, into a beam
+ * that burns through up to six bodies; and the moment it is full it fires itself. It goes straight through
+ * walls, {@link #WALLS} solid blocks of them after a second, rising to {@link #FULL_WALLS} the longer the
+ * stone was held, and holes each one the way it holes a body: a cauterised hole that can be seen through, open
  * for a minute or more and then knitting shut. The blocks are never broken; the hole is only drawn, by
  * every client in sight ({@code BlockWounds}). Nothing it reaches explodes.
  *
@@ -60,8 +61,8 @@ import java.util.UUID;
  * {@link LastMoments}.
  *
  * <p>Aim is always taken from the caster's eyes, so a shot lands on the crosshair; the stone's position
- * is only where the beam is drawn from. A charge the caster somehow never releases discharges on its own
- * after {@link #MAX_HOLD} ticks, so a lost release can never leave it held forever.
+ * is only where the beam is drawn from. Since a full stone fires itself, no hold outlasts
+ * {@link #FULL_HOLD} ticks, and a lost release can never leave it held forever.
  */
 public final class ScepterBlast {
     private ScepterBlast() { }
@@ -69,12 +70,11 @@ public final class ScepterBlast {
     public static final double RANGE = 100;
     /** Solid blocks a shot passes through, the next one stopping it: nine for a tap, rising to sixteen for a full stone. */
     public static final int WALLS = 9, FULL_WALLS = 16;
-    /** Presses shorter than this are taps. */
-    public static final int TAP = 6;
-    /** Ticks of holding past a tap for the stone to fill completely: three seconds from the press. */
-    public static final int FULL = 54;
-    public static final int MAX_HOLD = 200;
-    /** Recovery after a shot, in ticks: ten seconds for a tap, rising to twenty for a full stone. */
+    /** Ticks a press must be held for anything to fire: a second. */
+    public static final int MIN_HOLD = 20;
+    /** Ticks of holding for the stone to fill completely, at which it fires itself: ten seconds. */
+    public static final int FULL_HOLD = 200;
+    /** Recovery after a shot, in ticks: ten seconds for the least of them, rising to twenty for a full stone. */
     public static final int COOLDOWN = 200, FULL_COOLDOWN = 400;
     /** How long a hole bleeds, in ticks: ten seconds for a tap, rising to thirty for a full stone. */
     public static final int BLEED = 200, FULL_BLEED = 600;
@@ -92,16 +92,22 @@ public final class ScepterBlast {
     private static final int GRACE = 2;
     private static final int MAX_PIERCE = 6, MAX_STUNS = 192;
 
-    /** 0 for a tap; a charged release runs from a quarter of full power at the start of the window to all of it. */
+    /**
+     * How hard a hold of {@code held} ticks fires: 0, nothing at all, short of {@link #MIN_HOLD}; from there a
+     * quarter of full power, rising to all of it at {@link #FULL_HOLD}.
+     */
     public static float power(long held) {
-        return held < TAP ? 0 : .25f + .75f * Mth.clamp((held - TAP) / (float) FULL, 0, 1);
+        return held < MIN_HOLD ? 0 : .25f + .75f * Mth.clamp((held - MIN_HOLD) / (float) (FULL_HOLD - MIN_HOLD), 0, 1);
     }
 
     /** A stone filled all the way: the only shot that unmakes what it kills. */
     public static boolean full(float power) {return power >= 1;}
 
-    /** How far the hold went, 0 for a tap to 1 for a full stone: what the recovery, bleed and stun scale with. */
+    /** How far the hold went, 0 at a second to 1 for a full stone: what the recovery, bleed and stun scale with. */
     public static float fill(float power) {return power > 0 ? Mth.clamp((power - .25f) / .75f, 0, 1) : 0;}
+
+    /** How far off the shot is heard: a volume past one carries further rather than louder. */
+    public static float shotVolume(float power) {return 1.6f + .8f * power;}
 
     public static int cooldown(float power) {return COOLDOWN + Math.round((FULL_COOLDOWN - COOLDOWN) * fill(power));}
 
@@ -163,7 +169,10 @@ public final class ScepterBlast {
         Long start = CHARGES.remove(p.getUUID());
         if (start == null) return;
         if (!armed(p)) {cancelled(p); return;}
-        fire(p, power(HexData.now(p) - start));
+        long held = HexData.now(p) - start;
+        // Short of a second the stone has not taken: nothing fires, and there is nothing to recover from.
+        if (held < MIN_HOLD) {cancelled(p); return;}
+        fire(p, power(held));
     }
 
     /** Drops a hold without firing, and tells everyone watching. */
@@ -183,7 +192,8 @@ public final class ScepterBlast {
         Long start = CHARGES.get(p.getUUID());
         if (start == null) return;
         if (!armed(p)) {cancel(p); return;}
-        if (HexData.now(p) - start >= MAX_HOLD) release(p);
+        // Full: it fires itself, the tick it fills.
+        if (HexData.now(p) - start >= FULL_HOLD) release(p);
     }
 
     /** A death, a logout or a crossing drops the hold; the recovery stays in the player's data. */
@@ -235,11 +245,8 @@ public final class ScepterBlast {
             level.playSound(null, stop.x, stop.y, stop.z, HexGodOfStories.SCEPTER_SIZZLE.get(), SoundSource.PLAYERS, 1.1f, .86f + caster.getRandom().nextFloat() * .14f);
 
         // Everyone near hears the shot from the stone; the caster already heard it on release.
-        float pitch = .94f + caster.getRandom().nextFloat() * .14f;
-        if (charged) {
-            level.playSound(caster, muzzle.x, muzzle.y, muzzle.z, HexGodOfStories.SCEPTER_BEAM.get(), SoundSource.PLAYERS, 1.6f + .8f * power, 1.08f - .22f * power);
-            level.playSound(caster, muzzle.x, muzzle.y, muzzle.z, HexGodOfStories.SCEPTER_SHOT.get(), SoundSource.PLAYERS, 1.2f, .62f);
-        } else level.playSound(caster, muzzle.x, muzzle.y, muzzle.z, HexGodOfStories.SCEPTER_SHOT.get(), SoundSource.PLAYERS, 1.1f, pitch);
+        level.playSound(caster, muzzle.x, muzzle.y, muzzle.z, HexGodOfStories.SCEPTER_SHOT.get(), SoundSource.PLAYERS, shotVolume(power),
+            .97f + caster.getRandom().nextFloat() * .06f);
 
         CompoundTag state = new CompoundTag();
         state.putString("state", "shot");

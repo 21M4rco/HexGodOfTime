@@ -322,16 +322,6 @@ public final class ScepterFx {
         return drawn!=null&&frame-drawn.frame<=1?drawn.at:null;
     }
 
-    /** The stone has filled: one bright pulse and a chime, so the next release is known to be a full one. */
-    public static void full(Entity caster) {
-        if(Minecraft.getInstance().level==null)return;
-        Vec3 at=stone(caster);
-        ParticleEmitter pulse=particles(at,10,caster);
-        mote(pulse,Vec3.ZERO,Vec3.ZERO,.9f,0xff2a9dff);
-        mote(pulse,Vec3.ZERO,Vec3.ZERO,.4f,0xfff4ffff);
-        ScepterClient.play(net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_CHIME,at.x,at.y,at.z,1.4f,1.5f);
-    }
-
     public static void blast(int entity,CompoundTag n) {
         var level=Minecraft.getInstance().level;
         if(level==null)return;
@@ -392,12 +382,9 @@ public final class ScepterFx {
         // Where it stops, nothing goes up: the beam simply ends, and the walls it crossed keep their holes.
     }
 
-    /** The shot as the caster hears it, the tick they let go; everyone else hears it from the server. */
+    /** The shot as the caster hears it, the tick it fires; everyone else hears it from the server. */
     public static void fired(Player caster,float power) {
-        if(power>0) {
-            ScepterClient.play(HexGodOfStories.SCEPTER_BEAM.get(),caster.getX(),caster.getEyeY(),caster.getZ(),1.6f+.8f*power,1.08f-.22f*power);
-            ScepterClient.play(HexGodOfStories.SCEPTER_SHOT.get(),caster.getX(),caster.getEyeY(),caster.getZ(),1.2f,.62f);
-        } else ScepterClient.play(HexGodOfStories.SCEPTER_SHOT.get(),caster.getX(),caster.getEyeY(),caster.getZ(),1.1f,
-            .94f+caster.getRandom().nextFloat()*.14f);
+        ScepterClient.play(HexGodOfStories.SCEPTER_SHOT.get(),caster.getX(),caster.getEyeY(),caster.getZ(),
+            com.hexgodofstories.server.ScepterBlast.shotVolume(power),.97f+caster.getRandom().nextFloat()*.06f);
     }
 }

@@ -285,7 +285,7 @@ Install Player Animator **1.0.2-rc1+1.20** (CurseForge file 4587214) on clients.
 | N | **Personal Rewind** |
 | M | **Time Branch Unleashing** — tap for a charged fist or hold for the full beam |
 | Wheel *(while gripping)* | Push or pull what telekinesis is holding |
-| Attack / Use with a conjured weapon | Dagger combination / throw; Scepter two-heart hit with one-second bleed / tap for a bolt, hold to charge a piercing beam (100 blocks) |
+| Attack / Use with a conjured weapon | Dagger combination / throw; Scepter two-heart hit with one-second bleed / hold at least a second to charge a piercing beam (100 blocks), up to ten seconds, when it fires itself |
 
 Nobody has powers until an operator grants them: `/hgos unlock <player> on`. Until then the mod shows no HUD, opens no screen, answers no key and records no progression. Key mappings are configurable. Free your hands before conjuring. Successful spell use trains its discipline; training is rate limited. Temporal progression opens after 600 combined mastery in the four magical disciplines. Glorious Purpose opens after 800 Temporal Mastery.
 
