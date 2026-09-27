@@ -10,6 +10,7 @@ import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -559,8 +560,8 @@ public final class Arsenal {
         LivingEntity body = looked(p, REACH);
         if (body == null) return "Look at a body: Gotcha! puts a gun behind it.";
         ServerLevel level = p.serverLevel();
-        Vec3 at = behind(level, body);
-        if (at == null) return "There is no room behind it for a gun.";
+        Vec3 at = spot(level, p, body);
+        if (at == null) return "There is no room anywhere around it for a gun.";
         long now = HexData.now(p);
         Sneak sneak = new Sneak(level, p.getUUID(), ++nextSneak, body.getId(), at, now);
         SNEAKS.add(sneak);
@@ -594,27 +595,70 @@ public final class Arsenal {
         return best;
     }
 
+    /** Turns from straight back from the way a body faces, in degrees: behind it first, then further round either side. */
+    private static final int[] TURNS = {0, 20, -20, 40, -40, 60, -60, 80, -80, 100, -100, 120, -120, 140, -140, 160, -160, 180};
+    /** How far round the back a gun must hang to count as behind: the first, choosier search looks no further. */
+    private static final int BEHIND = 60;
+
     /**
-     * Where Gotcha!'s gun hangs: a little way straight back from the way the body faces and just above its chest, or
-     * nearer, or turned a little to either side, wherever it first has room to form and a clear shot at the back.
+     * Where Gotcha!'s gun hangs. First, somewhere behind the body the caster can see: straight back from the way it
+     * faces, then turned further round either side, nearer, higher. Failing that, anywhere round it at all, the caster
+     * seeing it or not; and last of all, over its head. Wherever it is, the whole gun has room and its muzzle a clear
+     * shot into the body. Null when there is nowhere.
      */
-    private static Vec3 behind(ServerLevel level, LivingEntity body) {
-        Vec3 chest = new Vec3(body.getX(), body.getY() + body.getBbHeight() * .62, body.getZ());
-        double yaw = body.yBodyRot * Mth.DEG_TO_RAD, far = body.getBbWidth() / 2 + ArsenalLayout.SNEAK_BACK;
-        for (double d : new double[]{far, far - .8, far - 1.5})
-            for (int turn : new int[]{0, 1, -1, 2, -2}) {
-                double a = yaw + turn * Math.toRadians(28);
-                // A body faces (-sin, cos) of its turn; its back is the other way.
-                Vec3 at = chest.add(Math.sin(a) * d, ArsenalLayout.SNEAK_RISE, -Math.cos(a) * d);
-                if (!level.hasChunkAt(BlockPos.containing(at)) || !level.noCollision(new AABB(at, at).inflate(.45))) continue;
-                if (level.clip(new ClipContext(at, chest, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null)).getType() != HitResult.Type.MISS)
-                    continue;
-                return at;
-            }
-        return null;
+    private static Vec3 spot(ServerLevel level, ServerPlayer p, LivingEntity body) {
+        double yaw = body.yBodyRot * Mth.DEG_TO_RAD, half = body.getBbWidth() / 2, chest = body.getY() + body.getBbHeight() * .62;
+        if (!Double.isFinite(yaw)) yaw = 0;
+        Vec3 eye = p.getEyePosition();
+        for (int pass = 0; pass < 2; pass++)
+            for (double rise : new double[]{ArsenalLayout.SNEAK_RISE, ArsenalLayout.SNEAK_RISE + .9})
+                for (double back : new double[]{ArsenalLayout.SNEAK_BACK, 2.2, 1.5})
+                    for (int turn : TURNS) {
+                        if (pass == 0 && Math.abs(turn) > BEHIND) continue;
+                        // A body faces (-sin, cos) of its turn; its back is the other way.
+                        double a = yaw + Math.toRadians(turn), d = half + back;
+                        Vec3 at = new Vec3(body.getX() + Math.sin(a) * d, chest + rise, body.getZ() - Math.cos(a) * d);
+                        if (fits(level, body, at, pass == 0 ? eye : null)) return at;
+                    }
+        Vec3 over = new Vec3(body.getX(), body.getBoundingBox().maxY + 1.6, body.getZ());
+        return fits(level, body, over, null) ? over : null;
     }
 
-    /** Every Gotcha! gun in this level that has come to its moment fires. */
+    /**
+     * Whether Gotcha!'s gun can hang at {@code at}: in the loaded world, room for all of it from stock to muzzle, and a
+     * clear shot from the muzzle into the body. Given the caster's eye, also where they can see it form: not in their
+     * face, not behind a block, and not hidden behind the body itself.
+     */
+    private static boolean fits(ServerLevel level, LivingEntity body, Vec3 at, Vec3 eye) {
+        if (!Double.isFinite(at.x) || !Double.isFinite(at.y) || !Double.isFinite(at.z)) return false;
+        BlockPos pos = BlockPos.containing(at);
+        if (!level.isInWorldBounds(pos) || !level.hasChunkAt(pos)) return false;
+        Vec3 muzzle = muzzle(at, body.getBoundingBox().getCenter());
+        Vec3 forward = muzzle.subtract(at).normalize();
+        if (!level.noCollision(new AABB(at.subtract(forward.scale(.7)), muzzle).inflate(.18))) return false;
+        if (entry(level, body, muzzle) == null) return false;
+        if (eye == null) return true;
+        if (eye.distanceToSqr(at) < 4) return false;
+        if (level.clip(new ClipContext(eye, at, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null)).getType() != HitResult.Type.MISS) return false;
+        return body.getBoundingBox().inflate(.25).clip(eye, at).isEmpty();
+    }
+
+    /** The muzzle of Gotcha!'s gun hung at {@code at} and turned on {@code aim}: where its round leaves. */
+    private static Vec3 muzzle(Vec3 at, Vec3 aim) {
+        return vec(ArsenalLayout.aimed(array(at), array(aim)).point(ArsenalLayout.MUZZLE[ArsenalLayout.SNEAK_TYPE], ArsenalLayout.GUN_SCALE));
+    }
+
+    /** Where a round from {@code muzzle} at the middle of the body goes into it, or null if it would not reach it: a block in the way. */
+    private static Vec3 entry(ServerLevel level, LivingEntity body, Vec3 muzzle) {
+        Vec3 middle = body.getBoundingBox().getCenter(), to = middle.subtract(muzzle);
+        if (to.lengthSqr() < 1e-6) return null;
+        var in = body.getBoundingBox().inflate(.1).clip(muzzle, middle.add(to.normalize().scale(2)));
+        if (in.isEmpty()) return null;
+        return level.clip(new ClipContext(muzzle, in.get(), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null)).getType() == HitResult.Type.MISS
+            ? in.get() : null;
+    }
+
+    /** Every Gotcha! gun in this level that has come to its moment fires; one that cannot land gives its recovery back. */
     private static void sneaks(ServerLevel level) {
         long now = level.getGameTime();
         for (Iterator<Sneak> it = SNEAKS.iterator(); it.hasNext(); ) {
@@ -625,27 +669,29 @@ public final class Arsenal {
             }
             if (now - s.start < ArsenalLayout.SNEAK_FIRE) continue;
             it.remove();
-            shoot(level, s);
+            if (shoot(level, s)) continue;
+            ServerPlayer caster = level.getServer().getPlayerList().getPlayer(s.caster);
+            if (caster == null) continue;
+            // Only the recovery this very Gotcha! set, never one that has replaced it since.
+            CompoundTag d = HexData.get(caster);
+            String key = "cd_" + Ability.ARSENAL.name();
+            if (d.getLong(key) != s.start + Ability.ARSENAL.cooldown) continue;
+            d.putLong(key, 0);
+            HexNetwork.sync(caster);
+            caster.displayClientMessage(Component.literal("Gotcha! lost its shot. No recovery taken."), true);
         }
     }
 
     /**
-     * Gotcha!'s one round, from its muzzle into the body's back wherever the body is now: none if the body is gone, has
-     * moved out of the line, or has put a block between them.
+     * Gotcha!'s one round, from its muzzle into the body's back wherever the body is now. False, and nothing dealt, if
+     * the body is gone or has put a block between them.
      */
-    private static void shoot(ServerLevel level, Sneak s) {
+    private static boolean shoot(ServerLevel level, Sneak s) {
         ServerPlayer caster = level.getServer().getPlayerList().getPlayer(s.caster);
-        if (caster == null || !(level.getEntity(s.target) instanceof LivingEntity body) || !body.isAlive() || !HexServer.validTarget(caster, body)) return;
-        Vec3 aim = body.getBoundingBox().getCenter();
-        ArsenalLayout.Pose pose = ArsenalLayout.aimed(array(s.at), array(aim));
-        Vec3 muzzle = vec(pose.point(ArsenalLayout.MUZZLE[ArsenalLayout.SNEAK_TYPE], ArsenalLayout.GUN_SCALE));
-        Vec3 direction = aim.subtract(muzzle);
-        if (direction.lengthSqr() < 1e-6) return;
-        direction = direction.normalize();
-        Vec3 end = aim.add(direction.scale(2));
-        BlockHitResult wall = level.clip(new ClipContext(muzzle, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null));
-        var in = body.getBoundingBox().inflate(.1).clip(muzzle, wall.getType() == HitResult.Type.MISS ? end : wall.getLocation());
-        if (in.isEmpty()) return;
+        if (caster == null || !(level.getEntity(s.target) instanceof LivingEntity body) || !body.isAlive() || !HexServer.validTarget(caster, body)) return false;
+        Vec3 muzzle = muzzle(s.at, body.getBoundingBox().getCenter()), in = entry(level, body, muzzle);
+        if (in == null) return false;
+        Vec3 direction = body.getBoundingBox().getCenter().subtract(muzzle).normalize();
         body.invulnerableTime = 0;
         striking = true;
         try {
@@ -653,12 +699,13 @@ public final class Arsenal {
         } finally {
             striking = false;
         }
-        if (body.isDeadOrDying()) return;
+        if (body.isDeadOrDying()) return true;
         // Jolted forward, the way the round went, not away from the caster.
         body.setDeltaMovement(body.getDeltaMovement().add(direction.x * .3, .08, direction.z * .3));
         body.hurtMarked = true;
-        BeamWound.open(body, in.get(), direction, GOTCHA_HOLE, HOLE_LIFE, true);
+        BeamWound.open(body, in, direction, GOTCHA_HOLE, HOLE_LIFE, true);
         Bleed.flow(caster, body, GOTCHA_BLEED);
+        return true;
     }
 
     private static Vec3 vec(double[] v) {return new Vec3(v[0], v[1], v[2]);}
