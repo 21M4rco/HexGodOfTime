@@ -28,7 +28,7 @@ public enum Ability {
     REWIND(TEMPORAL,180,35,200,false,true,"Personal Rewind","Return to your own state ten seconds ago. Permanent key; never in the quick bar."),
     // Save-compatible tombstone: removing this ordinal would silently remap every saved ability.
     SLOW_FIELD(TEMPORAL,320,0,0,false,true,"Removed",""),
-    TIME_STOP(TEMPORAL,560,0,0,false,true,"Stillness","Raise your right arm, then bring it down to stop time. Costs five Temporal Energy per second until resumed."),
+    TIME_STOP(TEMPORAL,560,0,0,false,true,"Stillness","Only while fully transformed (Glorious Purpose): raise your right arm, then bring it down to stop time. Costs five Temporal Energy per second until resumed, and ends if the transformation does."),
     SELECTIVE_STOP(TEMPORAL,740,30,160,false,"Chosen Moment","Suspend one target. Secondary: exempt one ally from your field."),
     THREADS(PURPOSE,0,25,80,false,"Temporal Threads","Bind a target in time. Secondary: pull it along the strand."),
     ASCENSION(PURPOSE,700,100,400,false,"Glorious Purpose","Weave the final mantle, living cloak and dark crown: armour, resistance and Strength I, for 2 Temporal Energy a second. Anywhere but the Overworld, toggle Cosmic Flight with its key (5 a second while flying); Space rises and crouch descends. Taking it off is free; worn to no energy, it falls away."),

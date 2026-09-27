@@ -165,6 +165,8 @@ public final class HexServer {
         if(a==Ability.TIME_STOP&&TemporalEngine.owns(p)) {
             TemporalEngine.clear(p);return;
         }
+        // Stopping time belongs to the full transformation: it can always be let go, but only begun while transformed.
+        if(a==Ability.TIME_STOP&&!Transformation.transformed(p)){notice(p,"Only the full transformation can stop time.");return;}
         if(a==Ability.TIME_STOP&&HexData.energy(p)<5){notice(p,"Five Temporal Energy is needed to hold time.");return;}
         if(!HexData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return;}
         if(HexData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return;}
@@ -240,10 +242,11 @@ public final class HexServer {
         }
     }
 
-    /** Takes the mantle off: its flight, the branch and everything it granted go with it. */
+    /** Takes the mantle off: its flight, the branch, a stop of time it was holding and everything it granted go with it. */
     static void dismissMantle(ServerPlayer p) {
         HexData.get(p).putBoolean("ascended",false);HexData.get(p).putLong("transformStart",HexData.now(p));
         CosmicFlight.revoke(p);TimeBranch.cancel(p);Transformation.strip(p);
+        if(TemporalEngine.stopping(p))TemporalEngine.clear(p);
         HexNetwork.fx(p,"dismiss");p.level().playSound(null,p.blockPosition(),HexGodOfStories.ASCEND.get(),SoundSource.PLAYERS,.75f,1);
     }
 

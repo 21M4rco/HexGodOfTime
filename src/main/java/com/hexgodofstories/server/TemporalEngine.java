@@ -71,6 +71,8 @@ public final class TemporalEngine {
     public static boolean slowed(Entity e) {return SLOWED.containsKey(e.getUUID());}
     public static double rateOf(Entity e) {return APPLIED.getOrDefault(e.getUUID(),1.0);}
     public static boolean owns(ServerPlayer p) {return WINDUPS.containsKey(p.getUUID())||FIELDS.stream().anyMatch(f->f.owner.equals(p.getUUID()));}
+    /** Stopping time, or winding up to: what only the full transformation may do. */
+    public static boolean stopping(ServerPlayer p) {return WINDUPS.containsKey(p.getUUID())||sustaining(p);}
     public static boolean sustaining(ServerPlayer p) {
         return FIELDS.stream().anyMatch(f->f.owner.equals(p.getUUID())&&f.stop&&f.target==null&&f.expires==Long.MAX_VALUE);
     }

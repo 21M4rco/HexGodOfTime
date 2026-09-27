@@ -101,14 +101,16 @@ public final class HexHud {
             int x=7+i*cell;
             boolean locked=!MasteryScreen.unlocked(d,a);
             long cd=Math.max(0,d.getLong("cd_"+a.name())-ClientState.now());
-            boolean poor=energy<a.cost;
+            // Stopping time takes the full transformation; outside it the key only says so.
+            boolean mantle=a==Ability.TIME_STOP&&!d.getBoolean("ascended")&&!d.getBoolean("timeStopped");
+            boolean poor=energy<a.cost||mantle;
             int accent=locked?0xff44443a:cd>0?0xffbb9256:poor?0xff8f6f5a:0xffcf9f56;
             g.fill(x,top+11,x+cell-3,top+24,0xa6091612);
             g.fill(x,top+11,x+1,top+24,accent);
             String key=HexClient.TIME_KEYS[i].getTranslatedKeyMessage().getString();
             g.drawString(mc.font,key,x+4,top+14,locked?0x6f6f60:0xe9f3ec,false);
             int nameX=x+5+Math.max(8,mc.font.width(key));
-            String label=locked?"Locked":a==Ability.TIME_STOP&&d.getBoolean("timeStopped")?"Resume":cd>0?String.format(Locale.ROOT,"%.0fs",cd/20f):CONTROL_NAMES[i];
+            String label=locked?"Locked":a==Ability.TIME_STOP&&d.getBoolean("timeStopped")?"Resume":mantle?"Mantle":cd>0?String.format(Locale.ROOT,"%.0fs",cd/20f):CONTROL_NAMES[i];
             g.drawString(mc.font,label,nameX,top+14,locked?0x6d6d5e:cd>0?0xd6b284:poor?0xb08f79:0xd8e6d5,false);
         }
     }
