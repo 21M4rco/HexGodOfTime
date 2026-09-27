@@ -52,18 +52,21 @@ import java.util.function.UnaryOperator;
  * then knitting shut. Nothing is broken. The blocks are all still there, solid, to stand on, mine and
  * build against; only the look of them is carved.
  *
- * <p>How it is made. A block the beam went through is left out of its chunk's mesh while its hole is open
- * ({@code BlockMeshMixin}), and drawn here instead, every frame, from its own model and its own light,
+ * <p>How it is made. A block the beam went through is left out of its chunk's mesh while its hole is open,
+ * and drawn here instead, every frame, from its own model and its own light,
  * less whatever lies inside the beam's cylinder ({@link WoundCarve}). What the hole shows is then simply
  * what is behind it. Its walls are the block's own texture, charred deeper in. A hole near a block's edge
  * runs on into the block beside it, as it would through a body, and that block is carved too. Where the
  * hole ends against a block it did not go through — the one that stopped it, or one beside the run — the
  * chunk hides that block's face, since it is up against a solid one, so that face is drawn back in, seared.
  *
- * <p>A block only leaves its mesh once a chunk build has been seen leaving it out, and only goes back to
- * being drawn by the chunk once a build has been seen taking it back; until then it is drawn here too. So
- * a chunk renderer that builds its meshes some other way (Embeddium, for one) is never shown a carved
- * block over a whole one: its holes are scorch marks, a charred disc with the scorch round it.
+ * <p>It leaves the mesh two ways, whichever the chunk renderer takes: vanilla chunk building's own call for
+ * each block ({@code BlockMeshMixin}), and, for a renderer that builds meshes some other way (Embeddium,
+ * for one), the block's model, which renders nothing for a holed block when chunk building asks for it
+ * ({@link HoleModel}). A block is only drawn carved here once a chunk build has been seen leaving it out,
+ * and only goes back to its chunk once a build has been seen taking it back; until then it is drawn here
+ * whole. A renderer that does neither is never shown a carved block over a whole one: its holes are scorch
+ * marks, a charred disc with the scorch round it.
  */
 public final class BlockWounds {
     private BlockWounds() { }
@@ -139,6 +142,8 @@ public final class BlockWounds {
         /** Once its holes have closed: the tick they did, and the frame a build was seen taking it back. */
         long closed = -1;
         int back = -1;
+        /** When it was holed, and its chunk asked to leave it out. */
+        long since = ClientState.now();
 
         Spot(BlockPos pos, BlockState state) {
             this.pos = pos;
@@ -153,12 +158,18 @@ public final class BlockWounds {
     private static volatile LongSet hidden = LongSets.EMPTY_SET, returning = LongSets.EMPTY_SET;
     /** What those builds have been seen doing, noted on their threads. */
     private static final Set<Long> LEFT_OUT = ConcurrentHashMap.newKeySet(), TAKEN_BACK = ConcurrentHashMap.newKeySet();
+    /** The block states holes are open in, or closing in, whose models are handed out wrapped; replaced whole. */
+    private static volatile Set<BlockState> holedStates = Set.of();
+    private static final Map<BakedModel, HoleModel> WRAPPED = new ConcurrentHashMap<>();
     private static int frame;
+    private static boolean warned;
 
     public static void clear() {
         SPOTS.clear();
         hidden = LongSets.EMPTY_SET;
         returning = LongSets.EMPTY_SET;
+        holedStates = Set.of();
+        WRAPPED.clear();
         LEFT_OUT.clear();
         TAKEN_BACK.clear();
     }
@@ -174,6 +185,16 @@ public final class BlockWounds {
         }
         if (back.contains(key)) TAKEN_BACK.add(key);
         return false;
+    }
+
+    /**
+     * From every model lookup, on any thread: while holes are open in blocks of {@code state}, its model
+     * wrapped so that chunk building leaves those blocks out; otherwise null, and the lookup is untouched.
+     */
+    public static BakedModel model(BlockState state, BakedModel original) {
+        Set<BlockState> states = holedStates;
+        if (states.isEmpty() || original instanceof HoleModel || !states.contains(state)) return null;
+        return WRAPPED.computeIfAbsent(original, HoleModel::new);
     }
 
     /** A shot's holes, from its blast: the walls it went through and the line it went down. */
@@ -298,10 +319,17 @@ public final class BlockWounds {
     /** Tells chunk building what to leave out now, and has every chunk whose answer changed built again. */
     private static void refresh() {
         LongSet out = new LongOpenHashSet(), back = new LongOpenHashSet();
-        for (Spot spot : SPOTS.values()) if (!spot.scorched) (spot.closed < 0 ? out : back).add(spot.pos.asLong());
+        Set<BlockState> states = new HashSet<>();
+        for (Spot spot : SPOTS.values()) {
+            if (spot.scorched) continue;
+            (spot.closed < 0 ? out : back).add(spot.pos.asLong());
+            states.add(spot.state);
+        }
         LongSet was = hidden;
         hidden = out.isEmpty() ? LongSets.EMPTY_SET : out;
         returning = back.isEmpty() ? LongSets.EMPTY_SET : back;
+        holedStates = states.isEmpty() ? Set.of() : states;
+        if (states.isEmpty()) WRAPPED.clear();
         LevelRenderer renderer = Minecraft.getInstance().levelRenderer;
         LongSet changed = new LongOpenHashSet(out);
         was.forEach((long key) -> {if (!changed.remove(key)) changed.add(key);});
@@ -331,6 +359,12 @@ public final class BlockWounds {
             if (spot.scorched) {
                 if (spot.holes.isEmpty()) it.remove();
                 continue;
+            }
+            if (!warned && spot.closed < 0 && spot.out < 0 && now - spot.since > 200) {
+                warned = true;
+                LOGGER.warn("Scepter holes in walls are drawn as scorch marks here: ten seconds on, no chunk build has left the holed {} "
+                    + "at {} out of its mesh. The chunk renderer meshes neither through vanilla's own call nor through Forge's "
+                    + "block models.", spot.state, spot.pos);
             }
             if (spot.holes.isEmpty() && spot.closed < 0) {
                 spot.closed = now;
