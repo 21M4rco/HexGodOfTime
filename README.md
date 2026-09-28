@@ -27,7 +27,10 @@
   less out to nine, and sets it burning; it blows a
   crater (a power-6 explosion's worth, asked of every mod that guards the world first) that knits itself shut
   a block at a time, the way Paradise's ground does, starting some eight seconds later. Nothing drops and
-  nothing is lost.
+  nothing is lost. The ground shakes forty blocks across: a wave rolls out from the crater's edge, throwing
+  each block of ground up and letting it settle (half a block near the crater, a little at the far edge),
+  kicking up dust, and whoever is standing on it feels it roll under them. It is drawn only, on each client;
+  no block moves.
 - **Gotcha!** Tap the alternate key while looking at a body and a single gun forms without a sound a little
   way behind its back, turns on it, and shoots it once in the back: ten hearts, a hole bigger than a round's
   (open thirty seconds at most) and five seconds of pouring. The gun goes behind the body where you can see
