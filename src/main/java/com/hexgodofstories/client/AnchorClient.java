@@ -11,6 +11,7 @@ import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.*;
 import net.minecraft.client.renderer.entity.*;
+import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.nbt.CompoundTag;
@@ -142,11 +143,16 @@ public final class AnchorClient {
         float slash=slashProgress(mc.player.getId(),event.getPartialTick());
         float arc=slash<0?0:(float)Math.sin(slash*Math.PI);
         PoseStack pose=event.getPoseStack();pose.pushPose();
-        pose.translate(.36-arc*.56,-.45+arc*.14,-.72);
-        pose.mulPose(Axis.XP.rotationDegrees(-85));pose.mulPose(Axis.ZP.rotationDegrees(-12+arc*65));
-        if(mc.getEntityRenderDispatcher().getRenderer(mc.player) instanceof PlayerRenderer renderer)
+        pose.translate(.6325-arc*.56,-.315+arc*.14,-.50);
+        pose.mulPose(Axis.XP.rotationDegrees(-85));pose.mulPose(Axis.ZP.rotationDegrees(arc*65));
+        if(mc.getEntityRenderDispatcher().getRenderer(mc.player) instanceof PlayerRenderer renderer) {
             renderer.renderRightHand(pose,event.getMultiBufferSource(),event.getPackedLight(),mc.player);
-        if(slash>=0){pose.translate(-.06,.55,0);WeaponRenderer.draw(0,pose,event.getMultiBufferSource(),event.getPackedLight(),1);}
+            if(slash>=0) {
+                renderer.getModel().rightArm.translateAndRotate(pose);pose.translate(-.0625,.625,0);
+                pose.mulPose(Axis.XP.rotationDegrees(180));
+                WeaponRenderer.draw(0,pose,event.getMultiBufferSource(),event.getPackedLight(),1);
+            }
+        }
         pose.popPose();
     }
     private static float slashProgress(int id,float partial) {
