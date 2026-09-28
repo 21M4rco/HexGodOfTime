@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 
 public final class HexAnimations {
    private static final ResourceLocation LAYER = HexGodOfStories.id("casting");
-   private static final Set<String> OWN_FIRST_PERSON_ARM = Set.of("branch_punch", "time_stop");
+   private static final Set<String> OWN_FIRST_PERSON_ARM = Set.of("branch_punch", "time_stop", "grasp_slash");
    private static final Logger LOGGER = LogUtils.getLogger();
 
    private HexAnimations() {
@@ -58,7 +58,7 @@ public final class HexAnimations {
             if(left&&name.startsWith("scepter_"))name+="_left";
             boolean manifest=name.startsWith("scepter_manifest")||name.startsWith("scepter_fire");
             // Gotcha!'s pointing arm, and the arm held out toward whatever telekinesis holds: seen in first person too.
-            boolean pointing=name.equals("gotcha")||name.equals("telekinesis")||name.equals("grasp_slash");
+            boolean pointing=name.equals("gotcha")||name.equals("telekinesis");
             ResourceLocation resourcelocation = HexGodOfStories.id(name);
             KeyframeAnimation keyframeanimation = PlayerAnimationRegistry.getAnimation(resourcelocation);
             if (keyframeanimation == null) {

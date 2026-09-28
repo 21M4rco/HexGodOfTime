@@ -98,4 +98,36 @@ public final class GraspRenderer {
             }
         }
     }
+
+    /**
+     * The stab, as its caster sees it: the conjured dagger in the right hand, drawn back, driven forward and down into
+     * the gut of what the hole dragged in, held there a beat and drawn out. The hand is drawn here in place of vanilla's
+     * for the length of the stroke (the grasp_slash animation leaves first person alone for it).
+     */
+    @net.minecraftforge.fml.common.Mod.EventBusSubscriber(modid=com.hexgodofstories.HexGodOfStories.ID,value=net.minecraftforge.api.distmarker.Dist.CLIENT)
+    public static final class Stab {
+        @net.minecraftforge.eventbus.api.SubscribeEvent
+        public static void hand(net.minecraftforge.client.event.RenderHandEvent e) {
+            var mc=Minecraft.getInstance();
+            if(mc.player==null||e.getHand()!=net.minecraft.world.InteractionHand.MAIN_HAND)return;
+            double left=ClientState.data(mc.player.getId()).getLong(GravityGrasp.KNIFE)-ClientState.time(e.getPartialTick());
+            if(left<=0||left>14)return;
+            e.setCanceled(true);
+            double t=14-left;
+            // Drawn back over three ticks, driven home in two, held four, drawn out over five.
+            double pull=t<3?t/3:t<5?1-(t-3)/2:0,thrust=t<3?0:t<5?(t-3)/2:t<9?1:Math.max(0,1-(t-9)/5);
+            thrust=thrust*thrust*(3-2*thrust);
+            var stack=new net.minecraft.world.item.ItemStack(com.hexgodofstories.HexGodOfStories.DAGGER.get());
+            stack.getOrCreateTag().putUUID("conjurer",mc.player.getUUID());
+            stack.getOrCreateTag().putLong("formed",mc.player.level().getGameTime()-40);
+            PoseStack pose=e.getPoseStack();
+            pose.pushPose();
+            pose.translate(.56-.3*thrust,-.52-.12*thrust+.05*pull,-.72+.2*pull-.55*thrust);
+            pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees((float)(-50*thrust+15*pull)));
+            pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees((float)(12*thrust)));
+            mc.getEntityRenderDispatcher().getItemInHandRenderer().renderItem(mc.player,stack,
+                net.minecraft.world.item.ItemDisplayContext.FIRST_PERSON_RIGHT_HAND,false,pose,e.getMultiBufferSource(),e.getPackedLight());
+            pose.popPose();
+        }
+    }
 }
