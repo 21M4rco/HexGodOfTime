@@ -747,12 +747,21 @@ public final class Arsenal {
         boolean blocked = body.isDamageSourceBlocked(source);
         body.invulnerableTime = 0;
         striking = true;
+        boolean held;
         try {
-            body.hurt(source, GOTCHA);
+            // A creature this shot would kill is left standing on its last breath instead, the hole in its head,
+            // before it drops (players and bosses die at once): the Scepter's LastMoments.
+            held = LastMoments.hurt(body, source, GOTCHA);
         } finally {
             striking = false;
         }
-        if (blocked || body.isDeadOrDying()) return;
+        if (blocked) return;
+        if (held) {
+            BeamWound.open(body, in, direction, GOTCHA_HOLE, HOLE_LIFE, true);
+            LastMoments.hold(caster, body);
+            return;
+        }
+        if (body.isDeadOrDying()) return;
         // Jolted forward, the way the round went, not away from the caster.
         body.setDeltaMovement(body.getDeltaMovement().add(direction.x * .3, .08, direction.z * .3));
         body.hurtMarked = true;
