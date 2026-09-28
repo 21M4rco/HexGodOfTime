@@ -43,7 +43,7 @@ public final class GravityGrasp {
     static final double HOLE = 1.5, MELEE = 2.7;
     /** The cut: five hearts, bleeding for ten seconds, and how long the dagger is seen. */
     static final float SLASH = 10;
-    static final int BLEED = 200, BLEED_STACKS = 2, DAGGER = 10;
+    static final int BLEED = 200, BLEED_STACKS = 2, DAGGER = 14;
     /** Recovery once let go, and where it lives; bodies pulled at once, at most. */
     public static final int RECOVERY = 240;
     public static final String READY = "graspReady", HOLDING = "graspStart", KNIFE = "graspDagger";
@@ -123,7 +123,7 @@ public final class GravityGrasp {
             Vec3 middle = body.getBoundingBox().getCenter(), to = hole.subtract(middle);
             double distance = to.length();
             if (distance > REACH) continue;
-            if (p.distanceTo(body) - body.getBbWidth() / 2 <= MELEE && !hold.cut.contains(body.getId())) slash(p, hold, body, now);
+            if (p.distanceTo(body) - body.getBbWidth() / 2 <= MELEE && !hold.cut.contains(body.getId())) {slash(p, hold, body, now); return;}
             // The bigger the body, the harder it is to drag; right at the hole it is held there rather than overshooting it.
             double mass = Math.max(1, body.getBbWidth() * body.getBbWidth() * body.getBbHeight() / 1.2);
             Vec3 velocity = body.getDeltaMovement().scale(distance < 1.2 ? .4 : .92);
@@ -137,16 +137,29 @@ public final class GravityGrasp {
         }
     }
 
-    /** Drawn within arm's reach: a dagger conjured and one stroke across it. */
+    /** How long the one stabbed is stunned. */
+    static final int STAB_STUN = 50;
+
+    /**
+     * Drawn within arm's reach: the hole closes, a dagger is conjured and driven into its gut. Five hearts, ten
+     * seconds' bleeding, and it is stunned where it stands. That ends the grasp.
+     */
     private static void slash(ServerPlayer p, Hold hold, LivingEntity body, long now) {
-        hold.cut.add(body.getId());
+        HOLDS.remove(p.getUUID());
+        body.setDeltaMovement(Vec3.ZERO);
+        body.hurtMarked = true;
         body.invulnerableTime = 0;
         body.hurt(p.damageSources().playerAttack(p), SLASH);
-        if (body.isAlive()) Bleed.apply(p, body, BLEED_STACKS, BLEED);
+        if (body.isAlive()) {
+            Bleed.apply(p, body, BLEED_STACKS, BLEED);
+            ScepterBlast.stun(body, STAB_STUN);
+        }
         HexNetwork.fx(body, "impact");
-        p.level().playSound(null, body.getX(), body.getY(), body.getZ(), HexGodOfStories.BLADE_SWING.get(), SoundSource.PLAYERS, 1, 1.1f);
-        hold.slashEnds = now + DAGGER;
-        HexData.get(p).putLong(KNIFE, now + DAGGER);
+        p.level().playSound(null, body.getX(), body.getY(), body.getZ(), HexGodOfStories.BLADE_SWING.get(), SoundSource.PLAYERS, 1, .8f);
+        CompoundTag d = HexData.get(p);
+        d.remove(HOLDING);
+        d.putLong(KNIFE, now + DAGGER);
+        d.putLong(READY, now + RECOVERY);
         HexNetwork.animate(p, "grasp_slash");
         HexNetwork.sync(p);
     }

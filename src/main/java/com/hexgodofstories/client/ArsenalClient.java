@@ -422,41 +422,18 @@ public final class ArsenalClient {
         if (heard != null) stereo(HexGodOfStories.ARSENAL_MISSILE_LAUNCH.get(), heard, 1, .96f + mc.level.random.nextFloat() * .08f, 96);
     }
 
-    private static final DustParticleOptions BURST_BRIGHT = new DustParticleOptions(new Vector3f(.45f, 1f, .55f), 3.6f),
-        BURST_DEEP = new DustParticleOptions(new Vector3f(.1f, .7f, .3f), 3f), BURST_PALE = new DustParticleOptions(new Vector3f(.8f, 1f, .72f), 4f);
     /** A grand Anchor copy's flash, whiting out the view of whoever was looking at it; fades out over a second. */
     private static float flash;
 
-    /**
-     * Anchor Being's copy bursting: a great dome of green fire filling the blast, a column of it thrown straight up,
-     * sparks flung far out, rings, the ground shaking, the boom; sixty blocks across for a grand one. Breaks nothing.
-     * Dust barely moves once spawned, so the fire is laid where it burns rather than thrown there.
-     */
+    /** Anchor Being's copy bursting: the missile's blast in green, rings, the ground shaking, the boom. Breaks nothing. */
     private static void anchorBurst(CompoundTag n) {
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
         boolean grand = n.getBoolean("grand");
         double size = grand ? 30 : 9;
         Vec3 at = new Vec3(n.getDouble("x"), n.getDouble("y"), n.getDouble("z")), core = at.add(0, 1, 0);
-        RandomSource random = level.random;
-        int dome = grand ? 1800 : 700, column = grand ? 400 : 160, sparks = grand ? 500 : 180;
-        for (int i = 0; i < dome; i++) {
-            Vec3 dir = new Vec3(random.nextGaussian(), Math.abs(random.nextGaussian()) * .9 + .05, random.nextGaussian()).normalize();
-            Vec3 p = at.add(dir.scale(size * .75 * Math.pow(random.nextDouble(), .6)));
-            level.addParticle(i % 3 == 0 ? BURST_DEEP : i % 7 == 0 ? BURST_PALE : BURST_BRIGHT, p.x, p.y, p.z, dir.x * .3, dir.y * .3 + .05, dir.z * .3);
-        }
-        for (int i = 0; i < column; i++) {
-            double h = random.nextDouble() * size * 1.1, spread = size * .12 * (1 - h / (size * 1.2));
-            level.addParticle(i % 2 == 0 ? BURST_BRIGHT : BURST_PALE, at.x + random.nextGaussian() * spread, at.y + h, at.z + random.nextGaussian() * spread, 0, .08, 0);
-        }
-        for (int i = 0; i < sparks; i++) {
-            Vec3 dir = new Vec3(random.nextGaussian(), random.nextGaussian() * .6 + .35, random.nextGaussian()).normalize();
-            double speed = (grand ? 1.2 : .5) + random.nextDouble() * (grand ? 1.6 : .7);
-            level.addParticle(i % 3 == 0 ? ParticleTypes.END_ROD : ParticleTypes.GLOW, core.x, core.y, core.z, dir.x * speed, dir.y * speed, dir.z * speed);
-        }
-        for (int i = 0; i < (grand ? 6 : 2); i++)
-            level.addParticle(ParticleTypes.FLASH, core.x + random.nextGaussian() * size * .2, core.y + random.nextDouble() * size * .3,
-                core.z + random.nextGaussian() * size * .2, 0, 0, 0);
+        // The Crown's own missile blast, green: bigger than a missile's, and a small nuke for a grand copy.
+        ArsenalFx.explode(at.add(0, .6, 0), grand ? 3.2f : 1.3f, true);
         quake(at, level, grand ? 30 : QUAKE_REACH);
         WAVES.add(new Wave(at, ClientState.now(), true, grand ? 3.2 : 1.4));
         while (WAVES.size() > 8) WAVES.remove(0);

@@ -43,6 +43,9 @@ final class ArsenalFx {
     /** Colour stops a mote passes through over its life, as 0xRRGGBB, with the alpha it has at each. */
     private static final int[] WHITE_HOT = {0xfffbe8, 0xffd27a, 0xff8a2a}, FLAME = {0xfff2c4, 0xffa23c, 0x8c2208},
         SPARK = {0xfffbe0, 0xffc861, 0xff6a1a}, GLOW = {0xffc978, 0xff7a24, 0x7a1c06};
+    /** The same fire, green: Anchor Being's copy bursting. */
+    private static final int[] WHITE_HOT_G = {0xf4fff0, 0x9dff9a, 0x2fd96a}, FLAME_G = {0xeaffdc, 0x5cf07a, 0x0f6a2a},
+        SPARK_G = {0xf4fff0, 0x8dff8a, 0x2ac45a}, GLOW_G = {0x9dffa0, 0x3fd06a, 0x0c4a1c};
 
     static void clear() {
         for (Emitter e : ACTIVE) e.remove(true);
@@ -145,62 +148,89 @@ final class ArsenalFx {
     }
 
     /** A missile's blast at {@code at}. */
-    static void explode(Vec3 at) {
+    static void explode(Vec3 at) {explode(at, 1, false);}
+
+    /**
+     * The same blast, {@code scale} times the size and green if asked: Anchor Being's copy (a little bigger than a
+     * missile) and, past twice the size, its secret form, which also throws up a stem of fire under a mushroom cap.
+     */
+    static void explode(Vec3 at, float scale, boolean green) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
         RandomSource random = mc.level.random;
-        float amount = amount();
+        float amount = amount(), more = Math.min(3, scale);
+        int[] hot = green ? WHITE_HOT_G : WHITE_HOT, flame = green ? FLAME_G : FLAME, spark = green ? SPARK_G : SPARK, glow = green ? GLOW_G : GLOW;
 
-        // The flash: white, wide and gone almost at once, over an orange glow that lingers a little longer.
+        // The flash: white, wide and gone almost at once, over a glow that lingers a little longer.
         ParticleEmitter flash = emitter(at, 14, FLARE);
-        mote(flash, Vec3.ZERO, Vec3.ZERO, 7, 14, 7, WHITE_HOT, 1, 0);
-        mote(flash, Vec3.ZERO, Vec3.ZERO, 14, 9, 12, GLOW, 1, 0);
+        mote(flash, Vec3.ZERO, Vec3.ZERO, 7, 14 * scale, 7 * scale, hot, 1, 0);
+        mote(flash, Vec3.ZERO, Vec3.ZERO, 14, 9 * scale, 12 * scale, glow, 1, 0);
 
         // The fireball: flame thrown out and slowed, swelling as it cools.
-        ParticleEmitter ball = emitter(at, 34, FIRE);
-        int puffs = Math.max(10, Math.round(30 * amount));
+        ParticleEmitter ball = emitter(at, Math.round(34 * (1 + (scale - 1) * .4f)), FIRE);
+        int puffs = Math.min(380, Math.max(10, Math.round(30 * amount * more)));
         for (int i = 0; i < puffs; i++) {
             Vec3 d = outward(random, .35);
-            double speed = .14 + random.nextDouble() * .30;
-            mote(ball, d.scale(random.nextDouble() * .9), d.scale(speed), 16 + random.nextInt(16),
-                1.1f + random.nextFloat() * .9f, 3.0f + random.nextFloat() * 1.8f, FLAME, .86f, -.006f);
+            double speed = (.14 + random.nextDouble() * .30) * scale;
+            mote(ball, d.scale(random.nextDouble() * .9 * scale), d.scale(speed), Math.round((16 + random.nextInt(16)) * (1 + (scale - 1) * .3f)),
+                (1.1f + random.nextFloat() * .9f) * scale, (3.0f + random.nextFloat() * 1.8f) * scale, flame, .86f, -.006f);
         }
         // Its heart, which burns on in place a moment after the rest has been flung out.
         for (int i = 0; i < 4; i++)
-            mote(ball, outward(random, .5).scale(.4), Vec3.ZERO, 20 + random.nextInt(8), 2.2f, 3.6f, FLAME, 1, -.01f);
+            mote(ball, outward(random, .5).scale(.4 * scale), Vec3.ZERO, 20 + random.nextInt(8), 2.2f * scale, 3.6f * scale, flame, 1, -.01f);
 
         // Sparks: fast, small and pulled down, each drawing its own short arc.
         ParticleEmitter sparks = emitter(at, 40, FLARE);
-        int count = Math.max(16, Math.round(56 * amount));
+        int count = Math.min(380, Math.max(16, Math.round(56 * amount * more)));
         for (int i = 0; i < count; i++) {
             Vec3 d = outward(random, .45);
-            mote(sparks, Vec3.ZERO, d.scale(.45 + random.nextDouble() * .75), 18 + random.nextInt(22),
-                .22f + random.nextFloat() * .12f, .05f, SPARK, .95f, .035f);
+            mote(sparks, Vec3.ZERO, d.scale((.45 + random.nextDouble() * .75) * Math.sqrt(scale)), 18 + random.nextInt(22),
+                (.22f + random.nextFloat() * .12f) * (float) Math.sqrt(scale), .05f, spark, .95f, .035f);
+        }
+
+        if (scale > 2) {
+            // A small nuke: a stem of fire climbing out of the blast, and the cap it spreads into overhead.
+            ParticleEmitter stem = emitter(at, 110, FIRE);
+            for (int i = 0; i < Math.round(90 * amount); i++) {
+                Vec3 offset = new Vec3(random.nextGaussian() * scale * .35, random.nextDouble() * scale * .5, random.nextGaussian() * scale * .35);
+                mote(stem, offset, new Vec3(0, (.12 + random.nextDouble() * .16) * scale, 0), 60 + random.nextInt(40),
+                    1.6f * scale * .6f, 3.4f * scale * .6f, flame, .965f, -.003f);
+            }
+            ParticleEmitter cap = emitter(at.add(0, scale * 3.2, 0), 120, FIRE);
+            for (int i = 0; i < Math.round(140 * amount); i++) {
+                Vec3 d = new Vec3(random.nextGaussian(), Math.abs(random.nextGaussian()) * .35, random.nextGaussian()).normalize();
+                mote(cap, d.scale(scale * (.6 + random.nextDouble() * 1.4)), d.scale(.06 * scale).add(0, .05 * scale, 0), 70 + random.nextInt(50),
+                    2.2f * scale * .6f, 5.5f * scale * .6f, flame, .95f, -.004f);
+            }
+            ParticleEmitter halo = emitter(at, 30, FLARE);
+            mote(halo, Vec3.ZERO, Vec3.ZERO, 30, 20 * scale, 40 * scale, glow, 1, 0);
         }
 
         // Smoke, cinders and a little fire left behind: vanilla-side, so they settle into the world as it is drawn.
-        int smoke = Math.max(6, Math.round(22 * amount));
+        int smoke = Math.max(6, Math.round(22 * amount * more));
         for (int i = 0; i < smoke; i++) {
             Vec3 d = outward(random, .6);
-            Particle puff = create(HexGodOfStories.ASH.get(), at.add(d.scale(random.nextDouble() * 2.2)),
+            Particle puff = create(HexGodOfStories.ASH.get(), at.add(d.scale(random.nextDouble() * 2.2 * scale)),
                 d.x * .06, .03 + random.nextDouble() * .07, d.z * .06);
             if (puff == null) continue;
             float grey = .16f + random.nextFloat() * .12f;
-            puff.setColor(grey, grey * .96f, grey * .92f);
+            if (green) puff.setColor(grey * .7f, grey * 1.25f, grey * .8f);
+            else puff.setColor(grey, grey * .96f, grey * .92f);
             puff.setLifetime(90 + random.nextInt(70));
         }
-        int cinders = Math.max(8, Math.round(34 * amount));
+        int cinders = Math.max(8, Math.round(34 * amount * more));
         for (int i = 0; i < cinders; i++) {
             Vec3 d = outward(random, .5);
-            create(HexGodOfStories.CINDER.get(), at.add(d.scale(.6)), d.x * (.25 + random.nextDouble() * .35),
-                .2 + random.nextDouble() * .35, d.z * (.25 + random.nextDouble() * .35));
+            Particle cinder = create(HexGodOfStories.CINDER.get(), at.add(d.scale(.6 * scale)), d.x * (.25 + random.nextDouble() * .35) * scale,
+                (.2 + random.nextDouble() * .35) * Math.sqrt(scale), d.z * (.25 + random.nextDouble() * .35) * scale);
+            if (cinder != null && green) cinder.setColor(.45f, 1f, .5f);
         }
         Vfx.bloom(-1, at, Vec3.ZERO, 36, (origin, look, progress) -> {
-            int flames = Math.round((1 - progress) * 3 * amount + random.nextFloat());
+            int flames = Math.round((1 - progress) * 3 * amount * more + random.nextFloat());
             for (int i = 0; i < flames; i++) {
-                Particle flame = create(HexGodOfStories.METEOR_FIRE.get(), origin.add((random.nextDouble() - .5) * 4.5, random.nextDouble() * .6 - .8,
-                    (random.nextDouble() - .5) * 4.5), 0, .02 + random.nextDouble() * .03, 0);
-                if (flame != null) flame.setLifetime(10 + random.nextInt(8));
+                Particle fire = create(HexGodOfStories.METEOR_FIRE.get(), origin.add((random.nextDouble() - .5) * 4.5 * scale, random.nextDouble() * .6 - .8,
+                    (random.nextDouble() - .5) * 4.5 * scale), 0, .02 + random.nextDouble() * .03, 0);
+                if (fire != null) {fire.setLifetime(10 + random.nextInt(8)); if (green) fire.setColor(.45f, 1f, .5f);}
             }
         });
     }
