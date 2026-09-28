@@ -105,7 +105,7 @@ public final class ThreadsRenderer {
             double h=Math.sin(seed*12.9898+i*78.233)*43758.5453;
             double f=h-Math.floor(h),g=(f*7.13)%1,k=(f*3.71)%1;
             Vec3 at=centre.add((f-.5)*radius*2.2,(g-.5)*radius*2,(k-.5)*radius*2.2);
-            BranchVfx.billboard(PAINTER,type,at,.035+.03*g,0,TemporalPalette.seidr((float)f),alpha*.7f);
+            BranchVfx.billboard(PAINTER,type,at,.035+.03*g,0,TemporalPalette.seidr(ClientState.cycle(f)),alpha*.7f);
         }
     }
 
