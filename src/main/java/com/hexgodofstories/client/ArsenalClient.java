@@ -432,15 +432,21 @@ public final class ArsenalClient {
         boolean grand = n.getBoolean("grand");
         double size = grand ? 30 : 9;
         Vec3 at = new Vec3(n.getDouble("x"), n.getDouble("y"), n.getDouble("z")), core = at.add(0, 1, 0);
-        // The Crown's own missile blast, green: bigger than a missile's, and a small nuke for a grand copy.
-        ArsenalFx.explode(at.add(0, .6, 0), grand ? 3.2f : 1.3f, true);
+        // A slow green blast that swells, rolls and smokes: a small nuke for a grand copy.
+        ArsenalFx.anchorBlast(at.add(0, .6, 0), grand ? 3.2f : 1.6f);
+        // The boom, and a second, deeper one rolling in after it.
+        mc.getSoundManager().playDelayed(new SimpleSoundInstance(HexGodOfStories.ARSENAL_EXPLOSION_FAR.get(), SoundSource.PLAYERS, grand ? 8 : 3,
+            grand ? .45f : .55f, SoundInstance.createUnseededRandom(), at.x, at.y, at.z), grand ? 16 : 10);
         quake(at, level, grand ? 30 : QUAKE_REACH);
         WAVES.add(new Wave(at, ClientState.now(), true, grand ? 3.2 : 1.4));
         while (WAVES.size() > 8) WAVES.remove(0);
         play(HexGodOfStories.ARSENAL_EXPLOSION.get(), at, grand ? 8 : 2, grand ? .7f : .82f);
         play(HexGodOfStories.ARSENAL_EXPLOSION_FAR.get(), at, grand ? 8 : 2, grand ? .66f : .78f);
         double d = mc.gameRenderer.getMainCamera().getPosition().distanceTo(at), felt = grand ? 110 : 48;
-        if (d < felt) com.hexgodofstories.client.leviathan.LeviathanEffects.scepterRecoil((float) ((grand ? 2.6 : 1.5) * (1 - d / felt) * (1 - d / felt)));
+        if (d < felt) {
+            com.hexgodofstories.client.leviathan.LeviathanEffects.scepterRecoil((float) ((grand ? 2.6 : 1.5) * (1 - d / felt) * (1 - d / felt)));
+            com.hexgodofstories.client.leviathan.LeviathanEffects.quake((float) ((grand ? 2.2 : 1.1) * (1 - d / felt)));
+        }
     }
 
     /** A grand copy about to burst: anyone looking toward it, with nothing in between, is blinded white. */

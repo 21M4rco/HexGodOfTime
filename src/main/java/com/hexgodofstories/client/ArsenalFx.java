@@ -38,7 +38,7 @@ final class ArsenalFx {
         FIRE = HexGodOfStories.id("textures/particle/meteor_fire.png");
     private static final List<Emitter> ACTIVE = new ArrayList<>();
     /** Emitters alive at once, at most: a blast is five of them. */
-    private static final int MOST = 40;
+    private static final int MOST = 80;
 
     /** Colour stops a mote passes through over its life, as 0xRRGGBB, with the alpha it has at each. */
     private static final int[] WHITE_HOT = {0xfffbe8, 0xffd27a, 0xff8a2a}, FLAME = {0xfff2c4, 0xffa23c, 0x8c2208},
@@ -231,6 +231,72 @@ final class ArsenalFx {
                 Particle fire = create(HexGodOfStories.METEOR_FIRE.get(), origin.add((random.nextDouble() - .5) * 4.5 * scale, random.nextDouble() * .6 - .8,
                     (random.nextDouble() - .5) * 4.5 * scale), 0, .02 + random.nextDouble() * .03, 0);
                 if (fire != null) {fire.setLifetime(10 + random.nextInt(8)); if (green) fire.setColor(.45f, 1f, .5f);}
+            }
+        });
+    }
+
+    /**
+     * Anchor Being's copy bursting: slower and heavier than a missile, and it takes its time. A long green flash; a
+     * shock of fire rolling out along the ground; a fireball that goes on swelling and climbing for three seconds (six
+     * for a grand one), a fresh roll of fire out of its heart every few ticks, each slower than the last; smoke that
+     * thickens as the fire dies and hangs there long after; and, past twice the size, a stem climbing under it into a
+     * cap: a small green nuke.
+     */
+    static void anchorBlast(Vec3 at, float scale) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+        RandomSource random = mc.level.random;
+        float amount = amount(), more = Math.min(3, scale);
+        boolean nuke = scale > 2;
+
+        ParticleEmitter flash = emitter(at, 26, FLARE);
+        mote(flash, Vec3.ZERO, Vec3.ZERO, 12, 16 * scale, 9 * scale, WHITE_HOT_G, 1, 0);
+        mote(flash, Vec3.ZERO, Vec3.ZERO, 26, 10 * scale, 18 * scale, GLOW_G, 1, 0);
+
+        ParticleEmitter shock = emitter(at, 44, FIRE);
+        int ring = Math.min(360, Math.round(70 * amount * more));
+        for (int i = 0; i < ring; i++) {
+            double a = random.nextDouble() * Math.PI * 2;
+            Vec3 d = new Vec3(Math.cos(a), .04 + random.nextDouble() * .1, Math.sin(a));
+            mote(shock, d.scale(.5 * scale), d.scale((.26 + random.nextDouble() * .14) * scale), 24 + random.nextInt(16),
+                .8f * scale, 2.8f * scale, FLAME_G, .9f, -.002f);
+        }
+        ParticleEmitter sparks = emitter(at, 50, FLARE);
+        for (int i = 0; i < Math.min(360, Math.round(60 * amount * more)); i++) {
+            Vec3 d = outward(random, .45);
+            mote(sparks, Vec3.ZERO, d.scale((.4 + random.nextDouble() * .7) * Math.sqrt(scale)), 26 + random.nextInt(24),
+                (.24f + random.nextFloat() * .12f) * (float) Math.sqrt(scale), .05f, SPARK_G, .95f, .03f);
+        }
+
+        int ticks = nuke ? 120 : 60;
+        Vfx.bloom(-1, at, Vec3.ZERO, ticks, (origin, look, progress) -> {
+            int age = Math.round(progress * ticks);
+            Vec3 heart = at.add(0, (nuke ? 2.8 : 1.1) * scale * Math.sqrt(progress), 0);
+            if (age % 3 == 0 && progress < .7f) {
+                ParticleEmitter swell = emitter(heart, 70, FIRE);
+                int n = Math.round(14 * amount * more);
+                for (int i = 0; i < n; i++) {
+                    Vec3 d = outward(random, nuke ? .15 : .3);
+                    mote(swell, d.scale(random.nextDouble() * .6 * scale), d.scale((.05 + random.nextDouble() * .09) * scale * (1 - progress * .6)),
+                        32 + random.nextInt(26), (1.4f + random.nextFloat() * .8f) * scale * .8f, (3.6f + random.nextFloat() * 1.8f) * scale * .8f,
+                        FLAME_G, .93f, -.005f);
+                }
+            }
+            if (nuke && age % 4 == 0 && progress < .8f) {
+                ParticleEmitter stem = emitter(at, 70, FIRE);
+                for (int i = 0; i < Math.round(8 * amount); i++)
+                    mote(stem, new Vec3(random.nextGaussian() * scale * .3, random.nextDouble() * (heart.y - at.y), random.nextGaussian() * scale * .3),
+                        new Vec3(0, (.1 + random.nextDouble() * .1) * scale * .4, 0), 40 + random.nextInt(30), .7f * scale, 1.5f * scale, FLAME_G, .95f, -.003f);
+            }
+            int puffs = Math.round((progress < .3f ? 1 : 3) * amount * more + random.nextFloat());
+            for (int i = 0; i < puffs; i++) {
+                Vec3 p = heart.add(random.nextGaussian() * scale * 1.2, random.nextGaussian() * scale * .6, random.nextGaussian() * scale * 1.2);
+                Particle smoke = create(HexGodOfStories.ASH.get(), p, random.nextGaussian() * .02, .02 + random.nextDouble() * .04, random.nextGaussian() * .02);
+                if (smoke == null) continue;
+                float g = .12f + random.nextFloat() * .1f;
+                smoke.setColor(g * .8f, g * 1.1f, g * .85f);
+                smoke.setLifetime(160 + random.nextInt(120));
+                smoke.scale(3f + random.nextFloat() * 3f * Math.min(2, scale));
             }
         });
     }
