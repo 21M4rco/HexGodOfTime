@@ -16,7 +16,7 @@ public final class ClientState {
     public static final Map<Integer,ThreadLink> THREADS=new HashMap<>();
     /** Borrowed-shape snapshots, kept apart from the per-second state packet because of their size. */
     public static final Map<Integer,CompoundTag> DISGUISES=new HashMap<>();
-    public record ThreadLink(int target,long until) {}
+    public record ThreadLink(int target,long start,long until) {}
     private static Object world;
 
     public static long now(){return Minecraft.getInstance().level==null?0:Minecraft.getInstance().level.getGameTime();}
@@ -119,7 +119,7 @@ public final class ClientState {
             }
             case HexNetwork.GRIP -> WorldEffects.grip(m.entity(),m.data());
             case HexNetwork.MEMORY -> WorldEffects.memory(m.entity(),m.data());
-            case HexNetwork.THREADS -> THREADS.put(m.entity(),new ThreadLink(m.data().getInt("target"),m.data().getLong("until")));
+            case HexNetwork.THREADS -> THREADS.put(m.entity(),new ThreadLink(m.data().getInt("target"),m.data().getLong("start"),m.data().getLong("until")));
             case HexNetwork.SLOWED -> {if(m.data().getBoolean("slowed"))SLOWED.add(m.entity());else SLOWED.remove(m.entity());}
             case HexNetwork.ARCHITECTURE -> WorldEffects.architecture(m.entity(),m.data());
             case HexNetwork.BLEED -> WorldEffects.bleeding(m.entity(),m.data().getInt("stacks"),m.data().getBoolean("pouring"));
@@ -167,7 +167,8 @@ public final class ClientState {
             FROZEN.keySet().removeIf(id->mc.level.getEntity(id)==null);
             DISGUISES.keySet().removeIf(id->mc.level.getEntity(id)==null);
         }
-        THREADS.entrySet().removeIf(e->e.getValue().until<now());
+        // A moment resuming: its clock rings break apart as they go.
+        THREADS.entrySet().removeIf(e->{if(e.getValue().until()>=now())return false;ThreadsRenderer.burst(e.getValue().target());return true;});
         STUNNED.entrySet().removeIf(e->e.getValue()<=now()||mc.level.getEntity(e.getKey())==null);
         WorldEffects.tick();
         TimeBranchRenderer.tick();

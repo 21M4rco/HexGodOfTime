@@ -144,7 +144,7 @@ public final class HexHud {
             case SLOW_FIELD -> "";
             case TIME_STOP -> "Freeze the local battlefield.";
             case SELECTIVE_STOP -> "Freeze the target in your aim.";
-            case THREADS -> "Bind your target in time.";
+            case THREADS -> "Stick your target in time: 5 s.";
             case ASCENSION -> "Toggle your final transformation.";
             case TIME_BRANCH -> "Tap: right fist. Hold/release: beam.";
             case ARSENAL -> "Hold: the crown fires and stuns. Hold 13s: missiles.";

@@ -245,10 +245,13 @@ public final class HexServer {
             case SELECTIVE_STOP -> {if(t==null||!validTarget(p,t)||!TemporalEngine.field(p,true,t,t instanceof Player?40:100))return false;gesture(p,"time_stop","bind",HexGodOfStories.STOP.get());return true;}
             case THREADS -> {
                 if(t==null||!validTarget(p,t))return false;
-                if(secondary){if(!Telekinesis.grab(p,t))return false;}
-                else if(!TemporalEngine.field(p,true,t,t instanceof Player?40:140))return false;
-                CompoundTag n=new CompoundTag();n.putInt("target",t.getId());n.putLong("until",now+100);
-                HexNetwork.tracking(p,new HexNetwork.Message(HexNetwork.THREADS,p.getId(),n));
+                if(secondary){if(!Telekinesis.grab(p,t))return false;gesture(p,"threads","bind",HexGodOfStories.SORCERY.get());return true;}
+                // Stuck in time for five seconds, player or creature, once the moment has wound down to a stop.
+                long held=TemporalEngine.RAMP+TemporalEngine.PLAYER_HOLD;
+                if(!TemporalEngine.field(p,true,t,(int)held))return false;
+                CompoundTag n=new CompoundTag();n.putInt("target",t.getId());n.putLong("start",now);n.putLong("until",now+held);
+                // Seen by everyone near the body held, not only those near the caster.
+                HexNetwork.near(p.serverLevel(),t.position(),72,new HexNetwork.Message(HexNetwork.THREADS,p.getId(),n));
                 gesture(p,"threads","bind",HexGodOfStories.SORCERY.get());return true;
             }
             // Worn, it is taken off before any cast is paid for (see the action handler); never charged for here.

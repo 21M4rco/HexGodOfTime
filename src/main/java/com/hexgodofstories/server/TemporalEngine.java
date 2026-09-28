@@ -57,6 +57,8 @@ public final class TemporalEngine {
     public static final int STOP_RADIUS=10,STOP_EXPANSION=17,STOP_WINDUP=20;
     /** Ticks spent decelerating into, and accelerating out of, a full stop. */
     public static final int RAMP=7;
+    /** The longest a timed hold keeps a player, once held: five seconds (Temporal Threads' whole hold). */
+    public static final int PLAYER_HOLD=100;
     /** How much of normal time a dilated body experiences. */
     private static final double DILATION=.32;
     /** The rate a body resumes at the instant a hold lets go, before the ramp brings it back to one. */
@@ -286,7 +288,7 @@ public final class TemporalEngine {
             Frozen s=FROZEN.get(entry.getKey());
             if(s==null) {
                 rate(e,1);
-                s=new Frozen(e,e.position(),e.getDeltaMovement(),e.getYRot(),e.getXRot(),e instanceof ServerPlayer&&entry.getValue()!=Long.MAX_VALUE?Math.min(entry.getValue(),now+60):entry.getValue());
+                s=new Frozen(e,e.position(),e.getDeltaMovement(),e.getYRot(),e.getXRot(),e instanceof ServerPlayer&&entry.getValue()!=Long.MAX_VALUE?Math.min(entry.getValue(),now+PLAYER_HOLD):entry.getValue());
                 FROZEN.put(entry.getKey(),s);sync(s,true);
             }
             hold(e,s,now);
