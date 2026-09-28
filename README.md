@@ -4,9 +4,11 @@
   from every eye) and in the same tick a double takes your place: where you stood, looking where you looked,
   holding what you held and, if you were walking, walking on. No sound, no flash, no gesture. Whatever was
   hunting you turns on it. It never fights: it watches anything hostile near it and otherwise wanders its
-  ground, for up to twenty seconds. Strike it and it laughs for two seconds, throws both arms up and bursts
-  in a great green blast: twenty hearts (half at the edge of nine blocks), twenty seconds of nausea, the
-  ground shaking forty blocks across, no block broken and no shield stopping it. 25 energy; 30 s recovery.
+  ground, for up to twenty seconds. Strike it and it looks down a moment and bursts in a great green blast:
+  twenty hearts (half at the edge of nine blocks), twenty seconds of nausea, the ground shaking forty blocks
+  across, no block broken and no shield stopping it. 25 energy; 30 s recovery. **Secret:** cast in the full
+  transformation, the blast is sixty blocks across (twenty hearts out to twelve, half at thirty), the ground
+  shakes all of it, and a moment before it goes anyone looking at it is blinded white; two minutes' recovery.
 - **Gravity Grasp (hold the alternate key).** Your arm goes out and a small black hole opens in front of your
   hand, drawing in everything you could harm within fourteen blocks, harder the longer you hold (ten seconds
   at most); at first a player can walk away from it, a couple of seconds in not even sprinting. Whatever it

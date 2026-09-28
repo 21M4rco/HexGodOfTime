@@ -35,6 +35,9 @@ public final class AnchorBeing {
 
     /** How long the caster is gone, and how long the copy stands in for them at most. */
     public static final int VANISH = 200, CLONE_LIFE = 400;
+    /** Cast in the full transformation: the secret variation, and the recovery it costs. */
+    public static final int GRAND_RECOVERY = 2400;
+    static final double GRAND_CORE = 12, GRAND_REACH = 30;
     /** The burst: twenty hearts within {@link #BLAST_CORE} blocks, down to half that at {@link #BLAST_REACH}; nausea after. */
     static final float BLAST = 40;
     static final double BLAST_CORE = 5, BLAST_REACH = 9;
@@ -61,31 +64,43 @@ public final class AnchorBeing {
         return true;
     }
 
-    /** The copy's burst, at the end of its laugh. */
+    /** A grand copy, a moment before it bursts: it whites out the eyes of anyone looking at it. */
+    public static void flash(IllusionEntity copy) {
+        if (!(copy.level() instanceof ServerLevel level)) return;
+        CompoundTag n = new CompoundTag();
+        n.putString("state", "anchor_flash");
+        n.putDouble("x", copy.getX()); n.putDouble("y", copy.getY() + 1); n.putDouble("z", copy.getZ());
+        HexNetwork.near(level, copy.position(), 192, new HexNetwork.Message(HexNetwork.ARSENAL, copy.getId(), n));
+    }
+
+    /** The copy's burst, a moment after it was struck: sixty blocks across if it is a grand one. */
     public static void burst(IllusionEntity copy, ServerPlayer caster) {
         if (!(copy.level() instanceof ServerLevel level)) return;
         Vec3 at = copy.position().add(0, 1, 0);
+        boolean grand = copy.grand();
+        double core = grand ? GRAND_CORE : BLAST_CORE, reach = grand ? GRAND_REACH : BLAST_REACH;
         // Credited to the caster, from nowhere a shield could face.
         DamageSource source = new DamageSource(level.damageSources().explosion(caster, caster).typeHolder(), null, caster);
-        for (Entity e : level.getEntities(copy, new AABB(at, at).inflate(BLAST_REACH), e -> e instanceof LivingEntity && HexServer.validTarget(caster, e))) {
+        for (Entity e : level.getEntities(copy, new AABB(at, at).inflate(reach), e -> e instanceof LivingEntity && HexServer.validTarget(caster, e))) {
             LivingEntity body = (LivingEntity) e;
             Vec3 middle = body.getBoundingBox().getCenter();
             double distance = Math.max(0, middle.distanceTo(at) - body.getBbWidth() / 2);
-            if (distance > BLAST_REACH) continue;
-            float strength = distance <= BLAST_CORE ? 1 : (float) (1 - .5 * (distance - BLAST_CORE) / (BLAST_REACH - BLAST_CORE));
+            if (distance > reach) continue;
+            float strength = distance <= core ? 1 : (float) (1 - .5 * (distance - core) / (reach - core));
             body.invulnerableTime = 0;
             body.hurt(source, BLAST * strength);
             if (!body.isAlive()) continue;
             body.addEffect(new MobEffectInstance(MobEffects.CONFUSION, NAUSEA, 0));
             Vec3 away = middle.subtract(at);
             away = away.lengthSqr() < 1e-6 ? new Vec3(0, 1, 0) : away.normalize();
-            double push = 1.4 * (1 - distance / BLAST_REACH);
+            double push = (grand ? 2.4 : 1.4) * (1 - distance / reach);
             body.setDeltaMovement(body.getDeltaMovement().add(away.x * push, .3 + away.y * push * .5, away.z * push));
             body.hurtMarked = true;
         }
         // Seen, heard and felt from here by everyone within reach of the message: see ArsenalClient.
         CompoundTag n = new CompoundTag();
         n.putString("state", "anchor_burst");
+        n.putBoolean("grand", grand);
         n.putDouble("x", at.x); n.putDouble("y", copy.getY()); n.putDouble("z", at.z);
         HexNetwork.near(level, at, 256, new HexNetwork.Message(HexNetwork.ARSENAL, copy.getId(), n));
     }

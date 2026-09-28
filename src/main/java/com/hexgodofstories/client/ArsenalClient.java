@@ -271,7 +271,7 @@ public final class ArsenalClient {
     }
 
     /** A blast's rings: a missile's are fire-coloured, an Anchor copy's green. */
-    private record Wave(Vec3 at, long born, boolean green) { }
+    private record Wave(Vec3 at, long born, boolean green, double scale) { }
 
     /** Gotcha!'s gun: where it hangs, the body it is for, where that body's head was when it began, where it points now, and this frame's gun. */
     private static final class Sneak {
@@ -319,10 +319,12 @@ public final class ArsenalClient {
         final Vec3 at;
         final long born;
         final List<Column> columns;
+        final double reach;
         /** Whether this client's own player has been reached by it yet. */
         boolean felt;
 
-        Quake(Vec3 at, long born, List<Column> columns) {
+        Quake(Vec3 at, long born, List<Column> columns, double reach) {
+            this.reach = reach;
             this.at = at;
             this.born = born;
             this.columns = columns;
@@ -373,6 +375,7 @@ public final class ArsenalClient {
             case "launch" -> launch(entity, data);
             case "impact" -> impact(data);
             case "anchor_burst" -> anchorBurst(data);
+            case "anchor_flash" -> anchorFlash(data);
             case "gotcha" -> {
                 ArsenalMeshes.preload(FLASH, FLARE);
                 SNEAKS.put(data.getInt("id"), new Sneak(data.getInt("target"), data.getLong("start"),
@@ -419,32 +422,74 @@ public final class ArsenalClient {
         if (heard != null) stereo(HexGodOfStories.ARSENAL_MISSILE_LAUNCH.get(), heard, 1, .96f + mc.level.random.nextFloat() * .08f, 96);
     }
 
-    private static final DustParticleOptions BURST_BRIGHT = new DustParticleOptions(new Vector3f(.45f, 1f, .55f), 3.2f),
-        BURST_DEEP = new DustParticleOptions(new Vector3f(.1f, .7f, .3f), 2.6f);
+    private static final DustParticleOptions BURST_BRIGHT = new DustParticleOptions(new Vector3f(.45f, 1f, .55f), 3.6f),
+        BURST_DEEP = new DustParticleOptions(new Vector3f(.1f, .7f, .3f), 3f), BURST_PALE = new DustParticleOptions(new Vector3f(.8f, 1f, .72f), 4f);
+    /** A grand Anchor copy's flash, whiting out the view of whoever was looking at it; fades out over a second. */
+    private static float flash;
 
-    /** Anchor Being's copy bursting: a great green blast, its rings, the ground shaking, the boom. Breaks nothing. */
+    /**
+     * Anchor Being's copy bursting: a great dome of green fire filling the blast, a column of it thrown straight up,
+     * sparks flung far out, rings, the ground shaking, the boom; sixty blocks across for a grand one. Breaks nothing.
+     * Dust barely moves once spawned, so the fire is laid where it burns rather than thrown there.
+     */
     private static void anchorBurst(CompoundTag n) {
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
+        boolean grand = n.getBoolean("grand");
+        double size = grand ? 30 : 9;
         Vec3 at = new Vec3(n.getDouble("x"), n.getDouble("y"), n.getDouble("z")), core = at.add(0, 1, 0);
         RandomSource random = level.random;
-        for (int i = 0; i < 220; i++) {
-            Vec3 dir = new Vec3(random.nextGaussian(), random.nextGaussian() * .8 + .15, random.nextGaussian()).normalize();
-            double speed = .25 + random.nextDouble() * .7;
-            level.addParticle(i % 3 == 0 ? BURST_DEEP : BURST_BRIGHT, core.x + dir.x * .4, core.y + dir.y * .4, core.z + dir.z * .4,
-                dir.x * speed, dir.y * speed, dir.z * speed);
+        int dome = grand ? 1800 : 700, column = grand ? 400 : 160, sparks = grand ? 500 : 180;
+        for (int i = 0; i < dome; i++) {
+            Vec3 dir = new Vec3(random.nextGaussian(), Math.abs(random.nextGaussian()) * .9 + .05, random.nextGaussian()).normalize();
+            Vec3 p = at.add(dir.scale(size * .75 * Math.pow(random.nextDouble(), .6)));
+            level.addParticle(i % 3 == 0 ? BURST_DEEP : i % 7 == 0 ? BURST_PALE : BURST_BRIGHT, p.x, p.y, p.z, dir.x * .3, dir.y * .3 + .05, dir.z * .3);
         }
-        for (int i = 0; i < 40; i++)
-            level.addParticle(i % 2 == 0 ? ParticleTypes.END_ROD : ParticleTypes.HAPPY_VILLAGER, core.x, core.y, core.z,
-                random.nextGaussian() * .35, random.nextGaussian() * .35 + .1, random.nextGaussian() * .35);
-        level.addParticle(ParticleTypes.FLASH, core.x, core.y, core.z, 0, 0, 0);
-        quake(at, level);
-        WAVES.add(new Wave(at, ClientState.now(), true));
+        for (int i = 0; i < column; i++) {
+            double h = random.nextDouble() * size * 1.1, spread = size * .12 * (1 - h / (size * 1.2));
+            level.addParticle(i % 2 == 0 ? BURST_BRIGHT : BURST_PALE, at.x + random.nextGaussian() * spread, at.y + h, at.z + random.nextGaussian() * spread, 0, .08, 0);
+        }
+        for (int i = 0; i < sparks; i++) {
+            Vec3 dir = new Vec3(random.nextGaussian(), random.nextGaussian() * .6 + .35, random.nextGaussian()).normalize();
+            double speed = (grand ? 1.2 : .5) + random.nextDouble() * (grand ? 1.6 : .7);
+            level.addParticle(i % 3 == 0 ? ParticleTypes.END_ROD : ParticleTypes.GLOW, core.x, core.y, core.z, dir.x * speed, dir.y * speed, dir.z * speed);
+        }
+        for (int i = 0; i < (grand ? 6 : 2); i++)
+            level.addParticle(ParticleTypes.FLASH, core.x + random.nextGaussian() * size * .2, core.y + random.nextDouble() * size * .3,
+                core.z + random.nextGaussian() * size * .2, 0, 0, 0);
+        quake(at, level, grand ? 30 : QUAKE_REACH);
+        WAVES.add(new Wave(at, ClientState.now(), true, grand ? 3.2 : 1.4));
         while (WAVES.size() > 8) WAVES.remove(0);
-        play(HexGodOfStories.ARSENAL_EXPLOSION.get(), at, 1, .82f);
-        play(HexGodOfStories.ARSENAL_EXPLOSION_FAR.get(), at, 1, .78f);
-        double d = mc.gameRenderer.getMainCamera().getPosition().distanceTo(at);
-        if (d < 48) com.hexgodofstories.client.leviathan.LeviathanEffects.scepterRecoil((float) (1.5 * (1 - d / 48) * (1 - d / 48)));
+        play(HexGodOfStories.ARSENAL_EXPLOSION.get(), at, grand ? 8 : 2, grand ? .7f : .82f);
+        play(HexGodOfStories.ARSENAL_EXPLOSION_FAR.get(), at, grand ? 8 : 2, grand ? .66f : .78f);
+        double d = mc.gameRenderer.getMainCamera().getPosition().distanceTo(at), felt = grand ? 110 : 48;
+        if (d < felt) com.hexgodofstories.client.leviathan.LeviathanEffects.scepterRecoil((float) ((grand ? 2.6 : 1.5) * (1 - d / felt) * (1 - d / felt)));
+    }
+
+    /** A grand copy about to burst: anyone looking toward it, with nothing in between, is blinded white. */
+    private static void anchorFlash(CompoundTag n) {
+        Minecraft mc = Minecraft.getInstance();
+        Camera camera = mc.gameRenderer.getMainCamera();
+        Vec3 eye = camera.getPosition(), at = new Vec3(n.getDouble("x"), n.getDouble("y"), n.getDouble("z")), to = at.subtract(eye);
+        double d = to.length();
+        if (d > 160) return;
+        if (d > 3) {
+            Vector3f look = camera.getLookVector();
+            if (new Vec3(look.x(), look.y(), look.z()).dot(to.scale(1 / d)) < .35) return;
+            if (mc.level.clip(new ClipContext(eye, at, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null)).getType() != HitResult.Type.MISS) return;
+        }
+        flash = 1;
+    }
+
+    /** The flash, over everything on screen. */
+    @net.minecraftforge.fml.common.Mod.EventBusSubscriber(modid = HexGodOfStories.ID, value = net.minecraftforge.api.distmarker.Dist.CLIENT)
+    public static final class Overlay {
+        @net.minecraftforge.eventbus.api.SubscribeEvent
+        public static void gui(net.minecraftforge.client.event.RenderGuiEvent.Post e) {
+            if (flash <= .01f) return;
+            var g = e.getGuiGraphics();
+            g.fill(0, 0, g.guiWidth(), g.guiHeight(), (int) (Mth.clamp(flash, 0, 1) * 255) << 24 | 0xF2FFF2);
+        }
     }
 
     private static void impact(CompoundTag n) {
@@ -453,8 +498,8 @@ public final class ArsenalClient {
         if (m != null) m.gone = true;
         Vec3 at = new Vec3(n.getDouble("x"), n.getDouble("y"), n.getDouble("z"));
         ArsenalFx.explode(at);
-        quake(at, mc.level);
-        WAVES.add(new Wave(at, ClientState.now(), false));
+        quake(at, mc.level, QUAKE_REACH);
+        WAVES.add(new Wave(at, ClientState.now(), false, 1));
         while (WAVES.size() > 8) WAVES.remove(0);
         float pitch = .92f + mc.level.random.nextFloat() * .1f;
         play(HexGodOfStories.ARSENAL_EXPLOSION.get(), at, 1, pitch);
@@ -497,10 +542,11 @@ public final class ArsenalClient {
                 if (mesh != null) spark(mesh, s.gun.middle(), s.gun.right(), s.gun.up(), s.gun.forward(), s.gun.scale(), s.gun.reveal(), level.random);
             }
         }
+        flash = Math.max(0, flash - .05f);
         for (Iterator<Quake> it = QUAKES.iterator(); it.hasNext(); ) {
             Quake q = it.next();
             long age = now - q.born;
-            if (age > QUAKE_REACH / QUAKE_SPEED + QUAKE_BUMP + 2 || age < -20) {it.remove(); continue;}
+            if (age > q.reach / QUAKE_SPEED + QUAKE_BUMP + 2 || age < -20) {it.remove(); continue;}
             rumble(q, age, level);
         }
         for (Missile m : MISSILES.values()) trail(m, now, level.random);
@@ -959,18 +1005,18 @@ public final class ArsenalClient {
      * The ground round a blast: the top block of every column from the crater's edge out to {@link #QUAKE_REACH},
      * near the blast's own height (a floor with open air, or nothing solid, above it), read once as the blast lands.
      */
-    private static void quake(Vec3 at, ClientLevel level) {
+    private static void quake(Vec3 at, ClientLevel level, double shaken) {
         Vec3 eye = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         if (eye.distanceToSqr(at) > QUAKE_SEEN * QUAKE_SEEN) return;
         // The second missile lands where the first did: one wave through that ground, not two drawn over each other.
         for (Quake q : QUAKES) if (q.at.distanceToSqr(at) < 64 && ClientState.now() - q.born < 20) return;
         List<Column> columns = new ArrayList<>();
-        int reach = (int) QUAKE_REACH, cx = Mth.floor(at.x), cz = Mth.floor(at.z), top = Mth.floor(at.y) + 4, bottom = Mth.floor(at.y) - 14;
+        int reach = (int) shaken, cx = Mth.floor(at.x), cz = Mth.floor(at.z), top = Mth.floor(at.y) + 4, bottom = Mth.floor(at.y) - 14;
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(), above = new BlockPos.MutableBlockPos();
         for (int dx = -reach; dx <= reach; dx++)
             for (int dz = -reach; dz <= reach; dz++) {
                 double r = Math.hypot(cx + dx + .5 - at.x, cz + dz + .5 - at.z);
-                if (r > QUAKE_REACH || r < QUAKE_INNER || !level.hasChunkAt(pos.set(cx + dx, top, cz + dz))) continue;
+                if (r > shaken || r < QUAKE_INNER || !level.hasChunkAt(pos.set(cx + dx, top, cz + dz))) continue;
                 for (int y = top; y >= bottom; y--) {
                     BlockState state = level.getBlockState(pos.set(cx + dx, y, cz + dz));
                     if (state.getCollisionShape(level, pos).isEmpty()) continue;
@@ -981,13 +1027,13 @@ public final class ArsenalClient {
                 }
             }
         if (columns.isEmpty()) return;
-        QUAKES.add(new Quake(at, ClientState.now(), columns));
+        QUAKES.add(new Quake(at, ClientState.now(), columns, shaken));
         while (QUAKES.size() > MOST_QUAKES) QUAKES.remove(0);
     }
 
     /** How far a block of ground {@code reach} out from a blast is thrown: most at the crater's edge, a little at the far one. */
-    private static double thrown(double reach) {
-        double out = Mth.clamp((reach - QUAKE_INNER) / (QUAKE_REACH - QUAKE_INNER), 0, 1);
+    private static double thrown(double reach, double shaken) {
+        double out = Mth.clamp((reach - QUAKE_INNER) / (shaken - QUAKE_INNER), 0, 1);
         return .08 + (QUAKE_THROW - .08) * Math.pow(1 - out, 1.3);
     }
 
@@ -997,7 +1043,7 @@ public final class ArsenalClient {
         for (Column c : q.columns) {
             if (!c.dust() || (long) (c.reach() / QUAKE_SPEED) != age || level.getBlockState(c.pos()) != c.state()) continue;
             level.addParticle(new BlockParticleOption(ParticleTypes.BLOCK, c.state()), c.pos().getX() + random.nextDouble(), c.pos().getY() + 1.05,
-                c.pos().getZ() + random.nextDouble(), random.nextGaussian() * .04, .12 + random.nextDouble() * .18 * thrown(c.reach()) / QUAKE_THROW,
+                c.pos().getZ() + random.nextDouble(), random.nextGaussian() * .04, .12 + random.nextDouble() * .18 * thrown(c.reach(), q.reach) / QUAKE_THROW,
                 random.nextGaussian() * .04);
         }
         Player me = Minecraft.getInstance().player;
@@ -1006,8 +1052,8 @@ public final class ArsenalClient {
         if (age < d / QUAKE_SPEED) return;
         q.felt = true;
         // Felt only standing on it, within reach of it and near its height.
-        if (d <= QUAKE_REACH && me.onGround() && Math.abs(me.getY() - q.at.y) < 12)
-            com.hexgodofstories.client.leviathan.LeviathanEffects.quake((float) (.5 + 1.6 * (1 - d / QUAKE_REACH)));
+        if (d <= q.reach && me.onGround() && Math.abs(me.getY() - q.at.y) < 12)
+            com.hexgodofstories.client.leviathan.LeviathanEffects.quake((float) (.5 + 1.6 * (1 - d / q.reach)));
     }
 
     /** Every block of ground a blast's wave is under this frame, thrown up and settling: drawn over itself, a little raised. */
@@ -1026,7 +1072,7 @@ public final class ArsenalClient {
                 for (Column c : q.columns) {
                     double local = age - c.reach() / QUAKE_SPEED;
                     if (local <= 0 || local >= QUAKE_BUMP || drawn >= MOST_THROWN) continue;
-                    double lift = thrown(c.reach()) * Math.sin(Math.PI * local / QUAKE_BUMP);
+                    double lift = thrown(c.reach(), q.reach) * Math.sin(Math.PI * local / QUAKE_BUMP);
                     // Gone since (the crater, a player), or out of sight: nothing to throw.
                     if (lift < .015 || level.getBlockState(c.pos()) != c.state()) continue;
                     if (frustum != null && !frustum.isVisible(new AABB(c.pos()).expandTowards(0, lift, 0))) continue;
@@ -1218,9 +1264,9 @@ public final class ArsenalClient {
         double u = age / WAVE_LIFE, eased = 1 - (1 - u) * (1 - u);
         float fade = (float) ((1 - u) * (1 - u));
         float[] c = w.green() ? GREEN_RING : FIRE_RING;
-        ring(out, view, camera, w.at().add(0, .2, 0), 1 + 15 * eased, 1.8 * (1 - .5 * u), fade, true, c);
+        ring(out, view, camera, w.at().add(0, .2, 0), (1 + 15 * eased) * w.scale(), 1.8 * (1 - .5 * u) * w.scale(), fade, true, c);
         double v = Math.min(1, age / 8);
-        if (v < 1) ring(out, view, camera, w.at(), 1.5 + 9 * (1 - (1 - v) * (1 - v)), 1.2, (float) ((1 - v) * (1 - v)) * .8f, false, c);
+        if (v < 1) ring(out, view, camera, w.at(), (1.5 + 9 * (1 - (1 - v) * (1 - v))) * w.scale(), 1.2 * w.scale(), (float) ((1 - v) * (1 - v)) * .8f, false, c);
     }
 
     private static final float[] FIRE_RING = {1, .8f, .55f}, GREEN_RING = {.45f, 1, .55f};

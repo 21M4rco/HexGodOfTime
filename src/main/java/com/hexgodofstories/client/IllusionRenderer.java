@@ -70,29 +70,13 @@ public final class IllusionRenderer extends MobRenderer<IllusionEntity,PlayerMod
         }
     }
 
-    /**
-     * Anchor Being's copy, struck: two seconds of laughing (head thrown back in fits, hands on its belly, shoulders
-     * shaking), then both arms flung straight up for the burst.
-     */
+    /** Anchor Being's copy, struck: it looks down, a little, and then it is gone. */
     private static final class Laugh {
         static void pose(PlayerModel<IllusionEntity> m,float t) {
-            float fit=Math.abs(net.minecraft.util.Mth.sin(t*.55f)),shake=net.minecraft.util.Mth.sin(t*2.3f)*.09f;
-            if(t<IllusionEntity.LAUGH_FOR) {
-                m.head.xRot=-.28f-.3f*fit;
-                m.head.yRot*=.3f;
-                m.rightArm.xRot=-.85f+shake;m.rightArm.yRot=-.55f;m.rightArm.zRot=.12f;
-                m.leftArm.xRot=-.85f-shake;m.leftArm.yRot=.55f;m.leftArm.zRot=-.12f;
-            } else {
-                float up=net.minecraft.util.Mth.clamp((t-IllusionEntity.LAUGH_FOR)/4f,0,1),eased=up*up*(3-2*up);
-                m.head.xRot=-.58f;m.head.yRot=0;
-                m.rightArm.xRot=net.minecraft.util.Mth.lerp(eased,-.85f,-3.05f);m.rightArm.yRot=net.minecraft.util.Mth.lerp(eased,-.55f,0);
-                m.rightArm.zRot=net.minecraft.util.Mth.lerp(eased,.12f,-.28f);
-                m.leftArm.xRot=net.minecraft.util.Mth.lerp(eased,-.85f,-3.05f);m.leftArm.yRot=net.minecraft.util.Mth.lerp(eased,.55f,0);
-                m.leftArm.zRot=net.minecraft.util.Mth.lerp(eased,-.12f,.28f);
-            }
+            float down=net.minecraft.util.Mth.clamp(t/6f,0,1),eased=down*down*(3-2*down);
+            m.head.xRot=net.minecraft.util.Mth.lerp(eased,m.head.xRot,.6f);
+            m.head.yRot*=1-.7f*eased;
             m.hat.copyFrom(m.head);
-            m.rightSleeve.copyFrom(m.rightArm);
-            m.leftSleeve.copyFrom(m.leftArm);
         }
     }
 

@@ -136,7 +136,9 @@ public final class HexServer {
         // ten-second limit.
         if(a.hold){Architecture.begin(p);return;}
         if(cast(p,a,action==ALTERNATE)) {
-            HexData.spend(p,a.cost);HexData.get(p).putLong("cd_"+a.name(),now+a.cooldown);
+            // Anchor Being cast in the full transformation is its secret, sixty-block variation, and costs two minutes.
+            int recovery=a==Ability.THREADS&&HexData.get(p).getBoolean("ascended")?AnchorBeing.GRAND_RECOVERY:a.cooldown;
+            HexData.spend(p,a.cost);HexData.get(p).putLong("cd_"+a.name(),now+recovery);
             reward(p,a.discipline,90);HexNetwork.sync(p);
         }
     }

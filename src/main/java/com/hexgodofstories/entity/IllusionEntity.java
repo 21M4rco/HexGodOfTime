@@ -43,8 +43,8 @@ public final class IllusionEntity extends PathfinderMob {
     /** Anchor Being's copy, and the tick it was struck and began to laugh (-1 until then). */
     private static final EntityDataAccessor<Boolean> ANCHOR=SynchedEntityData.defineId(IllusionEntity.class,EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Long> LAUGH=SynchedEntityData.defineId(IllusionEntity.class,EntityDataSerializers.LONG);
-    /** Ticks an Anchor copy laughs for once struck, and the tick its arms have gone up and it bursts. */
-    public static final int LAUGH_FOR=40,BURST_AT=48;
+    /** Once an Anchor copy is struck: the tick a grand one flashes, and the tick it bursts, having looked down a moment. */
+    public static final int FLASH_AT=12,BURST_AT=20;
     public static final int THROW_RELEASE=8,THROW_END=16;
     public enum Behavior { APPROACH, STRAFE, FEINT, RETREAT, WATCH, BLINK, THROW }
     /** 0 a single dagger, 1 twin daggers, 2 the Void sword. */
@@ -62,6 +62,8 @@ public final class IllusionEntity extends PathfinderMob {
     private Vec3 home;
     private long nextRoam;
     private int laughAt;
+    /** Cast by a caster in the full transformation: the secret, sixty-block burst. */
+    private boolean grand;
 
     public IllusionEntity(EntityType<? extends IllusionEntity> type,Level level) {super(type,level);setPersistenceRequired();}
     public static AttributeSupplier.Builder attributes() {return Mob.createMobAttributes().add(Attributes.MAX_HEALTH,1).add(Attributes.MOVEMENT_SPEED,.31).add(Attributes.FOLLOW_RANGE,32);}
@@ -82,6 +84,7 @@ public final class IllusionEntity extends PathfinderMob {
         return start<0?-1:level().getGameTime()-start+partial;
     }
     public boolean anchor() {return entityData.get(ANCHOR);}
+    public boolean grand() {return grand;}
     /** Ticks since an Anchor copy was struck and began to laugh, or -1 while it has not been. */
     public float laughAge(float partial) {
         long start=entityData.get(LAUGH);
@@ -94,6 +97,7 @@ public final class IllusionEntity extends PathfinderMob {
      */
     public void anchor(ServerPlayer p) {
         entityData.set(ANCHOR,true);
+        grand=HexData.get(p).getBoolean("ascended");
         setItemSlot(EquipmentSlot.MAINHAND,p.getMainHandItem().copy());
         setItemSlot(EquipmentSlot.OFFHAND,p.getOffhandItem().copy());
         for(EquipmentSlot slot:EquipmentSlot.values())setDropChance(slot,0);
@@ -376,7 +380,7 @@ public final class IllusionEntity extends PathfinderMob {
     }
 
     /**
-     * An Anchor copy never fights. Struck, it laughs, throws both arms up and bursts; until then it stands its ground
+     * An Anchor copy never fights. Struck, it looks down a moment and bursts; until then it stands its ground
      * and watches anything hostile near it (and anything hunting its caster hunts it instead), and with nothing
      * about it wanders its own ground the way someone killing time does.
      */
@@ -386,7 +390,7 @@ public final class IllusionEntity extends PathfinderMob {
             getNavigation().stop();
             setDeltaMovement(getDeltaMovement().multiply(0,1,0));
             if(level().getEntity(laughAt) instanceof LivingEntity at)getLookControl().setLookAt(at,30,30);
-            if(now-laugh==LAUGH_FOR/2)laughSound();
+            if(grand&&now-laugh==FLASH_AT)AnchorBeing.flash(this);
             if(now-laugh>=BURST_AT){AnchorBeing.burst(this,caster);discard();}
             return;
         }
@@ -418,10 +422,6 @@ public final class IllusionEntity extends PathfinderMob {
         }
     }
 
-    private void laughSound() {
-        level().playSound(null,getX(),getEyeY(),getZ(),net.minecraft.sounds.SoundEvents.WITCH_CELEBRATE,net.minecraft.sounds.SoundSource.PLAYERS,1.3f,.72f);
-    }
-
     public void dispel() {
         if(isRemoved())return;
         HexNetwork.fx(this,"dispel");
@@ -437,12 +437,11 @@ public final class IllusionEntity extends PathfinderMob {
     @Override public boolean hurt(DamageSource source,float amount) {
         if(level().isClientSide)return true;
         if(anchor()) {
-            // Struck by something, not by the world: it laughs, and there is no taking the blow back.
+            // Struck by something, not by the world: it looks down, and there is no taking the blow back.
             if(entityData.get(LAUGH)<0&&(source.getEntity()!=null||source.getDirectEntity()!=null)) {
                 entityData.set(LAUGH,level().getGameTime());
                 Entity by=source.getEntity()!=null?source.getEntity():source.getDirectEntity();
                 laughAt=by.getId();
-                laughSound();
             }
             return true;
         }
