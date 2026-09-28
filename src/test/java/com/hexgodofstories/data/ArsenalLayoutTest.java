@@ -267,6 +267,10 @@ public final class ArsenalLayoutTest {
             double[] muzzle = pose.point(ArsenalLayout.MUZZLE[ArsenalLayout.SNEAK_TYPE], ArsenalLayout.GUN_SCALE);
             require(dot(muzzle, to) / l > .4, "its muzzle is the end nearer the back");
         }
+        // The head, a third of the way down it on a player, and inside the body whatever its size.
+        require(Math.abs(ArsenalLayout.head(1.8) - 1.65) < .01, "a player is shot through the upper head, not " + ArsenalLayout.head(1.8));
+        for (double h = .1; h < 20; h *= 1.3)
+            require(ArsenalLayout.head(h) > h * .6 && ArsenalLayout.head(h) < h, "on a body " + h + " tall the aim is near its top and inside it");
         // Facing south with the top up, a right hand points west.
         ArsenalLayout.Pose south = ArsenalLayout.aimed(new double[]{0, 0, 0}, new double[]{0, 0, 10});
         require(close(south.right(), new double[]{-1, 0, 0}, 1e-9) && close(south.up(), new double[]{0, 1, 0}, 1e-9), "upright, right hand west");

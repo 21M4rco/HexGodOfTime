@@ -13,7 +13,8 @@
   the barrels, dust and sparks where the rounds land.
 - **The rounds hold; the missiles kill.** A round barely stings (a twentieth of a heart) but stuns for a
   second, and every round after it starts that second again, so a body kept under fire is held for as long
-  as it is. Rounds go through up to four bodies but never through a block, and once a second a body under
+  as it is. A shield raised toward you takes the rounds, and the stun with them. Rounds go through up to four
+  bodies but never through a block, and once a second a body under
   fire takes a tiny hole where a round went in (open thirty seconds at most) and bleeds a little. A body
   takes at most one round a tick however many barrels are on it, and is never knocked about by them. You
   walk at a third of your pace meanwhile and cannot jump or sprint.
@@ -22,8 +23,8 @@
 - **Hold to the end.** The guns come apart as two big missiles form beside your head, and at thirteen seconds
   you throw your arms down and they go — slowly, pushed by their fire, never straight: each climbs out to its
   own side, swings across the other's path and corkscrews down onto the point you aimed at, trailing smoke.
-  Whatever your fire was still holding when it stopped stays held until they land (six seconds at most). A
-  missile is forty hearts to the body it strikes; its blast is thirty to anything else within five blocks,
+  Whatever your fire was still holding when it stopped stays held until they land (six seconds at most). No
+  shield stops a missile. A missile is forty hearts to the body it strikes; its blast is thirty to anything else within five blocks,
   less out to nine, and sets it burning; it blows a
   crater (a power-6 explosion's worth, asked of every mod that guards the world first) that knits itself shut
   a block at a time, the way Paradise's ground does, starting some eight seconds later. Nothing drops and
@@ -32,13 +33,14 @@
   kicking up dust, and whoever is standing on it feels it roll under them. It is drawn only, on each client;
   no block moves.
 - **Gotcha!** Tap the alternate key while looking at a body and a single gun forms without a sound a little
-  way behind its back, turns on it, and shoots it once in the back: ten hearts, a hole bigger than a round's
-  (open thirty seconds at most) and five seconds of pouring. The gun goes behind the body where you can see
-  it form if it can (turned round to one side, nearer or higher when straight back is walled in or hidden
-  behind the body itself), otherwise anywhere around the body with room for the whole gun and a clear shot,
-  and last of all over its head. No energy; it leaves the same twenty-second recovery as the missiles. Nothing
-  is spent with no body in the look or nowhere to put the gun, and the recovery is given back if the shot is
-  lost (the body dies, leaves or puts a block between them before the gun fires).
+  way behind its back, facing where its head was, then turns onto its head wherever it is now and fires: a
+  perfect shot at the upper head, whatever the size of the body, that misses only if a block is in the way
+  (and a shield takes it only if raised toward the gun itself). Ten hearts, a hole bigger than a round's
+  (open thirty seconds at most) and five seconds of pouring; your right arm points at it meanwhile. The gun
+  goes behind the body where you can see it form if it can (turned round to one side, nearer or higher
+  when straight back is walled in or hidden behind the body itself), otherwise anywhere around it with room
+  and a clear shot, and last of all over its head. No energy; seven seconds' recovery, which the crown
+  shares. Nothing is spent with no body in the look or nowhere to put the gun; a miss is a miss.
 - **Light to run.** The guns exist only on each client, drawn from the same numbers the server fires by
   (`ArsenalLayout`): a crown costs no network traffic while it fires, and the server only a handful of rays
   a tick. Each model is one draw from the GPU; flashes, tracers, flames and rings are a few quads each; sound,

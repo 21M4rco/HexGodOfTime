@@ -10,7 +10,6 @@ import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -98,6 +97,8 @@ public final class Arsenal {
     /** Gotcha!: its one round, ten hearts; its hole, bigger than a round's; and the ticks its hole pours, five seconds. */
     static final float GOTCHA = 20, GOTCHA_HOLE = .12f;
     static final int GOTCHA_BLEED = 100;
+    /** Gotcha!'s recovery, which the crown shares: seven seconds. */
+    static final int GOTCHA_RECOVERY = 140;
 
     private static final class Crown {
         final long start;
@@ -238,7 +239,8 @@ public final class Arsenal {
             settle(p, crown, true);
             // The fire leads up to the missiles: whatever it was still holding stays held while they form.
             for (Map.Entry<Integer, Long> s : crown.struck.entrySet())
-                if (now - s.getValue() <= STUN && p.serverLevel().getEntity(s.getKey()) instanceof LivingEntity body && body.isAlive()) {
+                if (now - s.getValue() <= STUN && p.serverLevel().getEntity(s.getKey()) instanceof LivingEntity body && body.isAlive()
+                    && ScepterBlast.stunned(body)) {
                     crown.pinned.add(s.getKey());
                     ScepterBlast.stun(body, ArsenalLayout.LAUNCH - ArsenalLayout.FIRE_END + 2);
                 }
@@ -337,8 +339,9 @@ public final class Arsenal {
         crown.struck.put(id, now);
         crown.owed.merge(id, ROUND, Float::sum);
         crown.entry.put(id, new Vec3[]{hit.at(), direction});
-        // The first round into a body not already held lands at once: one round stops it where it stands.
-        crown.dealt.putIfAbsent(id, hit.body() instanceof LivingEntity body && ScepterBlast.stunned(body) ? now : now - DEAL_EVERY);
+        // The first round into a body not already held lands at once: one round stops it where it stands. One behind a
+        // raised shield is only gathered up like the rest.
+        crown.dealt.putIfAbsent(id, hit.body() instanceof LivingEntity body && (ScepterBlast.stunned(body) || body.isBlocking()) ? now : now - DEAL_EVERY);
     }
 
     /** Deals every body what it is owed, once it has been owed for {@link #DEAL_EVERY} ticks, or everything, now. */
@@ -354,6 +357,8 @@ public final class Arsenal {
             crown.dealt.remove(owed.getKey());
             Vec3[] entry = crown.entry.remove(owed.getKey());
             if (!(p.serverLevel().getEntity(owed.getKey()) instanceof LivingEntity body) || !body.isAlive()) continue;
+            // A shield raised toward the crown takes its rounds, and with them the stun, the hole and the bleeding.
+            boolean blocked = body.isDamageSourceBlocked(source);
             body.invulnerableTime = 0;
             striking = true;
             try {
@@ -361,7 +366,7 @@ public final class Arsenal {
             } finally {
                 striking = false;
             }
-            if (body.isDeadOrDying()) continue;
+            if (blocked || body.isDeadOrDying()) continue;
             // Held where it stands for a second from its latest round: under steady fire, held for good.
             ScepterBlast.stun(body, STUN);
             // Once a second under fire, a tiny hole where a round went in, and it bleeds a little.
@@ -462,6 +467,8 @@ public final class Arsenal {
     /** A missile bursting at {@code at}, on {@code struck} if it flew into a body and null if not. */
     private static void explode(ServerLevel level, Vec3 at, ServerPlayer caster, Missile m, Entity struck) {
         DamageSource source = caster != null ? level.damageSources().explosion(caster, caster) : level.damageSources().explosion(null, null);
+        // No shield stops a missile: the same blast, credited to the caster, but from nowhere a shield could face.
+        DamageSource unblockable = new DamageSource(source.typeHolder(), null, caster);
         crater(level, at, caster, source);
         // Forty hearts to the body it flew into; to every other body within reach thirty at the heart of it, less toward
         // the edge; and all of them burning.
@@ -472,7 +479,7 @@ public final class Arsenal {
             if (distance > BLAST_REACH) continue;
             float strength = distance <= BLAST_CORE ? 1 : (float) (1 - .65 * (distance - BLAST_CORE) / (BLAST_REACH - BLAST_CORE));
             e.invulnerableTime = 0;
-            e.hurt(source, e == struck ? DIRECT : BLAST * strength);
+            e.hurt(unblockable, e == struck ? DIRECT : BLAST * strength);
             e.setSecondsOnFire((int) BURN_SECONDS);
             Vec3 away = middle.subtract(at);
             away = away.lengthSqr() < 1e-6 ? new Vec3(0, 1, 0) : away.normalize();
@@ -565,8 +572,8 @@ public final class Arsenal {
         long now = HexData.now(p);
         Sneak sneak = new Sneak(level, p.getUUID(), ++nextSneak, body.getId(), at, now);
         SNEAKS.add(sneak);
-        HexData.get(p).putLong("cd_" + Ability.ARSENAL.name(), now + Ability.ARSENAL.cooldown);
-        Vec3 aim = body.getBoundingBox().getCenter();
+        HexData.get(p).putLong("cd_" + Ability.ARSENAL.name(), now + GOTCHA_RECOVERY);
+        Vec3 aim = head(body);
         CompoundTag n = new CompoundTag();
         n.putString("state", "gotcha");
         n.putInt("id", sneak.id);
@@ -635,10 +642,10 @@ public final class Arsenal {
         if (!Double.isFinite(at.x) || !Double.isFinite(at.y) || !Double.isFinite(at.z)) return false;
         BlockPos pos = BlockPos.containing(at);
         if (!level.isInWorldBounds(pos) || !level.hasChunkAt(pos)) return false;
-        Vec3 muzzle = muzzle(at, body.getBoundingBox().getCenter());
+        Vec3 aim = head(body), muzzle = muzzle(at, aim);
         Vec3 forward = muzzle.subtract(at).normalize();
         if (!level.noCollision(new AABB(at.subtract(forward.scale(.7)), muzzle).inflate(.18))) return false;
-        if (entry(level, body, muzzle) == null) return false;
+        if (entry(level, body, muzzle, aim) == null) return false;
         if (eye == null) return true;
         if (eye.distanceToSqr(at) < 4) return false;
         if (level.clip(new ClipContext(eye, at, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null)).getType() != HitResult.Type.MISS) return false;
@@ -650,17 +657,19 @@ public final class Arsenal {
         return vec(ArsenalLayout.aimed(array(at), array(aim)).point(ArsenalLayout.MUZZLE[ArsenalLayout.SNEAK_TYPE], ArsenalLayout.GUN_SCALE));
     }
 
-    /** Where a round from {@code muzzle} at the middle of the body goes into it, or null if it would not reach it: a block in the way. */
-    private static Vec3 entry(ServerLevel level, LivingEntity body, Vec3 muzzle) {
-        Vec3 middle = body.getBoundingBox().getCenter(), to = middle.subtract(muzzle);
-        if (to.lengthSqr() < 1e-6) return null;
-        var in = body.getBoundingBox().inflate(.1).clip(muzzle, middle.add(to.normalize().scale(2)));
-        if (in.isEmpty()) return null;
-        return level.clip(new ClipContext(muzzle, in.get(), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null)).getType() == HitResult.Type.MISS
-            ? in.get() : null;
+    /**
+     * Where a round from {@code muzzle} at {@code aim}, a point in the body, goes into it, or null if it would not reach
+     * it: a block in the way. Aimed at a point inside it, it cannot miss the body itself, however big or small.
+     */
+    private static Vec3 entry(ServerLevel level, LivingEntity body, Vec3 muzzle, Vec3 aim) {
+        AABB box = body.getBoundingBox().inflate(.1);
+        Vec3 to = aim.subtract(muzzle);
+        Vec3 in = box.contains(muzzle) || to.lengthSqr() < 1e-6 ? muzzle : box.clip(muzzle, aim.add(to.normalize().scale(2))).orElse(aim);
+        return level.clip(new ClipContext(muzzle, in, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null)).getType() == HitResult.Type.MISS
+            ? in : null;
     }
 
-    /** Every Gotcha! gun in this level that has come to its moment fires; one that cannot land gives its recovery back. */
+    /** Every Gotcha! gun in this level that has come to its moment fires. If it misses, it misses. */
     private static void sneaks(ServerLevel level) {
         long now = level.getGameTime();
         for (Iterator<Sneak> it = SNEAKS.iterator(); it.hasNext(); ) {
@@ -671,43 +680,43 @@ public final class Arsenal {
             }
             if (now - s.start < ArsenalLayout.SNEAK_FIRE) continue;
             it.remove();
-            if (shoot(level, s)) continue;
-            ServerPlayer caster = level.getServer().getPlayerList().getPlayer(s.caster);
-            if (caster == null) continue;
-            // Only the recovery this very Gotcha! set, never one that has replaced it since.
-            CompoundTag d = HexData.get(caster);
-            String key = "cd_" + Ability.ARSENAL.name();
-            if (d.getLong(key) != s.start + Ability.ARSENAL.cooldown) continue;
-            d.putLong(key, 0);
-            HexNetwork.sync(caster);
-            caster.displayClientMessage(Component.literal("Gotcha! lost its shot. No recovery taken."), true);
+            shoot(level, s);
         }
     }
 
+    /** Where Gotcha! aims on a body, whatever its size: the middle of the top of its head. */
+    static Vec3 head(LivingEntity body) {
+        AABB box = body.getBoundingBox();
+        return new Vec3((box.minX + box.maxX) / 2, box.minY + ArsenalLayout.head(box.getYsize()), (box.minZ + box.maxZ) / 2);
+    }
+
     /**
-     * Gotcha!'s one round, from its muzzle into the body's back wherever the body is now. False, and nothing dealt, if
-     * the body is gone or has put a block between them.
+     * Gotcha!'s one round: the gun turns onto the body's head wherever it is now and fires, a perfect shot. It misses
+     * only if the body is gone or a block is in the way; a shield takes it only if it is raised toward the gun itself.
      */
-    private static boolean shoot(ServerLevel level, Sneak s) {
+    private static void shoot(ServerLevel level, Sneak s) {
         ServerPlayer caster = level.getServer().getPlayerList().getPlayer(s.caster);
-        if (caster == null || !(level.getEntity(s.target) instanceof LivingEntity body) || !body.isAlive() || !HexServer.validTarget(caster, body)) return false;
-        Vec3 muzzle = muzzle(s.at, body.getBoundingBox().getCenter()), in = entry(level, body, muzzle);
-        if (in == null) return false;
-        Vec3 direction = body.getBoundingBox().getCenter().subtract(muzzle).normalize();
+        if (caster == null || !(level.getEntity(s.target) instanceof LivingEntity body) || !body.isAlive() || !HexServer.validTarget(caster, body)) return;
+        Vec3 aim = head(body), muzzle = muzzle(s.at, aim), in = entry(level, body, muzzle, aim);
+        if (in == null) return;
+        Vec3 direction = aim.subtract(muzzle);
+        direction = direction.lengthSqr() < 1e-6 ? new Vec3(0, 0, 1) : direction.normalize();
+        // From the gun, not the caster: a shield only helps turned toward the gun itself.
+        DamageSource source = new DamageSource(caster.damageSources().mobProjectile(caster, caster).typeHolder(), null, caster, muzzle);
+        boolean blocked = body.isDamageSourceBlocked(source);
         body.invulnerableTime = 0;
         striking = true;
         try {
-            body.hurt(caster.damageSources().mobProjectile(caster, caster), GOTCHA);
+            body.hurt(source, GOTCHA);
         } finally {
             striking = false;
         }
-        if (body.isDeadOrDying()) return true;
+        if (blocked || body.isDeadOrDying()) return;
         // Jolted forward, the way the round went, not away from the caster.
         body.setDeltaMovement(body.getDeltaMovement().add(direction.x * .3, .08, direction.z * .3));
         body.hurtMarked = true;
         BeamWound.open(body, in, direction, GOTCHA_HOLE, HOLE_LIFE, true);
         Bleed.flow(caster, body, GOTCHA_BLEED);
-        return true;
     }
 
     private static Vec3 vec(double[] v) {return new Vec3(v[0], v[1], v[2]);}

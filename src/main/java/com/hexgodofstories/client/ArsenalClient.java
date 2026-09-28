@@ -271,11 +271,11 @@ public final class ArsenalClient {
 
     private record Wave(Vec3 at, long born) { }
 
-    /** Gotcha!'s gun: where it hangs, the body whose back it is turned on, where that back was last seen, and this frame's gun. */
+    /** Gotcha!'s gun: where it hangs, the body it is for, where that body's head was when it began, where it points now, and this frame's gun. */
     private static final class Sneak {
         final int target;
         final long start;
-        final Vec3 at;
+        final Vec3 at, from;
         Vec3 aim;
         Gun gun;
         long drawn = Long.MIN_VALUE / 2;
@@ -285,6 +285,7 @@ public final class ArsenalClient {
             this.target = target;
             this.start = start;
             this.at = at;
+            this.from = aim;
             this.aim = aim;
         }
     }
@@ -724,9 +725,8 @@ public final class ArsenalClient {
             for (Sneak s : SNEAKS.values()) {
                 if (s.at.distanceToSqr(eye) > DRAW_RANGE * DRAW_RANGE) {s.gun = null; continue;}
                 double t = ClientState.since(s.start, partial);
-                // Turned on the body's back until it fires, and held where it fired from as it comes apart.
-                Entity target = mc.level.getEntity(s.target);
-                if (target != null && t < ArsenalLayout.SNEAK_FIRE) s.aim = target.getPosition(partial).add(0, target.getBbHeight() / 2, 0);
+                // Formed facing where the head was, then turned onto where it is as it fires, and held there as it comes apart.
+                if (t < ArsenalLayout.SNEAK_FIRE) s.aim = sneakAim(s, mc.level.getEntity(s.target), t, partial);
                 s.gun = sneak(s, t);
                 s.drawn = frame;
                 ArsenalMeshes.Mesh mesh = s.gun == null ? null : ArsenalMeshes.get(ArsenalMeshes.GUNS[s.gun.type()]);
@@ -884,10 +884,21 @@ public final class ArsenalClient {
         return new Gun(middle, right, up, forward, muzzle, scale, reveal, flash * flash, ArsenalLayout.SNEAK_TYPE, s.start);
     }
 
-    /** Gotcha!'s one round: the crack of it, its tracer into the back (or the block in the way), the thud, and a casing. */
+    /**
+     * Where Gotcha!'s gun points {@code t} ticks after it began: where the body's head was then, while it forms; then
+     * turning onto the head as it is now, the moment it fires.
+     */
+    private static Vec3 sneakAim(Sneak s, Entity target, double t, float partial) {
+        if (t <= ArsenalLayout.SNEAK_FORM) return s.from;
+        if (target == null) return s.aim;
+        Vec3 head = target.getPosition(partial).add(0, ArsenalLayout.head(target.getBbHeight()), 0);
+        return s.from.lerp(head, smooth(Mth.clamp((t - ArsenalLayout.SNEAK_FORM) / (ArsenalLayout.SNEAK_FIRE - ArsenalLayout.SNEAK_FORM), 0, 1)));
+    }
+
+    /** Gotcha!'s one round, dead on the head: the crack of it, its tracer (or the block in the way), the thud, and a casing. */
     private static void gotcha(Sneak s, ClientLevel level) {
         Entity target = level.getEntity(s.target);
-        if (target != null) s.aim = target.getBoundingBox().getCenter();
+        if (target != null) s.aim = target.position().add(0, ArsenalLayout.head(target.getBbHeight()), 0);
         Gun gun = sneak(s, ArsenalLayout.SNEAK_FIRE);
         if (gun == null) return;
         Vec3 to = s.aim.subtract(gun.muzzle());

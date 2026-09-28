@@ -286,6 +286,12 @@ public final class ArsenalLayout {
      * {@link #SNEAK_FIRE}, and comes apart from {@link #SNEAK_GONE}. It is always an RPK ({@link #SNEAK_TYPE}).
      */
     public static final int SNEAK_FORM = 14, SNEAK_FIRE = 18, SNEAK_GONE = 24, SNEAK_TYPE = 1;
+
+    /**
+     * Where Gotcha! aims on a body {@code height} tall, in blocks up from its feet: the head, a third of the way down
+     * it on a player (a little under a twelfth of the whole height below the top), whatever the size of the body.
+     */
+    public static double head(double height) {return height - Math.max(.04, Math.min(.3, height * .083));}
     /** How far behind a body's back its gun hangs, past the body's own half-width, and how far above its chest. */
     public static final double SNEAK_BACK = 3, SNEAK_RISE = .35;
 
