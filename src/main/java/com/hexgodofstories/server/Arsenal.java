@@ -73,6 +73,8 @@ public final class Arsenal {
     static final int DEAL_EVERY = 4;
     /** A round's stun, in ticks: a second, begun again by every round after it. */
     static final int STUN = 20;
+    /** Ticks at least between two refreshes of one body's stun: well inside the stun, so it never lapses under fire. */
+    static final int STUN_EVERY = 8;
     /** Bodies one round goes through, at most; a block always stops it. */
     static final int PIERCE = 4;
     /** A round's hole: its radius, far smaller than the Scepter's least, how long it stays open, and how often a body under fire is holed afresh. */
@@ -111,6 +113,8 @@ public final class Arsenal {
         /** Where the latest round went into each body and which way, for its hole; and when each was last holed. */
         final Map<Integer, Vec3[]> entry = new HashMap<>();
         final Map<Integer, Long> holed = new HashMap<>();
+        /** When each body's stun was last begun again by this crown: it need not be, and told to every client, every batch. */
+        final Map<Integer, Long> held = new HashMap<>();
         /** The bodies the fire was still holding when it ended: held on until the missiles are there. */
         final List<Integer> pinned = new ArrayList<>();
 
@@ -194,6 +198,22 @@ public final class Arsenal {
     public static void forget(ServerPlayer p) {
         Crown crown = CROWNS.get(p.getUUID());
         if (crown != null) end(p, crown, HexData.now(p), "cancel");
+    }
+
+    /**
+     * A caster logging in, on a world however old: no recovery left by an older, longer build (or a world clock that
+     * has moved) runs past this build's longest, and a hold a crash cut off is ended, so no client takes it up again.
+     */
+    public static void login(ServerPlayer p) {
+        CompoundTag d = HexData.get(p);
+        long now = HexData.now(p);
+        String key = "cd_" + Ability.ARSENAL.name();
+        if (d.getLong(key) - now > Ability.ARSENAL.cooldown) d.putLong(key, now + Ability.ARSENAL.cooldown);
+        long start = d.getLong("arsenalStart");
+        if (start > 0 && d.getLong("arsenalEnd") < start) {
+            d.putLong("arsenalEnd", Math.max(now, start));
+            d.putString("arsenalEnding", "cancel");
+        }
     }
 
     public static void reset() {
@@ -304,6 +324,8 @@ public final class Arsenal {
         Vec3 far = reach < 1e-3 ? crown.mark : eye.add(look.scale((reach + ArsenalLayout.PAST) / reach));
         // Everything any round this tick could reach: once, not once a round. Nothing to reach, nothing to trace.
         List<Entity> bodies = level.getEntities(p, new AABB(eye, far).inflate(3), e -> e instanceof LivingEntity && HexServer.validTarget(p, e));
+        // Only what is near the line the rounds fly along: a crowd off to one side of a long, slanting box costs no round anything.
+        bodies.removeIf(e -> offLine(e.getBoundingBox().getCenter(), eye, far) > 4 + e.getBbWidth());
         if (bodies.isEmpty()) return;
         List<Hit> through = new ArrayList<>();
         for (int gun = 0; gun < ArsenalLayout.GUNS; gun++) {
@@ -330,6 +352,13 @@ public final class Arsenal {
             through.sort(Comparator.comparingDouble(Hit::distance));
             for (int i = 0; i < Math.min(PIERCE, through.size()); i++) strike(crown, through.get(i), direction, now);
         }
+    }
+
+    /** How far {@code point} lies from the segment from {@code a} to {@code b}. */
+    private static double offLine(Vec3 point, Vec3 a, Vec3 b) {
+        Vec3 ab = b.subtract(a);
+        double l = ab.lengthSqr(), t = l < 1e-9 ? 0 : Mth.clamp(point.subtract(a).dot(ab) / l, 0, 1);
+        return point.distanceTo(a.add(ab.scale(t)));
     }
 
     /** A round into a body: owed its sting, and where it went in kept for its hole. One round a tick for any one body. */
@@ -368,7 +397,10 @@ public final class Arsenal {
             }
             if (blocked || body.isDeadOrDying()) continue;
             // Held where it stands for a second from its latest round: under steady fire, held for good.
-            ScepterBlast.stun(body, STUN);
+            if (now - crown.held.getOrDefault(owed.getKey(), Long.MIN_VALUE / 2) >= STUN_EVERY || !ScepterBlast.stunned(body)) {
+                crown.held.put(owed.getKey(), now);
+                ScepterBlast.stun(body, STUN);
+            }
             // Once a second under fire, a tiny hole where a round went in, and it bleeds a little.
             if (entry != null && now - crown.holed.getOrDefault(owed.getKey(), Long.MIN_VALUE / 2) >= HOLE_EVERY) {
                 crown.holed.put(owed.getKey(), now);
@@ -378,6 +410,7 @@ public final class Arsenal {
         }
         if (crown.struck.size() > 64) crown.struck.values().removeIf(t -> now - t > 20);
         if (crown.holed.size() > 64) crown.holed.values().removeIf(t -> now - t > HOLE_EVERY);
+        if (crown.held.size() > 64) crown.held.values().removeIf(t -> now - t > STUN);
     }
 
     /** The crown's rounds sting; they do not shove. */

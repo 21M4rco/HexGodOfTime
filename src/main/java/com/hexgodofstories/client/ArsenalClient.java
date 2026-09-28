@@ -306,7 +306,9 @@ public final class ArsenalClient {
     private static final double QUAKE_REACH = 20, QUAKE_INNER = 5.5, QUAKE_SPEED = 1.25, QUAKE_THROW = .55;
     private static final int QUAKE_BUMP = 4;
     /** Blocks of ground drawn thrown up in a frame, at most, over every blast; and blasts shaking the ground at once. */
-    private static final int MOST_THROWN = 700, MOST_QUAKES = 4;
+    private static final int MOST_THROWN = 500, MOST_QUAKES = 4;
+    /** Beyond this from the eye a blast's ground is not read or drawn shaking at all. */
+    private static final double QUAKE_SEEN = 96;
 
     /** A block of ground a blast's wave passes under: where, what it was, how far out, and whether it throws up dust. */
     private record Column(BlockPos pos, BlockState state, double reach, boolean dust) { }
@@ -927,6 +929,10 @@ public final class ArsenalClient {
      * near the blast's own height (a floor with open air, or nothing solid, above it), read once as the blast lands.
      */
     private static void quake(Vec3 at, ClientLevel level) {
+        Vec3 eye = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        if (eye.distanceToSqr(at) > QUAKE_SEEN * QUAKE_SEEN) return;
+        // The second missile lands where the first did: one wave through that ground, not two drawn over each other.
+        for (Quake q : QUAKES) if (q.at.distanceToSqr(at) < 64 && ClientState.now() - q.born < 20) return;
         List<Column> columns = new ArrayList<>();
         int reach = (int) QUAKE_REACH, cx = Mth.floor(at.x), cz = Mth.floor(at.z), top = Mth.floor(at.y) + 4, bottom = Mth.floor(at.y) - 14;
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(), above = new BlockPos.MutableBlockPos();
@@ -978,18 +984,21 @@ public final class ArsenalClient {
         Minecraft mc = Minecraft.getInstance();
         Vec3 camera = e.getCamera().getPosition();
         PoseStack pose = e.getPoseStack();
+        var frustum = e.getFrustum();
         MultiBufferSource.BufferSource source = MultiBufferSource.immediate(GROUND);
         var blocks = mc.getBlockRenderer();
         int drawn = 0;
         try {
             for (Quake q : QUAKES) {
+                if (q.at.distanceToSqr(camera) > QUAKE_SEEN * QUAKE_SEEN) continue;
                 double age = ClientState.since(q.born, e.getPartialTick());
                 for (Column c : q.columns) {
                     double local = age - c.reach() / QUAKE_SPEED;
                     if (local <= 0 || local >= QUAKE_BUMP || drawn >= MOST_THROWN) continue;
                     double lift = thrown(c.reach()) * Math.sin(Math.PI * local / QUAKE_BUMP);
-                    // Gone since (the crater, a player): nothing to throw.
+                    // Gone since (the crater, a player), or out of sight: nothing to throw.
                     if (lift < .015 || level.getBlockState(c.pos()) != c.state()) continue;
+                    if (frustum != null && !frustum.isVisible(new AABB(c.pos()).expandTowards(0, lift, 0))) continue;
                     drawn++;
                     BlockPos at = c.pos();
                     pose.pushPose();
