@@ -159,6 +159,7 @@ public final class WorldEffects {
         if(mc.level==null||mc.player==null)return;
         Vec3 eye=mc.player.getEyePosition();
         GripRenderer.tick(now);
+        GraspRenderer.tick();
         // Small emerald motes mark the actual ten-block freeze edge. These are particles,
         // not the large textured cloud used by Cosmic Flight and slow fields.
         if(now%2==0) {
@@ -479,7 +480,7 @@ public final class WorldEffects {
         CapeRenderer.renderAll(pose,buffers,partial);
         CosmicNebula.render(pose,buffers,partial);
 
-        ThreadsRenderer.render(pose,buffers,partial);
+        GraspRenderer.render(pose,buffers,partial);
         TimeBranchRenderer.render(pose,buffers,partial);
         ErasureRenderer.render(pose,buffers,partial);
         pose.popPose();

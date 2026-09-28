@@ -58,7 +58,7 @@ public final class HexAnimations {
             if(left&&name.startsWith("scepter_"))name+="_left";
             boolean manifest=name.startsWith("scepter_manifest")||name.startsWith("scepter_fire");
             // Gotcha!'s pointing arm, and the arm held out toward whatever telekinesis holds: seen in first person too.
-            boolean pointing=name.equals("gotcha")||name.equals("telekinesis");
+            boolean pointing=name.equals("gotcha")||name.equals("telekinesis")||name.equals("grasp_slash");
             ResourceLocation resourcelocation = HexGodOfStories.id(name);
             KeyframeAnimation keyframeanimation = PlayerAnimationRegistry.getAnimation(resourcelocation);
             if (keyframeanimation == null) {

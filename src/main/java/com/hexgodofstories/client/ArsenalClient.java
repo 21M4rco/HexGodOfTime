@@ -25,6 +25,7 @@ import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.BlockParticleOption;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -269,7 +270,8 @@ public final class ArsenalClient {
         }
     }
 
-    private record Wave(Vec3 at, long born) { }
+    /** A blast's rings: a missile's are fire-coloured, an Anchor copy's green. */
+    private record Wave(Vec3 at, long born, boolean green) { }
 
     /** Gotcha!'s gun: where it hangs, the body it is for, where that body's head was when it began, where it points now, and this frame's gun. */
     private static final class Sneak {
@@ -370,6 +372,7 @@ public final class ArsenalClient {
             }
             case "launch" -> launch(entity, data);
             case "impact" -> impact(data);
+            case "anchor_burst" -> anchorBurst(data);
             case "gotcha" -> {
                 ArsenalMeshes.preload(FLASH, FLARE);
                 SNEAKS.put(data.getInt("id"), new Sneak(data.getInt("target"), data.getLong("start"),
@@ -416,6 +419,34 @@ public final class ArsenalClient {
         if (heard != null) stereo(HexGodOfStories.ARSENAL_MISSILE_LAUNCH.get(), heard, 1, .96f + mc.level.random.nextFloat() * .08f, 96);
     }
 
+    private static final DustParticleOptions BURST_BRIGHT = new DustParticleOptions(new Vector3f(.45f, 1f, .55f), 3.2f),
+        BURST_DEEP = new DustParticleOptions(new Vector3f(.1f, .7f, .3f), 2.6f);
+
+    /** Anchor Being's copy bursting: a great green blast, its rings, the ground shaking, the boom. Breaks nothing. */
+    private static void anchorBurst(CompoundTag n) {
+        Minecraft mc = Minecraft.getInstance();
+        ClientLevel level = mc.level;
+        Vec3 at = new Vec3(n.getDouble("x"), n.getDouble("y"), n.getDouble("z")), core = at.add(0, 1, 0);
+        RandomSource random = level.random;
+        for (int i = 0; i < 220; i++) {
+            Vec3 dir = new Vec3(random.nextGaussian(), random.nextGaussian() * .8 + .15, random.nextGaussian()).normalize();
+            double speed = .25 + random.nextDouble() * .7;
+            level.addParticle(i % 3 == 0 ? BURST_DEEP : BURST_BRIGHT, core.x + dir.x * .4, core.y + dir.y * .4, core.z + dir.z * .4,
+                dir.x * speed, dir.y * speed, dir.z * speed);
+        }
+        for (int i = 0; i < 40; i++)
+            level.addParticle(i % 2 == 0 ? ParticleTypes.END_ROD : ParticleTypes.HAPPY_VILLAGER, core.x, core.y, core.z,
+                random.nextGaussian() * .35, random.nextGaussian() * .35 + .1, random.nextGaussian() * .35);
+        level.addParticle(ParticleTypes.FLASH, core.x, core.y, core.z, 0, 0, 0);
+        quake(at, level);
+        WAVES.add(new Wave(at, ClientState.now(), true));
+        while (WAVES.size() > 8) WAVES.remove(0);
+        play(HexGodOfStories.ARSENAL_EXPLOSION.get(), at, 1, .82f);
+        play(HexGodOfStories.ARSENAL_EXPLOSION_FAR.get(), at, 1, .78f);
+        double d = mc.gameRenderer.getMainCamera().getPosition().distanceTo(at);
+        if (d < 48) com.hexgodofstories.client.leviathan.LeviathanEffects.scepterRecoil((float) (1.5 * (1 - d / 48) * (1 - d / 48)));
+    }
+
     private static void impact(CompoundTag n) {
         Minecraft mc = Minecraft.getInstance();
         Missile m = MISSILES.remove(n.getInt("id"));
@@ -423,7 +454,7 @@ public final class ArsenalClient {
         Vec3 at = new Vec3(n.getDouble("x"), n.getDouble("y"), n.getDouble("z"));
         ArsenalFx.explode(at);
         quake(at, mc.level);
-        WAVES.add(new Wave(at, ClientState.now()));
+        WAVES.add(new Wave(at, ClientState.now(), false));
         while (WAVES.size() > 8) WAVES.remove(0);
         float pitch = .92f + mc.level.random.nextFloat() * .1f;
         play(HexGodOfStories.ARSENAL_EXPLOSION.get(), at, 1, pitch);
@@ -1186,12 +1217,16 @@ public final class ArsenalClient {
         if (age < 0 || age > WAVE_LIFE) return;
         double u = age / WAVE_LIFE, eased = 1 - (1 - u) * (1 - u);
         float fade = (float) ((1 - u) * (1 - u));
-        ring(out, view, camera, w.at().add(0, .2, 0), 1 + 15 * eased, 1.8 * (1 - .5 * u), fade, true);
+        float[] c = w.green() ? GREEN_RING : FIRE_RING;
+        ring(out, view, camera, w.at().add(0, .2, 0), 1 + 15 * eased, 1.8 * (1 - .5 * u), fade, true, c);
         double v = Math.min(1, age / 8);
-        if (v < 1) ring(out, view, camera, w.at(), 1.5 + 9 * (1 - (1 - v) * (1 - v)), 1.2, (float) ((1 - v) * (1 - v)) * .8f, false);
+        if (v < 1) ring(out, view, camera, w.at(), 1.5 + 9 * (1 - (1 - v) * (1 - v)), 1.2, (float) ((1 - v) * (1 - v)) * .8f, false, c);
     }
 
-    private static void ring(VertexConsumer out, Matrix4f view, Vec3 camera, Vec3 centre, double radius, double width, float fade, boolean level) {
+    private static final float[] FIRE_RING = {1, .8f, .55f}, GREEN_RING = {.45f, 1, .55f};
+
+    private static void ring(VertexConsumer out, Matrix4f view, Vec3 camera, Vec3 centre, double radius, double width, float fade, boolean level,
+                             float[] colour) {
         final int segments = 56;
         Vector3f middle = at(view, camera, centre);
         double[] radii = {Math.max(0, radius - width), radius, radius + width};
@@ -1206,12 +1241,12 @@ public final class ArsenalClient {
                         : new Vector3f(middle.x() + (float) (Math.cos(angle) * r), middle.y() + (float) (Math.sin(angle) * r), middle.z());
                 }
                 float inner = alpha[band], outer = alpha[band + 1];
-                vertex(out, p[0], 1, .8f, .55f, inner, 0, 0);
-                vertex(out, p[1], 1, .8f, .55f, inner, 1, 0);
-                vertex(out, p[2], 1, .8f, .55f, outer, 1, 1);
-                vertex(out, p[0], 1, .8f, .55f, inner, 0, 0);
-                vertex(out, p[2], 1, .8f, .55f, outer, 1, 1);
-                vertex(out, p[3], 1, .8f, .55f, outer, 0, 1);
+                vertex(out, p[0], colour[0], colour[1], colour[2], inner, 0, 0);
+                vertex(out, p[1], colour[0], colour[1], colour[2], inner, 1, 0);
+                vertex(out, p[2], colour[0], colour[1], colour[2], outer, 1, 1);
+                vertex(out, p[0], colour[0], colour[1], colour[2], inner, 0, 0);
+                vertex(out, p[2], colour[0], colour[1], colour[2], outer, 1, 1);
+                vertex(out, p[3], colour[0], colour[1], colour[2], outer, 0, 1);
             }
     }
 

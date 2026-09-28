@@ -1,3 +1,18 @@
+## Anchor Being — the first move of Glorious Purpose (replaces Temporal Threads)
+
+- **Anchor Being (cast).** You vanish for ten seconds (body, armour, what you hold, cloak, name and shadow,
+  from every eye) and in the same tick a double takes your place: where you stood, looking where you looked,
+  holding what you held and, if you were walking, walking on. No sound, no flash, no gesture. Whatever was
+  hunting you turns on it. It never fights: it watches anything hostile near it and otherwise wanders its
+  ground, for up to twenty seconds. Strike it and it laughs for two seconds, throws both arms up and bursts
+  in a great green blast: twenty hearts (half at the edge of nine blocks), twenty seconds of nausea, the
+  ground shaking forty blocks across, no block broken and no shield stopping it. 25 energy; 30 s recovery.
+- **Gravity Grasp (hold the alternate key).** Your arm goes out and a small black hole opens in front of your
+  hand, drawing in everything you could harm within fourteen blocks, harder the longer you hold (ten seconds
+  at most); at first a player can walk away from it, a couple of seconds in not even sprinting. Whatever it
+  drags within arm's reach you cut, once, with a dagger conjured for the stroke: five hearts and ten seconds'
+  bleeding. Its own 12 s recovery, apart from Anchor Being's.
+
 ## The Crown of Barrels — Loki's last conjuration
 
 - **Nothing in the hand.** Conjuration at 620 mastery, once the Scepter is unlocked; 200 Temporal Energy.

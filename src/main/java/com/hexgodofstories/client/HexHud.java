@@ -57,6 +57,11 @@ public final class HexHud {
         for(int i=0;i<Math.min(2,lines.size());i++)g.drawString(mc.font,lines.get(i),7,32+i*10,fracture?0xd8ecdd:0xc9d8ce,false);
         String hint=!fracture?alternate(a):home?"Choose where the break leads":"";
         if(a==Ability.WARPING)hint=com.hexgodofstories.warping.Destination.at(d.getInt("warpDestination")).title;
+        if(a==Ability.THREADS) {
+            // Gravity Grasp keeps its own recovery, apart from Anchor Being's shown above.
+            long grasp=d.getLong(com.hexgodofstories.server.GravityGrasp.READY)-ClientState.now();
+            if(grasp>0&&grasp<=com.hexgodofstories.server.GravityGrasp.RECOVERY)hint=String.format(Locale.ROOT,"Gravity Grasp %.1fs",grasp/20f);
+        }
         if(a==Ability.ARSENAL) {
             // Gotcha! keeps its own recovery, apart from the crown's shown above.
             long gotcha=d.getLong(com.hexgodofstories.server.Arsenal.GOTCHA_READY)-ClientState.now();
@@ -144,7 +149,7 @@ public final class HexHud {
             case SLOW_FIELD -> "";
             case TIME_STOP -> "Freeze the local battlefield.";
             case SELECTIVE_STOP -> "Freeze the target in your aim.";
-            case THREADS -> "Stick your target in time: 5 s.";
+            case THREADS -> "Vanish; your double bursts when struck.";
             case ASCENSION -> "Toggle your final transformation.";
             case TIME_BRANCH -> "Tap: right fist. Hold/release: beam.";
             case ARSENAL -> "Hold: the crown fires and stuns. Hold 13s: missiles.";
@@ -165,7 +170,7 @@ public final class HexHud {
             case SLOW_FIELD -> "";
             case TIME_STOP -> "Press Z again to resume";
             case SELECTIVE_STOP -> "Exempt an ally";
-            case THREADS -> "Pull bound target";
+            case THREADS -> "Hold: Gravity Grasp";
             case TIME_BRANCH -> "None — release the cast key to fire";
             case ARSENAL -> "Gotcha!";
             default -> "Same action";

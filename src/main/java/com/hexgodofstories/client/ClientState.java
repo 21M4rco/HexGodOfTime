@@ -167,8 +167,7 @@ public final class ClientState {
             FROZEN.keySet().removeIf(id->mc.level.getEntity(id)==null);
             DISGUISES.keySet().removeIf(id->mc.level.getEntity(id)==null);
         }
-        // A moment resuming: its clock rings break apart as they go.
-        THREADS.entrySet().removeIf(e->{if(e.getValue().until()>=now())return false;ThreadsRenderer.burst(e.getValue().target());return true;});
+        THREADS.entrySet().removeIf(e->e.getValue().until()<now());
         STUNNED.entrySet().removeIf(e->e.getValue()<=now()||mc.level.getEntity(e.getKey())==null);
         WorldEffects.tick();
         TimeBranchRenderer.tick();

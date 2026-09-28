@@ -1,0 +1,40 @@
+{
+  "version": 3,
+  "name": "grasp_slash",
+  "author": "HexGodOfStories",
+  "description": "Gravity Grasp's cut: from the arm held out to the hole, the dagger drawn back across the body and slashed out through whatever the hole dragged in, then back out to the hole.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 10,
+    "stopTick": 10,
+    "isLoop": false,
+    "returnTick": 0,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "outquad",
+        "rightArm": {"pitch": -90, "yaw": 0, "roll": 0},
+        "torso": {"pitch": 0, "yaw": 0, "roll": 0}
+      },
+      {
+        "tick": 2,
+        "easing": "inquad",
+        "rightArm": {"pitch": -115, "yaw": 55, "roll": -20},
+        "torso": {"pitch": 0, "yaw": 12, "roll": 0}
+      },
+      {
+        "tick": 5,
+        "easing": "outquad",
+        "rightArm": {"pitch": -70, "yaw": -60, "roll": 25},
+        "torso": {"pitch": 4, "yaw": -14, "roll": 0}
+      },
+      {
+        "tick": 10,
+        "easing": "inoutquad",
+        "rightArm": {"pitch": -90, "yaw": 0, "roll": 0},
+        "torso": {"pitch": 0, "yaw": 0, "roll": 0}
+      }
+    ]
+  }
+}

@@ -55,8 +55,11 @@ public final class IllusionRenderer extends MobRenderer<IllusionEntity,PlayerMod
     /** Pose the actual arm and sleeve so the held item follows the wind-up and release. */
     private static final class ThrowModel extends PlayerModel<IllusionEntity> {
         ThrowModel(net.minecraft.client.model.geom.ModelPart root,boolean slim){super(root,slim);}
+        private void laugh(float t){Laugh.pose(this,t);}
         @Override public void setupAnim(IllusionEntity e,float walk,float amount,float age,float yaw,float pitch) {
             super.setupAnim(e,walk,amount,age,yaw,pitch);
+            float laugh=e.laughAge(age-e.tickCount);
+            if(laugh>=0){laugh(laugh);return;}
             float t=e.throwAge(age-e.tickCount);
             if(t<0||t>IllusionEntity.THROW_END)return;
             float rotation=t<5?net.minecraft.util.Mth.lerp(t/5,-.35f,-3.25f)
@@ -64,6 +67,32 @@ public final class IllusionRenderer extends MobRenderer<IllusionEntity,PlayerMod
                 :net.minecraft.util.Mth.lerp((t-IllusionEntity.THROW_RELEASE)/8,-(float)Math.PI/2,-.35f);
             rightArm.xRot=rotation;rightArm.yRot=0;rightArm.zRot=0;
             rightSleeve.copyFrom(rightArm);
+        }
+    }
+
+    /**
+     * Anchor Being's copy, struck: two seconds of laughing (head thrown back in fits, hands on its belly, shoulders
+     * shaking), then both arms flung straight up for the burst.
+     */
+    private static final class Laugh {
+        static void pose(PlayerModel<IllusionEntity> m,float t) {
+            float fit=Math.abs(net.minecraft.util.Mth.sin(t*.55f)),shake=net.minecraft.util.Mth.sin(t*2.3f)*.09f;
+            if(t<IllusionEntity.LAUGH_FOR) {
+                m.head.xRot=-.28f-.3f*fit;
+                m.head.yRot*=.3f;
+                m.rightArm.xRot=-.85f+shake;m.rightArm.yRot=-.55f;m.rightArm.zRot=.12f;
+                m.leftArm.xRot=-.85f-shake;m.leftArm.yRot=.55f;m.leftArm.zRot=-.12f;
+            } else {
+                float up=net.minecraft.util.Mth.clamp((t-IllusionEntity.LAUGH_FOR)/4f,0,1),eased=up*up*(3-2*up);
+                m.head.xRot=-.58f;m.head.yRot=0;
+                m.rightArm.xRot=net.minecraft.util.Mth.lerp(eased,-.85f,-3.05f);m.rightArm.yRot=net.minecraft.util.Mth.lerp(eased,-.55f,0);
+                m.rightArm.zRot=net.minecraft.util.Mth.lerp(eased,.12f,-.28f);
+                m.leftArm.xRot=net.minecraft.util.Mth.lerp(eased,-.85f,-3.05f);m.leftArm.yRot=net.minecraft.util.Mth.lerp(eased,.55f,0);
+                m.leftArm.zRot=net.minecraft.util.Mth.lerp(eased,-.12f,.28f);
+            }
+            m.hat.copyFrom(m.head);
+            m.rightSleeve.copyFrom(m.rightArm);
+            m.leftSleeve.copyFrom(m.leftArm);
         }
     }
 

@@ -36,6 +36,8 @@ public final class HexClient {
     public static final KeyMapping[] TIME_KEYS={TIME_STOP,TIME_REWIND,TIME_BRANCH};
     private static KeyMapping key(String name,int key){return new KeyMapping("key.hexgodofstories."+name,InputConstants.Type.KEYSYM,key,"key.categories.hexgodofstories");}
     private static boolean primaryDown,selectDown,primaryWasHold,primaryLatched;
+    /** The alternate key held as Gravity Grasp (Anchor Being chosen): its release must always reach the server. */
+    private static boolean graspDown;
     private static int repeat;
     /** The server syncs this flag. Missing/false means this client gets no mod UI or controls at all. */
     public static boolean enabled(){return ClientState.self().getBoolean("abilitiesEnabled");}
@@ -99,7 +101,7 @@ public final class HexClient {
             if(e.phase!=TickEvent.Phase.END)return;
             ClientState.tick();
             Minecraft mc=Minecraft.getInstance();
-            if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;selectDown=false;QuickBar.closeBar(false);return;}
+            if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;selectDown=false;graspDown=false;QuickBar.closeBar(false);return;}
             if(!enabled()) {
                 // Locked means invisible and inert, not merely server-rejected. Swallow every mod input
                 // and close any mod-only screen immediately when access is revoked.
@@ -107,6 +109,7 @@ public final class HexClient {
                 ScepterClient.input(false);
                 primaryLatched=primaryPhysicallyDown();
                 primaryDown=false;primaryWasHold=false;repeat=0;
+                if(graspDown){graspDown=false;HexNetwork.send(HexServer.GRASP_END,0);}
                 selectDown=SELECT.isDown();
                 QuickBar.closeBar(false);
                 if(mc.screen instanceof WarpScreen||mc.screen instanceof MasteryScreen||mc.screen instanceof FractureScreen)mc.setScreen(null);
@@ -120,6 +123,7 @@ public final class HexClient {
                 // the screen closes. Crossing a dimension puts the terrain screen up mid-hold, which
                 // is exactly how arriving in the sanctum used to open a second break on arrival.
                 if(primaryDown){primaryDown=false;primaryLatched=true;if(primaryWasHold)HexNetwork.send(HexServer.HOLD_END,0);}
+                if(graspDown){graspDown=false;HexNetwork.send(HexServer.GRASP_END,0);}
                 if(selectDown){selectDown=false;QuickBar.closeBar(false);}
                 drain();return;
             }
@@ -143,10 +147,16 @@ public final class HexClient {
             if(!primary&&primaryDown&&primaryWasHold)HexNetwork.send(HexServer.HOLD_END,0);
             primaryDown=primary;
 
+            // With Anchor Being chosen the alternate key is held, not tapped: Gravity Grasp for as long as it is down.
+            boolean grasp=SECONDARY.isDown()&&selected==Ability.THREADS;
+            if(grasp&&!graspDown)HexNetwork.send(HexServer.GRASP_BEGIN,0);
+            if(!grasp&&graspDown)HexNetwork.send(HexServer.GRASP_END,0);
+            graspDown=grasp;
             // G chooses a Warping destination in ordinary worlds. Inside any Warping realm
             // (including the World Tree), it directly opens the World Tree exit selector.
             while(SECONDARY.consumeClick()) {
                 Ability live=Ability.at(ClientState.self().getInt("selected"));
+                if(live==Ability.THREADS)continue;
                 if(live==Ability.WARPING) {
                     if(com.hexgodofstories.server.PocketRealm.inside(mc.player.level())
                         || com.hexgodofstories.warping.Destination.from(mc.player.level())!=null)FractureScreen.open();

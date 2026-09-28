@@ -23,7 +23,9 @@ import java.util.*;
 public final class HexServer {
     public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12,BRANCH_TAP=13,WARP_CHOICE=14,WARP_RECALL=15,WARP_STRUGGLE=16,BRANCH_BEGIN=17,BRANCH_END=18,BRANCH_CANCEL=19,
         /** The Scepter's right click: held opens a charge, let go fires it. */
-        SCEPTER_PRESS=20,SCEPTER_RELEASE=21;
+        SCEPTER_PRESS=20,SCEPTER_RELEASE=21,
+        /** Anchor Being's held alternate, Gravity Grasp: the alternate key pressed, and let go. */
+        GRASP_BEGIN=22,GRASP_END=23;
     /** Keep rewind's wire value for saved clients; the B/resume action is retired. */
     public static final int TIME_HALT=0,TIME_REWIND=2;
     public record Moment(Vec3 position,float yaw,float pitch,float health) {}
@@ -75,6 +77,7 @@ public final class HexServer {
         if(Erasure.erasing(p))return;
         if(action==BRANCH_CANCEL){TimeBranch.cancel(p);return;}
         if(action==BRANCH_END){if(TimeBranch.charging(p))TimeBranch.release(p);return;}
+        if(action==GRASP_END){GravityGrasp.release(p);return;}
         if(TimeBranch.charging(p)){if(action==UTILITY)TimeBranch.cancel(p);return;}
         // Tapped as fast as a finger allows, so it sits ahead of the shared input throttle; the
         // Scepter's own recovery decides how fast it can actually fire.
@@ -92,6 +95,7 @@ public final class HexServer {
         // M is independent of the selected spell and must register even immediately after another key.
         if(action==BRANCH_TAP){BranchFist.arm(p);return;}
         if(action==BRANCH_BEGIN){branchBegin(p);return;}
+        if(action==GRASP_BEGIN){graspBegin(p);return;}
         if(now-INPUT.getOrDefault(p.getUUID(),-100L)<(TemporalEngine.slowed(p)?15:3))return;
         INPUT.put(p.getUUID(),now);
         // The recall carries no argument at all: the destination is the one already saved on the
@@ -135,6 +139,13 @@ public final class HexServer {
             HexData.spend(p,a.cost);HexData.get(p).putLong("cd_"+a.name(),now+a.cooldown);
             reward(p,a.discipline,90);HexNetwork.sync(p);
         }
+    }
+    /** Gravity Grasp: Anchor Being chosen and unlocked, and its own recovery run out. It costs nothing else. */
+    private static void graspBegin(ServerPlayer p) {
+        if(HexData.selected(p)!=Ability.THREADS||GravityGrasp.holding(p))return;
+        if(!HexData.unlocked(p,Ability.THREADS)){notice(p,"This chapter of your story is still locked.");return;}
+        if(GravityGrasp.recovering(p)){notice(p,"Gravity Grasp is recovering.");return;}
+        GravityGrasp.begin(p);
     }
     private static void branchBegin(ServerPlayer p) {
         Ability a=Ability.TIME_BRANCH;
@@ -243,17 +254,8 @@ public final class HexServer {
             }
             case TIME_STOP -> {if(!TemporalEngine.beginStop(p))return false;return true;}
             case SELECTIVE_STOP -> {if(t==null||!validTarget(p,t)||!TemporalEngine.field(p,true,t,t instanceof Player?40:100))return false;gesture(p,"time_stop","bind",HexGodOfStories.STOP.get());return true;}
-            case THREADS -> {
-                if(t==null||!validTarget(p,t))return false;
-                if(secondary){if(!Telekinesis.grab(p,t))return false;gesture(p,"threads","bind",HexGodOfStories.SORCERY.get());return true;}
-                // Stuck in time for five seconds, player or creature, once the moment has wound down to a stop.
-                long held=TemporalEngine.RAMP+TemporalEngine.PLAYER_HOLD;
-                if(!TemporalEngine.field(p,true,t,(int)held))return false;
-                CompoundTag n=new CompoundTag();n.putInt("target",t.getId());n.putLong("start",now);n.putLong("until",now+held);
-                // Seen by everyone near the body held, not only those near the caster.
-                HexNetwork.near(p.serverLevel(),t.position(),72,new HexNetwork.Message(HexNetwork.THREADS,p.getId(),n));
-                gesture(p,"threads","bind",HexGodOfStories.SORCERY.get());return true;
-            }
+            // Anchor Being. Silent on purpose: no gesture, no sound, nothing that says a swap just happened.
+            case THREADS -> {if(secondary){notice(p,"Hold the alternate key for Gravity Grasp.");return false;}return AnchorBeing.cast(p);}
             // Worn, it is taken off before any cast is paid for (see the action handler); never charged for here.
             case ASCENSION -> {if(HexData.get(p).getBoolean("ascended")){dismissMantle(p);HexNetwork.sync(p);return false;}HexData.get(p).putBoolean("ascended",true);HexData.get(p).putLong("transformStart",now);Transformation.sustain(p);HexNetwork.fx(p,"ascend");p.level().playSound(null,p.blockPosition(),HexGodOfStories.ASCEND.get(),SoundSource.PLAYERS,.75f,1);return true;}
             default -> {return false;}
@@ -419,11 +421,12 @@ public final class HexServer {
 
     public static void tick(ServerPlayer p) {
         long now=HexData.now(p);CompoundTag d=HexData.get(p);
-        if(!p.isAlive()){ScepterBlast.cancel(p);Arsenal.forget(p);Transformation.strip(p);return;}
-        if(!HexData.access(p)){ScepterBlast.cancel(p);Arsenal.forget(p);Transformation.strip(p);CosmicFlight.revoke(p);dismissWeapons(p);return;}
+        if(!p.isAlive()){ScepterBlast.cancel(p);Arsenal.forget(p);GravityGrasp.forget(p);Transformation.strip(p);return;}
+        if(!HexData.access(p)){ScepterBlast.cancel(p);Arsenal.forget(p);GravityGrasp.forget(p);Transformation.strip(p);CosmicFlight.revoke(p);dismissWeapons(p);return;}
         PersonalRewind.record(p);
         ScepterBlast.tick(p);
         Arsenal.tick(p);
+        GravityGrasp.tick(p);
         // The mantle is armour, so it is maintained where the mantle is: every tick, granted and
         // renewed while it is worn and taken off the instant it is not.
         Transformation.sustain(p);
@@ -639,6 +642,7 @@ public final class HexServer {
         // a death, a logout or a crossing.
         TimeBranch.forget(p);BranchFist.clear(p);Erasure.forget(p);Transformation.strip(p);
         Arsenal.forget(p);
+        GravityGrasp.forget(p);
         HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());ScepterBlast.forget(p);INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         HexData.clearTransient(p,death);
     }
@@ -647,6 +651,6 @@ public final class HexServer {
         HISTORY.clear();CHARMS.clear();STRIKES.clear();INPUT.clear();TRAINING.clear();ILLUSIONS.clear();WATCHED.clear();RIFTS.clear();
         Warping.reset();
         Telekinesis.reset();Architecture.reset();Bleed.reset();Frostbite.reset();ScepterBlast.reset();PocketRealm.reset();TemporalEngine.reset();
-        Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();Arsenal.reset();
+        Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();Arsenal.reset();GravityGrasp.reset();
     }
 }
