@@ -2,7 +2,7 @@
   "version": 3,
   "name": "grasp_slash",
   "author": "HexGodOfStories",
-  "description": "Gravity Grasp's stab: the right arm drawn back to the hip, then driven straight forward and a little down into the gut of what the hole dragged in, held there a beat, and drawn out.",
+  "description": "Gravity Grasp's cut: the right arm raised across the chest to the left at throat height, whipped out across to the right through the throat of what the hole dragged in, held through the follow-through, and dropped.",
   "emote": {
     "beginTick": 0,
     "endTick": 14,
@@ -12,9 +12,9 @@
     "degrees": true,
     "moves": [
       {"tick": 0, "easing": "outquad", "rightArm": {"pitch": -90, "yaw": 0, "roll": 0}, "torso": {"pitch": 0, "yaw": 0, "roll": 0}},
-      {"tick": 3, "easing": "inquad", "rightArm": {"pitch": -25, "yaw": -8, "roll": 10}, "torso": {"pitch": -2, "yaw": 14, "roll": 0}},
-      {"tick": 5, "easing": "outquad", "rightArm": {"pitch": -78, "yaw": 6, "roll": -4}, "torso": {"pitch": 10, "yaw": -12, "roll": 0}},
-      {"tick": 9, "easing": "linear", "rightArm": {"pitch": -76, "yaw": 6, "roll": -4}, "torso": {"pitch": 9, "yaw": -10, "roll": 0}},
+      {"tick": 3, "easing": "inquad", "rightArm": {"pitch": -100, "yaw": -55, "roll": 20}, "torso": {"pitch": 0, "yaw": 16, "roll": 0}},
+      {"tick": 5, "easing": "outquad", "rightArm": {"pitch": -88, "yaw": 55, "roll": -15}, "torso": {"pitch": 0, "yaw": -18, "roll": 0}},
+      {"tick": 9, "easing": "linear", "rightArm": {"pitch": -84, "yaw": 58, "roll": -15}, "torso": {"pitch": 0, "yaw": -16, "roll": 0}},
       {"tick": 14, "easing": "inoutquad", "rightArm": {"pitch": 0, "yaw": 0, "roll": 0}, "torso": {"pitch": 0, "yaw": 0, "roll": 0}}
     ]
   }

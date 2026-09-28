@@ -43,8 +43,13 @@ public final class IllusionEntity extends PathfinderMob {
     /** Anchor Being's copy, and the tick it was struck and began to laugh (-1 until then). */
     private static final EntityDataAccessor<Boolean> ANCHOR=SynchedEntityData.defineId(IllusionEntity.class,EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Long> LAUGH=SynchedEntityData.defineId(IllusionEntity.class,EntityDataSerializers.LONG);
-    /** Once an Anchor copy is struck: the tick a grand one flashes, and the tick it bursts, having looked down a moment. */
-    public static final int FLASH_AT=12,BURST_AT=20;
+    /** Cast by a caster in the full transformation: the secret, sixty-block burst. Synced so its wind-up is the grand one. */
+    private static final EntityDataAccessor<Boolean> GRAND=SynchedEntityData.defineId(IllusionEntity.class,EntityDataSerializers.BOOLEAN);
+    /** Once an Anchor copy is struck, the tick it bursts, having looked down and wound up to it; a grand one flashes just before. */
+    public static int burstAt(boolean grand) {return grand?60:36;}
+    public static int flashAt(boolean grand) {return burstAt(grand)-8;}
+    /** Client only: the last tick of its wind-up already played out. */
+    public int windup=-1;
     public static final int THROW_RELEASE=8,THROW_END=16;
     public enum Behavior { APPROACH, STRAFE, FEINT, RETREAT, WATCH, BLINK, THROW }
     /** 0 a single dagger, 1 twin daggers, 2 the Void sword. */
@@ -62,8 +67,6 @@ public final class IllusionEntity extends PathfinderMob {
     private Vec3 home;
     private long nextRoam;
     private int laughAt;
-    /** Cast by a caster in the full transformation: the secret, sixty-block burst. */
-    private boolean grand;
 
     public IllusionEntity(EntityType<? extends IllusionEntity> type,Level level) {super(type,level);setPersistenceRequired();}
     public static AttributeSupplier.Builder attributes() {return Mob.createMobAttributes().add(Attributes.MAX_HEALTH,1).add(Attributes.MOVEMENT_SPEED,.31).add(Attributes.FOLLOW_RANGE,32);}
@@ -71,7 +74,7 @@ public final class IllusionEntity extends PathfinderMob {
         super.defineSynchedData();
         entityData.define(OWNER,Optional.empty());entityData.define(FINAL,false);
         entityData.define(BEHAVIOR,0);entityData.define(QUARRY,0);entityData.define(LOADOUT,DAGGER);entityData.define(THROW_START,-1L);
-        entityData.define(ANCHOR,false);entityData.define(LAUGH,-1L);
+        entityData.define(ANCHOR,false);entityData.define(LAUGH,-1L);entityData.define(GRAND,false);
     }
     @Override protected void registerGoals() {goalSelector.addGoal(0,new FloatGoal(this));}
     public UUID owner() {return entityData.get(OWNER).orElse(null);}
@@ -84,7 +87,7 @@ public final class IllusionEntity extends PathfinderMob {
         return start<0?-1:level().getGameTime()-start+partial;
     }
     public boolean anchor() {return entityData.get(ANCHOR);}
-    public boolean grand() {return grand;}
+    public boolean grand() {return entityData.get(GRAND);}
     /** Ticks since an Anchor copy was struck and began to laugh, or -1 while it has not been. */
     public float laughAge(float partial) {
         long start=entityData.get(LAUGH);
@@ -97,7 +100,7 @@ public final class IllusionEntity extends PathfinderMob {
      */
     public void anchor(ServerPlayer p) {
         entityData.set(ANCHOR,true);
-        grand=HexData.get(p).getBoolean("ascended");
+        entityData.set(GRAND,HexData.get(p).getBoolean("ascended"));
         setItemSlot(EquipmentSlot.MAINHAND,p.getMainHandItem().copy());
         setItemSlot(EquipmentSlot.OFFHAND,p.getOffhandItem().copy());
         for(EquipmentSlot slot:EquipmentSlot.values())setDropChance(slot,0);
@@ -178,7 +181,12 @@ public final class IllusionEntity extends PathfinderMob {
 
     @Override public void tick() {
         super.tick();
-        if(level().isClientSide)return;
+        if(level().isClientSide) {
+            // The wind-up to a struck copy's burst is only seen and heard: it lives in a class the dedicated server never resolves.
+            if(anchor()&&laughAge(0)>=0)net.minecraftforge.fml.DistExecutor.unsafeRunWhenOn(net.minecraftforge.api.distmarker.Dist.CLIENT,
+                ()->()->com.hexgodofstories.client.AnchorWindup.tick(this));
+            return;
+        }
         ServerPlayer p=owner()==null?null:((ServerLevel)level()).getServer().getPlayerList().getPlayer(owner());
         if(p==null||p.level()!=level()||!p.isAlive()||level().getGameTime()>=expires||distanceToSqr(p)>4096){dispel();return;}
         if(anchor()){anchorTick(p);return;}
@@ -390,8 +398,8 @@ public final class IllusionEntity extends PathfinderMob {
             getNavigation().stop();
             setDeltaMovement(getDeltaMovement().multiply(0,1,0));
             if(level().getEntity(laughAt) instanceof LivingEntity at)getLookControl().setLookAt(at,30,30);
-            if(grand&&now-laugh==FLASH_AT)AnchorBeing.flash(this);
-            if(now-laugh>=BURST_AT){AnchorBeing.burst(this,caster);discard();}
+            if(grand()&&now-laugh==flashAt(true))AnchorBeing.flash(this);
+            if(now-laugh>=burstAt(grand())){AnchorBeing.burst(this,caster);discard();}
             return;
         }
         if(tickCount%10!=getId()%10)return;

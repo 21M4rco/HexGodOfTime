@@ -5,7 +5,9 @@ import com.hexgodofstories.data.HexData;
 import com.hexgodofstories.network.HexNetwork;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -23,8 +25,8 @@ import java.util.UUID;
 /**
  * Gravity Grasp, Anchor Being's held alternate. The caster stretches an arm out and a small black hole opens in front
  * of the hand, drawing in every body the caster could harm within {@link #REACH} blocks, harder the longer it is held,
- * for up to {@link #MOST} ticks. Whatever it drags to within arm's reach the caster cuts, once, with a dagger conjured
- * for the stroke: five hearts and ten seconds' bleeding.
+ * for up to {@link #MOST} ticks. Whatever it drags to within arm's reach the caster cuts across the throat, once, with a
+ * dagger conjured for the stroke: five hearts, ten seconds' bleeding and a stun.
  *
  * <p>Everything here is the server's: who is pulled, how hard, and who is cut. Clients are told only that the caster
  * is holding it (player data, {@code graspStart}) and when a dagger is out ({@code graspDagger}), and draw the rest.
@@ -34,11 +36,13 @@ public final class GravityGrasp {
     private GravityGrasp() { }
 
     /**
-     * The longest hold, the reach of the pull, and its least and greatest strength, in blocks a tick added each tick. At
-     * the least a player walking away outpaces it; a couple of seconds in, not even sprinting does.
+     * The longest hold, the reach of the pull, and its least and greatest strength, in blocks a tick added each tick,
+     * reached {@link #RAMP} ticks in. Even the least drags a sprinting player back (it settles near a third of a block a
+     * tick); at the most nothing short of a boss gets away.
      */
     public static final int MOST = 200;
-    static final double REACH = 14, PULL_LEAST = .012, PULL_MOST = .12;
+    static final int RAMP = 100;
+    static final double REACH = 16, PULL_LEAST = .05, PULL_MOST = .2, KEPT = .85;
     /** Where the hole hangs, out from the eye; and how close a body must come to be cut. */
     static final double HOLE = 1.5, MELEE = 2.7;
     /** The cut: five hearts, bleeding for ten seconds, and how long the dagger is seen. */
@@ -115,7 +119,7 @@ public final class GravityGrasp {
             HexNetwork.sync(p);
         }
         Vec3 hole = hole(p);
-        double strength = PULL_LEAST + (PULL_MOST - PULL_LEAST) * Math.min(1, held / (double) MOST);
+        double strength = PULL_LEAST + (PULL_MOST - PULL_LEAST) * Math.min(1, held / (double) RAMP);
         List<Entity> near = p.level().getEntities(p, new AABB(hole, hole).inflate(REACH), e -> e instanceof LivingEntity && HexServer.validTarget(p, e));
         near.sort(Comparator.comparingDouble(e -> e.distanceToSqr(hole)));
         for (int i = 0; i < Math.min(MOST_HELD, near.size()); i++) {
@@ -126,7 +130,7 @@ public final class GravityGrasp {
             if (p.distanceTo(body) - body.getBbWidth() / 2 <= MELEE && !hold.cut.contains(body.getId())) {slash(p, hold, body, now); return;}
             // The bigger the body, the harder it is to drag; right at the hole it is held there rather than overshooting it.
             double mass = Math.max(1, body.getBbWidth() * body.getBbWidth() * body.getBbHeight() / 1.2);
-            Vec3 velocity = body.getDeltaMovement().scale(distance < 1.2 ? .4 : .92);
+            Vec3 velocity = body.getDeltaMovement().scale(distance < 1.2 ? .4 : KEPT);
             if (distance > .6) velocity = velocity.add(to.scale(strength / mass / distance));
             double speed = velocity.length();
             if (speed > 1.4) velocity = velocity.scale(1.4 / speed);
@@ -141,8 +145,8 @@ public final class GravityGrasp {
     static final int STAB_STUN = 50;
 
     /**
-     * Drawn within arm's reach: the hole closes, a dagger is conjured and driven into its gut. Five hearts, ten
-     * seconds' bleeding, and it is stunned where it stands. That ends the grasp.
+     * Drawn within arm's reach: the hole closes, a dagger is conjured and drawn across its throat, the blood thrown out
+     * to the caster's right. Five hearts, ten seconds' bleeding, and it is stunned where it stands. That ends the grasp.
      */
     private static void slash(ServerPlayer p, Hold hold, LivingEntity body, long now) {
         HOLDS.remove(p.getUUID());
@@ -154,8 +158,16 @@ public final class GravityGrasp {
             Bleed.apply(p, body, BLEED_STACKS, BLEED);
             ScepterBlast.stun(body, STAB_STUN);
         }
-        HexNetwork.fx(body, "impact");
+        Vec3 look = p.getLookAngle();
+        CompoundTag cut = new CompoundTag();
+        cut.putString("state", "throat");
+        cut.putInt("id", body.getId());
+        cut.putDouble("rx", -look.z);
+        cut.putDouble("rz", look.x);
+        HexNetwork.near((ServerLevel) p.level(), body.position(), 64, new HexNetwork.Message(HexNetwork.ARSENAL, body.getId(), cut));
         p.level().playSound(null, body.getX(), body.getY(), body.getZ(), HexGodOfStories.BLADE_SWING.get(), SoundSource.PLAYERS, 1, .8f);
+        p.level().playSound(null, body.getX(), body.getY(), body.getZ(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 1, .75f);
+        p.level().playSound(null, body.getX(), body.getY(), body.getZ(), SoundEvents.HONEY_BLOCK_BREAK, SoundSource.PLAYERS, .8f, .6f);
         CompoundTag d = HexData.get(p);
         d.remove(HOLDING);
         d.putLong(KNIFE, now + DAGGER);

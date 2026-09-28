@@ -74,6 +74,8 @@ public final class LeviathanEffects {
     public static void scepterRecoil(float strength) { addShake(1.15f * strength, .80f); }
     /** The ground rolling underfoot: a longer, heavier shake than a kick, dying away over a second or two. */
     public static void quake(float strength) { addShake(strength, .93f); }
+    /** A blast close by: the heaviest shake there is, and slow to die away. */
+    public static void blast(float strength) { addShake(strength, .955f); }
 
     private static void addShake(float amount, float decay) {
         if (amount <= shake && decay <= shakeDecay) return;

@@ -4,16 +4,17 @@
   from every eye) and in the same tick a double takes your place: where you stood, looking where you looked,
   holding what you held and, if you were walking, walking on. No sound, no flash, no gesture. Whatever was
   hunting you turns on it. It never fights: it watches anything hostile near it and otherwise wanders its
-  ground, for up to twenty seconds. Strike it and it looks down a moment and bursts in a great green blast:
+  ground, for up to twenty seconds. Strike it and it looks down, trembles as the ground round it shakes and a charge and a heartbeat build (under two
+  seconds; three for a grand one), and bursts in a slow, swelling green blast that leaves smoke hanging:
   twenty hearts (half at the edge of nine blocks), twenty seconds of nausea, the ground shaking forty blocks
   across, no block broken and no shield stopping it. 25 energy; 30 s recovery. **Secret:** cast in the full
   transformation, the blast is sixty blocks across (twenty hearts out to twelve, half at thirty), the ground
   shakes all of it, and a moment before it goes anyone looking at it is blinded white; two minutes' recovery.
 - **Gravity Grasp (hold the alternate key).** Your arm goes out and a small black hole opens in front of your
-  hand, drawing in everything you could harm within fourteen blocks, harder the longer you hold (ten seconds
-  at most); at first a player can walk away from it, a couple of seconds in not even sprinting. Whatever it
-  drags within arm's reach you cut, once, with a dagger conjured for the stroke: five hearts and ten seconds'
-  bleeding. Its own 12 s recovery, apart from Anchor Being's.
+  hand, drawing in everything you could harm within sixteen blocks, harder the longer you hold (ten seconds
+  at most); even at first it drags a sprinting player back. Whatever it drags within arm's reach, the hole
+  closes and you cut its throat with a dagger conjured for the stroke, the blood thrown out to your right: five
+  hearts, ten seconds' bleeding and a stun. Its own 12 s recovery, apart from Anchor Being's.
 
 ## The Crown of Barrels — Loki's last conjuration
 

@@ -102,6 +102,37 @@ public final class Blood {
     }
 
     /**
+     * Gravity Grasp's cut, across the throat: as the blade comes through, a sheet of blood thrown out to the side it
+     * went, pooling where it lands; then the neck pumping on in spurts, each weaker than the last, for two seconds.
+     */
+    public static void throat(Entity e,Vec3 right) {
+        var mc=Minecraft.getInstance();
+        if(mc.level==null||mc.player==null||e.position().distanceToSqr(mc.player.getEyePosition())>RANGE)return;
+        var random=mc.level.random;
+        Vec3 side=right.lengthSqr()<1e-6?new Vec3(1,0,0):right.normalize(),neck=e.position().add(0,e.getBbHeight()*.8,0);
+        Vfx.bloom(e.getId(),neck,side,44,(at,aim,t)->{
+            int age=Math.round(t*44);
+            if(age==3) {
+                Vec3 cut=at.add(aim.scale(e.getBbWidth()*.3));
+                for(int i=0;i<44;i++) {
+                    double speed=.12+random.nextDouble()*.26;
+                    Vfx.spark(HexGodOfStories.BLOOD.get(),cut,aim.scale(speed).add((random.nextDouble()-.5)*.08,.02+random.nextDouble()*.12,(random.nextDouble()-.5)*.08));
+                }
+                for(int i=0;i<4;i++)
+                    drop(mc,e,at.add(aim.scale(.6+random.nextDouble()*1.6)).add((random.nextDouble()-.5)*.5,0,(random.nextDouble()-.5)*.5),
+                        random.nextDouble()*.25+.2,PUDDLE_LIFE,24);
+            } else if(age>3&&(age-3)%7==0) {
+                float left=1-t;
+                for(int i=0;i<Math.round(14*left)+2;i++) {
+                    double speed=(.05+random.nextDouble()*.14)*left;
+                    Vfx.spark(HexGodOfStories.BLOOD.get(),at,aim.scale(speed).add((random.nextDouble()-.5)*.05,random.nextDouble()*.06,(random.nextDouble()-.5)*.05));
+                }
+                drop(mc,e,at.add(aim.scale(.4+random.nextDouble()*.6)),random.nextDouble()*.2+.15,PUDDLE_LIFE,30);
+            }
+        });
+    }
+
+    /**
      * A Scepter beam's hole, pouring: a stream from the hole itself, a spurt thrown out of it with every
      * heartbeat, and a puddle spreading under the body — or a trail behind it, pool after pool, if it moves.
      */

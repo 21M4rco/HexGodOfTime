@@ -100,9 +100,9 @@ public final class GraspRenderer {
     }
 
     /**
-     * The stab, as its caster sees it: the conjured dagger in the right hand, drawn back, driven forward and down into
-     * the gut of what the hole dragged in, held there a beat and drawn out. The hand is drawn here in place of vanilla's
-     * for the length of the stroke (the grasp_slash animation leaves first person alone for it).
+     * The cut, as its caster sees it: the conjured dagger in the right hand, laid flat and raised across to the left at
+     * throat height, whipped across to the right, held through the follow-through and dropped away. The hand is drawn
+     * here in place of vanilla's for the length of the stroke (the grasp_slash animation leaves first person alone).
      */
     @net.minecraftforge.fml.common.Mod.EventBusSubscriber(modid=com.hexgodofstories.HexGodOfStories.ID,value=net.minecraftforge.api.distmarker.Dist.CLIENT)
     public static final class Stab {
@@ -114,17 +114,22 @@ public final class GraspRenderer {
             if(left<=0||left>14)return;
             e.setCanceled(true);
             double t=14-left;
-            // Drawn back over three ticks, driven home in two, held four, drawn out over five.
-            double pull=t<3?t/3:t<5?1-(t-3)/2:0,thrust=t<3?0:t<5?(t-3)/2:t<9?1:Math.max(0,1-(t-9)/5);
-            thrust=thrust*thrust*(3-2*thrust);
+            // Raised across over three ticks, whipped through in two, held four, dropped away over five.
+            double raise=Math.min(1,t/3),sweep=t<3?0:Math.min(1,(t-3)/2),drop=t<9?0:(t-9)/5;
+            raise=raise*raise*(3-2*raise);
+            sweep=1-(1-sweep)*(1-sweep)*(1-sweep);
+            drop=drop*drop;
             var stack=new net.minecraft.world.item.ItemStack(com.hexgodofstories.HexGodOfStories.DAGGER.get());
             stack.getOrCreateTag().putUUID("conjurer",mc.player.getUUID());
             stack.getOrCreateTag().putLong("formed",mc.player.level().getGameTime()-40);
             PoseStack pose=e.getPoseStack();
             pose.pushPose();
-            pose.translate(.56-.3*thrust,-.52-.12*thrust+.05*pull,-.72+.2*pull-.55*thrust);
-            pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees((float)(-50*thrust+15*pull)));
-            pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees((float)(12*thrust)));
+            double x=Mth.lerp(sweep,Mth.lerp(raise,.56,-.3),.85),y=Mth.lerp(raise,-.52,-.22)-.06*sweep-.9*drop,z=Mth.lerp(raise,-.72,-.85)+.1*sweep;
+            pose.translate(x,y,z);
+            // Laid flat, point to the left, and swung round to point ahead and right as it goes through.
+            pose.mulPose(com.mojang.math.Axis.ZP.rotationDegrees((float)(80*raise+15*sweep)));
+            pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees((float)(35*raise-75*sweep)));
+            pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees((float)(-15*raise)));
             mc.getEntityRenderDispatcher().getItemInHandRenderer().renderItem(mc.player,stack,
                 net.minecraft.world.item.ItemDisplayContext.FIRST_PERSON_RIGHT_HAND,false,pose,e.getMultiBufferSource(),e.getPackedLight());
             pose.popPose();

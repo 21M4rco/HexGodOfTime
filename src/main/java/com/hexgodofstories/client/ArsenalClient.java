@@ -320,14 +320,19 @@ public final class ArsenalClient {
         final long born;
         final List<Column> columns;
         final double reach;
+        /** Not a wave but a tremor this many ticks long: the ground trembling in place, harder and harder, till a copy bursts. */
+        final int tremor;
         /** Whether this client's own player has been reached by it yet. */
         boolean felt;
 
-        Quake(Vec3 at, long born, List<Column> columns, double reach) {
+        Quake(Vec3 at, long born, List<Column> columns, double reach) {this(at, born, columns, reach, 0);}
+
+        Quake(Vec3 at, long born, List<Column> columns, double reach, int tremor) {
             this.reach = reach;
             this.at = at;
             this.born = born;
             this.columns = columns;
+            this.tremor = tremor;
         }
     }
 
@@ -375,6 +380,10 @@ public final class ArsenalClient {
             case "launch" -> launch(entity, data);
             case "impact" -> impact(data);
             case "anchor_burst" -> anchorBurst(data);
+            case "throat" -> {
+                Entity body = Minecraft.getInstance().level.getEntity(data.getInt("id"));
+                if (body != null) Blood.throat(body, new Vec3(data.getDouble("rx"), 0, data.getDouble("rz")));
+            }
             case "anchor_flash" -> anchorFlash(data);
             case "gotcha" -> {
                 ArsenalMeshes.preload(FLASH, FLARE);
@@ -444,8 +453,8 @@ public final class ArsenalClient {
         play(HexGodOfStories.ARSENAL_EXPLOSION_FAR.get(), at, grand ? 8 : 2, grand ? .66f : .78f);
         double d = mc.gameRenderer.getMainCamera().getPosition().distanceTo(at), felt = grand ? 110 : 48;
         if (d < felt) {
-            com.hexgodofstories.client.leviathan.LeviathanEffects.scepterRecoil((float) ((grand ? 2.6 : 1.5) * (1 - d / felt) * (1 - d / felt)));
-            com.hexgodofstories.client.leviathan.LeviathanEffects.quake((float) ((grand ? 2.2 : 1.1) * (1 - d / felt)));
+            // Violent: the whole view thrown about, dying away over a couple of seconds.
+            com.hexgodofstories.client.leviathan.LeviathanEffects.blast((float) ((grand ? 4 : 3.2) * Math.pow(1 - d / felt, .7) + .4));
         }
     }
 
@@ -529,7 +538,8 @@ public final class ArsenalClient {
         for (Iterator<Quake> it = QUAKES.iterator(); it.hasNext(); ) {
             Quake q = it.next();
             long age = now - q.born;
-            if (age > q.reach / QUAKE_SPEED + QUAKE_BUMP + 2 || age < -20) {it.remove(); continue;}
+            if (age > (q.tremor > 0 ? q.tremor : q.reach / QUAKE_SPEED + QUAKE_BUMP + 2) || age < -20) {it.remove(); continue;}
+            if (q.tremor > 0) {tremble(q, age, level); continue;}
             rumble(q, age, level);
         }
         for (Missile m : MISSILES.values()) trail(m, now, level.random);
@@ -992,14 +1002,54 @@ public final class ArsenalClient {
         Vec3 eye = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         if (eye.distanceToSqr(at) > QUAKE_SEEN * QUAKE_SEEN) return;
         // The second missile lands where the first did: one wave through that ground, not two drawn over each other.
-        for (Quake q : QUAKES) if (q.at.distanceToSqr(at) < 64 && ClientState.now() - q.born < 20) return;
+        for (Quake q : QUAKES) if (q.tremor == 0 && q.at.distanceToSqr(at) < 64 && ClientState.now() - q.born < 20) return;
+        List<Column> columns = columns(at, level, shaken, QUAKE_INNER);
+        if (columns.isEmpty()) return;
+        QUAKES.add(new Quake(at, ClientState.now(), columns, shaken));
+        while (QUAKES.size() > MOST_QUAKES) QUAKES.remove(0);
+    }
+
+    /**
+     * The ground round a struck Anchor copy trembling for the {@code ticks} left of its fuse: every block out to
+     * {@code shaken} jumping in place, a little at first and hard at the end, and dust shaken off it.
+     */
+    static void tremor(Vec3 at, double shaken, int ticks) {
+        ClientLevel level = Minecraft.getInstance().level;
+        if (level == null || ticks <= 0) return;
+        Vec3 eye = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        if (eye.distanceToSqr(at) > QUAKE_SEEN * QUAKE_SEEN) return;
+        List<Column> columns = columns(at, level, shaken, 0);
+        if (columns.isEmpty()) return;
+        QUAKES.add(new Quake(at, ClientState.now(), columns, shaken, ticks));
+        while (QUAKES.size() > MOST_QUAKES) QUAKES.remove(0);
+    }
+
+    /** How hard a tremor is by now, nothing to one. */
+    private static double trembling(Quake q, double age) {
+        double p = Mth.clamp(age / q.tremor, 0, 1);
+        return p * p;
+    }
+
+    /** Dust shaken off the trembling ground, more as it builds. */
+    private static void tremble(Quake q, long age, ClientLevel level) {
+        RandomSource random = level.random;
+        double hard = trembling(q, age);
+        for (Column c : q.columns) {
+            if (random.nextFloat() > .01 + .06 * hard || level.getBlockState(c.pos()) != c.state()) continue;
+            level.addParticle(new BlockParticleOption(ParticleTypes.BLOCK, c.state()), c.pos().getX() + random.nextDouble(), c.pos().getY() + 1.05,
+                c.pos().getZ() + random.nextDouble(), random.nextGaussian() * .03, .05 + random.nextDouble() * .12 * hard, random.nextGaussian() * .03);
+        }
+    }
+
+    /** The top block of ground in every column from {@code inner} out to {@code shaken} round {@code at}, in reach. */
+    private static List<Column> columns(Vec3 at, ClientLevel level, double shaken, double inner) {
         List<Column> columns = new ArrayList<>();
         int reach = (int) shaken, cx = Mth.floor(at.x), cz = Mth.floor(at.z), top = Mth.floor(at.y) + 4, bottom = Mth.floor(at.y) - 14;
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(), above = new BlockPos.MutableBlockPos();
         for (int dx = -reach; dx <= reach; dx++)
             for (int dz = -reach; dz <= reach; dz++) {
                 double r = Math.hypot(cx + dx + .5 - at.x, cz + dz + .5 - at.z);
-                if (r > shaken || r < QUAKE_INNER || !level.hasChunkAt(pos.set(cx + dx, top, cz + dz))) continue;
+                if (r > shaken || r < inner || !level.hasChunkAt(pos.set(cx + dx, top, cz + dz))) continue;
                 for (int y = top; y >= bottom; y--) {
                     BlockState state = level.getBlockState(pos.set(cx + dx, y, cz + dz));
                     if (state.getCollisionShape(level, pos).isEmpty()) continue;
@@ -1009,9 +1059,7 @@ public final class ArsenalClient {
                     break;
                 }
             }
-        if (columns.isEmpty()) return;
-        QUAKES.add(new Quake(at, ClientState.now(), columns, shaken));
-        while (QUAKES.size() > MOST_QUAKES) QUAKES.remove(0);
+        return columns;
     }
 
     /** How far a block of ground {@code reach} out from a blast is thrown: most at the crater's edge, a little at the far one. */
@@ -1051,11 +1099,18 @@ public final class ArsenalClient {
         try {
             for (Quake q : QUAKES) {
                 if (q.at.distanceToSqr(camera) > QUAKE_SEEN * QUAKE_SEEN) continue;
-                double age = ClientState.since(q.born, e.getPartialTick());
+                double age = ClientState.since(q.born, e.getPartialTick()), hard = q.tremor > 0 ? trembling(q, age) : 0;
                 for (Column c : q.columns) {
-                    double local = age - c.reach() / QUAKE_SPEED;
-                    if (local <= 0 || local >= QUAKE_BUMP || drawn >= MOST_THROWN) continue;
-                    double lift = thrown(c.reach(), q.reach) * Math.sin(Math.PI * local / QUAKE_BUMP);
+                    double local = age - c.reach() / QUAKE_SPEED, lift;
+                    if (q.tremor > 0) {
+                        // Each block jumping on its own beat, hardest nearest the copy.
+                        if (drawn >= MOST_THROWN) continue;
+                        long seed = c.pos().asLong();
+                        lift = (.03 + .2 * hard) * (1 - .7 * c.reach() / q.reach) * Math.max(0, Math.sin(age * (2.1 + (seed & 7) * .23) + (seed >> 5 & 63)));
+                    } else {
+                        if (local <= 0 || local >= QUAKE_BUMP || drawn >= MOST_THROWN) continue;
+                        lift = thrown(c.reach(), q.reach) * Math.sin(Math.PI * local / QUAKE_BUMP);
+                    }
                     // Gone since (the crater, a player), or out of sight: nothing to throw.
                     if (lift < .015 || level.getBlockState(c.pos()) != c.state()) continue;
                     if (frustum != null && !frustum.isVisible(new AABB(c.pos()).expandTowards(0, lift, 0))) continue;

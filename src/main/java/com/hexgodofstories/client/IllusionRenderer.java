@@ -55,11 +55,11 @@ public final class IllusionRenderer extends MobRenderer<IllusionEntity,PlayerMod
     /** Pose the actual arm and sleeve so the held item follows the wind-up and release. */
     private static final class ThrowModel extends PlayerModel<IllusionEntity> {
         ThrowModel(net.minecraft.client.model.geom.ModelPart root,boolean slim){super(root,slim);}
-        private void laugh(float t){Laugh.pose(this,t);}
+        private void laugh(IllusionEntity e,float t){Laugh.pose(this,t,IllusionEntity.burstAt(e.grand()));}
         @Override public void setupAnim(IllusionEntity e,float walk,float amount,float age,float yaw,float pitch) {
             super.setupAnim(e,walk,amount,age,yaw,pitch);
             float laugh=e.laughAge(age-e.tickCount);
-            if(laugh>=0){laugh(laugh);return;}
+            if(laugh>=0){laugh(e,laugh);return;}
             float t=e.throwAge(age-e.tickCount);
             if(t<0||t>IllusionEntity.THROW_END)return;
             float rotation=t<5?net.minecraft.util.Mth.lerp(t/5,-.35f,-3.25f)
@@ -70,13 +70,24 @@ public final class IllusionRenderer extends MobRenderer<IllusionEntity,PlayerMod
         }
     }
 
-    /** Anchor Being's copy, struck: it looks down, a little, and then it is gone. */
+    /**
+     * Anchor Being's copy, struck: it looks down, a little, and holds there while whatever is in it builds; a tremor
+     * takes it, harder and harder as the fuse burns down, and then it is gone.
+     */
     private static final class Laugh {
-        static void pose(PlayerModel<IllusionEntity> m,float t) {
+        static void pose(PlayerModel<IllusionEntity> m,float t,int fuse) {
             float down=net.minecraft.util.Mth.clamp(t/6f,0,1),eased=down*down*(3-2*down);
-            m.head.xRot=net.minecraft.util.Mth.lerp(eased,m.head.xRot,.6f);
+            float build=net.minecraft.util.Mth.clamp(t/fuse,0,1),shake=.07f*build*build;
+            m.head.xRot=net.minecraft.util.Mth.lerp(eased,m.head.xRot,.6f)+shake*net.minecraft.util.Mth.sin(t*7.3f);
             m.head.yRot*=1-.7f*eased;
+            m.head.zRot=shake*net.minecraft.util.Mth.sin(t*9.1f+1);
             m.hat.copyFrom(m.head);
+            // Hands drawn open and a little out from the sides, shaking with it.
+            m.rightArm.zRot=.18f*build+shake*net.minecraft.util.Mth.sin(t*8.3f);
+            m.leftArm.zRot=-.18f*build-shake*net.minecraft.util.Mth.sin(t*8.9f+2);
+            m.rightSleeve.copyFrom(m.rightArm);m.leftSleeve.copyFrom(m.leftArm);
+            m.body.zRot=shake*.5f*net.minecraft.util.Mth.sin(t*6.7f);
+            m.jacket.copyFrom(m.body);
         }
     }
 

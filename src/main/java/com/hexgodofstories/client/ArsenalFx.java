@@ -236,6 +236,40 @@ final class ArsenalFx {
     }
 
     /**
+     * Anchor Being's copy winding up, each tick of its fuse: green light drawn in from all round, thicker and faster as
+     * it burns down; a core at its chest swelling brighter; dust dragged in along the ground to its feet.
+     */
+    static void anchorGather(Vec3 core, Vec3 feet, float progress, boolean grand, int age) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+        RandomSource random = mc.level.random;
+        float amount = amount(), size = grand ? 2 : 1;
+        if (age % 2 == 0) {
+            ParticleEmitter in = emitter(core, 24, FLARE);
+            int n = Math.round((5 + 20 * progress) * amount * size);
+            for (int i = 0; i < n; i++) {
+                Vec3 from = outward(random, 0).scale((3 + random.nextDouble() * 4) * size * (1.1 - .5 * progress));
+                int life = 10 + random.nextInt(12);
+                mote(in, from, from.scale(-1.0 / life), life, (.18f + random.nextFloat() * .2f) * size, .04f, random.nextInt(3) == 0 ? SPARK_G : GLOW_G, 1, 0);
+            }
+        }
+        ParticleEmitter heart = emitter(core, 3, FLARE);
+        float swell = (.4f + 2.2f * progress * progress) * size * (1 + .15f * (float) Math.sin(age * 1.3));
+        mote(heart, Vec3.ZERO, Vec3.ZERO, 3, swell, swell * .8f, progress > .8f ? WHITE_HOT_G : GLOW_G, 1, 0);
+        int dust = Math.round((1 + 4 * progress) * amount * size);
+        for (int i = 0; i < dust; i++) {
+            double a = random.nextDouble() * Math.PI * 2, r = (3 + random.nextDouble() * 4) * size;
+            Vec3 p = feet.add(Math.cos(a) * r, .1, Math.sin(a) * r);
+            Particle d = create(HexGodOfStories.ASH.get(), p, -Math.cos(a) * r / 22, .01 + random.nextDouble() * .02, -Math.sin(a) * r / 22);
+            if (d == null) continue;
+            float g = .16f + random.nextFloat() * .1f;
+            d.setColor(g * .85f, g * 1.1f, g * .85f);
+            d.setLifetime(22);
+            d.scale(1.5f + random.nextFloat() * 1.5f);
+        }
+    }
+
+    /**
      * Anchor Being's copy bursting: slower and heavier than a missile, and it takes its time. A long green flash; a
      * shock of fire rolling out along the ground; a fireball that goes on swelling and climbing for three seconds (six
      * for a grand one), a fresh roll of fire out of its heart every few ticks, each slower than the last; smoke that
