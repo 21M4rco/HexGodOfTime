@@ -199,3 +199,12 @@ tasks.register('copyPhotonRuntime', Copy) {
     into layout.buildDirectory.dir('runtime-mods')
 }
 tasks.named('build') { dependsOn 'copyPhotonRuntime' }
+
+// Anchor Being: preserve the saved slot and enforce the server hold/timing contract.
+tasks.register('verifyAnchorBeing', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.hexgodofstories.data.AnchorRulesTest'
+    enableAssertions = true
+}
+tasks.named('check') { dependsOn 'verifyAnchorBeing' }

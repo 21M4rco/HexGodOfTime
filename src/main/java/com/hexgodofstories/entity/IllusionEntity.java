@@ -40,7 +40,10 @@ public final class IllusionEntity extends PathfinderMob {
     private static final EntityDataAccessor<Integer> QUARRY=SynchedEntityData.defineId(IllusionEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> LOADOUT=SynchedEntityData.defineId(IllusionEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Long> THROW_START=SynchedEntityData.defineId(IllusionEntity.class,EntityDataSerializers.LONG);
+    /** New loadout value; reuse the existing wire fields so older saves keep the same entity schema. */
+    private static final int ANCHOR=3;
     public static final int THROW_RELEASE=8,THROW_END=16;
+    private Vec3 anchorHome=Vec3.ZERO;
     public enum Behavior { APPROACH, STRAFE, FEINT, RETREAT, WATCH, BLINK, THROW }
     /** 0 a single dagger, 1 twin daggers, 2 the Void sword. */
     public static final int DAGGER=0,TWIN=1,SWORD=2;
@@ -85,6 +88,43 @@ public final class IllusionEntity extends PathfinderMob {
         setCustomNameVisible(false);
         setYRot(p.getYRot());setYHeadRot(p.getYHeadRot());yBodyRot=p.yBodyRot;glanceYaw=p.getYRot();
         mirrorEffects(p);
+    }
+
+    public boolean anchor(){return loadout()==ANCHOR;}
+    public float anchorHitAge(float partial){long hit=entityData.get(THROW_START);return hit<0?-1:(level().getGameTime()-hit)+partial;}
+    public void configureAnchor(ServerPlayer p) {
+        configure(p,new Spec(Integer.MAX_VALUE-40,Behavior.WATCH,true,true,false),DAGGER);
+        entityData.set(LOADOUT,ANCHOR);expires=Long.MAX_VALUE;anchorHome=p.position();
+        // Restore the exact loadout: an empty hand must stay empty, and ordinary armour/tools must match.
+        for(EquipmentSlot slot:EquipmentSlot.values())setItemSlot(slot,p.getItemBySlot(slot).copy());
+        removeEffect(MobEffects.INVISIBILITY);setInvisible(false);
+        setPose(p.getPose());setSprinting(p.isSprinting());setDeltaMovement(p.getDeltaMovement());
+        setXRot(p.getXRot());setYHeadRot(p.getYHeadRot());yBodyRot=p.yBodyRot;
+        setOldPosAndRot();yHeadRotO=yHeadRot;yBodyRotO=yBodyRot;
+        walkAnimation.setSpeed(p.walkAnimation.speed());
+        oAttackAnim=attackAnim=p.attackAnim;
+    }
+    private void tickAnchor(ServerPlayer caster) {
+        float hit=anchorHitAge(0);
+        if(hit>=0) {
+            getNavigation().stop();setDeltaMovement(0,getDeltaMovement().y,0);
+            if(hit>=AnchorRules.LAUGH_TICKS+AnchorRules.RAISE_TICKS)AnchorBeing.explode(this,caster);
+            return;
+        }
+        // Hold the copied movement for the first few ticks so the handoff never snaps into a new pose.
+        if(tickCount<6)return;
+        if(tickCount%10!=getId()%10)return;
+        LivingEntity enemy=hunt(caster);
+        if(enemy!=null) {
+            getLookControl().setLookAt(enemy,30,30);
+            if(enemy instanceof Mob mob&&(mob.getTarget()==null||mob.getTarget()==caster))mob.setTarget(this);
+            if(distanceToSqr(enemy)>9)getNavigation().moveTo(enemy,1);
+            else getNavigation().stop();
+        } else if(getNavigation().isDone()) {
+            Vec3 goal=net.minecraft.world.entity.ai.util.DefaultRandomPos.getPosTowards(this,8,4,anchorHome,Math.PI);
+            if(goal!=null)getNavigation().moveTo(goal.x,goal.y,goal.z,.8);
+        }
+        setPose(Pose.STANDING);setSprinting(false);
     }
 
     /** Conjured steel, already fully formed so a copy never appears mid-manifestation. */
@@ -140,7 +180,8 @@ public final class IllusionEntity extends PathfinderMob {
         super.tick();
         if(level().isClientSide)return;
         ServerPlayer p=owner()==null?null:((ServerLevel)level()).getServer().getPlayerList().getPlayer(owner());
-        if(p==null||p.level()!=level()||!p.isAlive()||level().getGameTime()>=expires||distanceToSqr(p)>4096){dispel();return;}
+        if(p==null||p.level()!=level()||!p.isAlive()||(anchor()&&(!HexData.access(p)||p.isSpectator()))||level().getGameTime()>=expires||distanceToSqr(p)>4096){dispel();return;}
+        if(anchor()){tickAnchor(p);return;}
         tickThrow(p);
         LivingEntity enemy=quarry();
         if(enemy!=null&&(enemy.level()!=level()||distanceToSqr(enemy)>2304||!Hostility.hostile(enemy,p))){entityData.set(QUARRY,0);enemy=null;}
@@ -350,7 +391,19 @@ public final class IllusionEntity extends PathfinderMob {
         }
         discard();
     }
-    @Override public boolean hurt(DamageSource source,float amount) {if(level().isClientSide)return true;if(spec.dispelOnHit)dispel();return true;}
+    @Override public boolean hurt(DamageSource source,float amount) {
+        if(level().isClientSide)return true;
+        if(anchor()) {
+            if(amount<=0||isInvulnerableTo(source)||source.getEntity()==null&&source.getDirectEntity()==null)return false;
+            if(entityData.get(THROW_START)<0) {
+                entityData.set(THROW_START,level().getGameTime());getNavigation().stop();
+                level().playSound(null,blockPosition(),net.minecraft.sounds.SoundEvents.WITCH_CELEBRATE,
+                    net.minecraft.sounds.SoundSource.PLAYERS,1,.75f);
+            }
+            return true;
+        }
+        if(spec.dispelOnHit)dispel();return true;
+    }
     @Override public boolean isPushable() {return spec.collision;}
     @Override public boolean canCollideWith(Entity e) {return spec.collision&&super.canCollideWith(e);}
     @Override public boolean shouldShowName() {return false;}

@@ -1,0 +1,34 @@
+{
+  "version": 3,
+  "name": "gravity_grasp",
+  "author": "HexGodOfStories",
+  "description": "The right arm extends towards a small singularity.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 10,
+    "stopTick": 13,
+    "isLoop": true,
+    "returnTick": 0,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "linear",
+        "rightArm": {
+          "pitch": -90,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 10,
+        "easing": "linear",
+        "rightArm": {
+          "pitch": -90,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}

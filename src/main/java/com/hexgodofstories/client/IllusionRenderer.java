@@ -56,7 +56,22 @@ public final class IllusionRenderer extends MobRenderer<IllusionEntity,PlayerMod
     private static final class ThrowModel extends PlayerModel<IllusionEntity> {
         ThrowModel(net.minecraft.client.model.geom.ModelPart root,boolean slim){super(root,slim);}
         @Override public void setupAnim(IllusionEntity e,float walk,float amount,float age,float yaw,float pitch) {
+            head.y=body.y=0;body.xRot=0;
             super.setupAnim(e,walk,amount,age,yaw,pitch);
+            if(e.anchor()) {
+                float hit=e.anchorHitAge(age-e.tickCount);
+                if(hit>=0) {
+                    float laugh=(float)Math.sin(hit*1.4);
+                    float rise=net.minecraft.util.Mth.clamp((hit-com.hexgodofstories.data.AnchorRules.LAUGH_TICKS)/4f,0,1);
+                    head.xRot=-.24f+(.07f*laugh)*(1-rise);body.xRot=.06f*laugh*(1-rise);
+                    rightArm.xRot=leftArm.xRot=net.minecraft.util.Mth.lerp(rise,-.2f,-3.05f);
+                    rightArm.zRot=.12f+.28f*rise;leftArm.zRot=-rightArm.zRot;
+                    rightArm.yRot=leftArm.yRot=0;
+                    head.y=body.y=(1-rise)*.16f*laugh;
+                    rightSleeve.copyFrom(rightArm);leftSleeve.copyFrom(leftArm);hat.copyFrom(head);jacket.copyFrom(body);
+                }
+                return;
+            }
             float t=e.throwAge(age-e.tickCount);
             if(t<0||t>IllusionEntity.THROW_END)return;
             float rotation=t<5?net.minecraft.util.Mth.lerp(t/5,-.35f,-3.25f)

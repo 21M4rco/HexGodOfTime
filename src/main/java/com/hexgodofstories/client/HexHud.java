@@ -144,7 +144,7 @@ public final class HexHud {
             case SLOW_FIELD -> "";
             case TIME_STOP -> "Freeze the local battlefield.";
             case SELECTIVE_STOP -> "Freeze the target in your aim.";
-            case THREADS -> "Stick your target in time: 5 s.";
+            case THREADS -> "Vanish 10 s; leave an explosive double.";
             case ASCENSION -> "Toggle your final transformation.";
             case TIME_BRANCH -> "Tap: right fist. Hold/release: beam.";
             case ARSENAL -> "Hold: the crown fires and stuns. Hold 13s: missiles.";
@@ -165,7 +165,7 @@ public final class HexHud {
             case SLOW_FIELD -> "";
             case TIME_STOP -> "Press Z again to resume";
             case SELECTIVE_STOP -> "Exempt an ally";
-            case THREADS -> "Pull bound target";
+            case THREADS -> "Hold: Gravity Grasp (10 s max)";
             case TIME_BRANCH -> "None — release the cast key to fire";
             case ARSENAL -> "Gotcha!";
             default -> "Same action";

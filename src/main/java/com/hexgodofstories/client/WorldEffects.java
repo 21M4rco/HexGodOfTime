@@ -51,6 +51,7 @@ public final class WorldEffects {
 
     public static void add(int entity,CompoundTag n) {
         String name=n.getString("effect");
+        if(name.equals("anchor_explosion")){AnchorClient.explode(n);return;}
         // All teleport destinations share the same quiet arrival; old effect names remain harmless.
         if(name.equals("arrive")||name.equals("arrive_realm")||name.equals("rift_cross"))name="nebula_arrival";
         if(name.equals("scepter_blast"))ScepterFx.blast(entity,n);

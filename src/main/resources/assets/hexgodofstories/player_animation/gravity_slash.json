@@ -1,0 +1,61 @@
+{
+  "version": 3,
+  "name": "gravity_slash",
+  "author": "HexGodOfStories",
+  "description": "A dagger manifests instantly and cuts across the target, then the grasp resumes.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 13,
+    "stopTick": 16,
+    "isLoop": false,
+    "returnTick": 0,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "outquad",
+        "rightArm": {
+          "pitch": -110,
+          "yaw": -35,
+          "roll": -35
+        }
+      },
+      {
+        "tick": 3,
+        "easing": "inquad",
+        "rightArm": {
+          "pitch": -65,
+          "yaw": 55,
+          "roll": 35
+        }
+      },
+      {
+        "tick": 7,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -80,
+          "yaw": 20,
+          "roll": 15
+        }
+      },
+      {
+        "tick": 10,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -90,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 13,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}

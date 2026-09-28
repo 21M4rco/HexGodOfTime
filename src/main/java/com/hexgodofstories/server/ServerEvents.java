@@ -84,6 +84,7 @@ public final class ServerEvents {
         HexData.get(p).remove(BranchFistState.START);
         HexData.get(p).remove(BranchFistState.IMPACT);
         Arsenal.login(p);
+        AnchorBeing.clearState(HexData.get(p));
         // Attribute modifiers are saved with the player, so a session that ended mid-transformation would
         // otherwise hand the armour back for free. Re-derived from the mantle, never inherited.
         Transformation.strip(p);
@@ -100,6 +101,10 @@ public final class ServerEvents {
         Erasure.track(p,e.getTarget());
         if(!(e.getTarget() instanceof ServerPlayer q))return;
         HexNetwork.syncTo(p,q);
+        if(AnchorBeing.active(q)){
+            var pose=new net.minecraft.nbt.CompoundTag();pose.putString("animation","gravity_grasp");
+            HexNetwork.to(p,new HexNetwork.Message(HexNetwork.ANIMATE,q.getId(),pose));
+        }
         com.hexgodofstories.warping.CandyCorruption.syncTo(p,q);
         // A borrowed shape is sent once, not every second, so a new viewer has to be told separately.
         Masquerade.resend(p,q);

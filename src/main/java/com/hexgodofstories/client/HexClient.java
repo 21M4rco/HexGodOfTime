@@ -71,7 +71,7 @@ public final class HexClient {
         @SubscribeEvent public static void layers(EntityRenderersEvent.AddLayers e) {
             for(String skin:e.getSkins()) {
                 net.minecraft.client.renderer.entity.player.PlayerRenderer renderer=e.getSkin(skin);
-                if(renderer!=null){renderer.addLayer(new HexLayer(renderer));renderer.addLayer(new BranchFistLayer(renderer));}
+                if(renderer!=null){renderer.addLayer(new HexLayer(renderer));renderer.addLayer(new BranchFistLayer(renderer));renderer.addLayer(new AnchorClient.DaggerLayer(renderer));}
             }
         }
         @SubscribeEvent public static void reload(RegisterClientReloadListenersEvent e) {
@@ -151,7 +151,7 @@ public final class HexClient {
                     if(com.hexgodofstories.server.PocketRealm.inside(mc.player.level())
                         || com.hexgodofstories.warping.Destination.from(mc.player.level())!=null)FractureScreen.open();
                     else mc.setScreen(new WarpScreen());
-                } else HexNetwork.send(HexServer.ALTERNATE,0);
+                } else if(live!=Ability.THREADS)HexNetwork.send(HexServer.ALTERNATE,0);
             }
             while(TRANSFORM.consumeClick())HexNetwork.send(HexServer.TRANSFORM,0);
             while(RELEASE.consumeClick())HexNetwork.send(HexServer.UTILITY,0);
