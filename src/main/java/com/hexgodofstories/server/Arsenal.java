@@ -575,6 +575,8 @@ public final class Arsenal {
         n.putDouble("x", at.x); n.putDouble("y", at.y); n.putDouble("z", at.z);
         n.putDouble("tx", aim.x); n.putDouble("ty", aim.y); n.putDouble("tz", aim.z);
         HexNetwork.near(level, at, 160, new HexNetwork.Message(HexNetwork.ARSENAL, p.getId(), n));
+        // The caster points at it: the right arm stretched straight out until the gun has fired.
+        HexNetwork.animate(p, "gotcha");
         return null;
     }
 

@@ -57,6 +57,8 @@ public final class HexAnimations {
             boolean left=abstractclientplayer.getMainArm()==net.minecraft.world.entity.HumanoidArm.LEFT;
             if(left&&name.startsWith("scepter_"))name+="_left";
             boolean manifest=name.startsWith("scepter_manifest")||name.startsWith("scepter_fire");
+            // Gotcha!'s pointing arm is the whole of it: seen in first person too.
+            boolean pointing=name.equals("gotcha");
             ResourceLocation resourcelocation = HexGodOfStories.id(name);
             KeyframeAnimation keyframeanimation = PlayerAnimationRegistry.getAnimation(resourcelocation);
             if (keyframeanimation == null) {
@@ -66,7 +68,7 @@ public final class HexAnimations {
                KeyframeAnimationPlayer keyframeanimationplayer = new KeyframeAnimationPlayer(keyframeanimation)
                   .setFirstPersonMode(flag ? FirstPersonMode.NONE : FirstPersonMode.THIRD_PERSON_MODEL)
                   .setFirstPersonConfiguration(
-                     new FirstPersonConfiguration().setShowRightArm(manifest&&!left).setShowLeftArm(manifest&&left).setShowRightItem(true).setShowLeftItem(true)
+                     new FirstPersonConfiguration().setShowRightArm(manifest&&!left||pointing).setShowLeftArm(manifest&&left).setShowRightItem(true).setShowLeftItem(true)
                   );
                // Shots cut straight in so the kick lands on the tick it fires; raising to aim eases in.
                int fade=name.startsWith("scepter_fire")||name.startsWith("scepter_shot")?0:name.startsWith("scepter_aim")?2:Math.max(0,fadeTicks);

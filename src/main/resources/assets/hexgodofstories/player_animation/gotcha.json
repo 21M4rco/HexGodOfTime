@@ -1,0 +1,52 @@
+{
+  "version": 3,
+  "name": "gotcha",
+  "author": "HexGodOfStories",
+  "description": "Gotcha!: the right arm alone stretches straight out in front, holds there while the gun behind the target fires, and drops back to rest.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 30,
+    "stopTick": 30,
+    "isLoop": false,
+    "returnTick": 0,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "outquad",
+        "rightArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 4,
+        "easing": "linear",
+        "rightArm": {
+          "pitch": -90,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 22,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -90,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 30,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}
