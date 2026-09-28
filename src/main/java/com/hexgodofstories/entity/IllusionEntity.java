@@ -99,6 +99,7 @@ public final class IllusionEntity extends PathfinderMob {
         for(EquipmentSlot slot:EquipmentSlot.values())setItemSlot(slot,p.getItemBySlot(slot).copy());
         removeEffect(MobEffects.INVISIBILITY);setInvisible(false);
         setPose(p.getPose());setSprinting(p.isSprinting());setDeltaMovement(p.getDeltaMovement());
+        setLeftHanded(p.getMainArm()==HumanoidArm.LEFT);
         setXRot(p.getXRot());setYHeadRot(p.getYHeadRot());yBodyRot=p.yBodyRot;
         setOldPosAndRot();yHeadRotO=yHeadRot;yBodyRotO=yBodyRot;
         walkAnimation.setSpeed(p.walkAnimation.speed());

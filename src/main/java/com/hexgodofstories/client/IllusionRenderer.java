@@ -92,7 +92,16 @@ public final class IllusionRenderer extends MobRenderer<IllusionEntity,PlayerMod
         var mc=Minecraft.getInstance();
         var info=e.owner()!=null&&mc.getConnection()!=null?mc.getConnection().getPlayerInfo(e.owner()):null;
         model=info!=null&&"slim".equals(info.getModelName())?slim:classic;
-        super.render(e,yaw,partial,pose,buffers,light);
+        boolean crouching=model.crouching;
+        var right=model.rightArmPose;var left=model.leftArmPose;
+        if(e.anchor()) {
+            model.crouching=e.getPose()==net.minecraft.world.entity.Pose.CROUCHING;
+            var main=e.getMainHandItem().isEmpty()?net.minecraft.client.model.HumanoidModel.ArmPose.EMPTY:net.minecraft.client.model.HumanoidModel.ArmPose.ITEM;
+            var off=e.getOffhandItem().isEmpty()?net.minecraft.client.model.HumanoidModel.ArmPose.EMPTY:net.minecraft.client.model.HumanoidModel.ArmPose.ITEM;
+            model.rightArmPose=e.isLeftHanded()?off:main;model.leftArmPose=e.isLeftHanded()?main:off;
+        }
+        try {super.render(e,yaw,partial,pose,buffers,light);}
+        finally {model.crouching=crouching;model.rightArmPose=right;model.leftArmPose=left;}
     }
     /** Mirrors the rules a player's own tag follows, so the group's labels match at every distance. */
     @Override protected boolean shouldShowName(IllusionEntity e) {
