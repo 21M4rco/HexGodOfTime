@@ -57,8 +57,8 @@ public final class HexAnimations {
             boolean left=abstractclientplayer.getMainArm()==net.minecraft.world.entity.HumanoidArm.LEFT;
             if(left&&name.startsWith("scepter_"))name+="_left";
             boolean manifest=name.startsWith("scepter_manifest")||name.startsWith("scepter_fire");
-            // Gotcha!'s pointing arm is the whole of it: seen in first person too.
-            boolean pointing=name.equals("gotcha");
+            // Gotcha!'s pointing arm, and the arm held out toward whatever telekinesis holds: seen in first person too.
+            boolean pointing=name.equals("gotcha")||name.equals("telekinesis");
             ResourceLocation resourcelocation = HexGodOfStories.id(name);
             KeyframeAnimation keyframeanimation = PlayerAnimationRegistry.getAnimation(resourcelocation);
             if (keyframeanimation == null) {

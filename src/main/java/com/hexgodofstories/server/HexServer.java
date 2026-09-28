@@ -108,6 +108,8 @@ public final class HexServer {
         // Returning home must never depend on energy, mastery or the entry spell's recovery. The way
         // out follows whatever the owner's saved mode currently points at.
         if(a==Ability.WARPING&&(action==CAST||action==HOLD_BEGIN)&&Warping.leave(p))return;
+        // Telekinesis cast again while holding lets go, whatever its recovery says: letting go is always free.
+        if(a==Ability.TELEKINESIS&&action==CAST&&Telekinesis.holding(p)){Telekinesis.release(p,false);HexNetwork.sync(p);return;}
         if(action==ALTERNATE&&secondary(p,a)){HexNetwork.sync(p);return;}
         // Taking the mantle off is always free and always allowed: it drains energy while it is worn, and a
         // wearer too low to pay for a cast, or still inside its recovery, must never be kept in it.

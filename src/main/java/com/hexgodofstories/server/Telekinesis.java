@@ -34,7 +34,6 @@ import java.util.*;
 public final class Telekinesis {
     private static final class Held {
         final Entity entity;final boolean gravity,noAi;final long end;
-        double spin;
         Held(Entity entity,boolean gravity,boolean noAi,long end) {
             this.entity=entity;this.gravity=gravity;this.noAi=noAi;this.end=end;
         }
@@ -58,7 +57,8 @@ public final class Telekinesis {
         return false;
     }
 
-    private static int capacity(ServerPlayer p) {return 1+HexData.mastery(p,Discipline.SORCERY)/160;}
+    /** One body at a time: casting again lets it go rather than taking another. */
+    private static int capacity(ServerPlayer p) {return 1;}
     private static double maxDistance(ServerPlayer p) {return 6+HexData.mastery(p,Discipline.SORCERY)*.016;}
     /**
      * What the hand can lift. Deliberately generous from the moment the spell unlocks — an unseen hand
@@ -83,7 +83,6 @@ public final class Telekinesis {
         }
         long life=HexData.now(p)+(t instanceof Player?70:300);
         Held held=new Held(t,t.isNoGravity(),t instanceof Mob m&&m.isNoAi(),life);
-        held.spin=t.getYRot();
         grip.held.add(held);
         grip.distance=Math.max(MIN_DISTANCE,Math.min(maxDistance(p),p.distanceTo(t)));
         t.setNoGravity(true);t.fallDistance=0;
@@ -152,15 +151,6 @@ public final class Telekinesis {
             e.setDeltaMovement(Vec3.ZERO);
             e.move(MoverType.SELF,delta);
             e.hurtMarked=true;
-            // Turned as it is carried: the hold reads as control rather than as something glued on.
-            h.spin+=4.5;
-            e.setYRot((float)h.spin);
-            e.setXRot((float)(Math.sin(now*.09+i)*14));
-            if(e instanceof LivingEntity living) {
-                living.setYBodyRot((float)h.spin);
-                living.setYHeadRot((float)h.spin);
-                living.yRotO=living.getYRot();
-            }
         }
         if(now-grip.animated>40){grip.animated=now;HexNetwork.animate(p,"telekinesis");}
         if(now%10==0)sync(p,grip);

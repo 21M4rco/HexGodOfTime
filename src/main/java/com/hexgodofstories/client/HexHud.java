@@ -126,7 +126,7 @@ public final class HexHud {
             case ARCHITECTURE -> "Hold: raise a wall, Small to Massive.";
             case BOLT -> "Hurl a bolt of emerald seidr.";
             case PUSH -> "Push nearby enemies away.";
-            case TELEKINESIS -> "Grab target. Scroll: move it.";
+            case TELEKINESIS -> "Grab / let go. Scroll: closer or further.";
             case BLINK -> "Teleport toward your aim.";
             case WARD -> "Raise a defensive veil.";
             case DAGGERS -> "Conjure a dagger in an empty hand.";
