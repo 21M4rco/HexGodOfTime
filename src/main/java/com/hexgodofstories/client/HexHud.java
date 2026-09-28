@@ -57,6 +57,11 @@ public final class HexHud {
         for(int i=0;i<Math.min(2,lines.size());i++)g.drawString(mc.font,lines.get(i),7,32+i*10,fracture?0xd8ecdd:0xc9d8ce,false);
         String hint=!fracture?alternate(a):home?"Choose where the break leads":"";
         if(a==Ability.WARPING)hint=com.hexgodofstories.warping.Destination.at(d.getInt("warpDestination")).title;
+        if(a==Ability.ARSENAL) {
+            // Gotcha! keeps its own recovery, apart from the crown's shown above.
+            long gotcha=d.getLong(com.hexgodofstories.server.Arsenal.GOTCHA_READY)-ClientState.now();
+            if(gotcha>0&&gotcha<=140)hint=String.format(Locale.ROOT,"Gotcha! %.1fs",gotcha/20f);
+        }
         if(a==Ability.TIME_BRANCH) {
             long remaining=Math.max(0,d.getLong(BranchFistState.UNTIL)-ClientState.now());
             long fistCd=Math.max(0,d.getLong(BranchFistState.COOLDOWN)-ClientState.now());

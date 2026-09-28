@@ -39,8 +39,8 @@
   (open thirty seconds at most) and five seconds of pouring; your right arm points at it meanwhile. The gun
   goes behind the body where you can see it form if it can (turned round to one side, nearer or higher
   when straight back is walled in or hidden behind the body itself), otherwise anywhere around it with room
-  and a clear shot, and last of all over its head. No energy; seven seconds' recovery, which the crown
-  shares. Nothing is spent with no body in the look or nowhere to put the gun; a miss is a miss.
+  and a clear shot, and last of all over its head. No energy; its own seven-second recovery, apart from
+  the crown's twenty. Nothing is spent with no body in the look or nowhere to put the gun; a miss is a miss.
 - **Light to run.** The guns exist only on each client, drawn from the same numbers the server fires by
   (`ArsenalLayout`): a crown costs no network traffic while it fires, and the server only a handful of rays
   a tick. Each model is one draw from the GPU; flashes, tracers, flames and rings are a few quads each; sound,
