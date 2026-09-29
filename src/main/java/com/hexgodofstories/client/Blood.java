@@ -112,15 +112,16 @@ public final class Blood {
         Vec3 side=right.lengthSqr()<1e-6?new Vec3(1,0,0):right.normalize(),neck=e.position().add(0,e.getBbHeight()*.8,0);
         Vfx.bloom(e.getId(),neck,side,44,(at,aim,t)->{
             int age=Math.round(t*44);
-            if(age==3) {
-                Vec3 cut=at.add(aim.scale(e.getBbWidth()*.3));
-                for(int i=0;i<44;i++) {
-                    double speed=.12+random.nextDouble()*.26;
-                    Vfx.spark(HexGodOfStories.BLOOD.get(),cut,aim.scale(speed).add((random.nextDouble()-.5)*.08,.02+random.nextDouble()*.12,(random.nextDouble()-.5)*.08));
+            if(age==3||age==4) {
+                // Flung off the blade as it comes through: a long, heavy sheet thrown out to the right, from all across the cut.
+                for(int i=0;i<(age==3?110:50);i++) {
+                    Vec3 cut=at.add(aim.scale(e.getBbWidth()*(-.3+random.nextDouble()*.7))).add(0,(random.nextDouble()-.5)*.1,0);
+                    double speed=.18+random.nextDouble()*.42;
+                    Vfx.spark(HexGodOfStories.BLOOD.get(),cut,aim.scale(speed).add((random.nextDouble()-.5)*.14,.03+random.nextDouble()*.18,(random.nextDouble()-.5)*.14));
                 }
-                for(int i=0;i<4;i++)
-                    drop(mc,e,at.add(aim.scale(.6+random.nextDouble()*1.6)).add((random.nextDouble()-.5)*.5,0,(random.nextDouble()-.5)*.5),
-                        random.nextDouble()*.25+.2,PUDDLE_LIFE,24);
+                for(int i=0;i<(age==3?9:4);i++)
+                    drop(mc,e,at.add(aim.scale(.5+random.nextDouble()*3.2)).add((random.nextDouble()-.5)*.8,0,(random.nextDouble()-.5)*.8),
+                        random.nextDouble()*.35+.2,PUDDLE_LIFE,24);
             } else if(age>3&&(age-3)%7==0) {
                 float left=1-t;
                 for(int i=0;i<Math.round(14*left)+2;i++) {

@@ -100,8 +100,8 @@ public final class GraspRenderer {
     }
 
     /**
-     * The cut, as its caster sees it: the conjured dagger in the right hand, laid flat and raised across to the left at
-     * throat height, whipped across to the right, held through the follow-through and dropped away. The hand is drawn
+     * The cut, as its caster sees it: the conjured dagger gripped upright in the right hand, point forward, raised across
+     * to the left at throat height, whipped across to the right, held through the follow-through and dropped away. The hand is drawn
      * here in place of vanilla's for the length of the stroke (the grasp_slash animation leaves first person alone).
      */
     @net.minecraftforge.fml.common.Mod.EventBusSubscriber(modid=com.hexgodofstories.HexGodOfStories.ID,value=net.minecraftforge.api.distmarker.Dist.CLIENT)
@@ -126,10 +126,9 @@ public final class GraspRenderer {
             pose.pushPose();
             double x=Mth.lerp(sweep,Mth.lerp(raise,.56,-.3),.85),y=Mth.lerp(raise,-.52,-.22)-.06*sweep-.9*drop,z=Mth.lerp(raise,-.72,-.85)+.1*sweep;
             pose.translate(x,y,z);
-            // Laid flat, point to the left, and swung round to point ahead and right as it goes through.
-            pose.mulPose(com.mojang.math.Axis.ZP.rotationDegrees((float)(80*raise+15*sweep)));
-            pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees((float)(35*raise-75*sweep)));
-            pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees((float)(-15*raise)));
+            // Blade upright, point tipped forward, and swung from pointing ahead-left to ahead-right as it goes through.
+            pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees((float)(40*raise-85*sweep)));
+            pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees((float)(-55*raise)));
             mc.getEntityRenderDispatcher().getItemInHandRenderer().renderItem(mc.player,stack,
                 net.minecraft.world.item.ItemDisplayContext.FIRST_PERSON_RIGHT_HAND,false,pose,e.getMultiBufferSource(),e.getPackedLight());
             pose.popPose();

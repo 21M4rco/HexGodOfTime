@@ -137,7 +137,8 @@ public final class HexServer {
         if(a.hold){Architecture.begin(p);return;}
         if(cast(p,a,action==ALTERNATE)) {
             // Anchor Being cast in the full transformation is its secret, sixty-block variation, and costs two minutes.
-            int recovery=a==Ability.THREADS&&HexData.get(p).getBoolean("ascended")?AnchorBeing.GRAND_RECOVERY:a.cooldown;
+            // The mantle's own recovery starts only once it is off (see dismissMantle).
+            int recovery=a==Ability.THREADS&&HexData.get(p).getBoolean("ascended")?AnchorBeing.GRAND_RECOVERY:a==Ability.ASCENSION?0:a.cooldown;
             HexData.spend(p,a.cost);HexData.get(p).putLong("cd_"+a.name(),now+recovery);
             reward(p,a.discipline,90);HexNetwork.sync(p);
         }
@@ -259,14 +260,18 @@ public final class HexServer {
             // Anchor Being. Silent on purpose: no gesture, no sound, nothing that says a swap just happened.
             case THREADS -> {if(secondary){notice(p,"Hold the alternate key for Gravity Grasp.");return false;}return AnchorBeing.cast(p);}
             // Worn, it is taken off before any cast is paid for (see the action handler); never charged for here.
-            case ASCENSION -> {if(HexData.get(p).getBoolean("ascended")){dismissMantle(p);HexNetwork.sync(p);return false;}HexData.get(p).putBoolean("ascended",true);HexData.get(p).putLong("transformStart",now);Transformation.sustain(p);HexNetwork.fx(p,"ascend");p.level().playSound(null,p.blockPosition(),HexGodOfStories.ASCEND.get(),SoundSource.PLAYERS,.75f,1);return true;}
+            case ASCENSION -> {if(HexData.get(p).getBoolean("ascended")){dismissMantle(p);HexNetwork.sync(p);return false;}HexData.get(p).putBoolean("ascended",true);HexData.get(p).putLong("transformStart",now);HexData.energy(p,HexData.maxEnergy(p));Transformation.sustain(p);HexNetwork.fx(p,"ascend");p.level().playSound(null,p.blockPosition(),HexGodOfStories.ASCEND.get(),SoundSource.PLAYERS,.75f,1);return true;}
             default -> {return false;}
         }
     }
 
-    /** Takes the mantle off: its flight, the branch, a stop of time it was holding and everything it granted go with it. */
+    /**
+     * Takes the mantle off: its flight, the branch, a stop of time it was holding and everything it granted go with it,
+     * and its five minutes' recovery starts, whether it was taken off or worn down to nothing.
+     */
     static void dismissMantle(ServerPlayer p) {
         HexData.get(p).putBoolean("ascended",false);HexData.get(p).putLong("transformStart",HexData.now(p));
+        HexData.get(p).putLong("cd_"+Ability.ASCENSION.name(),HexData.now(p)+Ability.ASCENSION.cooldown);
         CosmicFlight.revoke(p);TimeBranch.cancel(p);Transformation.strip(p);
         if(TemporalEngine.stopping(p))TemporalEngine.clear(p);
         HexNetwork.fx(p,"dismiss");p.level().playSound(null,p.blockPosition(),HexGodOfStories.ASCEND.get(),SoundSource.PLAYERS,.75f,1);
