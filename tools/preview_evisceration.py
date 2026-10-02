@@ -5,8 +5,10 @@ moves (player_animation/blade_sword_evis_*.json) with the dash and the step back
 does, tick for tick. The body is a zombie or a player, cut along the plane the server sends, by the same means
 client/Halving draws it: every face clipped to one side of the plane, the lines the faces are cut along closed into
 loops and filled as the cut face, red-hot and cooling (data/HoleHeat), each half thrown, turned over and landed with
-Halving's own numbers. The blood is Blood.slash's sprays and the cut faces' pouring, as particles with the blood
-particle's own gravity and drag, and the pools they leave.
+Halving's own numbers, the halves going limp as Halving.limp poses them: each limb wholly on a half's side of the cut
+swinging loose, thrown about again on landing, settling splayed. The cut faces are raw blood red (the game sears them
+only when the blade burns). The blood is Blood.slash's sprays, Blood.skewer's pumping while the blade is in, and the cut
+faces' pouring, as particles with the blood particle's own gravity and drag, and the pools they leave.
 
 It is a picture of the move, not the game: no lighting but a sun, a flat floor, and the blood's sprites drawn as
 squares. Requires numpy and Pillow, and ffmpeg for the videos. Writes per body: <body>.mp4 (real time), <body>_slow.mp4
@@ -28,14 +30,15 @@ import blade_rig as rig  # noqa: E402
 ANIM = Path(__file__).resolve().parents[1] / 'src/main/resources/assets/hexgodofstories/player_animation'
 
 # server/Evisceration
-SPEED, REACH, DASH, THRUST, DOOMED_HOLD, CUT_HIT = 1.05, .9, 8, 2, 4, 6
-GUT, ANGLE, BLOOD = .58, 50, 2.5
+SPEED, REACH, DASH, THRUST, DOOMED_HOLD, CUT_HIT = 1.05, 1.2, 8, 2, 4, 6
+GUT, ANGLE, BLOOD = .55, 50, 2.5
 # client/Halving
-GRAVITY, MOST_SPIN, COOLING, RISE = .075, .5, 160, 5
-FLESH, CHAR = (.5, .05, .045), (.16, .03, .02)
+GRAVITY, MOST_SPIN, POUR = .075, .5, 200
+RAW, RAW_RIM = (.72, .03, .03), (.48, .015, .015)
+# Halving.Kind: how far each limb goes over as it goes limp (radians): the low and high of its pitch, and its roll either way.
+LIMBS = {'head': (.3, .9, .5), 'rightArm': (-1.5, .6, .9), 'leftArm': (-1.5, .6, .9), 'rightLeg': (-.6, .6, .4), 'leftLeg': (-.6, .6, .4)}
 # The blood particle (HexParticles.Drip): gravity .75 of vanilla's .04, drag .98, life 26 to 43 ticks.
 DRIP_FALL, DRIP_DRAG = .03, .98
-STOPS = [0, .92, .84, .42, .2, .96, .76, .26, .45, 1, .5, .1, .7, 1, .26, .04, 1, 1, .1, .02]
 
 BODIES = {
     # Zombie: green skin, cyan shirt, purple trousers, arms held out in front. Its box is 1.95 high.
@@ -64,21 +67,6 @@ def load(name):
     return {'end': e['endTick'], 'keys': keys}
 
 
-def heat(age):
-    t = age + RISE
-    cooled = (t - RISE) / COOLING
-    return 0. if cooled >= 1 else 1 - cooled
-
-
-def glow(h):
-    if h <= 0: return np.zeros(3)
-    i = 0
-    while i + 8 < len(STOPS) and STOPS[i + 4] < h: i += 4
-    f = (h - STOPS[i]) / (STOPS[i + 4] - STOPS[i])
-    bright = h ** .6
-    return np.array([(STOPS[i + 1 + c] + (STOPS[i + 5 + c] - STOPS[i + 1 + c]) * f) * bright for c in range(3)])
-
-
 def axis_angle(axis, angle):
     x, y, z = unit(axis)
     c, s, C = math.cos(angle), math.sin(angle), 1 - math.cos(angle)
@@ -89,10 +77,17 @@ def axis_angle(axis, angle):
 
 # ------------------------------------------------------------------ the body, and cutting it
 
-def body_faces(kind):
-    """The body's faces at rest, from its feet, facing the bearer (-z): (corners, colour) each."""
+def body_faces(kind, flops=None):
+    """
+    The body's faces, from its feet, facing the bearer (-z): (corners, colour, part) each. At rest, or with some limbs
+    posed limp: flops maps a part to the pitch and roll (degrees) added to it, as Halving.limp adds them.
+    """
     spec = BODIES[kind]
     frame = {'rightArm': {'pitch': spec['arms']}, 'leftArm': {'pitch': spec['arms']}}
+    for name, (pitch, roll) in (flops or {}).items():
+        part = frame.setdefault(name, {})
+        part['pitch'] = part.get('pitch', 0) + pitch
+        part['roll'] = part.get('roll', 0) + roll
     R = rig.root(frame)
     up, tor = rig.upper(frame)
     turn = np.diag([-1., 1, -1])
@@ -101,7 +96,7 @@ def body_faces(kind):
         M = R @ tor if name == 'torso' else R @ (up if name in ('head', 'rightArm', 'leftArm') else np.eye(4)) @ rig.partm(frame, name)
         for i, quad in enumerate(rig.box_faces(lo, hi, M)):
             colour = spec['face'] if name == 'head' and i == 0 else spec['colors'][name]
-            faces.append(([turn @ np.array(p) for p in quad], np.array(colour) / 255))
+            faces.append(([turn @ np.array(p) for p in quad], np.array(colour) / 255, name))
     return faces
 
 
@@ -151,8 +146,9 @@ def loops(lines, join=1e-3):
 class Piece:
     """One half, as Halving.Piece: what it keeps, where it turns about, and how it moves."""
 
-    def __init__(self, side, faces, caps, pivot, hull, vel, axis, topple, spin, accel, delay):
-        self.side, self.faces, self.caps, self.pivot, self.hull = side, faces, caps, pivot, hull
+    def __init__(self, side, faces, caps, parts, pivot, hull, vel, axis, topple, spin, accel, delay):
+        self.side, self.faces, self.caps, self.parts, self.pivot, self.hull = side, faces, caps, parts, pivot, hull
+        self.landed = -1.
         self.vel, self.axis, self.topple, self.spin, self.accel, self.delay = vel, unit(axis), topple, spin, accel, delay
         self.pos = np.zeros(3)
         self.prev_pos = np.zeros(3)
@@ -160,6 +156,20 @@ class Piece:
         self.prev_rot = np.eye(3)
         self.angle = self.prev_angle = 0.
         self.grounded = False
+
+    def flops(self, t, seed):
+        """Halving.limp: each limb wholly on this side swinging loose, thrown about again on landing, settling splayed."""
+        r = random.Random(seed)
+        ease = 1 - math.exp(-t / 6)
+        landed = 0 if self.landed < 0 or t < self.landed else t - self.landed
+        out = {}
+        for name, (low, high, z) in LIMBS.items():
+            rest_x, rest_z, phase, phase2 = low + r.random() * (high - low), (r.random() * 2 - 1) * z, r.random() * 6.28, r.random() * 6.28
+            if self.parts.get(name) != 'whole': continue
+            swing = .85 * math.exp(-t / 9) * math.sin(t * .6 + phase)
+            if landed > 0: swing += .7 * math.exp(-landed / 7) * math.sin(landed * .9 + phase2)
+            out[name] = (math.degrees(rest_x * ease + swing), math.degrees(rest_z * ease + swing * .6))
+        return out
 
     def place(self, local, partial=1.):
         angle = self.prev_angle + (self.angle - self.prev_angle) * partial
@@ -170,13 +180,17 @@ class Piece:
         self.prev_pos, self.prev_angle = self.pos.copy(), self.angle
         if age >= self.delay and self.angle < self.topple:
             self.spin = min(self.spin + self.accel, MOST_SPIN)
-            self.angle = min(self.topple, self.angle + self.spin)
+            self.angle = max(0., min(self.topple, self.angle + self.spin))
         self.vel = self.vel + np.array([0, -GRAVITY, 0])
         self.pos = self.pos + self.vel
         low = min(self.place(c)[1] for c in self.hull)
         if low < 0:
             self.pos = self.pos + np.array([0, -low, 0])
-            if not self.grounded and self.vel[1] < -.1: landed(self)
+            if not self.grounded:
+                self.landed = age
+                # It slumps back off the blow of landing before it goes on over.
+                if self.angle < self.topple: self.spin *= -.3
+                if self.vel[1] < -.1: landed(self)
             if self.vel[1] < 0: self.vel = np.array([self.vel[0] * .5, -self.vel[1] * .15, self.vel[2] * .5])
             self.grounded = True
         if self.grounded: self.vel = np.array([self.vel[0] * .78, self.vel[1], self.vel[2] * .78])
@@ -200,18 +214,27 @@ def halve(kind, rng):
     pieces = []
     for side in (1, -1):
         keep = normal * side
+        # Where each part lies against the cut, at rest (Halving.Clipper.lies): wholly kept, wholly the other half's, or
+        # cut through. Only a part cut through is clipped; a whole one goes through whole, and may go limp.
+        parts = {}
+        for quad, colour, part in faces:
+            sides = [(c - point) @ keep >= 0 for c in quad]
+            was = parts.get(part)
+            now = 'whole' if all(sides) else 'gone' if not any(sides) else 'cut'
+            parts[part] = now if was in (None, now) else 'cut'
         kept, lines = [], []
-        for quad, colour in faces:
+        for quad, colour, part in faces:
+            if parts[part] != 'cut': continue
             left, crossed = clip(quad, point, keep)
             if len(left) >= 3: kept.append((left, colour))
             if crossed: lines.append(crossed)
         caps = loops(lines)
         if side > 0:
-            pieces.append(Piece(1, kept, caps, np.mean(up, axis=0), up,
+            pieces.append(Piece(1, kept, caps, parts, np.mean(up, axis=0), up,
                                 (FORWARD * .22 + line * .17 + UP * .15) * math.sqrt(size), FORWARD + RIGHT * -.6,
                                 math.radians(100 + rng.random() * 25), .1 * slow, .035 * slow, 0))
         else:
-            pieces.append(Piece(-1, kept, caps, falls * w * .5, down,
+            pieces.append(Piece(-1, kept, caps, parts, falls * w * .5, down,
                                 (FORWARD * .14 + line * -.04 + UP * .05) * math.sqrt(size), -RIGHT + FORWARD * -.45,
                                 math.radians(84 + rng.random() * 10), 0., .028 * slow, 3))
     return pieces, point, normal, line
@@ -413,38 +436,53 @@ def simulate(kind, seed=7):
                 z += max(.25, min(SPEED, gap - REACH + .15))
         if thrust is not None and impale is None and now >= thrust + THRUST:
             impale = now
-            blood.slash(front, -FORWARD + UP * .3, BLOOD, now)
-            blood.slash(back, FORWARD + UP * .15, BLOOD, now)
-            blood.slash(back, FORWARD - UP * .3, BLOOD, now)
+            # Up and down out of both wounds, nothing across the blade's line.
+            blood.slash(front + UP * .12, unit(-FORWARD * .25 + UP), BLOOD, now)
+            blood.slash(front - UP * .12, unit(-FORWARD * .15 - UP), BLOOD, now)
+            blood.slash(back + UP * .12, unit(FORWARD * .5 + UP), BLOOD, now)
+            blood.slash(back - UP * .12, unit(FORWARD * .4 - UP), BLOOD, now)
         if impale is not None and cut_start is None and now - impale <= 9:
-            # Blood.impale: welling round the blade, a gush as it goes in, a spurt on each beat and push.
+            # Blood.skewer: both wounds running down the body, and spurting up and down it on each beat.
             age = now - impale
-            u = rng.random((12, 5))
-            blood.add(front + np.c_[(u[:, 0] - .5) * .16, (u[:, 1] - .5) * .12, (u[:, 2] - .5) * .16],
-                      np.c_[(u[:, 3] - .5) * .04, -.04 - u[:, 4] * .06, -.025 + (rng.random(12) - .5) * .04])
-            if age <= 1 or age == 3 or age % 4 == 0:
-                n = 90 if age <= 1 else 150 if age == 3 else 50
-                u = rng.random((n, 3))
-                aim = np.c_[(u[:, 0] - .5) * 1.6, np.zeros(n), -np.ones(n)]
-                aim /= np.linalg.norm(aim, axis=1, keepdims=True)
-                blood.add(np.repeat(front[None], n, 0), aim * (.08 + u[:, 1:2] * .3) + np.c_[np.zeros(n), .03 + u[:, 2] * .14, np.zeros(n)])
-            blood.pool(np.array([(pyrng.random() - .5) * .5, 0, -.35 - pyrng.random() * .8]), .3 + pyrng.random() * .3, now)
+            for wound in (front, back):
+                u = rng.random((10, 5))
+                blood.add(wound + np.c_[(u[:, 0] - .5) * .2, (u[:, 1] - .5) * .14, (u[:, 2] - .5) * .2],
+                          np.c_[(u[:, 3] - .5) * .03, -.05 - u[:, 4] * .06, (rng.random(10) - .5) * .03])
+                if age <= 1 or age % 4 == 0:
+                    u = rng.random((44, 3))
+                    up = (np.arange(44) % 2 == 0)
+                    speed = .08 + u[:, 0] * np.where(up, .3, .18)
+                    blood.add(np.repeat(wound[None], 44, 0), np.c_[(u[:, 1] - .5) * .09, np.where(up, speed, -speed), (u[:, 2] - .5) * .09])
+                    blood.pool(wound + np.array([(pyrng.random() - .5) * .7, 0, (pyrng.random() - .5) * .7]), .25 + pyrng.random() * .3, now)
+            blood.pool(np.array([(pyrng.random() - .5) * .5, 0, (pyrng.random() - .5) * .5]), .35 + pyrng.random() * .4, now)
         if impale is not None and cut_start is None and now >= impale + DOOMED_HOLD:
             cut_start = now
             back_step = -.32
-            blood.slash(front, -FORWARD + UP * .2, BLOOD, now)
+            blood.slash(front + UP * .1, unit(-FORWARD * .3 + UP), BLOOD, now)
+            blood.slash(front - UP * .1, unit(-FORWARD * .2 - UP), BLOOD, now)
         if cut_start is not None and cut is None and now >= cut_start + CUT_HIT:
             cut = now
             pieces, point, normal, line = halve(kind, pyrng)
+            # Evisceration.cut: nine sprays out of the whole length of the cut, every way.
+            reach = max(w, h * .5) * .4
             blood.slash(gut, line, BLOOD, now)
-            blood.slash(gut, unit(-line + UP * .6), BLOOD, now)
+            blood.slash(gut + line * reach, unit(line - UP * .4), BLOOD, now)
+            blood.slash(gut - line * reach, unit(-line + UP * .6), BLOOD, now)
             blood.slash(gut, unit(normal + FORWARD * .5), BLOOD, now)
+            blood.slash(gut, unit(normal - FORWARD * .4 + UP * .5), BLOOD, now)
+            blood.slash(gut, unit(-normal + FORWARD * .6), BLOOD, now)
             blood.slash(gut - UP * h * .2, unit(FORWARD - UP * .2), BLOOD, now)
-            for _ in range(80):
+            blood.slash(gut + RIGHT * w * .3, unit(RIGHT + UP * .3), BLOOD, now)
+            blood.slash(gut - RIGHT * w * .3, unit(-RIGHT + UP * .3), BLOOD, now)
+            # Halving.begin: the sheet out of the whole length of the cut, and pools all along under it.
+            for _ in range(360):
                 along = (pyrng.random() - .5) * max(w, h * .8)
                 at = np.array([0, h * GUT, 0]) + line * along + FORWARD * (pyrng.random() - .5) * w
-                out = normal * (1 if pyrng.random() < .5 else -1) * (.05 + pyrng.random() * .12)
-                blood.add(at, out + line * (.12 + pyrng.random() * .2) + UP * .05)
+                out = normal * (1 if pyrng.random() < .5 else -1) * (.05 + pyrng.random() * .2)
+                blood.add(at, out + line * ((pyrng.random() - .3) * .35) + UP * (.02 + pyrng.random() * .2))
+            for _ in range(14):
+                at = np.array([0, h * GUT, 0]) + line * (pyrng.random() - .5) * max(w, h)
+                blood.pool(np.array([at[0] + (pyrng.random() - .5) * 1.4, 0, at[2] + (pyrng.random() - .5) * 1.4]), .35 + pyrng.random() * .5, now)
         if back_step:
             z += back_step
             back_step = back_step * .546 if abs(back_step) > .01 else 0.
@@ -454,24 +492,28 @@ def simulate(kind, seed=7):
 
             def landed(piece, age=age):
                 at = piece.place(piece.pivot)
-                for _ in range(4):
-                    blood.pool(np.array([at[0] + (pyrng.random() - .5) * h * .5, 0, at[2] + (pyrng.random() - .5) * h * .5]),
-                               .3 + pyrng.random() * .4, now)
-                u = rng.random((40, 3))
-                blood.add(np.repeat(np.array([[at[0], .05, at[2]]]), 40, 0), np.c_[(u[:, 0] - .5) * .3, .05 + u[:, 1] * .15, (u[:, 2] - .5) * .3])
+                for _ in range(10):
+                    blood.pool(np.array([at[0] + (pyrng.random() - .5) * h * .8, 0, at[2] + (pyrng.random() - .5) * h * .8]),
+                               .35 + pyrng.random() * .5, now)
+                u = rng.random((140, 3))
+                blood.add(np.repeat(np.array([[at[0], .05, at[2]]]), 140, 0), np.c_[(u[:, 0] - .5) * .45, .05 + u[:, 1] * .22, (u[:, 2] - .5) * .45])
 
             for piece in pieces:
                 piece.step(age, landed)
-                if age <= 120:
+                if age <= POUR:
+                    # Halving.pour: the cut face pouring, spurting with the last beats, pooling under it.
                     face = piece.place(point)
                     out = axis_angle(piece.axis, piece.angle) @ (normal * -piece.side)
-                    flow = 1 - age / 120
-                    n = round(14 * flow * flow) + 1
+                    flow = 1 - age / POUR
+                    n = round(44 * flow * flow) + 4
                     u = rng.random((n, 5))
-                    spots = face + np.c_[(u[:, 0] - .5) * h * .25, (u[:, 1] - .5) * .1, (u[:, 2] - .5) * h * .25]
-                    blood.add(spots, np.c_[out[0] * (.04 + u[:, 3] * .1), np.full(n, out[1] * .06 - .02), out[2] * (.04 + u[:, 4] * .1)])
-                    if age % 3 == 0:
-                        blood.pool(face + np.array([(pyrng.random() - .5) * .6, 0, (pyrng.random() - .5) * .6]), .25 + pyrng.random() * .35 * flow, now)
+                    spots = face + np.c_[(u[:, 0] - .5) * h * .3, (u[:, 1] - .5) * .12, (u[:, 2] - .5) * h * .3]
+                    blood.add(spots, np.c_[out[0] * (.04 + u[:, 3] * .14), np.full(n, out[1] * .08 - .02), out[2] * (.04 + u[:, 4] * .14)])
+                    if age < 80 and age % 5 == 0:
+                        u = rng.random((40, 5))
+                        speed = (.15 + u[:, :1] * .25) * (1 - age / 100)
+                        blood.add(np.repeat(face[None], 40, 0), np.c_[out[0] * speed[:, 0] + (u[:, 1] - .5) * .08, .08 + u[:, 2] * .18, out[2] * speed[:, 0] + (u[:, 3] - .5) * .08])
+                    blood.pool(face + np.array([(pyrng.random() - .5) * .9, 0, (pyrng.random() - .5) * .9]), .3 + pyrng.random() * .45 * flow, now)
         blood.step(now)
         # The bearer's move this tick.
         if cut_start is not None: move, local = 'blade_sword_evis_cut', now - cut_start
@@ -482,7 +524,7 @@ def simulate(kind, seed=7):
         phase = ('stands' if now < press else 'dash' if thrust is None else 'thrust' if impale is None else
                  'impaled' if cut_start is None else 'cut' if cut is None else 'halved')
         states.append(dict(now=now, z=z, move=move, local=local, phase=phase, pieces=pieces and [
-            (p.prev_pos.copy(), p.pos.copy(), p.prev_angle, p.angle) for p in pieces],
+            (p.prev_pos.copy(), p.pos.copy(), p.prev_angle, p.angle, p.landed) for p in pieces],
             blood=(blood.p.copy(), blood.v.copy(), blood.age.copy(), blood.life.copy(), blood.size.copy()), pools=list(blood.pools),
             cut=cut, look=math.degrees(math.atan2(1.62 - h * .55, max(.5, -z))) if move in ('blade_sword_evis_dash', 'blade_sword_evis_thrust') else 0,
             dashing=thrust is None and now >= press))
@@ -515,22 +557,22 @@ def bearer_polygons(sim, i, partial):
 def body_polygons(sim, i, partial):
     s = sim['states'][i]
     if s['pieces'] is None:
-        return [(corners, colour, True) for corners, colour in sim['standing']]
+        return [(corners, colour, True) for corners, colour, _ in sim['standing']]
     out = []
     age = s['now'] - s['cut'] + partial
-    hot = heat(age)
-    g = glow(hot)
-    rim = np.minimum(1, np.array(CHAR) + g)
-    middle = np.minimum(1, np.array(FLESH) + g * .55)
-    for piece, (p0, p1, a0, a1) in zip(sim['halves'], s['pieces']):
-        piece.prev_pos, piece.pos, piece.prev_angle, piece.angle = p0, p1, a0, a1
+    for k, (piece, (p0, p1, a0, a1, landed)) in enumerate(zip(sim['halves'], s['pieces'])):
+        piece.prev_pos, piece.pos, piece.prev_angle, piece.angle, piece.landed = p0, p1, a0, a1, landed
+        # What the cut went through, clipped at rest; every part wholly on this side, posed limp.
         for corners, colour in piece.faces:
             out.append(([piece.place(c, partial) for c in corners], colour, True))
+        for corners, colour, part in body_faces(sim['kind'], piece.flops(age, 7 + k * 6)):
+            if piece.parts.get(part) == 'whole':
+                out.append(([piece.place(c, partial) for c in corners], colour, True))
         for loop in piece.caps:
             centre = np.mean(loop, axis=0)
-            for k in range(len(loop)):
-                out.append(([piece.place(centre, partial), piece.place(loop[k], partial), piece.place(loop[(k + 1) % len(loop)], partial)],
-                            np.array([middle, rim, rim]), hot < .05))
+            for n in range(len(loop)):
+                out.append(([piece.place(centre, partial), piece.place(loop[n], partial), piece.place(loop[(n + 1) % len(loop)], partial)],
+                            np.array([RAW, RAW_RIM, RAW_RIM]), True))
     return out
 
 
@@ -568,7 +610,7 @@ def render_body(kind, out, scale=2, width=640, height=400):
     sim = simulate(kind)
     W, H = width * scale, height * scale
     cameras = [('Behind the bearer', Camera((1.1, 2.5, -8.2), (-.1, 1.0, -.4), W, H), True),
-               ('From the side, the blood in the air left out to show the halves', Camera((6.4, 2.1, -2.2), (-.3, .9, -.4), W, H), False)]
+               ('In front, the blood in the air left out to show the halves', Camera((-2.6, 3.1, 6.2), (-.3, .55, .2), W, H), False)]
     frames = out / f'{kind}_frames'
     frames.mkdir(parents=True, exist_ok=True)
     from concurrent.futures import ProcessPoolExecutor
@@ -605,7 +647,7 @@ def _draw(job):
     sim = _SIMS[kind]
     W, H = width * scale, height * scale
     cameras = [('Behind the bearer', Camera((1.1, 2.5, -8.2), (-.1, 1.0, -.4), W, H), True),
-               ('From the side, the blood in the air left out to show the halves', Camera((6.4, 2.1, -2.2), (-.3, .9, -.4), W, H), False)]
+               ('In front, the blood in the air left out to show the halves', Camera((-2.6, 3.1, 6.2), (-.3, .55, .2), W, H), False)]
     return frame_image(sim, i, partial, cameras, scale)
 
 

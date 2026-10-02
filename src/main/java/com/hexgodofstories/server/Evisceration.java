@@ -69,7 +69,7 @@ public final class Evisceration {
      * The line the cut parts a body on: through its middle at {@link #GUT} of its height, falling from the bearer's
      * upper left to their lower right at {@link #ANGLE} degrees, as the blade went (blade_moves.SWINGS).
      */
-    public static final double GUT = .58, ANGLE = 50;
+    public static final double GUT = .55, ANGLE = 50;
     private static final float BLOOD = 2.5f;
 
     private enum Phase {DASH, THRUST, IMPALED, CUT}

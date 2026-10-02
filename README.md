@@ -28,6 +28,11 @@
   heart for four, and splashes it up all round where it lands. They lie there ten seconds and sink away. A totem of undying that saves a player from the cut leaves them cut,
   not halved.
 - **Nothing reached** and the thrust goes into the air, with a three-second recovery. A shield turns it aside.
+- **Seen before it ships.** `tools/preview_evisceration.py` simulates the whole move on a zombie and on a player
+  and draws it from behind the bearer and from in front: the bearer through the game's own transform chain playing the
+  shipped moves, the dash and step back as the server moves them, the body cut by the same clipping and closed cut
+  faces the game draws, the halves with the game's own physics and limp limbs, and the blood as the game's sprays and
+  particles. The cut passes just under the head, from the shoulder to the opposite hip, as drawn.
 - **The guard's parry stuns.** A blow parried from The Deceiver's guard (use held) no longer throws its striker back:
   it is stunned where it stands, in reach, for half a second, creature or player, so you can answer it.
 

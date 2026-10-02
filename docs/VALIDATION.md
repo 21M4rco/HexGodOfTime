@@ -447,10 +447,15 @@ directional streaking. Cuboids spinning off in all directions read as rubble and
 
 - **Checked offline.** `tools/generate_blades.py` solved the three new moves (`blade_sword_evis_dash`, `_thrust`,
   `_cut`) and passed its checks on all of them: the handle in the fist at every half tick, no forearm in the body, the
-  thrust's point travelling forward at its contact (agreement 0.82) and the cut's travelling down to the right along
-  the line the server parts the body on (0.92 against `Evisceration.ANGLE`'s 50 degrees). The thrust reaches 2.25 blocks
+  thrust's point travelling forward at its contact (agreement 0.88) and the cut's travelling down to the right along
+  the line the server parts the body on (0.92 against `Evisceration.ANGLE`'s 50 degrees). The thrust reaches 2.5 blocks
   ahead with the arm straight. Every move was looked at frame by frame on contact sheets.
 - **Not compiled locally.** Forge's Maven and Mojang's servers are closed to this environment; the build is CI's.
+- **Simulated.** `tools/preview_evisceration.py` ran the whole move on a zombie and a player with the server's timings
+  and the client's physics, clipping and limp limbs ported (a picture, not the game: a sun, a flat floor, square blood).
+  On both, the dash reaches the body on the fourth tick, the blade goes in on the sixth after G, the cut lands on the
+  sixteenth; the head and the legs go limp on their halves (and one arm of the zombie, held out clear of the line), the
+  torso and the arms the line crosses are cut and closed. CI built every commit and started the client with the new mixins applied.
 
 ### Not verified — needs a recorded in-game session
 
