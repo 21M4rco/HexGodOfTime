@@ -25,7 +25,9 @@ public final class HexServer {
         /** The Scepter's right click: held opens a charge, let go fires it. */
         SCEPTER_PRESS=20,SCEPTER_RELEASE=21,
         /** Anchor Being's held alternate, Gravity Grasp: the alternate key pressed, and let go. */
-        GRASP_BEGIN=22,GRASP_END=23;
+        GRASP_BEGIN=22,GRASP_END=23,
+        /** One of the seven bind slots' keys: choose whatever ability that slot holds. */
+        SLOT=24;
     /** Keep rewind's wire value for saved clients; the B/resume action is retired. */
     public static final int TIME_HALT=0,TIME_REWIND=2;
     public record Moment(Vec3 position,float yaw,float pitch,float health) {}
@@ -64,6 +66,18 @@ public final class HexServer {
             if(now-INPUT.getOrDefault(p.getUUID(),-100L)<2)return;
             INPUT.put(p.getUUID(),now);
             if(value>=0&&value<Ability.values().length&&HexData.unlocked(p,Ability.at(value)))HexData.get(p).putInt("selected",value);
+            HexNetwork.sync(p);return;
+        }
+        // A slot's key. Choosing is free and immediate, and it does not touch the cast throttle: a cast pressed right
+        // after it must not be dropped as too soon after the last input.
+        if(action==SLOT) {
+            int[] slots=HexData.quick(p);
+            if(value<0||value>=slots.length)return;
+            int id=slots[value];
+            if(id<0||id>=Ability.values().length||Ability.at(id).dedicated||!HexData.unlocked(p,Ability.at(id)))return;
+            if(HexData.get(p).getInt("selected")==id)return;
+            if(Warping.charging(p))Warping.cancel(p);
+            HexData.get(p).putInt("selected",id);
             HexNetwork.sync(p);return;
         }
         if(action==ASSIGN) {
@@ -181,7 +195,7 @@ public final class HexServer {
     }
 
     /**
-     * The permanent time controls. These never enter the quick bar, so they answer their own keys
+     * The permanent time controls. These are never bound to a slot, so they answer their own keys
      * directly and are reachable the instant they are unlocked, whatever spell is currently selected.
      */
     private static void time(ServerPlayer p,int which) {

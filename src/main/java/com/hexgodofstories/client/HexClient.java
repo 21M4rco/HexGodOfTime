@@ -15,27 +15,37 @@ import net.minecraftforge.fml.common.Mod;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * One mastery key, one quick bar, and contextual primary/secondary actions. Abilities that charge are
- * driven by the press and release of the same key rather than a second binding, so the scheme stays
- * small no matter how much progression adds.
+ * Seven bind slots along the bottom row of the keyboard, one mastery key, and contextual primary and
+ * secondary actions. Pressing a slot's key chooses the ability bound to it, at once; the cast key casts
+ * it and the alternate key does its other thing. Abilities that charge are driven by the press and
+ * release of the cast key rather than a second binding, so the scheme stays small no matter how much
+ * progression adds.
  *
- * <p>The time controls are the exception, and deliberately so. Stopping, rewinding and
- * branching are not spells to be scrolled to — they are commands, and each owns a permanent key that
- * works whatever else is selected. None of them appears in the quick bar at all. The chosen keys
- * are unbound in vanilla, so the scheme adds no conflicts.
+ * <p>The time controls are the exception, and deliberately so. Stopping, rewinding and branching are
+ * not spells to be chosen — they are commands, and each owns a permanent key that works whatever else
+ * is chosen. None of them is ever bound to a slot.
+ *
+ * <p>The slots took the bottom row, so the keys that used to live there moved, and moved under new names:
+ * a saved options file still holding Z for Stillness would otherwise sit on top of the first slot.
  */
 public final class HexClient {
-    public static final KeyMapping MENU=key("mastery",GLFW.GLFW_KEY_K),SELECT=key("select",GLFW.GLFW_KEY_V),
+    public static final KeyMapping MENU=key("mastery",GLFW.GLFW_KEY_K),
         PRIMARY=key("primary",GLFW.GLFW_KEY_R),SECONDARY=key("secondary",GLFW.GLFW_KEY_G),
-        TRANSFORM=key("transform",GLFW.GLFW_KEY_H),RELEASE=key("release",GLFW.GLFW_KEY_X),FLIGHT=key("flight",GLFW.GLFW_KEY_J),
+        TRANSFORM=key("transform",GLFW.GLFW_KEY_H),RELEASE=key("utility",GLFW.GLFW_KEY_U),FLIGHT=key("flight",GLFW.GLFW_KEY_J),
         /** Warping's other direction: reach into the realm chosen with G and pull its creatures out. */
         RECALL=key("recall",GLFW.GLFW_KEY_Y),
-        TIME_STOP=key("time_stop",GLFW.GLFW_KEY_Z),
-        TIME_REWIND=key("time_rewind",GLFW.GLFW_KEY_N),TIME_BRANCH=key("time_branch",GLFW.GLFW_KEY_M);
+        TIME_STOP=key("halt",GLFW.GLFW_KEY_I),
+        TIME_REWIND=key("rewind",GLFW.GLFW_KEY_O),TIME_BRANCH=key("branch",GLFW.GLFW_KEY_LEFT_ALT);
     /** The permanent time commands, paired with the value {@link HexServer#TIME} carries for each. */
     public static final KeyMapping[] TIME_KEYS={TIME_STOP,TIME_REWIND,TIME_BRANCH};
+    /** The seven bind slots, Z X C V B N M: each chooses whatever ability the archive bound to it. */
+    public static final KeyMapping[] SLOTS=new KeyMapping[com.hexgodofstories.data.HexData.QUICK_SLOTS];
+    static {
+        int[] keys={GLFW.GLFW_KEY_Z,GLFW.GLFW_KEY_X,GLFW.GLFW_KEY_C,GLFW.GLFW_KEY_V,GLFW.GLFW_KEY_B,GLFW.GLFW_KEY_N,GLFW.GLFW_KEY_M};
+        for(int i=0;i<SLOTS.length;i++)SLOTS[i]=key("slot_"+(i+1),keys[i]);
+    }
     private static KeyMapping key(String name,int key){return new KeyMapping("key.hexgodofstories."+name,InputConstants.Type.KEYSYM,key,"key.categories.hexgodofstories");}
-    private static boolean primaryDown,selectDown,primaryWasHold,primaryLatched;
+    private static boolean primaryDown,primaryWasHold,primaryLatched;
     /** The alternate key held as Gravity Grasp (Anchor Being chosen): its release must always reach the server. */
     private static boolean graspDown;
     private static int repeat;
@@ -57,7 +67,8 @@ public final class HexClient {
             e.enqueueWork(()->com.hexgodofstories.warping.WarpCrossing.clientGrant(id->WarpCrossingClient.phasing(id)||WarpEmergenceClient.emerging(id)));
         }
         @SubscribeEvent public static void keys(RegisterKeyMappingsEvent e) {
-            for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT,RECALL})e.register(k);
+            for(KeyMapping k:new KeyMapping[]{MENU,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT,RECALL})e.register(k);
+            for(KeyMapping k:SLOTS)e.register(k);
             for(KeyMapping k:TIME_KEYS)e.register(k);
         }
         @SubscribeEvent public static void entities(EntityRenderersEvent.RegisterRenderers e) {
@@ -101,7 +112,7 @@ public final class HexClient {
             if(e.phase!=TickEvent.Phase.END)return;
             ClientState.tick();
             Minecraft mc=Minecraft.getInstance();
-            if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;selectDown=false;graspDown=false;QuickBar.closeBar(false);return;}
+            if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;graspDown=false;return;}
             if(!enabled()) {
                 // Locked means invisible and inert, not merely server-rejected. Swallow every mod input
                 // and close any mod-only screen immediately when access is revoked.
@@ -110,8 +121,6 @@ public final class HexClient {
                 primaryLatched=primaryPhysicallyDown();
                 primaryDown=false;primaryWasHold=false;repeat=0;
                 if(graspDown){graspDown=false;HexNetwork.send(HexServer.GRASP_END,0);}
-                selectDown=SELECT.isDown();
-                QuickBar.closeBar(false);
                 if(mc.screen instanceof WarpScreen||mc.screen instanceof MasteryScreen||mc.screen instanceof FractureScreen)mc.setScreen(null);
                 drain();return;
             }
@@ -124,17 +133,11 @@ public final class HexClient {
                 // is exactly how arriving in the sanctum used to open a second break on arrival.
                 if(primaryDown){primaryDown=false;primaryLatched=true;if(primaryWasHold)HexNetwork.send(HexServer.HOLD_END,0);}
                 if(graspDown){graspDown=false;HexNetwork.send(HexServer.GRASP_END,0);}
-                if(selectDown){selectDown=false;QuickBar.closeBar(false);}
                 drain();return;
             }
             while(MENU.consumeClick())mc.setScreen(new MasteryScreen(false));
             // The Scepter's right click is read from the key itself: its hold is the charge.
             ScepterClient.input(mc.options.keyUse.isDown());
-
-            boolean select=SELECT.isDown();
-            if(select&&!selectDown)QuickBar.openBar();
-            if(!select&&selectDown)QuickBar.closeBar(true);
-            selectDown=select;
 
             Ability selected=Ability.at(ClientState.self().getInt("selected"));
             boolean primary=PRIMARY.isDown();
@@ -187,15 +190,29 @@ public final class HexClient {
             return PRIMARY.isDown();
         }
         private static void drain() {
-            for(KeyMapping k:new KeyMapping[]{MENU,SELECT,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT,RECALL})
+            for(KeyMapping k:new KeyMapping[]{MENU,PRIMARY,SECONDARY,TRANSFORM,RELEASE,FLIGHT,RECALL})
                 while(k.consumeClick());
+            for(KeyMapping k:SLOTS)while(k.consumeClick());
             for(KeyMapping k:TIME_KEYS)while(k.consumeClick());
+        }
+
+        /**
+         * A slot key, read from the key event itself rather than from its mapping's clicks. Two vanilla bindings sit on
+         * this row (the creative hotbar's save and load, on C and X), and a key shared between bindings only ever
+         * clicks one of them; the event reaches every listener whatever else is bound there.
+         */
+        @SubscribeEvent public static void slotKey(InputEvent.Key e) {
+            if(e.getAction()!=GLFW.GLFW_PRESS)return;
+            for(int i=0;i<SLOTS.length;i++)if(SLOTS[i].matches(e.getKey(),e.getScanCode())){QuickBar.press(i);return;}
+        }
+        @SubscribeEvent public static void slotMouse(InputEvent.MouseButton.Post e) {
+            if(e.getAction()!=GLFW.GLFW_PRESS)return;
+            for(int i=0;i<SLOTS.length;i++)if(SLOTS[i].matchesMouse(e.getButton())){QuickBar.press(i);return;}
         }
 
         @SubscribeEvent public static void scroll(InputEvent.MouseScrollingEvent e) {
             var mc=Minecraft.getInstance();
             if(mc.player==null||mc.screen!=null||!enabled())return;
-            if(QuickBar.scroll(e.getScrollDelta())){e.setCanceled(true);return;}
             if(ClientState.self().getInt("grip")>0) {
                 // Both hands are busy holding something; the wheel pushes and pulls it instead of the hotbar.
                 HexNetwork.send(HexServer.SCROLL,8+(int)Math.signum(e.getScrollDelta()));

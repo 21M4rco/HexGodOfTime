@@ -12,8 +12,9 @@ import net.minecraft.network.chat.Component;
 import java.util.*;
 
 /**
- * The Book of Stories. Choosing an ability selects it; choosing a quick slot first binds it
- * there instead, which is the only assignment gesture in the mod.
+ * The Book of Stories. Choosing an ability selects it; choosing one of the seven bind slots first (each shown under
+ * its key, Z X C V B N M) binds the next ability chosen to that key instead, which is the only assignment gesture in
+ * the mod. Every ability also says what the full transformation makes of it.
  */
 public final class MasteryScreen extends Screen {
     private Discipline chapter=Discipline.MISCHIEF;
@@ -64,36 +65,43 @@ public final class MasteryScreen extends Screen {
             // A permanent time command still shows its progress here, but it is fired from its own
             // key and can never be bound to a quick slot, so it is not selectable.
             button.active=unlocked(data(),a)&&!a.dedicated;
-            button.setTooltip(Tooltip.create(Component.literal(a.description)));
+            String tip=a.description;
+            if(Ascended.changes(a))tip+="\n\nTransformed \u2014 "+Ascended.title(a)+": "+Ascended.text(a);
+            button.setTooltip(Tooltip.create(Component.literal(tip)));
             addRenderableWidget(button);
         }
 
-        // Two rows of four rather than eight narrow cells: a slot is only useful if it says, in words,
-        // which ability answers to it.
-        int columns=HexData.QUICK_SLOTS/2;
+        // The slots in keyboard order, each under its own key: one row where the archive is wide enough for
+        // every slot to name its ability in words, four and three where it is not.
+        int columns=columns();
         slotWidth=Math.min(168,(w-36)/columns);
         barLeft=left+(w-slotWidth*columns)/2;
-        barTop=top+h-66;
+        barTop=top+h-(rows()==1?42:66);
         for(int slot=0;slot<HexData.QUICK_SLOTS;slot++) {
             final int index=slot;
             Ability bound=Ability.slot(quickSlot(data(),slot));
             String name=bound==null?"Empty":bound.title;
-            String label=(slot+1)+"  "+font.plainSubstrByWidth(name,slotWidth-26);
+            String key=QuickBar.key(slot);
+            String label=key+"  "+font.plainSubstrByWidth(name,slotWidth-16-font.width(key));
             Button button=Button.builder(Component.literal(label),b->{binding=binding==index?-1:index;rebuildWidgets();})
                 .bounds(barLeft+slot%columns*slotWidth,barTop+slot/columns*24,slotWidth-4,22).build();
-            button.setTooltip(Tooltip.create(Component.literal(binding==index?"Now pick an ability to bind to slot "+(index+1)+"."
-                :bound==null?"Quick slot "+(index+1)+" — empty. Click, then pick an ability."
-                :"Quick slot "+(index+1)+" — "+bound.title+". Click, then pick another ability to rebind it.")));
+            button.setTooltip(Tooltip.create(Component.literal(binding==index?"Now pick an ability to bind to "+key+"."
+                :bound==null?key+" \u2014 empty. Click, then pick an ability to bind to it."
+                :key+" \u2014 "+bound.title+". Click, then pick another ability to bind to it instead.")));
             addRenderableWidget(button);
         }
     }
 
-    /** The ability list gives up whatever the two quick-slot rows need. */
+    /** Slots across: every one in a row when there is room for them to name their abilities, else four. */
+    private int columns() {return w>=HexData.QUICK_SLOTS*86+36?HexData.QUICK_SLOTS:4;}
+    private int rows() {int c=columns();return (HexData.QUICK_SLOTS+c-1)/c;}
+
+    /** The ability list gives up whatever the slot rows need. */
     private int cardHeight(int entries) {return Math.min(48,(h-170)/Math.max(1,entries));}
 
     /** A coloured edge per slot: its discipline, the slot being bound, and the one selected now. */
     private void slotAccents(GuiGraphics g) {
-        int columns=HexData.QUICK_SLOTS/2,selected=data().getInt("selected");
+        int columns=columns(),selected=data().getInt("selected");
         for(int slot=0;slot<HexData.QUICK_SLOTS;slot++) {
             Ability bound=Ability.slot(quickSlot(data(),slot));
             int x=barLeft+slot%columns*slotWidth,y=barTop+slot/columns*24;
@@ -147,11 +155,13 @@ public final class MasteryScreen extends Screen {
                     +"  |  "+a.cooldown/20f+"s recovery"+(a.hold?"  |  hold to shape":"")
                 :"Mastery "+a.level+" required";
             g.drawString(font,text,left+nav+17,y+25,open?0x87a48b:0x8c8069,false);
+            // What the mantle makes of it, in the mantle's gold.
+            if(open&&Ascended.changes(a))g.drawString(font,"  \u2726 "+Ascended.title(a),left+nav+17+font.width(text),y+25,0xd8b86a,false);
         }
 
         g.fill(left+14,top+h-16,left+w-14,top+h-14,0xff293a2d);
         g.fill(left+14,top+h-16,left+14+(int)((w-28)*master/1000f),top+h-14,0xff000000|chapter.color);
-        g.drawString(font,binding>=0?"BINDING SLOT "+(binding+1)+" — PICK AN ABILITY":"QUICK SLOTS",left+14,barTop-14,binding>=0?0xd8c27a:0x6d8672,false);
+        g.drawString(font,binding>=0?"BINDING "+QuickBar.key(binding)+" \u2014 PICK AN ABILITY":"BIND SLOTS \u2014 PRESS A SLOT'S KEY IN GAME TO CHOOSE IT",left+14,barTop-14,binding>=0?0xd8c27a:0x6d8672,false);
         slotAccents(g);
         super.render(g,mx,my,partial);
     }

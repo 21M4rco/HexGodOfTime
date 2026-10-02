@@ -4,7 +4,8 @@ import net.minecraft.world.entity.player.Player;
 
 /** Persistent progression uses the foundation's compact player-NBT and XP curve. Transient control state lives on the server. */
 public final class HexData {
-    public static final int QUICK_SLOTS=8;
+    /** The bind slots, one per key along the bottom row of the keyboard: Z X C V B N M. */
+    public static final int QUICK_SLOTS=7;
     /** Where a player's progression lives, and the name it went under before the rebrand. */
     public static final String TAG="HexGodOfStories",LEGACY_TAG="Loki";
     /** The saved return point for a traveller, and its own pre-rebrand name. */
@@ -56,10 +57,24 @@ public final class HexData {
         return Ability.DUPLICATE;
     }
 
-    /** Eight persisted shortcuts. Empty slots hold -1 so an unlock can claim them without disturbing a chosen layout. */
+    /**
+     * The seven persisted bind slots. Empty slots hold -1 so an unlock can claim them without disturbing a chosen
+     * layout. A layout from before the slots moved onto keys had eight: its abilities are kept, in their order, in as
+     * many of the seven as they fill, so nobody loses the bar they built to the change.
+     */
     public static int[] quick(Player p) {
         int[] slots=get(p).getIntArray("quick");
-        if(slots.length!=QUICK_SLOTS) {int[] fresh=new int[QUICK_SLOTS];java.util.Arrays.fill(fresh,-1);get(p).putIntArray("quick",fresh);return fresh;}
+        if(slots.length!=QUICK_SLOTS) {
+            int[] fresh=new int[QUICK_SLOTS];java.util.Arrays.fill(fresh,-1);
+            int next=0;
+            for(int id:slots) {
+                Ability a=Ability.slot(id);
+                if(a==null||a.dedicated||next>=QUICK_SLOTS)continue;
+                boolean seen=false;for(int i=0;i<next;i++)if(fresh[i]==id)seen=true;
+                if(!seen)fresh[next++]=id;
+            }
+            get(p).putIntArray("quick",fresh);return fresh;
+        }
         // The time controls moved onto permanent keys; evict them from layouts saved before that change.
         boolean evicted=false;
         for(int i=0;i<QUICK_SLOTS;i++) {

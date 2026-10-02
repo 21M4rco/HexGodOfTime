@@ -6,10 +6,12 @@ import net.minecraft.client.gui.GuiGraphics;
 import java.util.Locale;
 
 /**
- * One small bottom-left ability readout; selecting another slot changes its instructions in place.
+ * One small bottom-left ability readout, with the seven bind slots in a strip over it, each under its key;
+ * choosing another slot changes the readout's instructions in place. While the full transformation is worn, an
+ * ability it changes is described as the variant it has become, in gold.
  *
- * <p>Underneath it sits the time bar. Those controls are not quick-bar entries and never scroll past:
- * they are permanent commands, so they are drawn permanently, each beside the key that fires it.
+ * <p>Underneath it sits the time bar. Those controls are never bound to a slot: they are permanent commands, so
+ * they are drawn permanently, each beside the key that fires it.
  */
 public final class HexHud {
     private static final int WIDTH=204,HEIGHT=122;
@@ -31,30 +33,33 @@ public final class HexHud {
         g.fill(0,0,WIDTH,HEIGHT,0xb807110d);
         g.fill(0,0,2,HEIGHT,0xff000000|a.discipline.color);
         String title=a.title;
-        g.drawString(mc.font,title,7,6,0xe6f3e8,false);
-        // Which shortcut this is, so the bound slot is readable without opening the bar or the archive.
-        int bound=slotOf(d,a);
+        // Which key chooses it, so the binding is readable without opening the archive.
+        int bound=QuickBar.slotOf(d,a);
+        boolean variant=d.getBoolean("ascended")&&Ascended.changes(a);
         if(bound>=0) {
-            String tag="SLOT "+(bound+1);
+            String tag="KEY "+QuickBar.key(bound);
             g.drawString(mc.font,tag,WIDTH-7-mc.font.width(tag),6,0x84a892,false);
         }
+        if(variant)title=Ascended.title(a);
+        g.drawString(mc.font,title,7,6,variant?0xf0d58a:0xe6f3e8,false);
         long cd=Math.max(0,d.getLong("cd_"+a.name())-ClientState.now());
         boolean home=a==Ability.RIFT&&com.hexgodofstories.server.PocketRealm.inside(mc.player.level())||a==Ability.WARPING&&com.hexgodofstories.warping.Destination.from(mc.player.level())!=null;
         String status=home?"Return: free":cd>0?String.format(Locale.ROOT,"Recovery %.1fs",cd/20f):d.getFloat("energy")<a.cost?"Low energy":"Ready";
         g.drawString(mc.font,status+"  |  Cost "+(home?0:a.cost),7,18,cd>0&&!home?0xd2b27f:0x93caaa,false);
-        if(a==Ability.WARPING){String charge=WarpRenderer.chargeLabel(mc.player.getId());if(!charge.isEmpty())g.drawString(mc.font,charge,3,d.getBoolean("ascended")?-24:-12,0xd7b9f0,false);}
+        int above=-QuickBar.height()-4;
+        if(a==Ability.WARPING){String charge=WarpRenderer.chargeLabel(mc.player.getId());if(!charge.isEmpty())g.drawString(mc.font,charge,3,above+(d.getBoolean("ascended")?-24:-12),0xd7b9f0,false);}
         String primary=HexClient.PRIMARY.getTranslatedKeyMessage().getString();
         String secondary=HexClient.SECONDARY.getTranslatedKeyMessage().getString();
         // Outside the sanctum the Fracture only does one thing — it takes you and whatever is
         // beside you in — so there is nothing to configure and no selector to offer. Inside, where
         // the break can lead anywhere, the cast key runs whatever the selector last saved.
         boolean fracture=a==Ability.RIFT;
-        String head=!fracture?primary(a)
+        String head=variant?Ascended.hud(a):!fracture?primary(a)
             :home?FractureModes.byId(d.getString("fractureMode")).label(d.getString("fractureTargetName"))
             :"Tap: doorway in. Hold: pull 5 blocks in.";
         if(a==Ability.WARPING&&home)head="Leave this dimension freely.";
         var lines=mc.font.split(net.minecraft.network.chat.Component.literal(primary+"  "+head),WIDTH-14);
-        for(int i=0;i<Math.min(2,lines.size());i++)g.drawString(mc.font,lines.get(i),7,32+i*10,fracture?0xd8ecdd:0xc9d8ce,false);
+        for(int i=0;i<Math.min(2,lines.size());i++)g.drawString(mc.font,lines.get(i),7,32+i*10,variant?0xe8d49c:fracture?0xd8ecdd:0xc9d8ce,false);
         String hint=!fracture?alternate(a):home?"Choose where the break leads":"";
         if(a==Ability.WARPING)hint=com.hexgodofstories.warping.Destination.at(d.getInt("warpDestination")).title;
         if(a==Ability.THREADS) {
@@ -63,10 +68,12 @@ public final class HexHud {
             if(grasp>0&&grasp<=com.hexgodofstories.server.GravityGrasp.RECOVERY)hint=String.format(Locale.ROOT,"Gravity Grasp %.1fs",grasp/20f);
         }
         if(a==Ability.ARSENAL) {
-            // Gotcha! keeps its own recovery, apart from the crown's shown above.
+            // Gotcha! keeps its own recovery, apart from the crown's shown above; worn, the mantle makes it a swarm.
+            if(d.getBoolean("ascended"))hint="Gotcha! Swarm";
             long gotcha=d.getLong(com.hexgodofstories.server.Arsenal.GOTCHA_READY)-ClientState.now();
-            if(gotcha>0&&gotcha<=140)hint=String.format(Locale.ROOT,"Gotcha! %.1fs",gotcha/20f);
+            if(gotcha>0&&gotcha<=com.hexgodofstories.server.Arsenal.SWARM_RECOVERY)hint=String.format(Locale.ROOT,"%s %.1fs",hint,gotcha/20f);
         }
+        if(a==Ability.TIME_STOP)hint="Press "+HexClient.TIME_STOP.getTranslatedKeyMessage().getString()+" again to resume";
         if(a==Ability.TIME_BRANCH) {
             long remaining=Math.max(0,d.getLong(BranchFistState.UNTIL)-ClientState.now());
             long fistCd=Math.max(0,d.getLong(BranchFistState.COOLDOWN)-ClientState.now());
@@ -74,8 +81,8 @@ public final class HexHud {
                 :fistCd>0?String.format(Locale.ROOT,"Tap recovery %.1fs",fistCd/20f):"Tap ready | Cost "+BranchFistState.COST;
         }
         if(!hint.isEmpty())g.drawString(mc.font,(a==Ability.TIME_BRANCH?"":secondary+"  ")+hint,7,54,fracture?0xc0b184:0x9cb6a6,false);
-        String select=HexClient.SELECT.getTranslatedKeyMessage().getString();
-        g.drawString(mc.font,select+" + scroll: choose ability",7,67,0x779d87,false);
+        String first=QuickBar.key(0),last=QuickBar.key(HexData.QUICK_SLOTS-1);
+        g.drawString(mc.font,first+"\u2013"+last+" choose \u00b7 "+primary+" cast \u00b7 "+secondary+" alt",7,67,0x779d87,false);
         float max=HexData.MAX_ENERGY,energy=d.getFloat("energy");
         String value="Energy "+Math.round(energy)+" / "+Math.round(max);
         g.drawString(mc.font,value,7,82,0xb3cbbd,false);
@@ -83,23 +90,16 @@ public final class HexHud {
         g.fill(start,84,WIDTH-7,88,0xff263e31);
         g.fill(start,84,start+(int)((WIDTH-7-start)*Math.max(0,Math.min(1,energy/max))),88,0xff74d8a6);
         controls(g,d,energy,94);
-        if(QuickBar.open())QuickBar.renderChoices(g,0,-QuickBar.height()-4,WIDTH);
-        else if(d.getBoolean("ascended")) {
+        QuickBar.render(g,(WIDTH-QuickBar.width())/2,above);
+        if(d.getBoolean("ascended")) {
             boolean flying=d.getBoolean("cosmicFlying"),grounded=mc.level!=null&&mc.level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD);
             String flight=HexClient.FLIGHT.getTranslatedKeyMessage().getString()+": "+(grounded?"no flight in the Overworld":flying?"flying (Space / crouch)":"flight")
                 +"  |  mantle -"+(flying?com.hexgodofstories.server.Transformation.FLYING_DRAIN:com.hexgodofstories.server.Transformation.DRAIN)+" energy/s";
-            g.drawString(mc.font,flight,3,-12,0xaadabd,false);
+            g.drawString(mc.font,flight,3,above-12,0xaadabd,false);
         }
         g.pose().popPose();
         if(ClientState.frozen(mc.player.getId()))g.drawCenteredString(mc.font,"BETWEEN MOMENTS",screenWidth/2,15,0xd8d6be);
     }
-    /** @return the quick slot the shown ability is bound to, or -1 when it is not on the bar. */
-    private static int slotOf(net.minecraft.nbt.CompoundTag data,Ability a) {
-        int[] slots=data.getIntArray("quick");
-        for(int i=0;i<slots.length;i++)if(slots[i]==a.ordinal())return i;
-        return -1;
-    }
-
     /** The permanent time commands: key, name and state, always on screen and never scrollable. */
     private static void controls(GuiGraphics g,net.minecraft.nbt.CompoundTag d,float energy,int top) {
         var mc=Minecraft.getInstance();
@@ -168,7 +168,7 @@ public final class HexHud {
             case DAGGERS,TWIN_DAGGERS,LAEVATEINN -> "Dismiss weapons";
             case ENCHANT -> "Direct charmed creatures";
             case SLOW_FIELD -> "";
-            case TIME_STOP -> "Press Z again to resume";
+            case TIME_STOP -> "Press again to resume";
             case SELECTIVE_STOP -> "Exempt an ally";
             case THREADS -> "Hold: Gravity Grasp";
             case TIME_BRANCH -> "None — release the cast key to fire";

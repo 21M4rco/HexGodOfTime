@@ -6,78 +6,133 @@ import com.hexgodofstories.server.HexServer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.util.Mth;
 
 /**
- * Eight persisted shortcuts in a compact bottom-left selector. Holding the select key opens the bar and the mouse wheel
- * walks it; releasing commits the choice, so switching spells mid-fight costs one gesture rather than a
- * trip through a menu. Slot contents live in player data, so a layout survives relogging and death.
+ * The seven bind slots, along the bottom row of the keyboard: Z X C V B N M. Pressing a slot's key chooses the
+ * ability bound to it on the spot, with nothing to open and nothing to scroll; the cast key then casts it. The slots
+ * are drawn as a strip over the ability panel, each under its own key, so which ability answers to which key is
+ * always on screen. Slot contents live in player data, so a layout survives relogging and death.
  */
 public final class QuickBar {
-    private static final int ROW=12;
-    private static boolean open;
-    private static int cursor;
+    private QuickBar() {}
+
+    /** A cell of the strip, in the panel's own (unscaled) units. */
+    private static final int CELL=28,GAP=1,TALL=22;
 
     private static boolean enabled(){return ClientState.self().getBoolean("abilitiesEnabled");}
-    public static boolean open() {return open&&enabled();}
 
-    public static void openBar() {
-        if(!enabled()||open)return;
-        open=true;
-        cursor=Math.max(0,indexOf(ClientState.self(),ClientState.self().getInt("selected")));
-    }
-    public static void closeBar(boolean commit) {
-        if(!enabled()||!open)return;
-        open=false;
-        if(!commit||!enabled())return;
-        int ability=slot(ClientState.self(),cursor);
-        if(ability>=0)HexNetwork.send(HexServer.SELECT,ability);
-    }
-    /** @return true when the wheel was consumed by the bar rather than the hotbar. */
-    public static boolean scroll(double delta) {
-        if(!enabled()||!open)return false;
-        int step=delta>0?-1:1;
-        for(int i=0;i<HexData.QUICK_SLOTS;i++) {
-            cursor=Math.floorMod(cursor+step,HexData.QUICK_SLOTS);
-            if(slot(ClientState.self(),cursor)>=0)break;
-        }
-        return true;
+    /**
+     * A slot's key was pressed. The choice is shown and kept here at once, before the server has answered, so a
+     * cast pressed straight after it already goes out as the ability just chosen (a held one as a hold); the
+     * server checks it against its own copy of the slots and its next sync settles any difference.
+     */
+    public static void press(int index) {
+        var mc=Minecraft.getInstance();
+        if(mc.player==null||mc.screen!=null||!enabled())return;
+        CompoundTag data=ClientState.self();
+        int ability=slot(data,index);
+        if(ability<0)return;
+        data.putInt("selected",ability);
+        HexNetwork.send(HexServer.SLOT,index);
     }
     public static void assign(int slot,int ability) {if(enabled())HexNetwork.send(HexServer.ASSIGN,slot*1000+ability+1);}
-    public static int cursor() {return cursor;}
 
-    private static int slot(CompoundTag data,int index) {
+    static int slot(CompoundTag data,int index) {
         int[] slots=data.getIntArray("quick");
         return slots.length==HexData.QUICK_SLOTS&&index>=0&&index<slots.length?slots[index]:-1;
     }
-    private static int indexOf(CompoundTag data,int ability) {
-        for(int i=0;i<HexData.QUICK_SLOTS;i++)if(slot(data,i)==ability)return i;
-        return 0;
+    /** @return the slot holding this ability, or -1 when it is not bound. */
+    static int slotOf(CompoundTag data,Ability a) {
+        for(int i=0;i<HexData.QUICK_SLOTS;i++)if(slot(data,i)==a.ordinal())return i;
+        return -1;
     }
     public static Ability displayed() {
         if(!enabled())return null;
-        int id=open?slot(ClientState.self(),cursor):ClientState.self().getInt("selected");
-        return Ability.slot(id);
+        return Ability.slot(ClientState.self().getInt("selected"));
     }
-    /** Every slot, named, while the bar is open: which ability answers to which slot is the whole point. */
-    public static void renderChoices(GuiGraphics g,int x,int y,int width) {
-        if(!open)return;
+
+    /** The name a slot's key goes by: Z, X, C... or whatever it has been rebound to. */
+    static String key(int index) {
+        return index<0||index>=HexClient.SLOTS.length?"":HexClient.SLOTS[index].getTranslatedKeyMessage().getString();
+    }
+
+    /** How wide the strip is, in the panel's own units. */
+    public static int width() {return HexData.QUICK_SLOTS*(CELL+GAP)-GAP;}
+    public static int height() {return TALL;}
+
+    /**
+     * The strip: each slot under its key, its discipline along the top, a short name, how much of its recovery is
+     * left drawn down over it, and the chosen one lit. A slot whose ability is changed by the full transformation
+     * shows it in gold while the mantle is worn.
+     */
+    public static void render(GuiGraphics g,int x,int y) {
         var mc=Minecraft.getInstance();
         CompoundTag data=ClientState.self();
+        int selected=data.getInt("selected");
+        boolean ascended=data.getBoolean("ascended");
+        long now=ClientState.now();
         for(int index=0;index<HexData.QUICK_SLOTS;index++) {
-            boolean here=index==cursor;
-            int top=y+index*ROW;
+            int left=x+index*(CELL+GAP);
             Ability a=Ability.slot(slot(data,index));
-            g.fill(x,top,x+width,top+ROW,here?0xe41a3528:0xb509130e);
-            g.fill(x,top,x+2,top+ROW,a==null?0xff2c3630:0xff000000|a.discipline.color);
-            g.drawString(mc.font,(index+1)+"  "+(a==null?"Empty":a.title),x+6,top+2,here?0xe0f5e7:a==null?0x6a7f73:0x9fb8a9,false);
+            boolean chosen=a!=null&&a.ordinal()==selected;
+            g.fill(left,y,left+CELL,y+TALL,chosen?0xe81a3528:0xb807110d);
+            g.fill(left,y,left+CELL,y+2,a==null?0xff2c3630:0xff000000|a.discipline.color);
+            if(a!=null) {
+                long cooldown=Math.max(0,data.getLong("cd_"+a.name())-now);
+                if(cooldown>0&&a.cooldown>0) {
+                    float left01=Math.min(1,cooldown/(float)Math.max(a.cooldown,1));
+                    int cover=Math.round((TALL-2)*left01);
+                    g.fill(left,y+TALL-cover,left+CELL,y+TALL,0x9a000000);
+                }
+            }
+            if(chosen) {
+                int ring=ascended&&a!=null&&Ascended.changes(a)?0xffe2c46a:0xff9fd8b4;
+                g.fill(left,y,left+1,y+TALL,ring);g.fill(left+CELL-1,y,left+CELL,y+TALL,ring);
+                g.fill(left,y+TALL-1,left+CELL,y+TALL,ring);
+            }
+            String key=key(index);
+            if(key.length()>3)key=key.substring(0,3);
+            g.drawString(mc.font,key,left+3,y+4,a==null?0x5f7266:0xf2f8f3,false);
             if(a==null)continue;
-            long cooldown=Math.max(0,data.getLong("cd_"+a.name())-ClientState.now());
-            if(cooldown<=0)continue;
-            String recovery=String.format(java.util.Locale.ROOT,"%.0fs",cooldown/20f);
-            g.drawString(mc.font,recovery,x+width-mc.font.width(recovery)-5,top+2,0xc6a271,false);
+            int tint=ascended&&Ascended.changes(a)?0xe2c46a:chosen?0xd9eadf:0x8fa898;
+            g.pose().pushPose();
+            g.pose().translate(left+2,y+14,0);
+            g.pose().scale(.62f,.62f,1);
+            String tag=tag(a);
+            g.drawString(mc.font,tag,Math.max(0,(int)((CELL-4)/.62f-mc.font.width(tag))/2),0,tint,false);
+            g.pose().popPose();
         }
     }
-    /** How tall the open bar is, so the panel above it knows where to start drawing. */
-    public static int height() {return HexData.QUICK_SLOTS*ROW;}
+
+    /** A slot's few letters: room for a word, never a title. */
+    static String tag(Ability a) {
+        return switch(a) {
+            case DUPLICATE -> "Proj";
+            case PROJECTION_SWAP -> "Swap";
+            case MASQUERADE -> "Mask";
+            case MIRAGE -> "Court";
+            case ARCHITECTURE -> "Wall";
+            case BOLT -> "Bolt";
+            case PUSH -> "Push";
+            case TELEKINESIS -> "Lift";
+            case BLINK -> "Step";
+            case WARD -> "Ward";
+            case RIFT -> "Rift";
+            case DAGGERS -> "Dagger";
+            case TWIN_DAGGERS -> "Twins";
+            case LAEVATEINN -> "Scepter";
+            case ENCHANT -> "Charm";
+            case MEMORY -> "Echo";
+            case TIME_SLIP -> "Slip";
+            case REWIND -> "Rewind";
+            case SLOW_FIELD -> "";
+            case TIME_STOP -> "Stop";
+            case SELECTIVE_STOP -> "Moment";
+            case THREADS -> "Anchor";
+            case ASCENSION -> "Mantle";
+            case TIME_BRANCH -> "Branch";
+            case WARPING -> "Warp";
+            case ARSENAL -> "Crown";
+        };
+    }
 }

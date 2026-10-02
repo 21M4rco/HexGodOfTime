@@ -12,7 +12,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.lwjgl.glfw.GLFW;
 
-/** M owns Time Branch independently of the selected quick slot. */
+/** Time Branch's own key (Left Alt by default) owns it independently of the chosen bind slot. */
 @Mod.EventBusSubscriber(modid=HexGodOfStories.ID,value=Dist.CLIENT)
 public final class BranchKeyInput {
     private static final BranchTapGesture GESTURE=new BranchTapGesture();

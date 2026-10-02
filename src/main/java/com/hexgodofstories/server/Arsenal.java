@@ -101,6 +101,8 @@ public final class Arsenal {
     static final int GOTCHA_BLEED = 100;
     /** Gotcha!'s own recovery, apart from the crown's: seven seconds; and where it lives in the player's saved data. */
     static final int GOTCHA_RECOVERY = 140;
+    /** The swarm's recovery: Gotcha! cast in the full transformation, four missiles rather than one gun. */
+    public static final int SWARM_RECOVERY = 200;
     public static final String GOTCHA_READY = "gotchaReady";
 
     private static final class Crown {
@@ -210,7 +212,7 @@ public final class Arsenal {
         long now = HexData.now(p);
         String key = "cd_" + Ability.ARSENAL.name();
         if (d.getLong(key) - now > Ability.ARSENAL.cooldown) d.putLong(key, now + Ability.ARSENAL.cooldown);
-        if (d.getLong(GOTCHA_READY) - now > GOTCHA_RECOVERY) d.putLong(GOTCHA_READY, now + GOTCHA_RECOVERY);
+        if (d.getLong(GOTCHA_READY) - now > SWARM_RECOVERY) d.putLong(GOTCHA_READY, now + SWARM_RECOVERY);
         long start = d.getLong("arsenalStart");
         if (start > 0 && d.getLong("arsenalEnd") < start) {
             d.putLong("arsenalEnd", Math.max(now, start));
@@ -625,7 +627,7 @@ public final class Arsenal {
     /** Whether Gotcha! is still recovering. A tick further off than its recovery could reach (a world clock that has moved) counts as ready. */
     public static boolean gotchaRecovering(ServerPlayer p) {
         long left = HexData.get(p).getLong(GOTCHA_READY) - HexData.now(p);
-        return left > 0 && left <= GOTCHA_RECOVERY;
+        return left > 0 && left <= SWARM_RECOVERY;
     }
 
     /** The body the caster looks at, as the crown finds its mark: the nearest along the look, short of any block. */
