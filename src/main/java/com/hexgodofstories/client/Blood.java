@@ -102,41 +102,50 @@ public final class Blood {
     }
 
     /**
-     * Gravity Grasp's cut, across the throat: as the blade comes through, a sheet of blood thrown out to the side it
-     * went, pooling where it lands; then the neck pumping on in spurts, each weaker than the last, for two seconds.
+     * Gravity Grasp's cut, across the throat: as the blade comes through, a great sheet of blood thrown out to the side it
+     * went over three ticks, pooling all along where it lands; then the neck pumping on in heavy spurts, each weaker than
+     * the last, and running down the body between them, for three seconds.
      */
     public static void throat(Entity e,Vec3 right) {
         var mc=Minecraft.getInstance();
         if(mc.level==null||mc.player==null||e.position().distanceToSqr(mc.player.getEyePosition())>RANGE)return;
         var random=mc.level.random;
         Vec3 side=right.lengthSqr()<1e-6?new Vec3(1,0,0):right.normalize(),neck=e.position().add(0,e.getBbHeight()*.8,0);
-        Vfx.bloom(e.getId(),neck,side,44,(at,aim,t)->{
-            int age=Math.round(t*44);
-            if(age==3||age==4) {
+        Vfx.bloom(e.getId(),neck,side,60,(at,aim,t)->{
+            int age=Math.round(t*60);
+            // Running down the body all the while.
+            for(int i=0;i<Math.round(6*(1-t))+1;i++)
+                Vfx.spark(HexGodOfStories.BLOOD.get(),at.add((random.nextDouble()-.5)*.2,(random.nextDouble()-.5)*.12,(random.nextDouble()-.5)*.2),
+                    new Vec3(aim.x*.02+(random.nextDouble()-.5)*.03,-.05-random.nextDouble()*.05,aim.z*.02+(random.nextDouble()-.5)*.03));
+            if(age>=3&&age<=5) {
                 // Flung off the blade as it comes through: a long, heavy sheet thrown out to the right, from all across the cut.
-                for(int i=0;i<(age==3?110:50);i++) {
-                    Vec3 cut=at.add(aim.scale(e.getBbWidth()*(-.3+random.nextDouble()*.7))).add(0,(random.nextDouble()-.5)*.1,0);
-                    double speed=.18+random.nextDouble()*.42;
-                    Vfx.spark(HexGodOfStories.BLOOD.get(),cut,aim.scale(speed).add((random.nextDouble()-.5)*.14,.03+random.nextDouble()*.18,(random.nextDouble()-.5)*.14));
+                for(int i=0;i<(age==3?300:age==4?160:70);i++) {
+                    Vec3 cut=at.add(aim.scale(e.getBbWidth()*(-.3+random.nextDouble()*.7))).add(0,(random.nextDouble()-.5)*.14,0);
+                    double speed=.18+random.nextDouble()*.5;
+                    Vfx.spark(HexGodOfStories.BLOOD.get(),cut,aim.scale(speed).add((random.nextDouble()-.5)*.18,.03+random.nextDouble()*.22,(random.nextDouble()-.5)*.18));
                 }
-                for(int i=0;i<(age==3?9:4);i++)
-                    drop(mc,e,at.add(aim.scale(.5+random.nextDouble()*3.2)).add((random.nextDouble()-.5)*.8,0,(random.nextDouble()-.5)*.8),
-                        random.nextDouble()*.35+.2,PUDDLE_LIFE,24);
-            } else if(age>3&&(age-3)%7==0) {
+                for(int i=0;i<(age==3?22:age==4?10:4);i++)
+                    drop(mc,e,at.add(aim.scale(.5+random.nextDouble()*4)).add((random.nextDouble()-.5)*1.1,0,(random.nextDouble()-.5)*1.1),
+                        random.nextDouble()*.45+.3,PUDDLE_LIFE,24);
+            } else if(age>5&&(age-3)%4==0) {
                 float left=1-t;
-                for(int i=0;i<Math.round(14*left)+2;i++) {
-                    double speed=(.05+random.nextDouble()*.14)*left;
-                    Vfx.spark(HexGodOfStories.BLOOD.get(),at,aim.scale(speed).add((random.nextDouble()-.5)*.05,random.nextDouble()*.06,(random.nextDouble()-.5)*.05));
+                for(int i=0;i<Math.round(45*left)+8;i++) {
+                    double speed=(.07+random.nextDouble()*.2)*left;
+                    Vfx.spark(HexGodOfStories.BLOOD.get(),at,aim.scale(speed).add((random.nextDouble()-.5)*.08,random.nextDouble()*.09,(random.nextDouble()-.5)*.08));
                 }
-                drop(mc,e,at.add(aim.scale(.4+random.nextDouble()*.6)),random.nextDouble()*.2+.15,PUDDLE_LIFE,30);
+                for(int i=0;i<3;i++)
+                    drop(mc,e,at.add(aim.scale(.4+random.nextDouble()*1.2)).add((random.nextDouble()-.5)*.5,0,(random.nextDouble()-.5)*.5),
+                        random.nextDouble()*.3+.2,PUDDLE_LIFE,30);
             }
+            if(random.nextInt(2)==0)drop(mc,e,null,random.nextDouble()*.4+.35,PUDDLE_LIFE,40);
         });
     }
 
     /**
-     * Gravity Grasp's stab, held in: for as long as the knife is left in the neck the wound pumps round the blade with
-     * each beat, the blood running down the body and off the blade's hilt and pooling under it, and every time the
-     * knife is leaned on a spurt is forced out past it. The side it went in faces the one holding it.
+     * Gravity Grasp's stab, held in: as the knife goes in the blood gushes back out round it; for as long as it is left
+     * in the neck the wound pumps round the blade with every beat, the blood pouring down the body and off the blade's
+     * hilt into a spreading pool under it, and every time the knife is leaned on a heavy spurt is forced out past it. The
+     * side it went in faces the one holding it.
      */
     public static void impale(Entity e,Entity by,int ticks) {
         var mc=Minecraft.getInstance();
@@ -149,22 +158,35 @@ public final class Blood {
         Vec3 wound=e.position().add(0,e.getBbHeight()*.82,0).add(out.scale(e.getBbWidth()*.45));
         Vfx.bloom(e.getId(),wound,out,Math.max(1,ticks),(at,aim,t)->{
             int age=Math.round(t*ticks);
-            // A steady welling round the blade, running down the body.
-            for(int i=0;i<4;i++)
-                Vfx.spark(HexGodOfStories.BLOOD.get(),at.add((random.nextDouble()-.5)*.12,(random.nextDouble()-.5)*.1,(random.nextDouble()-.5)*.12),
-                    new Vec3(aim.x*.02+(random.nextDouble()-.5)*.03,-.04-random.nextDouble()*.05,aim.z*.02+(random.nextDouble()-.5)*.03));
-            // Each beat, and each push of the knife (tools/blade_moves.py: deeper on the ninth and nineteenth): a spurt forced out past it.
-            boolean push=age==3||age==13,beat=age%6==0;
-            if(push||beat) {
-                for(int i=0;i<(push?40:16);i++) {
-                    double speed=(push?.1:.05)+random.nextDouble()*(push?.24:.12);
-                    Vec3 side=new Vec3(-aim.z,0,aim.x).scale((random.nextDouble()-.5)*1.4);
-                    Vfx.spark(HexGodOfStories.BLOOD.get(),at,aim.add(side).normalize().scale(speed).add(0,.02+random.nextDouble()*.1,0));
+            // A steady welling round the blade, pouring down the body.
+            for(int i=0;i<12;i++)
+                Vfx.spark(HexGodOfStories.BLOOD.get(),at.add((random.nextDouble()-.5)*.16,(random.nextDouble()-.5)*.12,(random.nextDouble()-.5)*.16),
+                    new Vec3(aim.x*.025+(random.nextDouble()-.5)*.04,-.04-random.nextDouble()*.06,aim.z*.025+(random.nextDouble()-.5)*.04));
+            // Going in: the blood gushes back out round the blade, toward the one driving it.
+            if(age<=1) {
+                for(int i=0;i<90;i++) {
+                    double speed=.08+random.nextDouble()*.3;
+                    Vec3 side=new Vec3(-aim.z,0,aim.x).scale((random.nextDouble()-.5)*1.8);
+                    Vfx.spark(HexGodOfStories.BLOOD.get(),at,aim.add(side).normalize().scale(speed).add(0,.03+random.nextDouble()*.16,0));
                 }
-                drop(mc,e,at.add(aim.scale(.3+random.nextDouble()*(push?1.2:.5))).add((random.nextDouble()-.5)*.4,0,(random.nextDouble()-.5)*.4),
-                    random.nextDouble()*.25+.2,PUDDLE_LIFE,24);
+                for(int i=0;i<4;i++)
+                    drop(mc,e,at.add(aim.scale(.3+random.nextDouble()*1.6)).add((random.nextDouble()-.5)*.7,0,(random.nextDouble()-.5)*.7),
+                        random.nextDouble()*.3+.25,PUDDLE_LIFE,24);
             }
-            if(random.nextInt(3)==0)drop(mc,e,null,random.nextDouble()*.3+.3,PUDDLE_LIFE,40);
+            // Each beat, and each push of the knife (tools/blade_moves.py: deeper on the ninth and nineteenth): a spurt forced out past it.
+            boolean push=age==3||age==13,beat=age%4==0;
+            if(push||beat) {
+                for(int i=0;i<(push?150:50);i++) {
+                    double speed=(push?.12:.06)+random.nextDouble()*(push?.3:.16);
+                    Vec3 side=new Vec3(-aim.z,0,aim.x).scale((random.nextDouble()-.5)*1.4);
+                    Vfx.spark(HexGodOfStories.BLOOD.get(),at,aim.add(side).normalize().scale(speed).add(0,.02+random.nextDouble()*.12,0));
+                }
+                for(int i=0;i<(push?5:2);i++)
+                    drop(mc,e,at.add(aim.scale(.3+random.nextDouble()*(push?1.8:.7))).add((random.nextDouble()-.5)*.5,0,(random.nextDouble()-.5)*.5),
+                        random.nextDouble()*.3+.22,PUDDLE_LIFE,24);
+            }
+            // Pooling under the body, a little wider every tick.
+            drop(mc,e,null,random.nextDouble()*.4+.35,PUDDLE_LIFE,40);
         });
     }
 

@@ -40,9 +40,10 @@ which carries Team Forbidden's CC0 notice). CC0 needs no attribution; it is give
 Gravity Grasp's stab, the dagger going into the neck, is a recording supplied for the mod by its author as
 `universfield-blade-piercing-body-352462.mp3` (the name of a Universfield "blade piercing body" effect). It is kept
 as supplied in `tools/audio_sources/blade/pierce.mp3` and prepared by `tools/prepare_blade_audio.py`: mono
-down-mix, leading silence trimmed so it sounds on the tick the blade goes in, the silent tail cut, peak-normalised
-to -1 dBFS, a 12 ms tail fade, and Ogg Vorbis.
+down-mix, leading silence trimmed so it sounds on the tick the blade goes in, the silent tail cut, brought up 15 dB
+to a loudest moment of -10.8 LUFS (from -16.7 at full scale) with its peaks held under -1.5 dBFS by a look-ahead
+limiter, a 12 ms tail fade, and Ogg Vorbis.
 
 | Mod sound | Source file | Author | Note |
 |---|---|---|---|
-| `blade/pierce` | `pierce.mp3` | supplied by the mod's author | 1.51 s, played alone as the stab goes in |
+| `blade/pierce` | `pierce.mp3` | supplied by the mod's author | 1.51 s, played alone (twice at once) as the stab goes in |

@@ -1,4 +1,4 @@
-## The Deceiver cuts on the run, and the stab is heard going in
+## The Deceiver cuts on the run, and the stab is heard going in and pours
 
 - **Running cuts.** Attacking while sprinting with The Deceiver is no longer the same slam every time. Each attack is
   one of seven running cuts, one-handed, the body leaning into the run and the legs left running under it: flat across
@@ -16,8 +16,15 @@
 - **As much blood as anything throws.** Every running cut, and the slam, throws the heaviest blood the game draws,
   the same as Gravity Grasp tearing the knife out across the throat: the full sheet off the edge, the gobs, the spray,
   the spurts after and the pools.
-- **Gravity Grasp's stab is heard going in.** The moment the dagger goes into the neck, a recording of a blade
-  piercing a body plays, on its own, from that tick (supplied by the mod's author; see SCEPTER_AUDIO_CREDITS.md).
+- **Gravity Grasp's stab is heard going in, loud.** The moment the dagger goes into the neck, a recording of a blade
+  piercing a body plays, on its own, from that tick (supplied by the mod's author; see SCEPTER_AUDIO_CREDITS.md). It
+  is brought up in the file to well over the Scepter's blast, played twice at once so the two add together (no single
+  sound in Minecraft goes past full volume), and carried twice as far.
+- **And it pours.** Going in, the blood is forced on along the blade and gushes back out round it toward you, both
+  as heavy as any cut's; held in, the wound wells three times as fast, spurts on every beat (half again as often,
+  three times the blood) and on each push of the knife (nearly four times), and pools wider under the body every
+  tick; torn out, two full sheets are thrown after the blade, high and low, with over three times the spray across
+  the cut, the neck pumps heavy spurts for three seconds instead of two, and the pools run all the way along.
 
 ## Paradise's price, kept; the fire sword points and burns like its blade
 

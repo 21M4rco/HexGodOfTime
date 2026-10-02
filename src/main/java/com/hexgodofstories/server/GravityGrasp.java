@@ -53,6 +53,8 @@ public final class GravityGrasp {
     public static final int STAB_END = 34;
     static final float STAB = 6, RIP = 6;
     static final int BLEED = 200, BLEED_STACKS = 2;
+    /** Each spray of the stab's blood, going in and torn out: as heavy as a client draws (Blood.slash). */
+    private static final float PIERCE_BLOOD = 2.5f;
     /**
      * Where the blade goes in (tools/blade_moves.py, blade_grasp_stab): the fist ends {@link #PIN} in front of the
      * caster's middle, the blade driven in at about {@link #NECK} off the ground. The body is held with its near side
@@ -193,15 +195,21 @@ public final class GravityGrasp {
             // In: down into the side of the neck, to the hilt. The blood comes out round it from here on (Blood.impale).
             body.invulnerableTime = 0;
             body.hurt(p.damageSources().playerAttack(p), STAB);
-            BladeCombo.spray(level, body, neck, inward(p).add(0, -.5, 0).normalize(), 1.4f, p);
+            // Driven in, the blood is forced on along the blade, and bursts back out round it toward the one who drove it,
+            // each as heavy as a client draws. (Only the first kicks the caster's view.)
+            BladeCombo.spray(level, body, neck, inward(p).add(0, -.5, 0).normalize(), PIERCE_BLOOD, p);
+            BladeCombo.spray(level, body, neck, inward(p).scale(-1).add(0, .35, 0).normalize(), PIERCE_BLOOD, null);
             CompoundTag n = new CompoundTag();
             n.putString("state", "impale");
             n.putInt("id", body.getId());
             n.putInt("by", p.getId());
             n.putInt("ticks", STAB_OUT - STAB_IN);
             HexNetwork.near(level, body.position(), 64, new HexNetwork.Message(HexNetwork.ARSENAL, body.getId(), n));
-            // The recording of a blade going into a body, from the tick it goes in, alone: nothing laid over it.
-            level.playSound(null, body.getX(), body.getEyeY(), body.getZ(), HexGodOfStories.BLADE_PIERCE.get(), SoundSource.PLAYERS, 1, 1);
+            // The recording of a blade going into a body, from the tick it goes in, alone: nothing laid over it. No play is
+            // heard above full scale (a volume over one only carries it further), so it is played twice at once, the two
+            // adding in the mix, and carried twice as far.
+            for (int i = 0; i < 2; i++)
+                level.playSound(null, body.getX(), body.getEyeY(), body.getZ(), HexGodOfStories.BLADE_PIERCE.get(), SoundSource.PLAYERS, 2, 1);
         } else if (t == 19) {
             // Leaned on, pushed deeper. (The first push, on the ninth, is the loudest moment of the recording itself.)
             level.playSound(null, body.getX(), body.getY(), body.getZ(), SoundEvents.HONEY_BLOCK_SLIDE, SoundSource.PLAYERS, .9f, .5f);
@@ -214,7 +222,9 @@ public final class GravityGrasp {
                 ScepterBlast.stun(body, AFTER_STUN);
             }
             Vec3 right = right(p);
-            BladeCombo.spray(level, body, neck, right.add(0, .25, 0).normalize(), 2.5f, p);
+            // The sheet thrown off after the blade, high and low along the way it went.
+            BladeCombo.spray(level, body, neck, right.add(0, .25, 0).normalize(), PIERCE_BLOOD, p);
+            BladeCombo.spray(level, body, neck, right.add(0, -.3, 0).normalize(), PIERCE_BLOOD, null);
             CompoundTag cut = new CompoundTag();
             cut.putString("state", "throat");
             cut.putInt("id", body.getId());
