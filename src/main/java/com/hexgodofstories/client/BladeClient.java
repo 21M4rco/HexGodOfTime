@@ -42,7 +42,7 @@ public final class BladeClient {
         com.hexgodofstories.network.HexNetwork.send(want?com.hexgodofstories.server.HexServer.GUARD_BEGIN:com.hexgodofstories.server.HexServer.GUARD_END,0);
     }
     /** The world went away: nothing to tell anyone. */
-    public static void forget() {guardDown=false;STANCES.clear();GUARD_SINCE.clear();}
+    public static void forget() {guardDown=false;STANCES.clear();GUARD_SINCE.clear();STILL_SINCE.clear();}
 
     /** Whether this player stands in The Deceiver's guard: this client's own key, or what the server says of anyone else. */
     public static boolean guarding(AbstractClientPlayer p) {
@@ -50,15 +50,18 @@ public final class BladeClient {
         return p==Minecraft.getInstance().player?guardDown:ClientState.data(p.getId()).getBoolean(com.hexgodofstories.server.SwordGuard.GUARD);
     }
 
-    /** The stance each player is shown in, by id: the guard, walking in it, or the charge, under any move it makes. */
+    /** The stance each player is shown in, by id: the guard, walking in it, the charge, or the rest, under any move. */
     private static final java.util.Map<Integer,String> STANCES=new java.util.HashMap<>();
     /** When each player raised the guard: its first ticks are the wind-up into it (blade_guard_enter), not the stance. */
     private static final java.util.Map<Integer,Long> GUARD_SINCE=new java.util.HashMap<>();
     private static final int GUARD_ENTER=11;
+    /** Since when each player has stood idle with The Deceiver in hand: after a while they fall into its rest. */
+    private static final java.util.Map<Integer,Long> STILL_SINCE=new java.util.HashMap<>();
+    private static final int IDLE_AFTER=50;
 
     /**
      * Every client tick, for everyone in sight holding The Deceiver: the guard (or its walk) while the use key is held,
-     * and the charge while sprinting. A layer under the moves (HexAnimations): a cut or a deflection plays over it and
+     * the charge while sprinting, and the rest after standing idle a while. A layer under the moves (HexAnimations): a cut or a deflection plays over it and
      * the stance is there again when it ends.
      */
     @SubscribeEvent public static void stances(net.minecraftforge.event.TickEvent.ClientTickEvent e) {
@@ -75,7 +78,14 @@ public final class BladeClient {
                     want=ClientState.now()-since<GUARD_ENTER?"blade_guard_enter":moving?"blade_guard_walk":"blade_guard";
                 }
                 else if(p.isSprinting()&&moving)want="blade_run";
+                // Standing about: not moving, not swinging, not in the air or crouched, no move playing. A little of
+                // it and the sword comes to rest, point on the ground; any of them and it is taken up again.
+                boolean idle=!moving&&want==null&&p.onGround()&&!p.isCrouching()&&!p.swinging&&!p.isUsingItem()&&!HexAnimations.busy(p)
+                    &&ClientState.data(p.getId()).getLong(BladeCombo.HELD)<=ClientState.now();
+                if(!idle)STILL_SINCE.put(p.getId(),ClientState.now());
+                else if(ClientState.now()-STILL_SINCE.computeIfAbsent(p.getId(),id->ClientState.now())>=IDLE_AFTER)want="blade_sword_idle";
             }
+            else STILL_SINCE.remove(p.getId());
             if(want==null||!want.startsWith("blade_guard"))GUARD_SINCE.remove(p.getId());
             String now=STANCES.get(p.getId());
             if(java.util.Objects.equals(want,now))continue;
@@ -84,6 +94,7 @@ public final class BladeClient {
         }
         STANCES.keySet().removeIf(id->mc.level.getEntity(id)==null);
         GUARD_SINCE.keySet().removeIf(id->mc.level.getEntity(id)==null);
+        STILL_SINCE.keySet().removeIf(id->mc.level.getEntity(id)==null);
     }
 
     /** The blade in this player's hand that is not really there, or empty when there is none to draw. */

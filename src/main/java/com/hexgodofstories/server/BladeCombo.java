@@ -12,6 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
@@ -179,7 +180,7 @@ public final class BladeCombo {
         try {hit = target.hurt(p.damageSources().playerAttack(p), move.damage);} finally {dealing = false;}
         Vec3 forward = forward(p);
         if (hit && (move.right != 0 || move.up != 0 || move.forward != 0))
-            blood(p, target, move.right, move.up, move.forward, run.kind == 0 ? .8f : 1f);
+            blood(p, target, move.right, move.up, move.forward, run.kind == 0 ? 1.3f : 1.7f);
         p.level().playSound(null, target.blockPosition(), HexGodOfStories.BLADE_HIT.get(), SoundSource.PLAYERS, .9f,
             (run.kind == 0 ? 1.1f : .9f) + p.getRandom().nextFloat() * .12f);
         if (!last) return;
@@ -250,12 +251,18 @@ public final class BladeCombo {
         toward = new Vec3(toward.x, 0, toward.z);
         toward = toward.lengthSqr() < 1e-6 ? Vec3.ZERO : toward.normalize().scale(victim.getBbWidth() * .45);
         Vec3 at = new Vec3(middle.x, victim.getY() + victim.getBbHeight() * .62, middle.z).add(toward);
+        spray(level, victim, at, swing, power, p);
+    }
+
+    /** Blood out of `victim` at `at`, thrown along `swing` (Blood.slash); `by`'s own view kicks with it, if anyone's. */
+    public static void spray(ServerLevel level, Entity victim, Vec3 at, Vec3 swing, float power, Entity by) {
+        if (swing.lengthSqr() < 1e-6) return;
         CompoundTag n = new CompoundTag();
         n.putDouble("x", at.x); n.putDouble("y", at.y); n.putDouble("z", at.z);
         n.putDouble("dx", swing.x); n.putDouble("dy", swing.y); n.putDouble("dz", swing.z);
         n.putFloat("power", power);
         // Who cut: their own view kicks with it (Blood.slash), the harder the heavier the blade.
-        n.putInt("by", p.getId());
+        if (by != null) n.putInt("by", by.getId());
         HexNetwork.near(level, at, 64, new HexNetwork.Message(HexNetwork.BLADE, victim.getId(), n));
     }
 

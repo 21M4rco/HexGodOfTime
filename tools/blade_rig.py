@@ -325,6 +325,22 @@ def hand(frame, side='left'):
     return np.array([-w[0], w[1], w[2]])
 
 
+def intrusion(frame):
+    """How far (in pixels) either forearm's middle line gets into the chest or the head: 0 when clear of both."""
+    worst = 0
+    up, _ = upper(frame)
+    for side, sx in (('rightArm', -1), ('leftArm', 1)):
+        A = up @ partm(frame, side)
+        x, y, z, p, yw, r, b, a = part(frame, side)
+        lower = A @ bendm(b, a, 4 / 16) if b else A
+        for yy in np.linspace(4, 10, 7):
+            px, py, pz = ((lower if yy > 4 else A) @ np.array([sx / 16, yy / 16, 0, 1]))[:3] * 16
+            chest = min(4 - abs(px), py, 12 - py, 2 - abs(pz))
+            head = min(4 - abs(px), py + 8, -py, 4 - abs(pz))
+            worst = max(worst, chest, head)
+    return worst
+
+
 def solve_left(frame, target, guess=(-60, 40, 0, -40)):
     """The left arm that puts the left hand at `target` (for both hands on a long grip). @return pose, miss."""
     target = np.array(target, float)
@@ -361,20 +377,33 @@ def to_world(body, v, point=True):
 
 def resolve_move(item):
     """One move's keys with every aim solved, in order (each solve starting from the last): (name, keys, worst miss)."""
-    name, move = item
+    name, move, canon = item if len(item) == 3 else (*item, frozenset())
     model = 'deceiver' if any(k in name for k in ('sword', 'guard', 'run', 'deflect')) else 'dagger'
     length = 1.55 if model == 'deceiver' else .80
-    right = (-55, 6, 0, -60, 0, 0); left = (-60, 40, 0, -40)
+    DEFAULT_RIGHT = right = (-55, 6, 0, -60, 0, 0); left = (-60, 40, 0, -40)
     out, worst = [], 0
+    # A pose the move comes back to is drawn the way it was the first time: the arm has more than one way to put the
+    # grip in one place, and a return by another (the same guard, the elbow somewhere else) jumps where the stance or
+    # the next move takes over from it.
+    seen = {}
     for tick, ease, pose in move['keys']:
+        known = seen.get(repr(pose))
+        if known is not None:
+            out.append((tick, ease, {k: dict(v) for k, v in known.items()}))
+            if 'rightArm' in known and 'rightItem' in known:
+                a, it = known['rightArm'], known['rightItem']
+                right = (a['pitch'], a['yaw'], a['roll'], a['bend'], it['pitch'], it['roll'])
+            continue
+        same = repr(pose)
         pose = {k: dict(v) for k, v in pose.items()}
         aim = pose.pop('aim', None)
         if aim:
             body = pose.get('body', {})
             grip = to_world(body, aim['grip']); d = to_world(body, aim['dir'], False)
-            start = right
-            if aim.get('rev') and abs(((right[4] + 180) % 360) - 180) < 90:
-                start = (right[0], right[1], right[2], right[3], 180, right[5])
+            start = DEFAULT_RIGHT if same in canon else right
+            if aim.get('hint'): start = tuple(aim['hint']) + start[4:]
+            if aim.get('rev') and abs(((start[4] + 180) % 360) - 180) < 90:
+                start = (start[0], start[1], start[2], start[3], 180, start[5])
             pose, miss = solve_right(pose, model, length, grip, d, start)
             worst = max(worst, miss)
             a, it = pose['rightArm'], pose['rightItem']
@@ -386,6 +415,7 @@ def resolve_move(item):
                 l = pose['leftArm']; left = (l['pitch'], l['yaw'], l['roll'], l['bend'])
             if aim['spin']:
                 pose['rightItem']['pitch'] = round(pose['rightItem']['pitch'] + 360 * aim['spin'], 1)
+        seen[same] = pose
         out.append((tick, ease, pose))
     return name, {**move, 'keys': pivot_on_fist(out)}, worst
 
@@ -444,8 +474,12 @@ def pivot_on_fist(keys):
 def resolve(moves, report=None):
     """Every move solved, in parallel. @return the moves with plain arms and wrists in place of aims."""
     from concurrent.futures import ProcessPoolExecutor
+    # The poses moves start from (the ready stances, the rest, the guard) are solved the same way wherever they come,
+    # from the arm's default rather than from whatever key came before: so one move ends in the very arm the next
+    # starts in, and the fade between them has nothing to swing.
+    canon = frozenset(repr(m['keys'][0][2]) for m in moves.values())
     with ProcessPoolExecutor() as pool:
-        done = list(pool.map(resolve_move, moves.items()))
+        done = list(pool.map(resolve_move, [(name, move, canon) for name, move in moves.items()]))
     if report:
         for name, _, worst in done: report(name, worst)
     return {name: move for name, move, _ in done}

@@ -63,13 +63,18 @@ public final class HexAnimations {
       if (name == null) {layer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(5, Ease.INOUTQUAD), null); return;}
       KeyframeAnimation animation = PlayerAnimationRegistry.getAnimation(HexGodOfStories.id(name));
       if (animation == null) {LOGGER.warn("Stance '{}' is not loaded.", name); return;}
-      // The guard is seen in first person too (the arm and the long blade low at the side); the charge is not, so the
-      // sword stays where a held item is while running.
-      boolean seen = !name.equals("blade_run");
+      // The guard is seen in first person too (the arm and the long blade low at the side); the charge and the rest are
+      // not, so the sword stays where a held item is while running, or standing about.
+      boolean seen = !name.equals("blade_run") && !name.equals("blade_sword_idle");
       KeyframeAnimationPlayer player1 = new KeyframeAnimationPlayer(animation)
          .setFirstPersonMode(seen ? FirstPersonMode.THIRD_PERSON_MODEL : FirstPersonMode.NONE)
          .setFirstPersonConfiguration(new FirstPersonConfiguration().setShowRightArm(seen).setShowLeftArm(false).setShowRightItem(true).setShowLeftItem(true));
       layer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(5, Ease.INOUTQUAD), player1);
+   }
+
+   /** Whether a move (anything on the casting layer) is playing on this player right now. */
+   public static boolean busy(AbstractClientPlayer player) {
+      return PlayerAnimationAccess.getPlayerAssociatedData(player).get(LAYER) instanceof ModifierLayer<?> layer && layer.isActive();
    }
 
    public static void playRemote(int entityId, String name, int fadeTicks) {
@@ -87,6 +92,8 @@ public final class HexAnimations {
             // The blades' moves (tools/blade_moves.py): the sword arm is seen in first person, blade and all. Both
             // blades are one-handed; the free arm works for balance and stays out of the view.
             boolean blade=name.startsWith("blade_");
+            // The charge's slam takes the sword in both hands: both arms come into view behind it.
+            boolean twoHanded=name.equals("blade_sword_dash");
             ResourceLocation resourcelocation = HexGodOfStories.id(name);
             KeyframeAnimation keyframeanimation = PlayerAnimationRegistry.getAnimation(resourcelocation);
             if (keyframeanimation == null) {
@@ -96,7 +103,7 @@ public final class HexAnimations {
                KeyframeAnimationPlayer keyframeanimationplayer = new KeyframeAnimationPlayer(keyframeanimation)
                   .setFirstPersonMode(flag ? FirstPersonMode.NONE : FirstPersonMode.THIRD_PERSON_MODEL)
                   .setFirstPersonConfiguration(
-                     new FirstPersonConfiguration().setShowRightArm(manifest&&!left||pointing||blade).setShowLeftArm(manifest&&left).setShowRightItem(true).setShowLeftItem(true)
+                     new FirstPersonConfiguration().setShowRightArm(manifest&&!left||pointing||blade).setShowLeftArm(manifest&&left||twoHanded).setShowRightItem(true).setShowLeftItem(true)
                   );
                // Shots cut straight in so the kick lands on the tick it fires; raising to aim eases in.
                // A combo's moves follow each other within a few ticks: each cuts in almost at once, or the wind-up is lost in the blend.

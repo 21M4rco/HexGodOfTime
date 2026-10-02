@@ -176,6 +176,9 @@ public final class ThrownDagger extends ThrowableProjectile {
             float damage=5+Math.min(4,com.hexgodofstories.data.HexData.mastery(p,Discipline.CONJURATION)*.005f);
             if(victim.hurt(damageSources().thrown(this,p),damage)) {
                 if(victim instanceof LivingEntity living)Bleed.apply(p,living,1,160);
+                // It goes in where it struck, and the blood comes out the way it was going.
+                if(level() instanceof net.minecraft.server.level.ServerLevel level)
+                    com.hexgodofstories.server.BladeCombo.spray(level,victim,contact,getDeltaMovement().normalize(),1.2f,null);
                 HexServer.reward(p,Discipline.CONJURATION,40);
             }
         }

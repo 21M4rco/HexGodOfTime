@@ -36,7 +36,7 @@ public final class Blood {
     private static final List<Splat> SPLATS=new ArrayList<>();
     private static final Map<Integer,Vec3> LAST=new HashMap<>();
     /** Pools at once; how long a wound's pool lies, and a beam hole's puddle. */
-    private static final int MAX_SPLATS=320,LIFE=600,PUDDLE_LIFE=900;
+    private static final int MAX_SPLATS=640,LIFE=600,PUDDLE_LIFE=900;
     private static final double RANGE=1024,SPREAD=.55;
     /** Ticks between the spurts of a beam's hole: a racing heart. */
     private static final int BEAT=18;
@@ -134,8 +134,10 @@ public final class Blood {
     }
 
     /**
-     * A blade's cut (BladeCombo): a sheet of blood flung off the edge the way the blade went, the faster drops thrown
-     * the furthest, and a few of them pooling where they come down on that side.
+     * A blade's cut or stab (BladeCombo, the ordinary attacks, the charge's slam, a thrown knife): a heavy sheet of
+     * blood flung off the edge the way the blade went, the fastest drops thrown furthest; thick gobs arcing out of the
+     * wound and a fine spray bursting from it; then the wound pumping two or three spurts after the blade has gone, and
+     * pools spattered all along the way the blood was thrown and under the body.
      */
     public static void slash(int id,net.minecraft.nbt.CompoundTag n) {
         var mc=Minecraft.getInstance();
@@ -145,7 +147,7 @@ public final class Blood {
         Vec3 swing=new Vec3(n.getDouble("dx"),n.getDouble("dy"),n.getDouble("dz"));
         if(swing.lengthSqr()<1e-6)return;
         swing=swing.normalize();
-        float power=Math.max(.2f,Math.min(1.5f,n.getFloat("power")));
+        float power=Math.max(.3f,Math.min(2.5f,n.getFloat("power")));
         // The one who cut feels it land: a kick of the view, the heavier the blade the harder.
         if(n.contains("by")&&n.getInt("by")==mc.player.getId())
             com.hexgodofstories.client.leviathan.LeviathanEffects.scepterRecoil(.22f+.3f*Math.min(1,power));
@@ -154,16 +156,42 @@ public final class Blood {
         Vec3 across=swing.cross(new Vec3(0,1,0));
         if(across.lengthSqr()<1e-4)across=swing.cross(new Vec3(1,0,0));
         across=across.normalize();
-        for(int i=0;i<Math.round(46*power);i++) {
-            Vec3 from=at.add(across.scale((random.nextDouble()-.5)*.35)).add(swing.scale(random.nextDouble()*.12));
-            double speed=(.1+random.nextDouble()*.34)*(.6+.4*power);
-            Vfx.spark(HexGodOfStories.BLOOD.get(),from,swing.scale(speed).add((random.nextDouble()-.5)*.08,.02+random.nextDouble()*.09,(random.nextDouble()-.5)*.08));
+        // The sheet off the edge.
+        for(int i=0;i<Math.round(120*power);i++) {
+            Vec3 from=at.add(across.scale((random.nextDouble()-.5)*.55)).add(swing.scale(random.nextDouble()*.15));
+            double speed=(.12+random.nextDouble()*.46)*(.65+.35*power);
+            Vfx.spark(HexGodOfStories.BLOOD.get(),from,swing.scale(speed).add((random.nextDouble()-.5)*.12,.03+random.nextDouble()*.14,(random.nextDouble()-.5)*.12));
         }
+        // Gobs: slower, heavier, thrown up out of the wound to arc down and splash.
+        for(int i=0;i<Math.round(26*power);i++) {
+            double speed=.06+random.nextDouble()*.2;
+            Vfx.spark(HexGodOfStories.BLOOD.get(),at.add(across.scale((random.nextDouble()-.5)*.3)),
+                swing.scale(speed).add((random.nextDouble()-.5)*.1,.12+random.nextDouble()*.2,(random.nextDouble()-.5)*.1));
+        }
+        // A fine spray bursting out every way at once.
+        for(int i=0;i<Math.round(36*power);i++)
+            Vfx.spark(HexGodOfStories.BLOOD.get(),at,new Vec3((random.nextDouble()-.5)*.3,(random.nextDouble()-.3)*.22,(random.nextDouble()-.5)*.3));
         net.minecraft.world.entity.Entity e=mc.level.getEntity(id);
         if(e==null)return;
-        for(int i=0;i<Math.round(3*power)+1;i++)
-            drop(mc,e,at.add(swing.scale(.35+random.nextDouble()*1.6*power)).add((random.nextDouble()-.5)*.5,0,(random.nextDouble()-.5)*.5),
-                random.nextDouble()*.22+.14,LIFE,18);
+        // Spattered all along the way it was thrown, and pooling under the body.
+        for(int i=0;i<Math.round(7*power)+3;i++)
+            drop(mc,e,at.add(swing.scale(.3+random.nextDouble()*2.4*power)).add((random.nextDouble()-.5)*.8,0,(random.nextDouble()-.5)*.8),
+                random.nextDouble()*.3+.16,LIFE,18);
+        for(int i=0;i<2;i++)drop(mc,e,null,random.nextDouble()*.3+.3,PUDDLE_LIFE,40);
+        // The wound pumps on after the blade has gone: a spurt or three, each weaker than the last.
+        final Vec3 way=swing;
+        final float strength=power;
+        Vfx.bloom(id,at,way,22,(origin,aim,t)->{
+            int age=Math.round(t*22);
+            if(age!=5&&age!=12&&age!=19)return;
+            float left=1-t*.6f;
+            for(int i=0;i<Math.round(22*strength*left);i++) {
+                double speed=(.08+random.nextDouble()*.2)*left;
+                Vfx.spark(HexGodOfStories.BLOOD.get(),origin,aim.scale(speed).add((random.nextDouble()-.5)*.08,.05+random.nextDouble()*.12,(random.nextDouble()-.5)*.08));
+            }
+            drop(mc,e,origin.add(aim.scale(.4+random.nextDouble()*.9)).add((random.nextDouble()-.5)*.4,0,(random.nextDouble()-.5)*.4),
+                random.nextDouble()*.22+.18,PUDDLE_LIFE,24);
+        });
     }
 
     /**

@@ -1,7 +1,28 @@
+## The sword's slam and its rest, no more spins, and far more blood
+
+- **No more full turns.** The Master Cuts' second cut spun the whole body round 360°, and the cuts after it carried that
+  turn on, so a combo cut short could unwind it the other way. It is now the Zwerchhau as the masters cut it, feet
+  planted: the blade carried back past the left shoulder and swept flat across at head height, the hips turning into
+  it. The Flurry's spin is likewise a low sweeping cut off bent knees. No blade move turns the body more than 45° now.
+- **The guard's slap to the left no longer puts the arm behind your back.** Its arm had been solved swung up and back
+  over the shoulder to point the blade across; it now reaches across the front of the chest, the blade upright. A
+  new check fails the build tools if any forearm passes into the chest or head at any half tick of any move, and a
+  pose a move returns to is always drawn with the same arm, so one move ends exactly where the next (or the stance)
+  begins.
+- **The charge's slam: attack while sprinting with The Deceiver.** Both hands on the grip, a lunge off the stride with
+  the sword swung up overhead, and it comes straight down: nine damage in a wide reach ahead, the body driven into the
+  ground and held there for a moment, the ground cracking under it, and the heaviest blood of all.
+- **The Deceiver at rest.** Stand still with it in hand for a couple of seconds and you settle into a rest: weight on one
+  leg, a hand on the hip, the sword hanging loose a little ahead with its point on the ground. Move, swing or guard
+  and it comes up again. Your head stays your own, and first person is untouched.
+- **Far more blood.** Every blade's cut, the combos, the slam and a thrown dagger's hit throw about three times the
+  blood: a heavy sheet off the edge, thick gobs arcing out of the wound, a fine spray, then the wound pumping two or
+  three spurts after the blade has gone, with many more pools spattered along the way it flew and under the body.
+
 ## Real blades, and combo starters
 
 - **Every blade move is the whole body now.** The cuts, the combos and the attacks are posed on the player model with
-  Player Animator's body, legs, head and elbows, not one arm: weight shifts and dips, steps and lunges, full spins,
+  Player Animator's body, legs, head and elbows, not one arm: weight shifts and dips, steps and lunges, twists,
   the head keeping its eyes on the target, and the dagger flipping between a forward and an icepick grip. Each was
   checked on a model of the game's own render chain before it shipped (`tools/preview_blades.py` draws them,
   `tools/generate_blades.py` holds every cut's point to the side its blood flies, and the handle to the fist at every
@@ -10,10 +31,10 @@
   fist, so the hand closes on the handle with handle showing either side and the pommel below, and both blades are
   bigger: the dagger about a block long in the hand, The Deceiver about a block and two thirds.
 - **The Flurry** after the Winter Soldier's knife work: the knife flips into an icepick grip for a backhand across the
-  throat, a hammer stab drives down at the collarbone, it flips back for a lunging thrust, a low spinning cut, and a push
+  throat, a hammer stab drives down at the collarbone, it flips back for a lunging thrust, a low sweeping cut, and a push
   kick, then a twirl of the knife as the hand drops.
 - **The Master Cuts** (Vinland Saga), one-handed, the free arm working for balance: a stepping cut from over the
-  shoulder with the free hand pointing the way in, a cut out of a full turn with the arm out wide, a fencer's lunge
+  shoulder with the free hand pointing the way in, a flat cut across at head height with the arm flung wide, a fencer's lunge
   with the free arm thrown up behind, and the launcher: down into a crouch and exploding upward with a rising cut that
   lifts the body.
 - **The Deceiver's guard: hold use.** A sweep of the sword up and out, then down into Malenia's stance: upright and

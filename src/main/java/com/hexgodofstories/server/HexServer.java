@@ -34,7 +34,12 @@ public final class HexServer {
     public static final int TIME_HALT=0,TIME_REWIND=2;
     public record Moment(Vec3 position,float yaw,float pitch,float health) {}
     private record Charm(Mob mob,UUID owner,long end,UUID previous) {}
-    private record Strike(int weapon,int combo,long contact,long end) {}
+    private record Strike(int weapon,int combo,long contact,long end,boolean slam) {
+        Strike(int weapon,int combo,long contact,long end){this(weapon,combo,contact,end,false);}
+    }
+    /** The charge's slam (sprinting, The Deceiver's attack): its reach from where the lunge has carried the bearer, its weight. */
+    private static final double SLAM_REACH=4.2;
+    private static final float SLAM_DAMAGE=9;
     /** Where each ordinary attack's blood goes, in the caster's right, up and forward (tools/blade_moves.py, SWINGS). */
     private static final double[][] DAGGER_SWINGS={{-.7,-.7,0},{1,0,0},{-.7,-.7,0},{0,0,1}},
         SWORD_SWINGS={{-.7,-.7,0},{.6,.8,0},{-1,0,0},{0,-.8,.6}};
@@ -472,6 +477,19 @@ public final class HexServer {
         // Each its own whole-body move (tools/blade_moves.py): the dagger's land on their fourth tick, the
         // Deceiver's, slower and heavier, on their sixth.
         boolean sword=w.kind==3;
+        if(sword&&p.isSprinting()) {
+            // The charge's slam (blade_sword_dash): both hands on the grip, a lunge off the stride with the sword swung
+            // up overhead, and on the sixth tick it comes straight down. It ends a string of cuts: the next starts over.
+            Vec3 look=p.getLookAngle(),ahead=new Vec3(look.x,0,look.z);
+            ahead=ahead.lengthSqr()<1e-6?Vec3.ZERO:ahead.normalize();
+            p.setDeltaMovement(p.getDeltaMovement().multiply(.5,1,.5).add(ahead.x*.62,p.onGround()?.12:0,ahead.z*.62));
+            p.hurtMarked=true;
+            STRIKES.put(p.getUUID(),new Strike(3,3,now+6,now+20,true));
+            HexNetwork.animate(p,"blade_sword_dash");
+            HexNetwork.fx(p,"slash");
+            p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,1,.82f);
+            return;
+        }
         boolean twin=!sword&&p.getOffhandItem().is(HexGodOfStories.DAGGER.get());
         int windup=sword?6:twin?4:4,recovery=sword?15:10;
         STRIKES.put(p.getUUID(),new Strike(w.kind,combo,now+windup,now+recovery));
@@ -526,28 +544,51 @@ public final class HexServer {
         SwordGuard.tick(p);
         Strike strike=STRIKES.get(p.getUUID());
         if(strike!=null&&strike.contact==now) {
-            boolean sword=strike.weapon==3;
-            double reach=sword?3.8:2.9;
+            boolean sword=strike.weapon==3,slam=strike.slam;
+            double reach=slam?SLAM_REACH:sword?3.8:2.9;
             boolean finisher=strike.combo==3;
+            if(slam)slamGround(p);
             for(LivingEntity e:p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(reach),e->validTarget(p,e)&&p.hasLineOfSight(e))) {
                 Vec3 direction=e.getEyePosition().subtract(p.getEyePosition()).normalize();
-                if(direction.dot(p.getLookAngle())<.35||p.distanceToSqr(e)>reach*reach)continue;
-                if(!e.hurt(p.damageSources().playerAttack(p),sword?5:4))continue;
+                if(direction.dot(p.getLookAngle())<(slam?.25:.35)||p.distanceToSqr(e)>reach*reach)continue;
+                if(!e.hurt(p.damageSources().playerAttack(p),slam?SLAM_DAMAGE:sword?5:4))continue;
                 // The blood goes the way this swing's edge went (blade_moves.SWINGS), and a sword's cut lands heavy.
                 double[] swing=(sword?SWORD_SWINGS:DAGGER_SWINGS)[strike.combo&3];
-                BladeCombo.blood(p,e,swing[0],swing[1],swing[2],sword?1.1f:.75f);
+                BladeCombo.blood(p,e,swing[0],swing[1],swing[2],slam?2.4f:sword?1.5f:1.1f);
                 if(sword) {
-                    e.knockback(.3,p.getX()-e.getX(),p.getZ()-e.getZ());
                     p.serverLevel().sendParticles(net.minecraft.core.particles.ParticleTypes.CRIT,e.getX(),e.getY()+e.getBbHeight()*.6,e.getZ(),10,.25,.3,.25,.35);
                     p.level().playSound(null,e.blockPosition(),net.minecraft.sounds.SoundEvents.PLAYER_ATTACK_STRONG,SoundSource.PLAYERS,.9f,.8f+p.getRandom().nextFloat()*.1f);
                 }
-                e.knockback(.25,p.getX()-e.getX(),p.getZ()-e.getZ());
+                if(slam) {
+                    // Not thrown back but driven down, and held there a moment by the weight of it.
+                    e.setDeltaMovement(e.getDeltaMovement().multiply(.2,0,.2).add(0,-.4,0));
+                    e.hurtMarked=true;
+                    ScepterBlast.stun(e,14);
+                }
+                else e.knockback(sword?.55:.25,p.getX()-e.getX(),p.getZ()-e.getZ());
                 if(finisher)Bleed.apply(p,e,1,120);
                 reward(p,Discipline.CONJURATION,55);
                 HexNetwork.fx(e,"impact");
                 p.level().playSound(null,e.blockPosition(),HexGodOfStories.BLADE_HIT.get(),SoundSource.PLAYERS,.85f,1+p.getRandom().nextFloat()*.14f);
             }
         }
+    }
+
+    /** Where the charge's slam comes down, a stride ahead: the ground cracks and throws up what it is made of. */
+    private static void slamGround(ServerPlayer p) {
+        Vec3 look=p.getLookAngle(),ahead=new Vec3(look.x,0,look.z);
+        ahead=ahead.lengthSqr()<1e-6?Vec3.ZERO:ahead.normalize();
+        Vec3 at=p.position().add(ahead.scale(2.1));
+        BlockPos below=BlockPos.containing(at.x,at.y-.2,at.z);
+        var state=p.level().getBlockState(below);
+        if(state.isAir()){below=below.below();state=p.level().getBlockState(below);}
+        ServerLevel level=p.serverLevel();
+        if(!state.isAir())
+            level.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK,state),
+                at.x,below.getY()+1.05,at.z,46,.45,.05,.45,.22);
+        level.sendParticles(net.minecraft.core.particles.ParticleTypes.CRIT,at.x,below.getY()+1.2,at.z,16,.4,.1,.4,.45);
+        level.playSound(null,BlockPos.containing(at),SoundEvents.PLAYER_ATTACK_STRONG,SoundSource.PLAYERS,1,.62f);
+        level.playSound(null,BlockPos.containing(at),SoundEvents.ANVIL_LAND,SoundSource.PLAYERS,.35f,.55f+p.getRandom().nextFloat()*.1f);
     }
 
     public static void tickLevel(ServerLevel level) {

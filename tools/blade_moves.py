@@ -14,7 +14,7 @@ Directions, as Player Animator applies them (its PlayerRendererMixin, AnimationA
 The legs are keyed only where the move has footwork of its own; elsewhere they are left to walk and run.
 
 References: the Winter Soldier's knife fight (reverse-grip flips, hammer stabs, a flip back into a lunging thrust,
-kicks between cuts), Vinland Saga (spinning cuts low to the ground), and the longsword masters (the Zornhau from the
+kicks between cuts), Vinland Saga (low sweeping cuts off bent knees), and the longsword masters (the Zornhau from the
 shoulder, the Zwerchhau across at the head, the thrust from the plough guard, the rising Unterhau); and for the
 guard, Malenia: upright and easy, the sword arm hanging loose, the long blade angled down and out to the side.
 """
@@ -25,7 +25,8 @@ guard, Malenia: upright and easy, the sword arm hanging loose, the long blade an
 # feet, forward). `two` puts the left hand on the grip too, a fist below the right; `spin` adds whole turns of the
 # blade in the hand (end over end) on the way into the key.
 
-def P(body=(0, 0, 0, 0, 0, 0), head=(0, 0, 0), la=(0, 0, 0, 0), rl=None, ll=None, aim=None, two=False, spin=0, ra=None, item=None, rev=False):
+def P(body=(0, 0, 0, 0, 0, 0), head=(0, 0, 0), la=(0, 0, 0, 0), rl=None, ll=None, aim=None, two=False, spin=0, ra=None, item=None, rev=False,
+      hint=None):
     """body (x, y, z, pitch, yaw, roll); head (pitch, yaw, roll); arms and legs (pitch, yaw, roll, bend)."""
     f = {'body': dict(zip(('x', 'y', 'z', 'pitch', 'yaw', 'roll'), body)),
          'leftArm': dict(zip(('pitch', 'yaw', 'roll', 'bend'), la))}
@@ -36,12 +37,14 @@ def P(body=(0, 0, 0, 0, 0, 0), head=(0, 0, 0), la=(0, 0, 0, 0), rl=None, ll=None
     if rl is not None: f['rightLeg'] = dict(zip(('pitch', 'yaw', 'roll', 'bend'), rl))
     if ll is not None: f['leftLeg'] = dict(zip(('pitch', 'yaw', 'roll', 'bend'), ll))
     # rev: the knife turned over in the fist (the icepick grip), so the wrist is solved from a reversed hold.
-    if aim is not None: f['aim'] = {'grip': aim[0], 'dir': aim[1], 'two': two, 'spin': spin, 'rev': rev}
+    # hint: the arm (pitch, yaw, roll, bend) the solve starts from, where the last key's would let it settle on a
+    # reach no body makes (the sword arm swung up and back over the shoulder to point the blade across).
+    if aim is not None: f['aim'] = {'grip': aim[0], 'dir': aim[1], 'two': two, 'spin': spin, 'rev': rev, 'hint': hint}
     return f
 
 
 def turned(frame, yaw):
-    """The same pose with the whole body (and the eyes with it) turned a further `yaw`: for moves after a full spin."""
+    """The same pose with the whole body (and the eyes with it) turned a further `yaw`."""
     out = {k: dict(v) for k, v in frame.items()}
     out['body']['yaw'] = out['body'].get('yaw', 0) + yaw
     if 'head' in out: out['head']['yaw'] = out['head'].get('yaw', 0) + yaw
@@ -110,34 +113,33 @@ move('blade_dagger_2', 17, [
                      aim=((.08, 1.22, .74), (0, .05, 1)))),
     (12, 'inoutsine', READY),
     (17, 'inoutsine', READY)])
-# 4. The spin: wound up to the left, a full turn to the right low on bent knees, the blade trailing, whipped out
-#    flat at the end of the turn.
-SPUN = turned(READY, -360)
+# 4. The sweep: wound up to the left low on bent knees, the knife cocked back across the body, then whipped out flat
+#    to the right at the waist, the hips turning into it. No full turn: the feet stay where they are.
 move('blade_dagger_3', 16, [
     (0, 'linear', READY),
-    (1, 'outquad', P(body=(0, -.06, 0, -4, 22, 0), head=(0, 22, 0), la=(-60, 30, 0, -60), rl=(14, 0, 0, 20), ll=(-16, 0, 0, 24),
-                     aim=((-.4, 1.25, .35), (-.8, 0, .5)))),
-    (4, 'linear', P(body=(0, -.12, 0, -6, -170, 0), head=(0, -150, 0), la=(-40, 30, -20, -50), rl=(0, 0, 0, 34), ll=(-6, 0, 0, 34),
-                    aim=((-.48, 1.18, -.08), (-.9, 0, -.3)))),
-    (6, 'inquad', P(body=(0, -.10, 0, -8, -338, 0), head=(0, -348, 0), la=(-50, 26, -10, -56), rl=(12, 0, 0, 26), ll=(-18, 0, 0, 28),
-                    aim=((.12, 1.3, .58), (.3, 0, 1)))),
-    (8, 'outquad', P(body=(0, -.09, 0, -6, -378, 0), head=(0, -372, 0), la=(-62, 20, 0, -66), rl=(14, 0, 0, 24), ll=(-18, 0, 0, 26),
-                     aim=((.68, 1.3, .25), (1, 0, .2)))),
-    (12, 'inoutsine', SPUN),
-    (16, 'inoutsine', SPUN)])
+    (2, 'outquad', P(body=(0, -.12, 0, -6, 30, 0), head=(0, 26, 0), la=(-60, 30, 0, -60), rl=(20, 0, 0, 40), ll=(-24, 0, 0, 44),
+                     aim=((-.18, 1.0, .42), (-.7, -.1, .7)), hint=(-60, -30, 0, -40))),
+    (4, 'inquad', P(body=(0, -.15, -.06, -9, 10, 0), head=(0, 8, 0), la=(-56, 28, 0, -62), rl=(22, 0, 0, 44), ll=(-28, 0, 0, 48),
+                    aim=((.05, 1.0, .62), (-.15, -.05, 1)))),
+    (6, 'outquad', P(body=(0, -.15, -.08, -10, -12, 0), head=(0, -10, 0), la=(-40, 14, -10, -60), rl=(22, 0, 0, 44), ll=(-28, 0, 0, 48),
+                     aim=((.35, 1.05, .6), (.8, 0, .6)))),
+    (8, 'outquad', P(body=(0, -.13, -.07, -8, -26, 0), head=(0, -18, 0), la=(-36, 10, -12, -58), rl=(20, 0, 0, 40), ll=(-26, 0, 0, 44),
+                     aim=((.7, 1.08, .3), (1, .05, -.05)))),
+    (12, 'inoutsine', READY),
+    (16, 'inoutsine', READY)])
 # 5. The kick: knee up, a push kick off the right leg into the body, leaning back from it, knife held back and low.
 KNIFE_BACK = ((.45, .98, -.12), (.1, .35, .95))
 move('blade_dagger_kick', 20, [
-    (0, 'linear', SPUN),
-    (3, 'outquad', turned(P(body=(0, -.02, .03, 8, 0, 0), head=(-6, 0, 0), la=(-72, 14, 0, -40), rl=(-76, 0, 0, 86), ll=(0, 0, 0, 18),
-                            aim=KNIFE_BACK), -360)),
-    (5, 'inexpo', turned(P(body=(0, 0, .06, 16, 0, 0), head=(-10, 0, 0), la=(-78, 10, 0, -30), rl=(-96, 0, 0, 2), ll=(4, 0, 0, 22),
-                           aim=KNIFE_BACK), -360)),
-    (8, 'outquad', turned(P(body=(0, -.02, .03, 8, 0, 0), head=(-6, 0, 0), la=(-72, 14, 0, -44), rl=(-54, 0, 0, 62), ll=(0, 0, 0, 18),
-                            aim=KNIFE_BACK), -360)),
-    (12, 'inoutsine', SPUN),
-    # The knife twirled once in the fingers as the hand drops: the move ends with it, so the turn never unwinds.
-    (20, 'linear', turned(P(ra=(0, 0, 0, 0), item=(360, 0, 0), rl=(0, 0, 0, 0), ll=(0, 0, 0, 0)), -360))])
+    (0, 'linear', READY),
+    (3, 'outquad', P(body=(0, -.02, .03, 8, 0, 0), head=(-6, 0, 0), la=(-72, 14, 0, -40), rl=(-76, 0, 0, 86), ll=(0, 0, 0, 18),
+                     aim=KNIFE_BACK)),
+    (5, 'inexpo', P(body=(0, 0, .06, 16, 0, 0), head=(-10, 0, 0), la=(-78, 10, 0, -30), rl=(-96, 0, 0, 2), ll=(4, 0, 0, 22),
+                    aim=KNIFE_BACK)),
+    (8, 'outquad', P(body=(0, -.02, .03, 8, 0, 0), head=(-6, 0, 0), la=(-72, 14, 0, -44), rl=(-54, 0, 0, 62), ll=(0, 0, 0, 18),
+                     aim=KNIFE_BACK)),
+    (12, 'inoutsine', READY),
+    # The knife twirled once in the fingers as the hand drops.
+    (20, 'linear', P(ra=(0, 0, 0, 0), item=(360, 0, 0), rl=(0, 0, 0, 0), ll=(0, 0, 0, 0)))])
 
 # --- The Master Cuts (The Deceiver, held). One hand: the free arm points the way in, is thrown back to balance a lunge,
 #     rides out wide through a turn.
@@ -147,7 +149,6 @@ LA_BACK = (40, 0, -40, -58)
 LA_OUT = (-10, 0, -78, -8)
 SWORD_REST = P(body=(0, -.03, 0, -2, -10, 0), head=(0, -10, 0), la=LA_CHEST, rl=(12, 0, 0, 12), ll=(-12, 0, 0, 14),
                aim=((.26, 1.05, .36), (.1, .55, .82)))
-SWORD_SPUN = turned(SWORD_REST, -360)
 # 1. A stepping cut from over the right shoulder: the sword high and back, the free hand pointing the way, then a
 #    step in and a cut down through the left hip, the body turning with it and the free arm swinging back.
 move('blade_sword_0', 18, [
@@ -160,44 +161,44 @@ move('blade_sword_0', 18, [
                      aim=((-.35, .85, .42), (-.7, -.6, .4)))),
     (12, 'inoutsine', SWORD_REST),
     (18, 'inoutsine', SWORD_REST)])
-# 2. A spinning cut: wound up to the left, a full turn to the right with the free arm out wide, and the blade flat
-#    across at head height out of the turn.
+# 2. The cross cut (the Zwerchhau): the blade carried back past the left shoulder, then flat across at head height
+#    and out to the right, the hips turning into it and the free arm flung the other way. The feet stay planted.
 move('blade_sword_1', 18, [
     (0, 'linear', SWORD_REST),
-    (2, 'outquad', P(body=(0, -.04, 0, 0, 30, 0), head=(0, 30, 0), la=LA_OUT, rl=(14, 0, 0, 18), ll=(-12, 0, 0, 16),
-                     aim=((-.3, 1.4, .15), (-.85, .15, -.4)))),
-    (5, 'linear', P(body=(0, -.10, 0, -4, -150, 0), head=(0, -132, 0), la=(-10, 0, -82, -4), rl=(0, 0, 0, 30), ll=(-4, 0, 0, 30),
-                    aim=((-.45, 1.35, -.1), (-.9, .05, -.4)))),
-    (7, 'inquad', P(body=(0, -.08, 0, -4, -336, 0), head=(0, -346, 0), la=(-10, 0, -82, -4), rl=(12, 0, 0, 22), ll=(-14, 0, 0, 24),
-                    aim=((.05, 1.45, .65), (.25, .02, 1)))),
-    (9, 'outquad', P(body=(0, -.08, 0, -4, -380, 0), head=(0, -372, 0), la=(0, 0, -60, -20), rl=(12, 0, 0, 22), ll=(-14, 0, 0, 24),
-                     aim=((.65, 1.42, .25), (.95, 0, .3)))),
-    (13, 'inoutsine', SWORD_SPUN),
-    (18, 'inoutsine', SWORD_SPUN)])
+    (3, 'outquad', P(body=(0, -.04, .02, 0, 32, 0), head=(0, 26, 0), la=(-30, 20, 0, -70), rl=(14, 0, 0, 18), ll=(-12, 0, 0, 16),
+                     aim=((-.18, 1.32, .36), (-.65, .45, -.6)), hint=(-80, -30, 0, -60))),
+    (5, 'inquad', P(body=(0, -.07, -.04, -4, 14, 0), head=(0, 10, 0), la=(-10, 0, -40, -20), rl=(18, 0, 0, 16), ll=(-22, 0, 0, 22),
+                    aim=((-.02, 1.4, .58), (-.45, .05, .9)))),
+    (7, 'linear', P(body=(0, -.08, -.06, -6, -8, 0), head=(0, -6, 0), la=(-4, 0, -64, -12), rl=(18, 0, 0, 16), ll=(-24, 0, 0, 24),
+                    aim=((.32, 1.42, .56), (.65, 0, .76)))),
+    (9, 'outquad', P(body=(0, -.08, -.06, -6, -24, 0), head=(0, -16, 0), la=(0, 0, -78, -8), rl=(18, 0, 0, 16), ll=(-24, 0, 0, 24),
+                     aim=((.66, 1.42, .24), (.98, 0, .05)))),
+    (13, 'inoutsine', SWORD_REST),
+    (18, 'inoutsine', SWORD_REST)])
 # 3. A fencer's lunge: the point drawn back beside the chest, the free hand guiding, then the front foot shooting
 #    out, the point driven through and the free arm thrown up behind for balance.
 move('blade_sword_2', 18, [
-    (0, 'linear', SWORD_SPUN),
-    (3, 'outquad', turned(P(body=(0, -.06, .05, 2, -22, 0), head=(0, -22, 0), la=LA_GUIDE, rl=(20, 0, 0, 30), ll=(-12, 0, 0, 14),
-                            aim=((.32, 1.15, .05), (0, .12, 1))), -360)),
-    (5, 'inexpo', turned(P(body=(0, -.15, -.36, -14, 10, 0), head=(-6, 10, 0), la=LA_BACK, rl=(42, 0, 0, 2), ll=(-62, 0, 0, 62),
-                           aim=((.12, 1.28, .85), (0, .02, 1))), -360)),
-    (8, 'outquad', turned(P(body=(0, -.15, -.37, -14, 11, 0), head=(-6, 11, 0), la=LA_BACK, rl=(42, 0, 0, 2), ll=(-62, 0, 0, 62),
-                            aim=((.12, 1.28, .87), (0, .02, 1))), -360)),
-    (13, 'inoutsine', SWORD_SPUN),
-    (18, 'inoutsine', SWORD_SPUN)])
+    (0, 'linear', SWORD_REST),
+    (3, 'outquad', P(body=(0, -.06, .05, 2, -22, 0), head=(0, -22, 0), la=LA_GUIDE, rl=(20, 0, 0, 30), ll=(-12, 0, 0, 14),
+                     aim=((.32, 1.15, .05), (0, .12, 1)))),
+    (5, 'inexpo', P(body=(0, -.15, -.36, -14, 10, 0), head=(-6, 10, 0), la=LA_BACK, rl=(42, 0, 0, 2), ll=(-62, 0, 0, 62),
+                    aim=((.12, 1.28, .85), (0, .02, 1)))),
+    (8, 'outquad', P(body=(0, -.15, -.37, -14, 11, 0), head=(-6, 11, 0), la=LA_BACK, rl=(42, 0, 0, 2), ll=(-62, 0, 0, 62),
+                     aim=((.12, 1.28, .87), (0, .02, 1)))),
+    (13, 'inoutsine', SWORD_REST),
+    (18, 'inoutsine', SWORD_REST)])
 # 4. The launcher: dropping low with the blade trailing behind on the right, then exploding up off both feet, the cut
 #    rising from the ground to high overhead and the free arm flung out.
 move('blade_sword_3', 22, [
-    (0, 'linear', SWORD_SPUN),
-    (3, 'outquad', turned(P(body=(0, -.28, .02, -16, -20, 0), head=(-10, -20, 0), la=(-40, 15, 0, -20), rl=(14, 0, 0, 82), ll=(-40, 0, 0, 84),
-                            aim=((.45, .45, -.2), (.4, -.5, -.75))), -360)),
-    (6, 'inexpo', turned(P(body=(0, .08, -.06, 10, 10, 0), head=(-14, 10, 0), la=(30, 0, -60, -20), rl=(10, 0, 0, 0), ll=(-10, 0, 0, 2),
-                           aim=((.25, 1.95, .3), (.05, 1, .15))), -360)),
-    (8, 'outquad', turned(P(body=(0, .05, -.06, 12, 14, 0), head=(-18, 14, 0), la=(36, 0, -64, -20), rl=(8, 0, 0, 0), ll=(-8, 0, 0, 0),
-                            aim=((.2, 2.08, .05), (0, .9, -.4))), -360)),
-    (14, 'inoutsine', SWORD_SPUN),
-    (22, 'inoutsine', turned(NEUTRAL, -360))])
+    (0, 'linear', SWORD_REST),
+    (3, 'outquad', P(body=(0, -.28, .02, -16, -20, 0), head=(-10, -20, 0), la=(-40, 15, 0, -20), rl=(14, 0, 0, 82), ll=(-40, 0, 0, 84),
+                     aim=((.45, .45, -.2), (.4, -.5, -.75)))),
+    (6, 'inexpo', P(body=(0, .08, -.06, 10, 10, 0), head=(-14, 10, 0), la=(30, 0, -60, -20), rl=(10, 0, 0, 0), ll=(-10, 0, 0, 2),
+                    aim=((.25, 1.95, .3), (.05, 1, .15)))),
+    (8, 'outquad', P(body=(0, .05, -.06, 12, 14, 0), head=(-18, 14, 0), la=(36, 0, -64, -20), rl=(8, 0, 0, 0), ll=(-8, 0, 0, 0),
+                     aim=((.2, 2.08, .05), (0, .9, -.4)))),
+    (14, 'inoutsine', SWORD_REST),
+    (22, 'inoutsine', NEUTRAL)])
 
 # --- Ordinary attacks: each its own whole little move, beginning and ending at rest. Contact on the hit tick.
 # Daggers (contact 4): a forehand cut, a backhand, the icepick hook (flip and flip back), and a stab.
@@ -298,17 +299,48 @@ move('blade_deflect_r', 16, [
     (8, 'outquad', P(body=(0, -.05, -.04, -4, -6, 5), head=None, la=(-30, 20, 0, -40), aim=((.82, 1.5, .1), (.7, .6, -.3)),
                      rl=(14, 0, 0, 12), ll=(-16, 0, 0, 16))),
     (16, 'inoutsine', GUARD)])
+# To the left the sword arm reaches across the front of the chest, the blade upright, never up and back over the shoulder.
 move('blade_deflect_l', 16, [
     (0, 'linear', GUARD),
-    (1, 'outquad', P(body=(0, -.02, .02, 2, 0, 2), head=None, la=(-10, 0, -20, -20), aim=((.5, .95, .05), (.7, -.2, .5)),
+    (1, 'outquad', P(body=(0, -.02, .02, 2, 0, 2), head=None, la=(-10, 0, -20, -20), aim=((.5, .95, .08), (.7, -.2, .5)),
                      rl=(6, 0, 0, 8), ll=(-6, 0, 0, 8))),
-    (3, 'inexpo', P(body=(0, -.07, -.06, -7, 8, -6), head=None, la=(10, 0, -50, -30), aim=((-.4, 1.45, .55), (-.8, .55, .25)),
-                    rl=(20, 0, 0, 18), ll=(-24, 0, 0, 24))),
-    (5, 'outquad', P(body=(0, -.08, -.07, -7, 10, -8), head=None, la=(16, 0, -56, -30), aim=((-.6, 1.4, .25), (-.85, .45, -.25)),
-                     rl=(20, 0, 0, 18), ll=(-24, 0, 0, 24))),
-    (8, 'outquad', P(body=(0, -.05, -.04, -4, 6, -5), head=None, la=(10, 0, -46, -26), aim=((-.5, 1.35, .3), (-.8, .5, -.2)),
-                     rl=(14, 0, 0, 12), ll=(-16, 0, 0, 16))),
+    (3, 'inexpo', P(body=(0, -.07, -.06, -7, 10, -6), head=None, la=(10, 0, -50, -30), aim=((-.06, 1.3, .55), (-.55, .75, .35)),
+                    rl=(20, 0, 0, 18), ll=(-24, 0, 0, 24), hint=(-75, -25, 10, -30))),
+    (5, 'outquad', P(body=(0, -.08, -.07, -7, 12, -8), head=None, la=(16, 0, -56, -30), aim=((-.22, 1.36, .5), (-.85, .5, .15)),
+                     rl=(20, 0, 0, 18), ll=(-24, 0, 0, 24), hint=(-80, -35, 10, -20))),
+    (8, 'outquad', P(body=(0, -.05, -.04, -4, 6, -5), head=None, la=(10, 0, -46, -26), aim=((-.14, 1.28, .5), (-.75, .6, .25)),
+                     rl=(14, 0, 0, 12), ll=(-16, 0, 0, 16), hint=(-75, -30, 10, -25))),
     (16, 'inoutsine', GUARD)])
+
+# --- The charge's cut (sprinting, the attack key): both hands on the grip, the sword swung up overhead in the stride
+#     and slammed straight down through whatever is ahead, the body folding over it into a deep lunge.
+RUNNING = P(body=(0, 0, 0, -16, 0, 0), head=(-14, 0, 0), la=(-58, 0, 0, -70), aim=((.4, .82, -.3), (.2, -.35, -.9)))
+move('blade_sword_dash', 20, [
+    (0, 'linear', RUNNING),
+    (3, 'outquad', P(body=(0, .03, .02, 8, 0, 0), head=(-12, 0, 0), rl=(-46, 0, 0, 64), ll=(22, 0, 0, 30),
+                     aim=((.08, 1.98, .14), (0, .55, -.83)), two=True, hint=(-160, 10, 0, -20))),
+    (6, 'inexpo', P(body=(0, -.22, -.3, -28, 0, 0), head=(12, 0, 0), rl=(40, 0, 0, 4), ll=(-60, 0, 0, 64),
+                    aim=((.06, 1.08, .72), (0, -.5, .87)), two=True)),
+    (8, 'outquad', P(body=(0, -.25, -.33, -32, 0, 0), head=(14, 0, 0), rl=(42, 0, 0, 4), ll=(-62, 0, 0, 66),
+                     aim=((.05, .8, .74), (0, -.82, .57)), two=True)),
+    (11, 'inoutsine', P(body=(0, -.24, -.32, -30, 0, 0), head=(12, 0, 0), rl=(42, 0, 0, 4), ll=(-62, 0, 0, 66),
+                        aim=((.06, .84, .72), (0, -.8, .6)), two=True)),
+    (20, 'inoutsine', NEUTRAL)])
+
+# --- The Deceiver at rest (in hand, the bearer standing still a while): weight on one leg, the sword hanging from a
+#     loose wrist a little ahead, its point resting on the ground in front, the free hand on the hip. The head is the
+#     player's own.
+IDLE = P(body=(0, -.01, 0, -1, 0, -2), head=None, la=(20, 65, -40, -100), rl=(-2, 0, 2, 0), ll=(-8, 0, -4, 14),
+         aim=((.38, .8, .2), (.22, -.58, .78)))
+IDLE_BREATH = P(body=(0, -.018, 0, -1, 0, -2.5), head=None, la=(22, 65, -42, -102), rl=(-2, 0, 2, 0), ll=(-8, 0, -4, 15),
+                aim=((.38, .79, .21), (.22, -.6, .77)))
+move('blade_sword_idle', 54, [
+    (0, 'linear', CARRY),
+    # A lazy flick of the wrist, the point swung out and let fall to the ground.
+    (6, 'inoutsine', P(head=None, la=(10, 30, -20, -50), aim=((.42, .92, .2), (.55, .35, .75)))),
+    (14, 'outquad', IDLE),
+    (34, 'inoutsine', IDLE_BREATH),
+    (54, 'inoutsine', IDLE)], loop=14)
 
 # ------------------------------------------------------------------ what the server must agree with
 # The tick of each cut's contact, and where its blood goes (the caster's right, up, forward). server/BladeCombo and
@@ -316,8 +348,9 @@ move('blade_deflect_l', 16, [
 CONTACT = {'blade_dagger_0': 4, 'blade_dagger_1': 3, 'blade_dagger_2': 5, 'blade_dagger_3': 6, 'blade_dagger_kick': 5,
            'blade_sword_0': 5, 'blade_sword_1': 7, 'blade_sword_2': 5, 'blade_sword_3': 6,
            'blade_m_dagger_0': 4, 'blade_m_dagger_1': 4, 'blade_m_dagger_2': 4, 'blade_m_dagger_3': 4,
-           'blade_m_sword_0': 6, 'blade_m_sword_1': 6, 'blade_m_sword_2': 6, 'blade_m_sword_3': 6}
+           'blade_m_sword_0': 6, 'blade_m_sword_1': 6, 'blade_m_sword_2': 6, 'blade_m_sword_3': 6, 'blade_sword_dash': 6}
 SWINGS = {'blade_dagger_0': (1, 0, 0), 'blade_dagger_1': (0, -.8, .6), 'blade_dagger_2': (0, 0, 1), 'blade_dagger_3': (1, 0, 0),
           'blade_sword_0': (-.7, -.7, 0), 'blade_sword_1': (1, 0, 0), 'blade_sword_2': (0, 0, 1), 'blade_sword_3': (0, 1, 0),
           'blade_m_dagger_0': (-.7, -.7, 0), 'blade_m_dagger_1': (1, 0, 0), 'blade_m_dagger_2': (-.7, -.7, 0), 'blade_m_dagger_3': (0, 0, 1),
-          'blade_m_sword_0': (-.7, -.7, 0), 'blade_m_sword_1': (.6, .8, 0), 'blade_m_sword_2': (-1, 0, 0), 'blade_m_sword_3': (0, -.8, .6)}
+          'blade_m_sword_0': (-.7, -.7, 0), 'blade_m_sword_1': (.6, .8, 0), 'blade_m_sword_2': (-1, 0, 0), 'blade_m_sword_3': (0, -.8, .6),
+          'blade_sword_dash': (0, -.8, .6)}

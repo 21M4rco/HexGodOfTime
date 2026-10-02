@@ -159,7 +159,7 @@ public final class HexHud {
             case BLINK -> "Teleport toward your aim.";
             case WARD -> "Raise a defensive veil.";
             case DAGGERS -> "Conjure a dagger; again: put it away.";
-            case TWIN_DAGGERS -> "Conjure The Deceiver. Hold use: guard and parry.";
+            case TWIN_DAGGERS -> "Conjure The Deceiver. Hold use: guard and parry. Sprint and attack: the slam.";
             case LAEVATEINN -> "Conjure/recall the Scepter. Hold right click 1-10s: beam.";
             case ENCHANT -> "Charm a creature to follow you.";
             case MEMORY -> "Reveal a target's recent steps.";

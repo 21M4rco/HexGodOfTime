@@ -392,6 +392,16 @@ def check(resolved):
     for name in sorted(offs, key=lambda n: -offs[n][0])[:6]: print(f'  handle {name:18} worst {offs[name][0]:.3f} at t{offs[name][1]}')
     assert worst[0] < .065, f'the handle leaves the fist by {worst[0]:.3f} at {worst[1]}'
     print(f'handle in the fist through every move: worst {worst[0]:.3f} blocks off, at {worst[1]}')
+    # No arm through the body: neither forearm's middle line may pass into the chest or the head (each arm is 4px
+    # thick, so a line 1.5px in is an arm well buried) at any half tick, which an arm swung round the wrong way to
+    # reach across (up and back over the shoulder, behind the back) always does somewhere on its way.
+    worst = (0, '')
+    for name, move in resolved.items():
+        for half in range(0, move['end'] * 2 + 1):
+            d = rig.intrusion(rig.keyed(move, half / 2))
+            if d > worst[0]: worst = (d, f'{name} t{half / 2}')
+    assert worst[0] < 1.5, f'an arm goes {worst[0]:.1f}px into the body at {worst[1]}'
+    print(f'no arm through the body: deepest {worst[0]:.1f}px, at {worst[1]}')
     for name, swing in blade_moves.SWINGS.items():
         move = resolved[name]
         model, length = ('deceiver', 1.55) if 'sword' in name else ('dagger', .80)
