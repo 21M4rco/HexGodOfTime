@@ -183,6 +183,7 @@ public final class Halving {
 
     /** Whether this body is drawn as its halves instead (ErasureRenderMixin leaves it undrawn). */
     public static boolean hidden(Entity e) {
+        if (CUTS.isEmpty()) return false;
         Cut cut = CUTS.get(e.getId());
         return cut != null && cut.body == e && !cut.broken;
     }

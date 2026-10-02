@@ -1,3 +1,27 @@
+## Alongside HexKagunes
+
+This mod and HexKagunes 1.0.2 run side by side. Nothing in HexKagunes is changed and no key moves; this mod only
+reads, when HexKagunes is installed, which bodies its tendrils are holding.
+
+- **No body is left frozen or floating for good.** A stun, the unseen hand, an erasure and a body rising out of a
+  Warping pool all hold a body still by switching its gravity and AI off for a while and back on after; the tendrils'
+  grab does the same. Each used to put back whatever it found when it took hold, so a grab during one of these (or
+  one of these during a grab, or two of these on one body) could hand back the other's switched-off state: a creature
+  frozen in place, or a creature or player hanging in the air, saved like that. Every hold now learns the body's own
+  gravity and AI, past anything else holding it, and leaves them alone while anything else still holds it; the last
+  to let go puts them back. If a tendril took one of this mod's holds for the body's own, the body's own are put back
+  the moment it lets go. A player who leaves the game while held is saved standing on their own feet.
+- **A stunned body stays stunned** to the end even if a tendril lets go of it meanwhile, and so does a body still held
+  by the unseen hand or still rising from a pool.
+- **One hold at a time.** The unseen hand and Gravity Grasp leave alone a body a tendril is holding, instead of dragging
+  it back and forth with it.
+- **A shot is turned once.** The Deceiver's guard, Mirror Ward and the Sanctum answer a shot before the tendrils' own
+  swat does, and a shot the tendrils have already swatted away is left alone; it used to be possible for the guard to
+  turn it straight back into its bearer.
+- **A player cut in two harms nothing**, tendrils included, for the five seconds they lie there.
+- **A body that is gone looks gone.** A player lying as two halves, or a body an erasure has finished taking apart, no
+  longer has tendrils, a shadow or flames drawn where it stood.
+
 ## Complete Evisceration
 
 - **The Deceiver's G.** With The Deceiver in your hand, G no longer opens Warping's destinations (put the sword away

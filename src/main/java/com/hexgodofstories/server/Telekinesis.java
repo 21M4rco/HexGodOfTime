@@ -33,9 +33,10 @@ import java.util.*;
  */
 public final class Telekinesis {
     private static final class Held {
-        final Entity entity;final boolean gravity,noAi;final long end;
-        Held(Entity entity,boolean gravity,boolean noAi,long end) {
-            this.entity=entity;this.gravity=gravity;this.noAi=noAi;this.end=end;
+        /** The flags the body had of its own (BodyFlags), handed back when it is let go. */
+        final Entity entity;final BodyFlags.Own own;final long end;
+        Held(Entity entity,BodyFlags.Own own,long end) {
+            this.entity=entity;this.own=own;this.end=end;
         }
     }
     private static final class Grip {
@@ -58,6 +59,11 @@ public final class Telekinesis {
         for(Grip g:GRIPS.values())for(Held h:g.held)if(h.entity==e)return true;
         return false;
     }
+    /** The flags a grip (other than {@code except}) keeps for this body while it holds it (BodyFlags), or null. */
+    static BodyFlags.Own own(Entity e,Object except) {
+        for(Grip g:GRIPS.values())for(Held h:g.held)if(h.entity==e&&h!=except)return h.own;
+        return null;
+    }
 
     /**
      * One body at a time: casting again lets it go rather than taking another. In the full transformation, Many Hands
@@ -74,7 +80,8 @@ public final class Telekinesis {
 
     /** @return true when the target was taken, so the caster only pays the cost on a real grab. */
     public static boolean grab(ServerPlayer p,Entity t) {
-        if(t==null||!HexServer.validTarget(p,t)||t.isPassenger()||t.isVehicle()||TemporalEngine.frozen(t)||heldBySomeone(t))return false;
+        // Held by somebody else's hand already, or by a Kagune's tendril: two holds would only drag it back and forth.
+        if(t==null||!HexServer.validTarget(p,t)||t.isPassenger()||t.isVehicle()||TemporalEngine.frozen(t)||heldBySomeone(t)||BodyFlags.kaguneHolds(t))return false;
         if(Erasure.erasing(t))return false;
         double mass=t.getBbWidth()*t.getBbWidth()*t.getBbHeight();
         if(mass>massLimit(p)) {
@@ -87,7 +94,7 @@ public final class Telekinesis {
             return false;
         }
         long life=HexData.now(p)+(t instanceof Player?70:300);
-        Held held=new Held(t,t.isNoGravity(),t instanceof Mob m&&m.isNoAi(),life);
+        Held held=new Held(t,BodyFlags.of(t),life);
         grip.held.add(held);
         grip.distance=Math.max(MIN_DISTANCE,Math.min(maxDistance(p),p.distanceTo(t)));
         t.setNoGravity(true);t.fallDistance=0;
@@ -132,6 +139,7 @@ public final class Telekinesis {
             double angle=i*Math.PI*2/n+now*.022;
             Vec3 goal=anchor.add(side.scale(Math.cos(angle)*spread)).add(up.scale(Math.sin(angle)*spread));
             e.setNoGravity(true);
+            if(e instanceof Mob mob&&!mob.isNoAi())mob.setNoAi(true);
             e.fallDistance=0;
             if(e instanceof ServerPlayer target) {
                 // Their own client owns their body. Drive it by velocity and take their movement input
@@ -205,8 +213,7 @@ public final class Telekinesis {
     }
 
     private static void restore(Held h) {
-        h.entity.setNoGravity(h.gravity);
-        if(h.entity instanceof Mob m)m.setNoAi(h.noAi);
+        BodyFlags.handBack(h.entity,h.own,h);
         h.entity.fallDistance=0;
         h.entity.setXRot(0);
     }

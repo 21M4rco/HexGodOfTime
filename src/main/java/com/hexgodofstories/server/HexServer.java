@@ -691,6 +691,7 @@ public final class HexServer {
         Delusion.tick(level);
         Frostbite.tick(level);
         ScepterBlast.tick(level);
+        BodyFlags.tick(level);
         Arsenal.tickLevel(level);
         Threat.tick(now);
         Decoy.tick(now);
@@ -894,5 +895,6 @@ public final class HexServer {
         Telekinesis.reset();Architecture.reset();Bleed.reset();Frostbite.reset();ScepterBlast.reset();PocketRealm.reset();TemporalEngine.reset();
         Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();Arsenal.reset();GravityGrasp.reset();
         Delusion.reset();Glorious.reset();BladeCombo.reset();Evisceration.reset();SwordGuard.reset();BladeFire.reset();FlameStream.reset();
+        BodyFlags.reset();
     }
 }

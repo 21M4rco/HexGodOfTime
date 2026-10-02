@@ -478,3 +478,26 @@ directional streaking. Cuboids spinning off in all directions read as rubble and
   cutter and the death screen; leaving meanwhile; a totem in hand.
 - The longer thrust: the point visibly out of the back of a zombie, a pig (looked down at) and a wider body, and the
   fist meeting the body rather than going into it.
+
+## Alongside HexKagunes
+
+- **Read, not built against.** HexKagunes 1.0.2's jar (built from its repository) was decompiled here to see what it
+  does to the bodies it holds: its grab saves a body's NoGravity and NoAI, switches both on, moves the body every tick
+  (a player by teleport), and puts the saved pair back when it lets go; its centipede legs do the same; it swats shots
+  away in `ProjectileImpactEvent` (SKIP_ENTITY) and stops some in `LivingAttackEvent`; its tendrils are drawn for every
+  player who is not invisible. It has no mixins, its keys are its own, and its animation layer (priority 80) sits under
+  this mod's (800, 900). This mod reads `KaguneRuntime.peek` and the held slots' public fields by reflection, only when
+  `hexkagune` is loaded, and switches the link off with one warning if they cannot be read.
+- **Not compiled locally**; CI built the commit and started the client with `HiddenBodyMixin` applied. CI does not run
+  HexKagunes.
+
+### Not verified — needs a recorded in-game session with both mods
+
+- A tendril grabbing a stunned creature, one held by the unseen hand, one being erased and a player rising from a pool,
+  and each of these done to a creature the tendrils already hold: once everything has let go, the body walks and falls.
+- A creature held by a tendril and banished by an erasure: back from its realm, it walks and falls.
+- Leaving the game while a tendril holds you, and coming back.
+- An arrow at a player guarding with The Deceiver whose tendrils also swat shots: turned once, by the guard.
+- A Kagune player cut in two: their tendrils hidden, and nothing they hit for those five seconds hurt.
+- The unseen hand and Gravity Grasp passing over a body a tendril holds.
+

@@ -1,6 +1,7 @@
 package com.hexgodofstories.warping;
 
 import com.hexgodofstories.network.HexNetwork;
+import com.hexgodofstories.server.BodyFlags;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -32,9 +33,11 @@ public final class WarpEmergence {
         // first-person rendering the inside of the ground while still making the emergence obvious.
         double depth=Math.min(1.35,Math.max(.72,e.getBbHeight()*.70));
         double startY=top.y-depth;
-        Boolean noAi=e instanceof Mob mob?mob.isNoAi():null;
+        // The body's own flags, not those of anything else holding it right now (BodyFlags).
+        BodyFlags.Own own=BodyFlags.of(e);
+        Boolean noAi=e instanceof Mob?own.noAi():null;
         Rise s=new Rise(e,level.dimension(),e.getUUID(),top,startY,level.getGameTime(),
-            after==null?Vec3.ZERO:after,e.noPhysics,e.isNoGravity(),noAi,e.getYRot(),e.getXRot());
+            after==null?Vec3.ZERO:after,e.noPhysics,own.noGravity(),noAi,e.getYRot(),e.getXRot());
         ACTIVE.put(e.getUUID(),s);
 
         e.noPhysics=true;e.setNoGravity(true);
@@ -80,12 +83,15 @@ public final class WarpEmergence {
             double y=s.startY()+(s.top().y-s.startY())*eased;
             place(e,s.top().x,y,s.top().z,s.yaw(),s.pitch());
             e.setDeltaMovement(Vec3.ZERO);e.fallDistance=0;e.hurtMarked=true;
-            if(t<1)continue;
+            if(t<1){
+                // Still rising, whatever else let go of it meanwhile (a tendril putting back what it found).
+                e.setNoGravity(true);if(e instanceof Mob mob)mob.setNoAi(true);
+                continue;
+            }
 
             ACTIVE.remove(entry.getKey());
             place(e,s.top().x,s.top().y,s.top().z,s.yaw(),s.pitch());
-            e.noPhysics=s.oldNoPhysics();e.setNoGravity(s.oldNoGravity());
-            if(e instanceof Mob mob&&s.oldNoAi()!=null)mob.setNoAi(s.oldNoAi());
+            e.noPhysics=s.oldNoPhysics();BodyFlags.handBack(e,own(s),s);
             e.setDeltaMovement(s.after());e.fallDistance=0;e.hurtMarked=true;
             if(e instanceof ServerPlayer p){
                 CompoundTag n=new CompoundTag();n.putBoolean("clear",true);
@@ -102,13 +108,18 @@ public final class WarpEmergence {
     }
 
     public static boolean active(Entity e){return e!=null&&ACTIVE.containsKey(e.getUUID());}
+    private static BodyFlags.Own own(Rise s){return new BodyFlags.Own(s.oldNoGravity(),s.oldNoAi()!=null&&s.oldNoAi());}
+    /** The flags a rise (other than {@code except}) keeps for this body while it holds it (BodyFlags), or null. */
+    public static BodyFlags.Own own(Entity e,Object except){
+        Rise s=ACTIVE.get(e.getUUID());
+        return s==null||s==except?null:own(s);
+    }
     /** Restore leased physics/AI before logout, removal, death or a different dimension takes over. */
     public static void cancel(Entity e){
         Rise s=ACTIVE.remove(e.getUUID());if(s==null)return;
         if(e.isAlive()&&!e.isRemoved()&&e.level().dimension().equals(s.level()))
             place(e,s.top().x,s.top().y,s.top().z,e.getYRot(),e.getXRot());
-        e.noPhysics=e.isSpectator()||s.oldNoPhysics();e.setNoGravity(s.oldNoGravity());
-        if(e instanceof Mob mob&&s.oldNoAi()!=null)mob.setNoAi(s.oldNoAi());
+        e.noPhysics=e.isSpectator()||s.oldNoPhysics();BodyFlags.handBack(e,own(s),s);
         e.fallDistance=0;
         if(e instanceof ServerPlayer p){
             CompoundTag n=new CompoundTag();n.putBoolean("clear",true);

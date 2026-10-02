@@ -121,7 +121,8 @@ public final class ScepterBlast {
     /** A heart for a tap, one and a half to three for a charged beam. The bleed does the rest. */
     private static float damage(float power) {return power > 0 ? 2 + 4 * power : 2;}
 
-    private record Stun(LivingEntity victim, long until, boolean hadNoAi) { }
+    /** A stun, and the flags its body had of its own (BodyFlags): NoAI is switched on for a creature until it ends. */
+    private record Stun(LivingEntity victim, long until, BodyFlags.Own own) { }
     private record Hit(LivingEntity victim, Vec3 at, double distance) { }
 
     private static final Map<UUID, Long> CHARGES = new HashMap<>();
@@ -388,12 +389,12 @@ public final class ScepterBlast {
     static void stun(LivingEntity victim, int ticks) {
         if (STUNS.size() >= MAX_STUNS && !STUNS.containsKey(victim.getUUID())) return;
         Stun old = STUNS.get(victim.getUUID());
-        boolean hadNoAi = old != null ? old.hadNoAi : victim instanceof Mob mob && mob.isNoAi();
+        BodyFlags.Own own = old != null ? old.own : BodyFlags.of(victim);
         long until = Math.max(old == null ? 0 : old.until, victim.level().getGameTime() + ticks);
-        STUNS.put(victim.getUUID(), new Stun(victim, until, hadNoAi));
+        STUNS.put(victim.getUUID(), new Stun(victim, until, own));
         if (victim instanceof Mob mob) {
             mob.setNoAi(true);
-            if (!hadNoAi) victim.getPersistentData().putBoolean(STUN_TAG, true);
+            if (!own.noAi()) victim.getPersistentData().putBoolean(STUN_TAG, true);
         }
         victim.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, ticks, 255, false, false, true));
         victim.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, ticks, 255, false, false, true));
@@ -419,13 +420,22 @@ public final class ScepterBlast {
                 state.putLong("until", 0);
                 if (!victim.isRemoved()) HexNetwork.tracking(victim, new HexNetwork.Message(HexNetwork.STUN, victim.getId(), state));
             }
+            // Held still to the end, whatever else let go of it meanwhile (a tendril putting back what it found).
+            else if (victim instanceof Mob mob && !mob.isNoAi()) mob.setNoAi(true);
         }
         LastMoments.tick(level);
     }
 
     private static void release(LivingEntity victim, Stun stun) {
-        if (victim instanceof Mob mob && !stun.hadNoAi) mob.setNoAi(false);
+        if (victim instanceof Mob) BodyFlags.handBack(victim, stun.own, stun);
         victim.getPersistentData().remove(STUN_TAG);
+    }
+
+    /** The flags a stun (other than {@code except}) keeps for this creature while it holds it (BodyFlags), or null. */
+    static BodyFlags.Own own(net.minecraft.world.entity.Entity e, Object except) {
+        if (!(e instanceof Mob)) return null;
+        Stun stun = STUNS.get(e.getUUID());
+        return stun == null || stun == except || e.level().getGameTime() >= stun.until ? null : stun.own;
     }
 
     public static void clear(LivingEntity victim) {

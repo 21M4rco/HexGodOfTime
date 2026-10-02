@@ -105,7 +105,7 @@ public final class ServerEvents {
         // A borrowed shape is sent once, not every second, so a new viewer has to be told separately.
         Masquerade.resend(p,q);
     }
-    @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p){Evisceration.loggedOut(p);PersonalRewind.clear(p);HexServer.clear(p,false);com.hexgodofstories.warping.CandyCorruption.forget(p);}}
+    @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p){Evisceration.loggedOut(p);PersonalRewind.clear(p);HexServer.clear(p,false);com.hexgodofstories.warping.CandyCorruption.forget(p);BodyFlags.leaving(p);}}
     @SubscribeEvent public static void dimension(PlayerEvent.PlayerChangedDimensionEvent e) {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
         HexServer.clear(p,false);HexNetwork.sync(p);com.hexgodofstories.warping.WarpRealms.greet(p,e.getTo());
@@ -175,7 +175,14 @@ public final class ServerEvents {
         if(e.getSource().getEntity()==null&&e.getSource().getDirectEntity()==null)return;
         if(SanctumWard.evade(e.getEntity()))e.setCanceled(true);
     }
-    @SubscribeEvent public static void wardProjectile(net.minecraftforge.event.entity.ProjectileImpactEvent e) {
+    /**
+     * Ahead of the ordinary handlers, and only for a shot nothing has dealt with yet: a guard that is held up answers
+     * before anything automatic does (HexKagunes' tendrils swat shots away by themselves), and a shot another mod has
+     * already turned is never turned a second time — back into the face of the one it was just turned away from.
+     */
+    @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.HIGH)
+    public static void wardProjectile(net.minecraftforge.event.entity.ProjectileImpactEvent e) {
+        if(e.getImpactResult()!=net.minecraftforge.event.entity.ProjectileImpactEvent.ImpactResult.DEFAULT)return;
         if(!(e.getRayTraceResult() instanceof net.minecraft.world.phys.EntityHitResult hit))return;
         // The Deceiver's guard: a shot from the front slapped back the way it came (SwordGuard).
         if(hit.getEntity() instanceof ServerPlayer guard&&SwordGuard.deflect(guard,e.getProjectile())){e.setCanceled(true);return;}
@@ -239,11 +246,13 @@ public final class ServerEvents {
 
     /**
      * A player cut in two (Evisceration) lies helpless for five seconds and then dies of it: nothing hurts them meanwhile
-     * but that, and they strike, use, touch and break nothing.
+     * but that, and they strike, use, touch and break nothing — nor harm anything by any other means, such as the
+     * kagune of HexKagunes, which strikes on its own.
      */
     @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.HIGHEST)
     public static void halvedHurt(net.minecraftforge.event.entity.living.LivingAttackEvent e) {
-        if(Evisceration.halved(e.getEntity())&&!Evisceration.finishing())e.setCanceled(true);
+        if(Evisceration.finishing())return;
+        if(Evisceration.halved(e.getEntity())||Evisceration.halved(e.getSource().getEntity()))e.setCanceled(true);
     }
     @SubscribeEvent public static void halvedAttack(net.minecraftforge.event.entity.player.AttackEntityEvent e) {if(Evisceration.halved(e.getEntity()))e.setCanceled(true);}
     @SubscribeEvent public static void halvedBlock(net.minecraftforge.event.entity.player.PlayerInteractEvent.RightClickBlock e) {if(Evisceration.halved(e.getEntity()))e.setCanceled(true);}

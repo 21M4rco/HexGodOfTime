@@ -128,8 +128,10 @@ public final class WarpResidency extends SavedData {
         // Track is called immediately after the dimension hand-off, before the realm gets a tick.
         // If this is an already-known resident, keep its original entry snapshot rather than
         // learning a temporary state a second time.
-        boolean noGravity=prior!=null&&prior.transportStateKnown()?prior.noGravity():entity.isNoGravity();
-        boolean noAi=prior!=null&&prior.transportStateKnown()?prior.noAi():(entity instanceof Mob mob&&mob.isNoAi());
+        // Learned past anything holding it still right now (a stun, an erasure, a tendril of HexKagunes): BodyFlags.
+        com.hexgodofstories.server.BodyFlags.Own own=com.hexgodofstories.server.BodyFlags.of(entity);
+        boolean noGravity=prior!=null&&prior.transportStateKnown()?prior.noGravity():own.noGravity();
+        boolean noAi=prior!=null&&prior.transportStateKnown()?prior.noAi():own.noAi();
         Resident old=data.residents.put(entity.getUUID(),new Resident(owner,chunk.toLong(),true,noGravity,noAi));
         if(old!=null&&old.chunk()!=chunk.toLong())release(level,entity.getUUID(),new ChunkPos(old.chunk()));
         hold(level,entity.getUUID(),chunk);

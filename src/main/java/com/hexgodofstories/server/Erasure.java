@@ -64,6 +64,11 @@ public final class Erasure {
 
     /** A body already leaving the timeline cannot move, fight, cast or be caught a second time. */
     public static boolean erasing(Entity e) {return e!=null&&FADING.containsKey(e.getUUID());}
+    /** The flags an erasure (other than {@code except}) keeps for this body while it holds it (BodyFlags), or null. */
+    static BodyFlags.Own own(Entity e,Object except) {
+        Fading f=FADING.get(e.getUUID());
+        return f==null||f==except?null:new BodyFlags.Own(f.gravity,f.noAi);
+    }
 
     /**
      * Takes a body out of the fight and starts its sequence.
@@ -91,8 +96,9 @@ public final class Erasure {
         if(victim instanceof TamableAnimal pet&&caster.getUUID().equals(pet.getOwnerUUID()))return false;
         int duration=implosion?com.hexgodofstories.data.BranchFistState.IMPLOSION
             :(victim instanceof Player?PLAYER_TICKS:MOB_TICKS)+(int)(power*CHARGE_TICKS);
+        BodyFlags.Own own=BodyFlags.of(victim);
         Fading fading=new Fading(victim,caster.getUUID(),direction.normalize(),victim.level().getGameTime(),
-            duration,victim.isNoGravity(),victim instanceof Mob m&&m.isNoAi(),victim.isSilent(),implosion,power,banishTo);
+            duration,own.noGravity(),own.noAi(),victim.isSilent(),implosion,power,banishTo);
         FADING.put(victim.getUUID(),fading);
         if(banishTo!=null) {
             ServerLevel destination=caster.server.getLevel(banishTo.key);
@@ -169,9 +175,8 @@ public final class Erasure {
     /** The mechanical holds only. Silence is kept through a death so the death itself stays quiet. */
     private static void unhold(Fading f) {
         LivingEntity v=f.victim;
-        v.setNoGravity(f.gravity);
+        BodyFlags.handBack(v,new BodyFlags.Own(f.gravity,f.noAi),f);
         v.fallDistance=0;
-        if(v instanceof Mob mob)mob.setNoAi(f.noAi);
     }
 
     /**

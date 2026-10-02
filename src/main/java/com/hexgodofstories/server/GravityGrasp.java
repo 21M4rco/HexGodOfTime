@@ -134,7 +134,8 @@ public final class GravityGrasp {
         if (!p.isAlive() || TemporalEngine.frozen(p) || ScepterBlast.stunned(p) || held >= MOST) {release(p); return;}
         Vec3 hole = hole(p);
         double strength = PULL_LEAST + (PULL_MOST - PULL_LEAST) * Math.min(1, held / (double) RAMP);
-        List<Entity> near = p.level().getEntities(p, new AABB(hole, hole).inflate(REACH), e -> e instanceof LivingEntity && HexServer.validTarget(p, e));
+        // A body a Kagune's tendril is holding (HexKagunes) is held still in the air: it would only be dragged back and forth.
+        List<Entity> near = p.level().getEntities(p, new AABB(hole, hole).inflate(REACH), e -> e instanceof LivingEntity && HexServer.validTarget(p, e) && !BodyFlags.kaguneHolds(e));
         near.sort(Comparator.comparingDouble(e -> e.distanceToSqr(hole)));
         for (int i = 0; i < Math.min(MOST_HELD, near.size()); i++) {
             LivingEntity body = (LivingEntity) near.get(i);
