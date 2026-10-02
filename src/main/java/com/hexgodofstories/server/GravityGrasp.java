@@ -9,8 +9,10 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -47,14 +49,19 @@ public final class GravityGrasp {
     /** Where the hole hangs, out from the eye on the outstretched palm; and how close a body must come to be caught. */
     static final double HOLE = 1.25, ASIDE = .3, DOWN = .38, MELEE = 2.7;
     /** The stab: in on {@link #STAB_IN}, torn out on {@link #STAB_OUT}, the blade gone by {@link #STAB_END}. */
-    static final int STAB_IN = 6, STAB_OUT = 27, STAB_END = 34, AFTER_STUN = 20;
+    static final int STAB_IN = 6, STAB_OUT = 27, AFTER_STUN = 20;
+    public static final int STAB_END = 34;
     static final float STAB = 6, RIP = 6;
     static final int BLEED = 200, BLEED_STACKS = 2;
-    /** How far in front of the caster's middle the blade goes in: the body is held there, its near side on the point. */
-    static final double PIN = .85;
+    /**
+     * Where the blade goes in (tools/blade_moves.py, blade_grasp_stab): the fist ends {@link #PIN} in front of the
+     * caster's middle, the blade driven in at about {@link #NECK} off the ground. The body is held with its near side
+     * there, and one too short to have its neck at that height is held up on the blade until it does.
+     */
+    static final double PIN = .85, NECK = 1.45;
     /** Recovery once let go, and where it lives; bodies pulled at once, at most. */
     public static final int RECOVERY = 240;
-    public static final String READY = "graspReady", HOLDING = "graspStart";
+    public static final String READY = "graspReady", HOLDING = "graspStart", STABBING = "graspStab";
     static final int MOST_HELD = 12;
 
     private static final class Hold {
@@ -158,6 +165,7 @@ public final class GravityGrasp {
         CompoundTag d = HexData.get(p);
         d.remove(HOLDING);
         d.putLong(READY, now + RECOVERY);
+        d.putLong(STABBING, now);
         d.putLong(BladeCombo.HELD, now + STAB_END);
         d.putInt(BladeCombo.KIND, 0);
         d.putLong(BladeCombo.FORMED, now);
@@ -177,6 +185,8 @@ public final class GravityGrasp {
         // Killed by the blade going in (or gone some other way): there is nothing left to hold it in, so it ends there.
         if (gone && t >= STAB_IN) {finish(p); HexNetwork.animate(p, "__clear__"); return;}
         if (t <= STAB_OUT) pin(p, body);
+        // Torn off the blade, a body held up on it comes down again (stunned, it has no fall of its own).
+        else if (!(body instanceof ServerPlayer) && !body.onGround()) body.move(MoverType.SELF, new Vec3(0, -.35, 0));
         ServerLevel level = p.serverLevel();
         Vec3 neck = neck(p, body);
         if (t == STAB_IN) {
@@ -228,29 +238,42 @@ public final class GravityGrasp {
 
     private static void sheathe(ServerPlayer p) {
         CompoundTag d = HexData.get(p);
+        d.remove(STABBING);
         d.remove(BladeCombo.HELD);
         d.remove(BladeCombo.KIND);
         d.remove(BladeCombo.FORMED);
     }
 
-    /** Held on the blade: kept a step in front of the caster, near side on the point, facing them, wherever they go. */
+    /**
+     * Held on the blade: carried a step in front of the caster, near side on the point, neck at the blade's height, and
+     * facing them, wherever they go. Clients turn the caster's body to their look while it lasts (GraspRenderer), so
+     * the move's blade comes out of the very direction the body is held in.
+     */
     private static void pin(ServerPlayer p, LivingEntity body) {
         Vec3 ahead = inward(p);
-        Vec3 want = p.position().add(ahead.scale(PIN + body.getBbWidth() / 2));
-        Vec3 pull = want.subtract(body.position());
-        double y = body.onGround() && Math.abs(pull.y) < .6 ? Math.min(0, body.getDeltaMovement().y) : pull.y * .5;
-        Vec3 v = new Vec3(pull.x * .6, y, pull.z * .6);
-        if (v.length() > 1.2) v = v.scale(1.2 / v.length());
-        body.setDeltaMovement(v);
+        double lift = Mth.clamp(NECK - body.getBbHeight() * .82, 0, 1);
+        Vec3 want = p.position().add(ahead.scale(PIN + body.getBbWidth() / 2)).add(0, lift, 0);
+        Vec3 gap = want.subtract(body.position());
         body.fallDistance = 0;
-        body.hurtMarked = true;
-        if (body instanceof ServerPlayer target) target.connection.send(new ClientboundSetEntityMotionPacket(target));
-        else {
-            float yaw = (float) (Math.toDegrees(Math.atan2(-ahead.x, ahead.z)) + 180);
-            body.setYRot(yaw);
-            body.setYHeadRot(yaw);
-            body.yBodyRot = yaw;
+        if (body instanceof ServerPlayer target) {
+            // A player moves themselves: they are thrown onto it, and their own client carries it out.
+            Vec3 v = gap.scale(.6);
+            if (v.length() > 1.2) v = v.scale(1.2 / v.length());
+            target.setDeltaMovement(v);
+            target.hurtMarked = true;
+            target.connection.send(new ClientboundSetEntityMotionPacket(target));
+            return;
         }
+        // Stunned, a mob has no physics of its own (ScepterBlast's NoAI): a velocity would never move it. So it is
+        // carried there outright, a little over half the remaining way each tick, stopped by whatever walls are in the way.
+        Vec3 step = gap.scale(.55);
+        if (step.length() > .8) step = step.scale(.8 / step.length());
+        body.setDeltaMovement(Vec3.ZERO);
+        body.move(MoverType.SELF, step);
+        float yaw = (float) (Math.toDegrees(Math.atan2(-ahead.x, ahead.z)) + 180);
+        body.setYRot(yaw);
+        body.setYHeadRot(yaw);
+        body.yBodyRot = yaw;
     }
 
     /** Where the blade goes in: the near side of the neck. */

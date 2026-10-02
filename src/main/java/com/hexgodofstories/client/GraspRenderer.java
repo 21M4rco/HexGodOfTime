@@ -110,10 +110,21 @@ public final class GraspRenderer {
         }
     }
 
+    /** Whether this player is holding the grasp open or stabbing with it: their body is kept square to their look. */
+    private static boolean squared(Player p) {
+        var d=ClientState.data(p.getId());
+        long stab=d.getLong(GravityGrasp.STABBING);
+        return holding(p)||stab>0&&ClientState.now()-stab<=GravityGrasp.STAB_END;
+    }
+
     /** Portal motes streaming in from all round every hole in sight: they start out from it and fall into it. */
     public static void tick() {
         var mc=Minecraft.getInstance();
         if(mc.level==null||mc.player==null)return;
+        // After the players' own ticks: their moves are played from the body, but the hole and the body caught are
+        // placed from the look (GravityGrasp), and vanilla lets the body trail the head by as much as fifty degrees;
+        // the arm would point off beside its own hole, and the blade go in beside the body it was meant for.
+        for(Player p:mc.level.players())if(squared(p)&&!p.isSpectator())p.yBodyRot=p.getYHeadRot();
         Vec3 eye=mc.player.getEyePosition();
         var random=mc.level.random;
         for(Player p:mc.level.players()) {
