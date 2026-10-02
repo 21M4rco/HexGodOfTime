@@ -22,18 +22,21 @@ public final class QuickBar {
     private static boolean enabled(){return ClientState.self().getBoolean("abilitiesEnabled");}
 
     /**
-     * A slot's key was pressed. The choice is shown and kept here at once, before the server has answered, so a
-     * cast pressed straight after it already goes out as the ability just chosen (a held one as a hold); the
-     * server checks it against its own copy of the slots and its next sync settles any difference.
+     * A slot's key was pressed: its ability becomes the chosen one, here at once (before the server has answered) and
+     * on the server, which checks it against its own copy of the slots. The caller then casts it.
+     *
+     * @return the ability chosen, or null when there is nothing on that key or nothing may be cast now
      */
-    public static void press(int index) {
+    public static Ability press(int index) {
         var mc=Minecraft.getInstance();
-        if(mc.player==null||mc.screen!=null||!enabled())return;
+        if(mc.player==null||mc.screen!=null||!enabled())return null;
         CompoundTag data=ClientState.self();
         int ability=slot(data,index);
-        if(ability<0)return;
+        Ability a=Ability.slot(ability);
+        if(a==null)return null;
         data.putInt("selected",ability);
         HexNetwork.send(HexServer.SLOT,index);
+        return a;
     }
     public static void assign(int slot,int ability) {if(enabled())HexNetwork.send(HexServer.ASSIGN,slot*1000+ability+1);}
 
@@ -81,8 +84,9 @@ public final class QuickBar {
             int left=x+index*(CELL+GAP);
             Ability a=Ability.slot(slot(data,index));
             boolean chosen=a!=null&&a.ordinal()==selected;
-            g.fill(left,y,left+CELL,y+TALL,chosen?0xe81a3528:0xb807110d);
-            g.fill(left,y,left+CELL,y+2,a==null?0xff2c3630:0xff000000|a.discipline.color);
+            HexUi.rounded(g,left,y,CELL,TALL,chosen?0xe81c3627:0xd00a1310);
+            HexUi.outline(g,left,y,CELL,TALL,HexUi.BORDER);
+            g.fill(left+2,y+1,left+CELL-2,y+3,a==null?0xff2c3630:0xff000000|a.discipline.color);
             if(a!=null) {
                 long cooldown=Math.max(0,data.getLong("cd_"+a.name())-now);
                 // Measured against the recovery the spell actually left: the mantle's variants mostly take longer.
@@ -93,11 +97,7 @@ public final class QuickBar {
                     g.fill(left,y+TALL-cover,left+CELL,y+TALL,0x9a000000);
                 }
             }
-            if(chosen) {
-                int ring=ascended&&a!=null&&Ascended.changes(a)?0xffe2c46a:0xff9fd8b4;
-                g.fill(left,y,left+1,y+TALL,ring);g.fill(left+CELL-1,y,left+CELL,y+TALL,ring);
-                g.fill(left,y+TALL-1,left+CELL,y+TALL,ring);
-            }
+            if(chosen)HexUi.outline(g,left,y,CELL,TALL,ascended&&a!=null&&Ascended.changes(a)?0xffe2c46a:0xff9fd8b4);
             String key=shortKey(key(index));
             g.drawString(mc.font,key,left+3,y+4,a==null?0x5f7266:0xf2f8f3,false);
             if(a==null)continue;

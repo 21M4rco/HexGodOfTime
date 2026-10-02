@@ -83,8 +83,8 @@ public final class Ascended {
             case REWIND -> "Rewind; wounds go back to senders.";
             case SELECTIVE_STOP -> "Freeze the target and all around it.";
             case WARPING -> "Tap: the pool opens full size at once.";
-            case ARSENAL -> "Hold: the crown. Alternate: the swarm.";
-            case THREADS -> "Vanish; your double bursts sixty wide.";
+            case ARSENAL -> "Tap: the swarm. Hold: the crown.";
+            case THREADS -> "Tap: vanish (sixty wide). Hold: Grasp.";
             default -> "";
         };
     }

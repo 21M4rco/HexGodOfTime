@@ -24,7 +24,9 @@ import java.util.*;
  * to the same world as the break it configures instead of looking like an inventory.
  */
 public final class FractureScreen extends Screen {
-    private static final int WIDTH=340,ROW=30,PAD=12;
+    private static final int ROW=30,PAD=12;
+    /** As wide as the screen allows, up to 340. */
+    private int WIDTH=340;
     private static final int PANEL=0xe6060d0c,PLATE=0x9c0d1a16,PLATE_HOVER=0xc4163428,PLATE_ACTIVE=0xd4123f2c;
     private static final int EDGE=0xff2c4a3c,EDGE_ACTIVE=0xff6fe0a8;
     private static final int TITLE=0xe6f4ea,TEXT=0xa9c4b4,DIM=0x6f8a7b,ACCENT=0x74d8a6,GOLD=0xd9bd7e;
@@ -46,6 +48,7 @@ public final class FractureScreen extends Screen {
         rebuildCandidates();
         int rows=picking==null?FractureModes.count():Math.max(1,candidates.size());
         panel=Math.min(height-40,64+rows*ROW+PAD);
+        WIDTH=Math.min(340,width-16);
         left=(width-WIDTH)/2;
         top=(height-panel)/2;
         scroll=0;
@@ -112,19 +115,20 @@ public final class FractureScreen extends Screen {
 
     @Override public void render(GuiGraphics g,int mx,int my,float partial) {
         float time=ClientState.wave(partial);
-        g.fill(0,0,width,height,0xa603080a);
+        HexUi.dim(g,width,height);
         nebula(g,time);
-        g.fill(left-1,top-1,left+WIDTH+1,top+panel+1,EDGE);
-        g.fill(left,top,left+WIDTH,top+panel,PANEL);
+        HexUi.panel(g,left,top,WIDTH,panel,0x6fe0a8);
         motes(g,time);
 
-        g.drawString(font,"W O R L D   T R E E   E X I T",left+PAD,top+12,GOLD,false);
+        g.drawString(font,"WORLD TREE EXIT",left+PAD,top+12,GOLD,false);
         FractureMode live=active();
-        g.drawString(font,picking==null?"Choose where the World Tree sends you back out":"Choose who to emerge beside",left+PAD,top+26,DIM,false);
-        String current=live.label(activeTarget());
-        g.drawString(font,"NOW: "+current,left+WIDTH-PAD-font.width("NOW: "+current),top+12,ACCENT,false);
-        g.drawString(font,picking==null?"R uses this route until you change it":"Escape to go back",
-            left+WIDTH-PAD-font.width(picking==null?"The cast key keeps this until you change it":"Escape to go back"),top+26,DIM,false);
+        // Each header line gets its half of the panel and is fitted to it, never left to run out of the frame.
+        int half=(WIDTH-PAD*2)/2-4;
+        g.drawString(font,HexUi.fit(font,picking==null?"Where R sends you back out":"Who to emerge beside",half),left+PAD,top+26,DIM,false);
+        String current=HexUi.fit(font,"NOW: "+live.label(activeTarget()),half);
+        g.drawString(font,current,left+WIDTH-PAD-font.width(current),top+12,ACCENT,false);
+        String help=HexUi.fit(font,picking==null?"Kept until you change it":"Esc to go back",half);
+        g.drawString(font,help,left+WIDTH-PAD-font.width(help),top+26,DIM,false);
         g.fill(left+PAD,top+42,left+WIDTH-PAD,top+43,0xff20382e);
 
         int visible=Math.max(1,(panel-64)/ROW);
@@ -143,7 +147,7 @@ public final class FractureScreen extends Screen {
             boolean chosen=mode==live;
             plate(g,y,hovered,chosen,time);
             icon(g,new ItemStack(mode.icon),left+PAD+6,y+5,time,chosen);
-            String title=chosen?mode.label(activeTarget()):mode.title;
+            String title=HexUi.fit(font,chosen?mode.label(activeTarget()):mode.title,WIDTH-PAD*2-96);
             g.drawString(font,title,left+PAD+30,y+4,chosen?0xeafff2:TITLE,false);
             g.drawString(font,trim(mode.description,WIDTH-PAD*2-96),left+PAD+30,y+15,chosen?0x8fd7b5:TEXT,false);
             if(chosen) {
@@ -177,7 +181,7 @@ public final class FractureScreen extends Screen {
     /** A soft plate with a lit border when the row is the saved mode, and a gentle pulse to match. */
     private void plate(GuiGraphics g,int y,boolean hovered,boolean chosen,float time) {
         int x0=left+PAD,x1=left+WIDTH-PAD,y1=y+ROW-4;
-        g.fill(x0,y,x1,y1,chosen?PLATE_ACTIVE:hovered?PLATE_HOVER:PLATE);
+        HexUi.card(g,x0,y,x1-x0,y1-y,hovered,false,chosen?0x6fe0a8:0x2c4a3c);
         if(chosen) {
             int glow=0xff000000|tint(0x3f8f6c,0x9dffcf,(Mth.sin(time*.12f)+1)*.5f);
             g.fill(x0,y,x1,y+1,glow);g.fill(x0,y1-1,x1,y1,glow);

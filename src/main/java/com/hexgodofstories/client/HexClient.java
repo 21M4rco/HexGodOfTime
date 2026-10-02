@@ -46,6 +46,18 @@ public final class HexClient {
     }
     private static KeyMapping key(String name,int key){return new KeyMapping("key.hexgodofstories."+name,InputConstants.Type.KEYSYM,key,"key.categories.hexgodofstories");}
     private static boolean primaryDown,primaryWasHold,primaryLatched;
+    /**
+     * What each slot key is doing while it is down: nothing; a cast already sent; a hold under way; or, for the two
+     * spells that are one thing tapped and another held (the Crown: tap for Gotcha!, hold for the crown; Anchor Being:
+     * tap to vanish, hold for Gravity Grasp), waiting to see which, and then the long one under way.
+     */
+    private static final int SLOT_IDLE=0,SLOT_CAST=1,SLOT_HOLD=2,SLOT_DECIDING=3,SLOT_LONG=4;
+    /** Ticks a key must stay down to count as held rather than tapped: a quarter of a second. */
+    private static final int SLOT_TAP=5;
+    private static final int[] slotState=new int[com.hexgodofstories.data.HexData.QUICK_SLOTS];
+    private static final long[] slotSince=new long[com.hexgodofstories.data.HexData.QUICK_SLOTS];
+    private static final Ability[] slotAbility=new Ability[com.hexgodofstories.data.HexData.QUICK_SLOTS];
+    private static long clientTicks;
     /** The alternate key held as Gravity Grasp (Anchor Being chosen): its release must always reach the server. */
     private static boolean graspDown;
     private static int repeat;
@@ -113,8 +125,9 @@ public final class HexClient {
         @SubscribeEvent public static void tick(TickEvent.ClientTickEvent e) {
             if(e.phase!=TickEvent.Phase.END)return;
             ClientState.tick();
+            clientTicks++;
             Minecraft mc=Minecraft.getInstance();
-            if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;graspDown=false;return;}
+            if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;graspDown=false;slotsCancel(false);return;}
             if(!enabled()) {
                 // Locked means invisible and inert, not merely server-rejected. Swallow every mod input
                 // and close any mod-only screen immediately when access is revoked.
@@ -123,6 +136,7 @@ public final class HexClient {
                 primaryLatched=primaryPhysicallyDown();
                 primaryDown=false;primaryWasHold=false;repeat=0;
                 if(graspDown){graspDown=false;HexNetwork.send(HexServer.GRASP_END,0);}
+                slotsCancel(true);
                 if(mc.screen instanceof WarpScreen||mc.screen instanceof MasteryScreen||mc.screen instanceof FractureScreen)mc.setScreen(null);
                 drain();return;
             }
@@ -135,8 +149,15 @@ public final class HexClient {
                 // is exactly how arriving in the sanctum used to open a second break on arrival.
                 if(primaryDown){primaryDown=false;primaryLatched=true;if(primaryWasHold)HexNetwork.send(HexServer.HOLD_END,0);}
                 if(graspDown){graspDown=false;HexNetwork.send(HexServer.GRASP_END,0);}
+                slotsCancel(true);
                 drain();return;
             }
+            // A tap-or-hold spell still down after a quarter of a second is being held: its long form begins.
+            for(int i=0;i<slotState.length;i++)
+                if(slotState[i]==SLOT_DECIDING&&clientTicks-slotSince[i]>=SLOT_TAP) {
+                    HexNetwork.send(slotAbility[i]==Ability.ARSENAL?HexServer.HOLD_BEGIN:HexServer.GRASP_BEGIN,0);
+                    slotState[i]=SLOT_LONG;
+                }
             while(MENU.consumeClick())mc.setScreen(new MasteryScreen(false));
             // The Scepter's right click is read from the key itself: its hold is the charge.
             ScepterClient.input(mc.options.keyUse.isDown());
@@ -204,12 +225,50 @@ public final class HexClient {
          * clicks one of them; the event reaches every listener whatever else is bound there.
          */
         @SubscribeEvent public static void slotKey(InputEvent.Key e) {
-            if(e.getAction()!=GLFW.GLFW_PRESS)return;
-            for(int i=0;i<SLOTS.length;i++)if(SLOTS[i].matches(e.getKey(),e.getScanCode())){QuickBar.press(i);return;}
+            if(e.getAction()==GLFW.GLFW_REPEAT)return;
+            for(int i=0;i<SLOTS.length;i++)if(SLOTS[i].matches(e.getKey(),e.getScanCode())){slotEdge(i,e.getAction()==GLFW.GLFW_PRESS);return;}
         }
         @SubscribeEvent public static void slotMouse(InputEvent.MouseButton.Post e) {
-            if(e.getAction()!=GLFW.GLFW_PRESS)return;
-            for(int i=0;i<SLOTS.length;i++)if(SLOTS[i].matchesMouse(e.getButton())){QuickBar.press(i);return;}
+            for(int i=0;i<SLOTS.length;i++)if(SLOTS[i].matchesMouse(e.getButton())){slotEdge(i,e.getAction()==GLFW.GLFW_PRESS);return;}
+        }
+
+        /**
+         * A slot key goes down or comes up. Down, it chooses its ability and casts it at once: a plain spell goes off,
+         * a held one begins and lasts while the key is down. The Crown and Anchor Being wait a quarter of a second to
+         * see whether they are being tapped or held (see tick).
+         */
+        private static void slotEdge(int i,boolean down) {
+            if(down) {
+                if(slotState[i]!=SLOT_IDLE)return;
+                Ability a=QuickBar.press(i);
+                if(a==null)return;
+                slotAbility[i]=a;slotSince[i]=clientTicks;
+                if(a==Ability.ARSENAL||a==Ability.THREADS){slotState[i]=SLOT_DECIDING;return;}
+                if(a.hold){HexNetwork.send(HexServer.HOLD_BEGIN,0);slotState[i]=SLOT_HOLD;return;}
+                HexNetwork.send(HexServer.CAST,0);slotState[i]=SLOT_CAST;
+                return;
+            }
+            Ability a=slotAbility[i];int state=slotState[i];
+            slotState[i]=SLOT_IDLE;slotAbility[i]=null;
+            if(a==null)return;
+            switch(state) {
+                case SLOT_HOLD -> HexNetwork.send(HexServer.HOLD_END,0);
+                // Tapped: the Crown's Gotcha!, or Anchor Being's vanishing.
+                case SLOT_DECIDING -> HexNetwork.send(a==Ability.ARSENAL?HexServer.ALTERNATE:HexServer.CAST,0);
+                case SLOT_LONG -> HexNetwork.send(a==Ability.ARSENAL?HexServer.HOLD_END:HexServer.GRASP_END,0);
+                default -> {}
+            }
+        }
+
+        /** Every slot key let go at once: a screen opening, access taken away, the world gone. */
+        private static void slotsCancel(boolean tell) {
+            for(int i=0;i<slotState.length;i++) {
+                if(tell&&slotAbility[i]!=null) {
+                    if(slotState[i]==SLOT_HOLD)HexNetwork.send(HexServer.HOLD_END,0);
+                    if(slotState[i]==SLOT_LONG)HexNetwork.send(slotAbility[i]==Ability.ARSENAL?HexServer.HOLD_END:HexServer.GRASP_END,0);
+                }
+                slotState[i]=SLOT_IDLE;slotAbility[i]=null;
+            }
         }
 
         @SubscribeEvent public static void scroll(InputEvent.MouseScrollingEvent e) {

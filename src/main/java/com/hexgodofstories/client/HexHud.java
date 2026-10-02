@@ -31,8 +31,9 @@ public final class HexHud {
         int bottom=screenHeight-(screenWidth<540?54:8);
         int x=screenWidth-8-(int)(WIDTH*SCALE),y=bottom-(int)(HEIGHT*SCALE);
         g.pose().pushPose();g.pose().translate(x,y,0);g.pose().scale(SCALE,SCALE,1);
-        g.fill(0,0,WIDTH,HEIGHT,0xb807110d);
-        g.fill(0,0,2,HEIGHT,0xff000000|a.discipline.color);
+        HexUi.rounded(g,0,0,WIDTH,HEIGHT,0xd00a1310);
+        HexUi.outline(g,0,0,WIDTH,HEIGHT,HexUi.BORDER);
+        g.fill(1,2,3,HEIGHT-2,0xff000000|a.discipline.color);
         String title=a.title;
         // Which key chooses it, so the binding is readable without opening the archive.
         int bound=QuickBar.slotOf(d,a);
@@ -59,7 +60,9 @@ public final class HexHud {
             :home?FractureModes.byId(d.getString("fractureMode")).label(d.getString("fractureTargetName"))
             :"Tap: doorway in. Hold: pull 5 blocks in.";
         if(a==Ability.WARPING&&home)head="Leave this dimension freely.";
-        var lines=mc.font.split(net.minecraft.network.chat.Component.literal(primary+"  "+head),WIDTH-14);
+        // The key that casts it: its own slot's, or the cast key for one not bound to any.
+        String castKey=bound>=0?QuickBar.shortKey(QuickBar.key(bound)):primary;
+        var lines=mc.font.split(net.minecraft.network.chat.Component.literal(castKey+"  "+head),WIDTH-14);
         for(int i=0;i<Math.min(2,lines.size());i++)g.drawString(mc.font,lines.get(i),7,32+i*10,variant?0xe8d49c:fracture?0xd8ecdd:0xc9d8ce,false);
         String hint=!fracture?alternate(a):home?"Choose where the break leads":"";
         if(a==Ability.WARPING)hint=com.hexgodofstories.warping.Destination.at(d.getInt("warpDestination")).title;
@@ -83,7 +86,7 @@ public final class HexHud {
         }
         if(!hint.isEmpty())g.drawString(mc.font,(a==Ability.TIME_BRANCH?"":secondary+"  ")+hint,7,54,fracture?0xc0b184:0x9cb6a6,false);
         String first=QuickBar.shortKey(QuickBar.key(0)),last=QuickBar.shortKey(QuickBar.key(HexData.QUICK_SLOTS-1));
-        g.drawString(mc.font,first+"\u2013"+last+" choose \u00b7 "+primary+" cast \u00b7 "+secondary+" alt",7,67,0x779d87,false);
+        g.drawString(mc.font,first+"\u2013"+last+" cast \u00b7 "+primary+" again \u00b7 "+secondary+" alt",7,67,0x779d87,false);
         float max=HexData.MAX_ENERGY,energy=d.getFloat("energy");
         String value="Energy "+Math.round(energy)+" / "+Math.round(max);
         g.drawString(mc.font,value,7,82,0xb3cbbd,false);
@@ -150,10 +153,10 @@ public final class HexHud {
             case SLOW_FIELD -> "";
             case TIME_STOP -> "Freeze the local battlefield.";
             case SELECTIVE_STOP -> "Freeze the target in your aim.";
-            case THREADS -> "Vanish; your double bursts when struck.";
+            case THREADS -> "Tap: vanish. Hold: Gravity Grasp.";
             case ASCENSION -> "Toggle your final transformation.";
             case TIME_BRANCH -> "Tap: right fist. Hold/release: beam.";
-            case ARSENAL -> "Hold: the crown fires and stuns. Hold 13s: missiles.";
+            case ARSENAL -> "Tap: Gotcha! Hold: the crown (13s: missiles).";
         };
     }
     private static String alternate(Ability a) {

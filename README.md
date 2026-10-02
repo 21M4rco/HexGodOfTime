@@ -1,7 +1,9 @@
 ## Seven keys, a remade mantle, a standing sea
 
-- **Seven bind slots on the bottom row of the keyboard: Z X C V B N M.** Pressing a slot's key chooses its
-  ability at once — nothing to hold, nothing to scroll — and R casts it, G does its alternate. The slots are drawn
+- **Seven bind slots on the bottom row of the keyboard: Z X C V B N M.** Pressing a slot's key casts its
+  ability at once — one press, nothing to choose first (hold it for spells that are held; the Crown is Gotcha! on a
+  tap and the crown on a hold, Anchor Being is the vanishing on a tap and Gravity Grasp on a hold). G does the
+  alternate of the spell you last used, and R casts it again. The slots are drawn
   as a strip over the ability panel, each under its key, with its recovery drawn down over it and the chosen one
   lit. Bind them in the archive (K): click a slot (shown under its key), then click an ability. A layout saved
   with the old eight slots keeps its abilities, in order, in the seven. The keys that used to sit on that row moved,
@@ -396,8 +398,8 @@ Install Player Animator **1.0.2-rc1+1.20** (CurseForge file 4587214) on clients.
 | Input | Action |
 |---|---|
 | K | Mastery archive |
-| Z X C V B N M | The seven bind slots: press one to choose the ability bound to it |
-| R | Cast the chosen spell; **hold** for abilities that shape while held |
+| Z X C V B N M | The seven bind slots: press one to **cast** what is bound to it (hold it for spells that are held). Crown of Barrels: tap for Gotcha!, hold for the crown. Anchor Being: tap to vanish, hold for Gravity Grasp |
+| R | Cast the last spell again; **hold** for abilities that shape while held |
 | G | Alternate contextual action — **Fracture mode selector**, while Fracture is selected and you are inside your sanctum |
 | H | Glorious Purpose transformation |
 | U | Utility: release held targets / seal your fracture / leave a realm / resume your time fields |

@@ -95,9 +95,8 @@ public final class MasteryScreen extends Screen {
     // ------------------------------------------------------------------ drawing
 
     @Override public void render(GuiGraphics g,int mx,int my,float partial) {
-        g.fill(0,0,width,height,0xa8040807);
-        g.fill(left-1,top-1,left+w+1,top+h+1,0xff6d5e42);
-        g.fill(left,top,left+w,top+h,0xf20b1411);
+        HexUi.dim(g,width,height);
+        HexUi.panel(g,left,top,w,h,chapter.color);
         CompoundTag data=data();
         // The header: whose book this is, and how far into the chapter shown.
         g.drawString(font,"THE ARCHIVE",left+12,top+10,INK,false);
@@ -122,9 +121,8 @@ public final class MasteryScreen extends Screen {
         int y=top+46;
         for(Discipline d:Discipline.values()) {
             boolean here=d==chapter,over=inside(mx,my,left+6,y,navW-12,NAV_ROW-3);
-            g.fill(left+6,y,left+navW-6,y+NAV_ROW-3,here?0xff1a2b22:over?0xff142019:0x00000000);
-            g.fill(left+6,y,left+8,y+NAV_ROW-3,here?0xff000000|d.color:0xff26352d);
-            g.drawString(font,font.plainSubstrByWidth(d.title,navW-46),left+13,y+7,here?INK:over?0xbfd0c4:MUTED,false);
+            HexUi.card(g,left+6,y,navW-12,NAV_ROW-3,over,here,here?d.color:0x26352d);
+            g.drawString(font,HexUi.fit(font,d.title,navW-46),left+13,y+7,here?INK:over?0xbfd0c4:MUTED,false);
             String m=String.valueOf(mastery(data,d));
             g.drawString(font,m,left+navW-9-font.width(m),y+7,here?d.color:DIM,false);
             y+=NAV_ROW;
@@ -145,15 +143,12 @@ public final class MasteryScreen extends Screen {
             boolean open=unlocked(data,a),over=inside(mx,my,listX,y,listW,ROW-3)&&my>=listY&&my<listY+listH;
             if(over)hovered=a;
             boolean isPicked=a==picked,isSelected=a.ordinal()==selected;
-            int back=isPicked?0xff22382a:over?0xff17251e:0xff111c17;
-            g.fill(listX,y,listX+listW,y+ROW-3,back);
-            g.fill(listX,y,listX+2,y+ROW-3,open?0xff000000|a.discipline.color:0xff2b3530);
-            if(isPicked){g.fill(listX,y,listX+listW,y+1,0xff000000|GOLD);g.fill(listX,y+ROW-4,listX+listW,y+ROW-3,0xff000000|GOLD);}
+            HexUi.card(g,listX,y,listW,ROW-3,over,isPicked,open?a.discipline.color:0x2b3530);
             String name=ascended&&open&&Ascended.changes(a)?Ascended.title(a):a.title;
-            g.drawString(font,name,listX+8,y+5,open?(ascended&&Ascended.changes(a)?0xf0d58a:INK):DIM,false);
+            g.drawString(font,HexUi.fit(font,name,listW-80),listX+8,y+5,open?(ascended&&Ascended.changes(a)?0xf0d58a:INK):DIM,false);
             String info=!open?"Needs "+a.discipline.title+" "+a.level
                 :(a.cost>0?a.cost+" energy  ·  ":"")+fmt(a.cooldown)+" recovery"+(a.hold?"  ·  hold":"");
-            g.drawString(font,font.plainSubstrByWidth(info,listW-74),listX+8,y+16,open?MUTED:0x6e6a58,false);
+            g.drawString(font,HexUi.fit(font,info,listW-74),listX+8,y+16,open?MUTED:0x6e6a58,false);
             // On the right: the key it answers to, and whether the mantle changes it.
             int right=listX+listW-6;
             String tag=a.dedicated?key(a):boundKey(data,a);
@@ -179,7 +174,8 @@ public final class MasteryScreen extends Screen {
     /** Everything the archive knows about one ability: what it does, and what the mantle makes of it. */
     private void detail(GuiGraphics g,CompoundTag data,Ability a) {
         int x=detailX,y=listY,width=detailW;
-        g.fill(x,y,x+width,keysY-10,0xff0e1814);
+        HexUi.rounded(g,x,y,width,keysY-10-y,0xff0e1814);
+        HexUi.outline(g,x,y,width,keysY-10-y,HexUi.BORDER);
         if(a==null){g.drawString(font,"Point at an ability.",x+8,y+8,DIM,false);return;}
         boolean open=unlocked(data,a);
         g.fill(x,y,x+width,y+2,0xff000000|a.discipline.color);
@@ -187,7 +183,7 @@ public final class MasteryScreen extends Screen {
         for(FormattedCharSequence line:font.split(Component.literal(a.title),width-16)){g.drawString(font,line,x+8,y,INK,false);y+=11;}
         String status=!open?"Locked: "+a.discipline.title+" "+a.level
             :a.dedicated?"Its own key: "+key(a):boundKey(data,a).isEmpty()?"Not bound to a key":"Bound to "+boundKey(data,a);
-        g.drawString(font,font.plainSubstrByWidth(status,width-16),x+8,y,open?0x9fd8b4:0x8c8069,false);
+        g.drawString(font,HexUi.fit(font,status,width-16),x+8,y,open?0x9fd8b4:0x8c8069,false);
         y+=14;
         int bottom=keysY-14;
         y=wrap(g,a.description,x+8,y,width-16,bottom,0xb6c8bc);
@@ -214,20 +210,19 @@ public final class MasteryScreen extends Screen {
     private void keys(GuiGraphics g,CompoundTag data,int mx,int my) {
         String hint=pending>=0?"Now click the ability to bind to "+QuickBar.key(pending)+".   (Esc or click the key again to stop.)"
             :picked!=null&&!picked.dedicated&&unlocked(data,picked)?"Click a key below, or press it, to bind "+picked.title+"."
-            :"Pick an ability, then a key — or a key, then an ability. Pressing Z–M in game chooses what is bound there.";
-        g.drawString(font,font.plainSubstrByWidth(hint,w-24),left+12,keysY-12,pending>=0||picked!=null?GOLD:DIM,false);
+            :"Pick an ability, then a key — or a key, then an ability. In game, a key casts what is bound to it.";
+        g.drawString(font,HexUi.fit(font,hint,w-24),left+12,keysY-12,pending>=0||picked!=null?GOLD:DIM,false);
         long now=ClientState.now();
         for(int i=0;i<HexData.QUICK_SLOTS;i++) {
             int x=keysX+i*keyW+3,width=keyW-6,y=keysY+4,tall=44;
             Ability a=Ability.slot(QuickBar.slot(data,i));
             boolean over=inside(mx,my,x,y,width,tall),waiting=pending==i;
             float glow=flashed==i?Math.max(0,1-(now-flashedAt)/14f):0;
-            // A keycap: a lighter top edge, a darker bottom one, the face between.
-            g.fill(x,y,x+width,y+tall,waiting?0xff3b3220:over?0xff22362b:0xff17241d);
-            g.fill(x,y,x+width,y+1,waiting?0xff000000|GOLD:0xff3d5447);
-            g.fill(x,y+tall-3,x+width,y+tall,a==null?0xff26302a:0xff000000|a.discipline.color);
-            if(glow>0)g.fill(x,y,x+width,y+tall,((int)(glow*90)<<24)|0x7dffb0);
-            if(waiting){g.fill(x,y,x+1,y+tall,0xff000000|GOLD);g.fill(x+width-1,y,x+width,y+tall,0xff000000|GOLD);}
+            // A keycap: framed like every card, its discipline along the bottom rather than the side.
+            HexUi.rounded(g,x,y,width,tall,waiting?0xff2c2818:over?HexUi.CARD_HOVER:HexUi.CARD);
+            HexUi.outline(g,x,y,width,tall,waiting?0xff000000|GOLD:over?HexUi.BORDER_HOVER:HexUi.BORDER);
+            g.fill(x+2,y+tall-3,x+width-2,y+tall-1,a==null?0xff26302a:0xff000000|a.discipline.color);
+            if(glow>0)HexUi.rounded(g,x,y,width,tall,((int)(glow*90)<<24)|0x7dffb0);
             String key=QuickBar.shortKey(QuickBar.key(i));
             g.pose().pushPose();
             g.pose().translate(x+6,y+5,0);
@@ -235,7 +230,7 @@ public final class MasteryScreen extends Screen {
             g.drawString(font,font.plainSubstrByWidth(key,(int)((width-10)/1.5f)),0,0,a==null?DIM:INK,false);
             g.pose().popPose();
             String name=a==null?"empty":a.title;
-            g.drawString(font,font.plainSubstrByWidth(name,width-10),x+5,y+tall-15,a==null?DIM:waiting?GOLD:0xbdd6c6,false);
+            g.drawString(font,HexUi.fit(font,name,width-10),x+5,y+tall-15,a==null?DIM:waiting?GOLD:0xbdd6c6,false);
         }
     }
 
