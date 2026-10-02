@@ -124,7 +124,7 @@ public final class SeekerMissile extends ThrowableProjectile {
 
     @Override protected boolean canHitEntity(Entity e) {
         if (e == getOwner() || e instanceof SeekerMissile) return false;
-        if (getOwner() instanceof ServerPlayer p && !HexServer.validTarget(p, e)) return false;
+        if (getOwner() instanceof ServerPlayer p && !HexServer.foe(p, e)) return false;
         return super.canHitEntity(e);
     }
 
@@ -145,7 +145,7 @@ public final class SeekerMissile extends ThrowableProjectile {
         ServerPlayer caster = getOwner() instanceof ServerPlayer p ? p : null;
         DamageSource source = level.damageSources().explosion(this, caster);
         for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, new AABB(at, at).inflate(REACH), e -> e.isAlive() && !e.isSpectator()
-            && e != caster && (caster == null || HexServer.validTarget(caster, e)))) {
+            && e != caster && (caster == null || HexServer.foe(caster, e)))) {
             Vec3 middle = e.getBoundingBox().getCenter();
             double distance = Math.max(0, middle.distanceTo(at) - e.getBbWidth() / 2);
             if (distance > REACH) continue;

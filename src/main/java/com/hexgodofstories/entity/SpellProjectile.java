@@ -107,7 +107,7 @@ public final class SpellProjectile extends ThrowableProjectile {
         Entity held=quarry==0?null:level().getEntity(quarry);
         if(!(held instanceof LivingEntity alive)||!alive.isAlive()||tickCount%5==0) {
             held=null;quarry=0;double best=Double.MAX_VALUE;
-            for(LivingEntity e:level().getEntitiesOfClass(LivingEntity.class,getBoundingBox().inflate(SEEK_REACH),e->e.isAlive()&&HexServer.validTarget(p,e))) {
+            for(LivingEntity e:level().getEntitiesOfClass(LivingEntity.class,getBoundingBox().inflate(SEEK_REACH),e->e.isAlive()&&HexServer.foe(p,e))) {
                 Vec3 to=e.getBoundingBox().getCenter().subtract(position());
                 double d=to.length();
                 if(d>SEEK_REACH||d<1e-3||to.scale(1/d).dot(heading)<.55)continue;

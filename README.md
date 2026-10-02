@@ -1,3 +1,54 @@
+## Seven keys, a remade mantle, a standing sea
+
+- **Seven bind slots on the bottom row of the keyboard: Z X C V B N M.** Pressing a slot's key chooses its
+  ability at once — nothing to hold, nothing to scroll — and R casts it, G does its alternate. The slots are drawn
+  as a strip over the ability panel, each under its key, with its recovery drawn down over it and the chosen one
+  lit. Bind them in the archive (K): click a slot (shown under its key), then click an ability. A layout saved
+  with the old eight slots keeps its abilities, in order, in the seven. The keys that used to sit on that row moved,
+  under new names so an old options file cannot put them on top of a slot: **U** utility (release / seal / leave),
+  **I** Stillness, **O** Personal Rewind, **Left Alt** Time Branch. All of them can be rebound in Controls.
+- **Glorious Purpose remakes the spells.** While the full transformation is worn, the same key casts a bigger
+  spell (the archive lists each, in gold; the panel names it while you wear the mantle). The daggers and the
+  Scepter are left as they are.
+
+  | Ability | Transformed | What it does |
+  |---|---|---|
+  | Living Projection | Living Legion | Two copies at a time, two past your usual limit; they hit twice as hard, and one struck down bursts in seidr shards (two hearts, blindness, slowness around it). |
+  | Sleight of Place | Exchange | Trade places with the creature or player you aim at (30 blocks); it is left where you stood, turned away and reeling. 8 s. |
+  | Masquerade | Impostor | The one you copy glows for ten seconds and every creature near it turns on it; a player is blinded. 20 s. |
+  | Court of Lies | Mass Delusion | Vanish for five seconds while every creature within sixteen blocks turns on the nearest other creature for eight; players reel. 20 s. |
+  | Borrowed Reality | Reality Made | Grows twice as fast, stands half as long again, and is real to everyone but you: players are shoved back, projectiles are swallowed. |
+  | Emerald Throw | Emerald Storm | Five bolts fanned out, each turning after the nearest creature ahead of it. 2 s. |
+  | Sovereign Push | Kneel | Everything within twelve blocks is hammered to the ground: three hearts, held three seconds, slowed after. 15 s. |
+  | Telekinesis | Many Hands | Lift everything in front of you at once, up to five bodies; G throws them all. 6 s. |
+  | Veilstep | Behind You | Step out right behind the creature or player you aim at, facing its back; aimed at nothing, twice as far. 5 s. |
+  | Runic Ward | Mirror Ward | Six seconds of the veil, and three quarters of every blow returns to whoever dealt it; projectiles rebound. 15 s. |
+  | Whispered Allegiance | Silver Tongue | Charm up to six creatures within ten blocks at once, for twice as long; a player you aim at drops what they hold. 15 s. |
+  | Memory Echo | Total Recall | Everything living within forty eight blocks glows through walls for twelve seconds. 20 s. |
+  | Time Slipping | Slipstream | Slip back exactly three seconds, and drag everything within ten blocks back three seconds along its own path. 12 s. |
+  | Personal Rewind | Return to Sender | Rewind as ever, and every blow you took in those ten seconds lands on whoever dealt it. |
+  | Chosen Moment | Chosen Many | The one you aim at and every creature within six blocks of it (up to six) is suspended together. 15 s. |
+  | Warping | Wide Open | No hold: a tap opens the pool at its full size where you look, for the full cost. |
+  | Crown of Barrels | Gotcha! Swarm | G sends four small missiles that hunt the body you looked at (see below). |
+  | Anchor Being | Grand Anchor | The sixty-block blast, as before. |
+
+- **Gotcha! Swarm.** In the transformation, Gotcha! sends four of the Crown's missiles, shrunk to under half the
+  size, instead of a gun. They are thrown out from beside your head, fan away, then turn and hunt the body you looked
+  at — slow (barely faster than a sprint), never straight, turning no tighter than a few blocks across, so they can
+  be outrun for a while or side-stepped into overshooting; after nine seconds they burst wherever they are. Each
+  bursts on the first thing it meets: five hearts to a body it flies into, three at the heart of a small blast,
+  a short scorch, no block broken. A shield turned toward one takes it. 10 s recovery, shared with Gotcha!.
+- **The Void Sea stands up.** The moving swell is gone (its formula, its pull on swimmers and its overlay). The
+  sea itself is shaped now: long, bent swells running one way, rising into heavy peaks some twenty blocks tall that
+  come down smoothly, never steeper than a block up for a block along, built of water — whole blocks, and the last
+  fraction of each column as water with less in it, so the surface follows the shape to an eighth of a block. Each
+  chunk is built once, the first time it loads, old chunks and new alike, before anyone is sent it; the realm's
+  water never flows, so the shape stays. The Pilgrim reads the real waterline wherever it is.
+- **No realm is a life sentence.** Anything a Warping break drops into a realm is held there two minutes at most.
+  Still alive when they are up, it is let out where it was first taken, rising out of a black puddle on the very
+  spot; a player hears the countdown at a minute, thirty seconds and the last ten. The time and the place travel on
+  the body itself, so logging out or a restart changes nothing. Keepers (anyone with Warping) are never held.
+
 ## Anchor Being — the first move of Glorious Purpose (replaces Temporal Threads)
 
 - **Anchor Being (cast).** You vanish for ten seconds (body, armour, what you hold, cloak, name and shadow,
@@ -345,22 +396,22 @@ Install Player Animator **1.0.2-rc1+1.20** (CurseForge file 4587214) on clients.
 | Input | Action |
 |---|---|
 | K | Mastery archive |
-| V *(hold)* | Quick bar — wheel to choose, release to select |
-| R | Cast the selected spell; **hold** for abilities that shape while held; press again to resume an active Stillness |
+| Z X C V B N M | The seven bind slots: press one to choose the ability bound to it |
+| R | Cast the chosen spell; **hold** for abilities that shape while held |
 | G | Alternate contextual action — **Fracture mode selector**, while Fracture is selected and you are inside your sanctum |
 | H | Glorious Purpose transformation |
-| X | Release held targets / seal your fracture / also resumes your time fields |
-| Z | **Stillness** — suspend the local battlefield |
-| N | **Personal Rewind** |
-| M | **Time Branch Unleashing** — tap for a charged fist or hold for the full beam |
+| U | Utility: release held targets / seal your fracture / leave a realm / resume your time fields |
+| I | **Stillness** — suspend the local battlefield; press again to resume |
+| O | **Personal Rewind** |
+| Left Alt | **Time Branch Unleashing** — tap for a charged fist or hold for the full beam |
 | Wheel *(while gripping)* | Push or pull what telekinesis is holding |
 | Attack / Use with a conjured weapon | Dagger combination / throw; Scepter two-heart hit with one-second bleed / hold at least a second to charge a piercing beam (100 blocks), up to ten seconds, when it fires itself |
 
 Nobody has powers until an operator grants them: `/hgos unlock <player> on`. Until then the mod shows no HUD, opens no screen, answers no key and records no progression. Key mappings are configurable. Free your hands before conjuring. Successful spell use trains its discipline; training is rate limited. Temporal progression opens after 600 combined mastery in the four magical disciplines. Glorious Purpose opens after 800 Temporal Mastery.
 
-The quick bar holds eight shortcuts. It fills itself as abilities unlock; to place one deliberately, open the archive, click a quick slot at the bottom, then click the ability you want bound there.
+The seven bind slots fill themselves as abilities unlock; to place one deliberately, open the archive, click a slot at the bottom (each is shown under its key), then click the ability you want bound to it.
 
-The four time controls are not shortcuts and never enter the quick bar. They are permanent commands on the four keys above, shown as a fixed row at the bottom of the screen with their keys, readiness and recovery. All bindings are configurable in Minecraft's Controls menu; the defaults are unbound in vanilla.
+The time controls are never bound to a slot. They are permanent commands on their own keys, shown as a fixed row at the bottom of the panel with their keys, readiness and recovery. All bindings are configurable in Minecraft's Controls menu. C and X are also vanilla's creative hotbar save/load activators; the slots read their keys directly, so both work.
 
 ## Notable abilities
 

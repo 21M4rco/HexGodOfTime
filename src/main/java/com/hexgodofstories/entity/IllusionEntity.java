@@ -468,7 +468,7 @@ public final class IllusionEntity extends PathfinderMob {
         if(!(level() instanceof ServerLevel level)||owner()==null)return;
         ServerPlayer caster=level.getServer().getPlayerList().getPlayer(owner());
         if(caster==null)return;
-        for(LivingEntity e:level.getEntitiesOfClass(LivingEntity.class,getBoundingBox().inflate(3),e->e!=this&&HexServer.validTarget(caster,e))) {
+        for(LivingEntity e:level.getEntitiesOfClass(LivingEntity.class,getBoundingBox().inflate(3),e->e!=this&&HexServer.foe(caster,e))) {
             e.invulnerableTime=0;
             e.hurt(damageSources().indirectMagic(this,caster),4);
             e.addEffect(new MobEffectInstance(MobEffects.BLINDNESS,30,0,false,false));

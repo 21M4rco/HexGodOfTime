@@ -669,7 +669,7 @@ public final class Arsenal {
         Vec3 stop = block.getType() == HitResult.Type.MISS ? end : block.getLocation();
         double nearest = eye.distanceToSqr(stop);
         LivingEntity best = null;
-        for (Entity e : p.level().getEntities(p, new AABB(eye, stop).inflate(1), e -> e instanceof LivingEntity && HexServer.validTarget(p, e))) {
+        for (Entity e : p.level().getEntities(p, new AABB(eye, stop).inflate(1), e -> e instanceof LivingEntity && HexServer.foe(p, e))) {
             var hit = e.getBoundingBox().inflate(.3).clip(eye, stop);
             if (hit.isPresent() && eye.distanceToSqr(hit.get()) < nearest) {
                 nearest = eye.distanceToSqr(hit.get());

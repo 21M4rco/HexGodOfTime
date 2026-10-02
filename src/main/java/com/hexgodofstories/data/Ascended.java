@@ -98,7 +98,7 @@ public final class Ascended {
             case PROJECTION_SWAP -> 160;
             case MASQUERADE -> 400;
             case MIRAGE -> 400;
-            case BOLT -> 30;
+            case BOLT -> 40;
             case PUSH -> 300;
             case TELEKINESIS -> 120;
             case BLINK -> 100;

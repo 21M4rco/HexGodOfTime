@@ -41,6 +41,8 @@ public final class HexServer {
     private static final Map<UUID,UUID> RIFTS=new HashMap<>();
     private static final Map<UUID,ArrayDeque<Vec3>> WATCHED=new HashMap<>();
 
+    /** Something the caster's spells should strike: a valid target that is not one of the caster's own projections. */
+    public static boolean foe(ServerPlayer p,Entity e) {return validTarget(p,e)&&!(e instanceof IllusionEntity copy&&p.getUUID().equals(copy.owner()));}
     public static boolean validTarget(ServerPlayer p,Entity e) {return e!=p&&e.isAlive()&&!e.isSpectator()&&!p.isAlliedTo(e)&&(!(e instanceof Player q)||!q.isCreative()&&p.canHarmPlayer(q));}
     public static Entity target(ServerPlayer p,double range) {
         Vec3 start=p.getEyePosition(),end=start.add(p.getLookAngle().scale(range));
@@ -561,7 +563,7 @@ public final class HexServer {
         List<Moment> history=new ArrayList<>(h);
         Moment m=history.get(history.size()-15);if(!safe(p,m.position))return false;
         // Everyone near is taken first, from where they stand now, before the caster has moved away from them.
-        List<LivingEntity> near=p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(10),e->validTarget(p,e)&&!Glorious.huge(e)&&!e.isPassenger());
+        List<LivingEntity> near=p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(10),e->foe(p,e)&&!Glorious.huge(e)&&!e.isPassenger());
         gesture(p,"time_slip","slip",HexGodOfStories.SLIP.get());teleport(p,m.position);p.setYRot(m.yaw);p.setXRot(m.pitch);
         HexNetwork.fx(p,"slip");
         for(LivingEntity e:near) {

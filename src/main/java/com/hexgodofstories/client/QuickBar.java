@@ -79,8 +79,10 @@ public final class QuickBar {
             g.fill(left,y,left+CELL,y+2,a==null?0xff2c3630:0xff000000|a.discipline.color);
             if(a!=null) {
                 long cooldown=Math.max(0,data.getLong("cd_"+a.name())-now);
-                if(cooldown>0&&a.cooldown>0) {
-                    float left01=Math.min(1,cooldown/(float)Math.max(a.cooldown,1));
+                // Measured against the recovery the spell actually left: the mantle's variants mostly take longer.
+                int whole=Math.max(a.cooldown,ascended&&Ascended.recovery(a)>0?Ascended.recovery(a):0);
+                if(cooldown>0&&whole>0) {
+                    float left01=Math.min(1,cooldown/(float)whole);
                     int cover=Math.round((TALL-2)*left01);
                     g.fill(left,y+TALL-cover,left+CELL,y+TALL,0x9a000000);
                 }

@@ -83,7 +83,7 @@ public final class Glorious {
     /** Trade places with what is in the look: it is left where the caster stood, turned away and reeling. */
     private static Boolean exchange(ServerPlayer p) {
         Entity t = HexServer.target(p, 32);
-        if (!(t instanceof LivingEntity body) || !HexServer.validTarget(p, body)) return null;
+        if (!(t instanceof LivingEntity body) || !HexServer.foe(p, body)) return null;
         if (huge(body) || body.isPassenger() || body.isVehicle() || TemporalEngine.frozen(body) || Erasure.erasing(body)) {
             HexServer.notice(p, "That will not trade places with you.");
             return false;
@@ -143,12 +143,12 @@ public final class Glorious {
             e -> e != p && e.isAlive() && !e.isSpectator() && !(e instanceof IllusionEntity) && !(e instanceof ArmorStand) && !huge(e));
         for (LivingEntity e : crowd) {
             if (e instanceof ServerPlayer q) {
-                if (!HexServer.validTarget(p, q)) continue;
+                if (!HexServer.foe(p, q)) continue;
                 q.addEffect(new MobEffectInstance(MobEffects.CONFUSION, 100, 0, false, false));
                 q.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 20, 0, false, false));
                 continue;
             }
-            if (!(e instanceof Mob mob) || !HexServer.validTarget(p, mob)) continue;
+            if (!(e instanceof Mob mob) || !HexServer.foe(p, mob)) continue;
             // Creatures turn on creatures: the nearest one to each that is not itself.
             LivingEntity other = null;
             double nearest = Double.MAX_VALUE;
@@ -185,7 +185,7 @@ public final class Glorious {
         ServerLevel level = p.serverLevel();
         DamageSource source = p.damageSources().indirectMagic(p, p);
         for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, p.getBoundingBox().inflate(12),
-            e -> HexServer.validTarget(p, e) && e.distanceToSqr(p) <= 144 && !huge(e))) {
+            e -> HexServer.foe(p, e) && e.distanceToSqr(p) <= 144 && !huge(e))) {
             e.invulnerableTime = 0;
             e.hurt(source, 6);
             if (!e.isAlive()) continue;
@@ -213,7 +213,7 @@ public final class Glorious {
         List<Entity> bodies = new ArrayList<>();
         List<Entity> rest = new ArrayList<>();
         if (aimed != null) bodies.add(aimed);
-        for (Entity e : p.level().getEntities(p, p.getBoundingBox().inflate(14), e -> e instanceof LivingEntity && e != aimed && HexServer.validTarget(p, e))) {
+        for (Entity e : p.level().getEntities(p, p.getBoundingBox().inflate(14), e -> e instanceof LivingEntity && e != aimed && HexServer.foe(p, e))) {
             Vec3 to = e.getBoundingBox().getCenter().subtract(eye);
             double d = to.length();
             if (d > 14 || d < 1e-3 || to.scale(1 / d).dot(look) < .82 || !p.hasLineOfSight(e)) continue;
@@ -236,7 +236,7 @@ public final class Glorious {
     /** Out of the air right behind what is in the look, facing its back; or, with nothing there, a step twice as far. */
     private static boolean behind(ServerPlayer p) {
         Entity t = HexServer.target(p, 32);
-        if (t instanceof LivingEntity body && HexServer.validTarget(p, body) && !huge(body)) {
+        if (t instanceof LivingEntity body && HexServer.foe(p, body) && !huge(body)) {
             Vec3 facing = Vec3.directionFromRotation(0, body.getYRot());
             double back = body.getBbWidth() / 2 + .9;
             for (int turn : new int[]{0, 30, -30, 60, -60, 100, -100})
@@ -308,7 +308,7 @@ public final class Glorious {
     /** Every creature near that could be charmed is, at once; a player in the look lets go of what they hold. */
     private static boolean silverTongue(ServerPlayer p, Entity aimed) {
         boolean any = false;
-        if (aimed instanceof ServerPlayer other && HexServer.validTarget(p, other)) {
+        if (aimed instanceof ServerPlayer other && HexServer.foe(p, other)) {
             ItemStack held = other.getMainHandItem();
             if (!held.isEmpty()) {
                 other.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
@@ -320,7 +320,7 @@ public final class Glorious {
         }
         double limit = 2 * (30 + HexData.mastery(p, Discipline.ENCHANTMENT) * .25);
         List<Mob> mobs = p.serverLevel().getEntitiesOfClass(Mob.class, p.getBoundingBox().inflate(10),
-            m -> HexServer.validTarget(p, m) && m.getMaxHealth() <= limit && !(m instanceof IllusionEntity) && !huge(m) && !HexServer.charmed(m));
+            m -> HexServer.foe(p, m) && m.getMaxHealth() <= limit && !(m instanceof IllusionEntity) && !huge(m) && !HexServer.charmed(m));
         mobs.sort(Comparator.comparingDouble(p::distanceToSqr));
         int ticks = 2 * (240 + HexData.mastery(p, Discipline.ENCHANTMENT) / 2);
         for (int i = 0; i < Math.min(6, mobs.size()); i++) {
@@ -375,7 +375,7 @@ public final class Glorious {
         for (Wound w : list) if (now - w.at() <= REMEMBERED + 20) owed.merge(w.by(), w.amount(), Float::sum);
         for (Map.Entry<UUID, Float> debt : owed.entrySet()) {
             Entity e = p.serverLevel().getEntity(debt.getKey());
-            if (!(e instanceof LivingEntity dealt) || !dealt.isAlive() || !HexServer.validTarget(p, dealt) || dealt.distanceToSqr(p) > 128 * 128) continue;
+            if (!(e instanceof LivingEntity dealt) || !dealt.isAlive() || !HexServer.foe(p, dealt) || dealt.distanceToSqr(p) > 128 * 128) continue;
             dealt.invulnerableTime = 0;
             dealt.hurt(p.damageSources().indirectMagic(p, p), Math.min(40, debt.getValue()));
             HexNetwork.fx(dealt, "slip");
@@ -387,11 +387,11 @@ public final class Glorious {
 
     /** The one in the look, and every creature within six blocks of it, up to six, suspended together. */
     private static boolean chosenMany(ServerPlayer p, Entity aimed) {
-        if (aimed == null || !HexServer.validTarget(p, aimed)) return false;
+        if (aimed == null || !HexServer.foe(p, aimed)) return false;
         List<Entity> bodies = new ArrayList<>();
         bodies.add(aimed);
         List<Entity> near = p.level().getEntities(p, aimed.getBoundingBox().inflate(6),
-            e -> e != aimed && e instanceof LivingEntity && HexServer.validTarget(p, e) && !(e instanceof IllusionEntity));
+            e -> e != aimed && e instanceof LivingEntity && HexServer.foe(p, e) && !(e instanceof IllusionEntity));
         near.sort(Comparator.comparingDouble(aimed::distanceToSqr));
         for (Entity e : near) {
             if (bodies.size() >= 6) break;
