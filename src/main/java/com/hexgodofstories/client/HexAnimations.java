@@ -29,7 +29,7 @@ public final class HexAnimations {
    private static final ResourceLocation LAYER = HexGodOfStories.id("casting");
    /** Under the moves: the stances a weapon is carried in (BladeClient), which a move plays over and returns to. */
    private static final ResourceLocation STANCE = HexGodOfStories.id("stance");
-   private static final Set<String> OWN_FIRST_PERSON_ARM = Set.of("branch_punch", "time_stop", "grasp_slash");
+   private static final Set<String> OWN_FIRST_PERSON_ARM = Set.of("branch_punch", "time_stop");
    private static final Logger LOGGER = LogUtils.getLogger();
 
    private HexAnimations() {
@@ -92,8 +92,9 @@ public final class HexAnimations {
             // The blades' moves (tools/blade_moves.py): the sword arm is seen in first person, blade and all. Both
             // blades are one-handed; the free arm works for balance and stays out of the view.
             boolean blade=name.startsWith("blade_");
-            // The charge's slam takes the sword in both hands: both arms come into view behind it.
-            boolean twoHanded=name.equals("blade_sword_dash");
+            // The charge's slam takes the sword in both hands, and Gravity Grasp's stab holds the body by the shoulder
+            // with the free one: both arms come into view.
+            boolean twoHanded=name.equals("blade_sword_dash")||name.equals("blade_grasp_stab");
             ResourceLocation resourcelocation = HexGodOfStories.id(name);
             KeyframeAnimation keyframeanimation = PlayerAnimationRegistry.getAnimation(resourcelocation);
             if (keyframeanimation == null) {

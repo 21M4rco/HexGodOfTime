@@ -399,6 +399,11 @@ public final class ArsenalClient {
                 Entity body = Minecraft.getInstance().level.getEntity(data.getInt("id"));
                 if (body != null) Blood.throat(body, new Vec3(data.getDouble("rx"), 0, data.getDouble("rz")));
             }
+            case "impale" -> {
+                Entity body = Minecraft.getInstance().level.getEntity(data.getInt("id"));
+                Entity by = Minecraft.getInstance().level.getEntity(data.getInt("by"));
+                if (body != null) Blood.impale(body, by, data.getInt("ticks"));
+            }
             case "anchor_flash" -> anchorFlash(data);
             case "gotcha" -> {
                 ArsenalMeshes.preload(FLASH, FLARE);

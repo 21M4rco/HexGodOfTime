@@ -1,4 +1,4 @@
-## The sword's slam and its rest, no more spins, and far more blood
+## The sword's slam and its rest, no more spins, a held stab, and far more blood
 
 - **No more full turns.** The Master Cuts' second cut spun the whole body round 360°, and the cuts after it carried that
   turn on, so a combo cut short could unwind it the other way. It is now the Zwerchhau as the masters cut it, feet
@@ -15,6 +15,13 @@
 - **The Deceiver at rest.** Stand still with it in hand for a couple of seconds and you settle into a rest: weight on one
   leg, a hand on the hip, the sword hanging loose a little ahead with its point on the ground. Move, swing or guard
   and it comes up again. Your head stays your own, and first person is untouched.
+- **Gravity Grasp, harder and slower to kill.** The pull is about three times stronger and reaches twenty-two blocks,
+  tearing bodies off the ground so nothing walks away from it. The hole on your palm is now the Gravity Well's black
+  hole in miniature: a black horizon with a ring of bent light, a tilted disk of fine turning rings from white-hot
+  lilac to deep purple, and streaks of light falling in. And the cut is a held stab: the caught body is seized, the
+  dagger forms in an icepick grip and goes into the side of its neck and stays there for a full second, held,
+  leaned on and pushed deeper, the wound pumping round the blade, before it is torn out across the throat in a
+  sheet of blood, the body stunned a second more.
 - **Far more blood.** Every blade's cut, the combos, the slam and a thrown dagger's hit throw about three times the
   blood: a heavy sheet off the edge, thick gobs arcing out of the wound, a fine spray, then the wound pumping two or
   three spurts after the blade has gone, with many more pools spattered along the way it flew and under the body.
@@ -158,11 +165,12 @@
   across, no block broken and no shield stopping it. 25 energy; 30 s recovery. **Secret:** cast in the full
   transformation, the blast is sixty blocks across (twenty hearts out to twelve, half at thirty), the ground
   shakes all of it, and a moment before it goes anyone looking at it is blinded white; two minutes' recovery.
-- **Gravity Grasp (hold Anchor Being's key).** Your arm goes out and a small black hole opens in front of your
-  hand, drawing in everything you could harm within sixteen blocks, harder the longer you hold (ten seconds
-  at most); even at first it drags a sprinting player back. Whatever it drags within arm's reach, the hole
-  closes and you cut its throat with a dagger conjured for the stroke, the blood thrown out to your right: five
-  hearts, ten seconds' bleeding and a stun. Its own 12 s recovery, apart from Anchor Being's.
+- **Gravity Grasp (hold Anchor Being's key).** Your arm goes out and a small black hole opens on your palm (the
+  Gravity Well's in miniature), tearing everything you could harm within twenty-two blocks off its feet and
+  dragging it in, harder the longer you hold (ten seconds at most). The first body it brings within arm's reach is
+  seized: the hole closes, a dagger forms reversed in your hand, and you drive it down into the side of the neck
+  and leave it there, the body held stunned on it, for a second, then tear it out across the throat: six hearts,
+  ten seconds' bleeding and a second's more stun. Its own 12 s recovery, apart from Anchor Being's.
 
 ## The Crown of Barrels — Loki's last conjuration
 

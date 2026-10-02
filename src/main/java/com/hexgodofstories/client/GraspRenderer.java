@@ -4,34 +4,41 @@ import com.hexgodofstories.server.GravityGrasp;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Gravity Grasp, seen: a small black hole hanging just out in front of the caster's hand. A core of true black with a
- * darker halo, a thin burning rim round it, an accretion disk of seidr light turning fast about it, and portal motes
- * streaming in from all round; it grows as it is held. Drawn wherever the server says a player is holding it (their
- * {@code graspStart}), from the same place the server pulls toward, and nothing past forty-eight blocks.
+ * Gravity Grasp, seen: the Gravity Well's black hole (WarpScene), small enough to hold on a palm. A sphere of true black
+ * with a softer dark round it and a thin ring of bent light hugging its edge; about it a tilted accretion disk of fine
+ * concentric rings, white-hot lilac within, violet, then deep purple without, each turning and flickering as it goes;
+ * and streaks of light falling in out of the space round it. It grows as it is held. Drawn wherever the server says a
+ * player is holding it (their {@code graspStart}), from the same place the server pulls toward, and nothing past
+ * forty-eight blocks.
  */
 public final class GraspRenderer {
     private GraspRenderer() {}
 
-    private static final BranchVfx.Painter PAINTER=new BranchVfx.Painter();
+    /** Drawn in this order: what lies behind the dark, the dark, and what lies in front of it. */
+    private static final BranchVfx.Painter BACK=new BranchVfx.Painter(),DARK=new BranchVfx.Painter(),FRONT=new BranchVfx.Painter();
     private static final double VISIBLE=48*48;
-    private static final int RIM=28,DISK=36;
+    private static final int RIM=28,RINGS=9,SEGMENTS=40,STREAKS=36;
+    /** The Gravity Well's disk tilt, and its colours from the inside out (WarpScene, GRAVITY_WELL). */
+    private static final double TILT=.28;
+    private static final int HOT=0xf4d4ff,VIOLET=0xae67ff,DEEP=0x452464,FALLING=0xd6aaff;
 
     /** Where a player's hole hangs this frame: the same as the server's {@link GravityGrasp#hole}, smoothed for drawing. */
     static Vec3 hole(Player p,float partial) {
-        return p.getEyePosition(partial).add(p.getViewVector(partial).scale(1.5)).add(0,-.3,0);
+        Vec3 look=p.getViewVector(partial),flat=new Vec3(look.x,0,look.z);
+        Vec3 right=flat.lengthSqr()<1e-6?Vec3.ZERO:new Vec3(-flat.z,0,flat.x).normalize();
+        return p.getEyePosition(partial).add(look.scale(1.25)).add(right.scale(.3)).add(0,-.38,0);
     }
 
-    /** How big it has grown, from a pea to a fist, over the whole hold. */
+    /** How big it has grown, from a marble to a plum, over the whole hold. */
     private static double radius(Player p,double time) {
         long start=ClientState.data(p.getId()).getLong(GravityGrasp.HOLDING);
-        return .16+.28*Mth.clamp((time-start)/GravityGrasp.MOST,0,1);
+        return .085+.075*Mth.clamp((time-start)/(GravityGrasp.MOST*.5),0,1);
     }
 
     private static boolean holding(Player p) {
@@ -40,7 +47,7 @@ public final class GraspRenderer {
 
     public static void render(PoseStack pose,MultiBufferSource.BufferSource buffers,float partial) {
         var mc=Minecraft.getInstance();
-        if(mc.level==null){PAINTER.discard();return;}
+        if(mc.level==null){discard();return;}
         Vec3 camera=mc.gameRenderer.getMainCamera().getPosition();
         double time=ClientState.time(partial);
         boolean any=false;
@@ -51,35 +58,56 @@ public final class GraspRenderer {
             any=true;
             double r=radius(p,time);
             Vec3 right=BranchVfx.cameraRight(),up=BranchVfx.cameraUp();
-            // The halo, then the core: black laid over black, so the edge of the dark is soft.
-            BranchVfx.billboard(PAINTER,BranchVfx.shadow(),at,r*1.9,0,0x000000,.38f);
-            BranchVfx.billboard(PAINTER,BranchVfx.shadow(),at,r,0,0x000000,.98f);
-            // The rim: light bent round the edge of it.
+            // The disk's plane: level with the caster's right and their forward tipped up by the Well's tilt, so it is
+            // seen as the Well's is, a flattened ring about the dark.
+            Vec3 look=p.getViewVector(partial),flat=new Vec3(look.x,0,look.z);
+            flat=flat.lengthSqr()<1e-6?new Vec3(0,0,1):flat.normalize();
+            Vec3 u=new Vec3(-flat.z,0,flat.x),v=flat.scale(Math.cos(TILT)).add(0,Math.sin(TILT),0),normal=u.cross(v).normalize();
+            // The disk's far half first, then the dark over it, then the near half over the dark.
+            disk(BACK,at,r,u,v,time,false);
+            BranchVfx.billboard(DARK,BranchVfx.shadow(),at,r*1.6,0,0x000000,.45f);
+            BranchVfx.billboard(DARK,BranchVfx.shadow(),at,r,0,0x000000,1f);
+            // The photon ring: light bent right round the edge of it.
             Vec3 last=null;
             for(int i=0;i<=RIM;i++) {
-                double a=i*Math.PI*2/RIM;
-                Vec3 point=at.add(right.scale(Math.cos(a)*r*1.08)).add(up.scale(Math.sin(a)*r*1.08));
-                if(last!=null)BranchVfx.ribbon(PAINTER,BranchVfx.glow(),last,point,r*.09,i%2==0?0xb68cff:0x7dffb0,.85f);
+                double a=i*Math.PI*2/RIM+time*.3;
+                Vec3 point=at.add(right.scale(Math.cos(a)*r*1.06)).add(up.scale(Math.sin(a)*r*1.06));
+                if(last!=null)BranchVfx.ribbon(FRONT,BranchVfx.glow(),last,point,r*.07,HOT,.9f);
                 last=point;
             }
-            // The disk: a tilted ring of streaks turning fast, brighter on its inner edge.
-            Vec3 look=p.getViewVector(partial);
-            Vec3 normal=look.add(0,1.4,0).normalize(),u=BranchVfx.perpendicular(normal),v=normal.cross(u).normalize();
-            for(int band=0;band<2;band++) {
-                double radiusOf=r*(1.6+band*.7),spin=time*(.55-band*.18);
-                last=null;
-                for(int i=0;i<=DISK;i++) {
-                    double a=i*Math.PI*2/DISK+spin;
-                    Vec3 point=at.add(u.scale(Math.cos(a)*radiusOf)).add(v.scale(Math.sin(a)*radiusOf));
-                    float fade=(float)(.35+.45*Math.abs(Math.sin(a*1.5)));
-                    if(last!=null)BranchVfx.ribbon(PAINTER,BranchVfx.glow(),last,point,r*(.14-band*.04),
-                        TemporalPalette.seidr(ClientState.cycle(i/(double)DISK+time*.01)),fade*(band==0?.8f:.5f));
-                    last=point;
-                }
+            disk(FRONT,at,r,u,v,time,true);
+            // Light falling in out of the space round it, on spirals that tighten as they go.
+            for(int i=0;i<STREAKS;i++) {
+                double phase=((i*.37-time*.03)%1+1)%1,rr=r*(1.2+phase*4.2),a=i*2.399+time*.1+phase*2.5;
+                Vec3 off=u.scale(Math.cos(a)*rr).add(v.scale(Math.sin(a)*rr)).add(normal.scale(Math.sin(i*1.7)*rr*.35));
+                Vec3 from=at.add(off),to=from.add(at.subtract(from).normalize().scale(r*(.5+phase*1.4)));
+                BranchVfx.ribbon(off.dot(camera.subtract(at))>0?FRONT:BACK,BranchVfx.glow(),from,to,r*.05,FALLING,(float)(.75*(1-phase*.6)));
             }
         }
-        if(any)PAINTER.flush(pose,buffers);
-        else PAINTER.discard();
+        if(any){BACK.flush(pose,buffers);DARK.flush(pose,buffers);FRONT.flush(pose,buffers);}
+        else discard();
+    }
+
+    private static void discard() {BACK.discard();DARK.discard();FRONT.discard();}
+
+    /** One half of the accretion disk (the half nearer the camera, or the further): the Well's fine turning rings. */
+    private static void disk(BranchVfx.Painter painter,Vec3 at,double r,Vec3 u,Vec3 v,double time,boolean near) {
+        Vec3 camera=Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        Vec3 toward=camera.subtract(at);
+        for(int ring=0;ring<RINGS;ring++) {
+            double radius=r*(1.35+ring*.2),turn=time*(.16-ring*.008)+ring*.08;
+            int colour=ring<2?HOT:ring<5?VIOLET:DEEP;
+            Vec3 last=null;
+            for(int i=0;i<=SEGMENTS;i++) {
+                double a=i*Math.PI*2/SEGMENTS+turn;
+                Vec3 point=at.add(u.scale(Math.cos(a)*radius)).add(v.scale(Math.sin(a)*radius));
+                if(last!=null&&(point.add(last).scale(.5).subtract(at).dot(toward)>0)==near) {
+                    float shine=(float)(.65+.35*Math.sin(a*3-time*.4));
+                    BranchVfx.ribbon(painter,BranchVfx.glow(),last,point,r*.075,com.hexgodofstories.client.WarpMesh.shade(colour,shine),.6f);
+                }
+                last=point;
+            }
+        }
     }
 
     /** Portal motes streaming in from all round every hole in sight: they start out from it and fall into it. */
@@ -92,46 +120,10 @@ public final class GraspRenderer {
             if(!holding(p))continue;
             Vec3 at=hole(p,1);
             if(at.distanceToSqr(eye)>VISIBLE)continue;
-            for(int i=0;i<5;i++) {
-                Vec3 from=new Vec3(random.nextGaussian(),random.nextGaussian(),random.nextGaussian()).normalize().scale(1.5+random.nextDouble()*2.5);
+            for(int i=0;i<4;i++) {
+                Vec3 from=new Vec3(random.nextGaussian(),random.nextGaussian(),random.nextGaussian()).normalize().scale(1+random.nextDouble()*2);
                 mc.level.addParticle(ParticleTypes.PORTAL,at.x,at.y,at.z,from.x,from.y,from.z);
             }
-        }
-    }
-
-    /**
-     * The cut, as its caster sees it: the conjured dagger gripped upright in the right hand, point forward, raised across
-     * to the left at throat height, whipped across to the right, held through the follow-through and dropped away. The hand is drawn
-     * here in place of vanilla's for the length of the stroke (the grasp_slash animation leaves first person alone).
-     */
-    @net.minecraftforge.fml.common.Mod.EventBusSubscriber(modid=com.hexgodofstories.HexGodOfStories.ID,value=net.minecraftforge.api.distmarker.Dist.CLIENT)
-    public static final class Stab {
-        @net.minecraftforge.eventbus.api.SubscribeEvent
-        public static void hand(net.minecraftforge.client.event.RenderHandEvent e) {
-            var mc=Minecraft.getInstance();
-            if(mc.player==null||e.getHand()!=net.minecraft.world.InteractionHand.MAIN_HAND)return;
-            double left=ClientState.data(mc.player.getId()).getLong(GravityGrasp.KNIFE)-ClientState.time(e.getPartialTick());
-            if(left<=0||left>14)return;
-            e.setCanceled(true);
-            double t=14-left;
-            // Raised across over three ticks, whipped through in two, held four, dropped away over five.
-            double raise=Math.min(1,t/3),sweep=t<3?0:Math.min(1,(t-3)/2),drop=t<9?0:(t-9)/5;
-            raise=raise*raise*(3-2*raise);
-            sweep=1-(1-sweep)*(1-sweep)*(1-sweep);
-            drop=drop*drop;
-            var stack=new net.minecraft.world.item.ItemStack(com.hexgodofstories.HexGodOfStories.DAGGER.get());
-            stack.getOrCreateTag().putUUID("conjurer",mc.player.getUUID());
-            stack.getOrCreateTag().putLong("formed",mc.player.level().getGameTime()-40);
-            PoseStack pose=e.getPoseStack();
-            pose.pushPose();
-            double x=Mth.lerp(sweep,Mth.lerp(raise,.56,-.3),.85),y=Mth.lerp(raise,-.52,-.22)-.06*sweep-.9*drop,z=Mth.lerp(raise,-.72,-.85)+.1*sweep;
-            pose.translate(x,y,z);
-            // Blade upright, point tipped forward, and swung from pointing ahead-left to ahead-right as it goes through.
-            pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees((float)(40*raise-85*sweep)));
-            pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees((float)(-55*raise)));
-            mc.getEntityRenderDispatcher().getItemInHandRenderer().renderItem(mc.player,stack,
-                net.minecraft.world.item.ItemDisplayContext.FIRST_PERSON_RIGHT_HAND,false,pose,e.getMultiBufferSource(),e.getPackedLight());
-            pose.popPose();
         }
     }
 }

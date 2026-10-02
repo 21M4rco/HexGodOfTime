@@ -39,9 +39,6 @@ public final class HexLayer extends RenderLayer<AbstractClientPlayer,PlayerModel
     }
 
     @Override public void render(PoseStack pose,MultiBufferSource buffers,int light,AbstractClientPlayer p,float walk,float walkAmount,float partial,float age,float headYaw,float headPitch) {
-        // Gravity Grasp's cut: a dagger conjured into the right hand for the stroke, and gone after it.
-        if(!p.isSpectator()&&!ClientState.hidden(p)&&ClientState.data(p.getId()).getLong(com.hexgodofstories.server.GravityGrasp.KNIFE)>ClientState.now())
-            dagger(pose,buffers,light,p);
         float progress=ClientState.progress(p.getId(),partial);
         if(p.isSpectator()||ClientState.hidden(p)||progress<=0||ClientState.data(p.getId()).contains("disguise"))return;
         pose.pushPose();getParentModel().head.translateAndRotate(pose);crown(pose,buffers,light,progress);pose.popPose();
@@ -49,21 +46,6 @@ public final class HexLayer extends RenderLayer<AbstractClientPlayer,PlayerModel
         pose.pushPose();getParentModel().body.translateAndRotate(pose);
         CapeRenderer.capture(p,pose);
         collar(pose,buffers,light,progress);
-        pose.popPose();
-    }
-
-    /** The dagger in the right hand, held the way any item in it is (vanilla's ItemInHandLayer). */
-    private void dagger(PoseStack pose,MultiBufferSource buffers,int light,AbstractClientPlayer p) {
-        net.minecraft.world.item.ItemStack stack=new net.minecraft.world.item.ItemStack(HexGodOfStories.DAGGER.get());
-        stack.getOrCreateTag().putUUID("conjurer",p.getUUID());
-        stack.getOrCreateTag().putLong("formed",p.level().getGameTime()-40);
-        pose.pushPose();
-        getParentModel().translateToHand(net.minecraft.world.entity.HumanoidArm.RIGHT,pose);
-        pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-90));
-        pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180));
-        pose.translate(1/16f,.125f,-.625f);
-        net.minecraft.client.Minecraft.getInstance().getEntityRenderDispatcher().getItemInHandRenderer().renderItem(p,stack,
-            net.minecraft.world.item.ItemDisplayContext.THIRD_PERSON_RIGHT_HAND,false,pose,buffers,light);
         pose.popPose();
     }
 

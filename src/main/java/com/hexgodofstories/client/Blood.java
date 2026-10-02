@@ -134,6 +134,41 @@ public final class Blood {
     }
 
     /**
+     * Gravity Grasp's stab, held in: for as long as the knife is left in the neck the wound pumps round the blade with
+     * each beat, the blood running down the body and off the blade's hilt and pooling under it, and every time the
+     * knife is leaned on a spurt is forced out past it. The side it went in faces the one holding it.
+     */
+    public static void impale(Entity e,Entity by,int ticks) {
+        var mc=Minecraft.getInstance();
+        if(mc.level==null||mc.player==null||e.position().distanceToSqr(mc.player.getEyePosition())>RANGE)return;
+        var random=mc.level.random;
+        Vec3 toward=by==null?new Vec3(0,0,1):by.position().subtract(e.position());
+        toward=new Vec3(toward.x,0,toward.z);
+        toward=toward.lengthSqr()<1e-6?new Vec3(0,0,1):toward.normalize();
+        final Vec3 out=toward;
+        Vec3 wound=e.position().add(0,e.getBbHeight()*.82,0).add(out.scale(e.getBbWidth()*.45));
+        Vfx.bloom(e.getId(),wound,out,Math.max(1,ticks),(at,aim,t)->{
+            int age=Math.round(t*ticks);
+            // A steady welling round the blade, running down the body.
+            for(int i=0;i<4;i++)
+                Vfx.spark(HexGodOfStories.BLOOD.get(),at.add((random.nextDouble()-.5)*.12,(random.nextDouble()-.5)*.1,(random.nextDouble()-.5)*.12),
+                    new Vec3(aim.x*.02+(random.nextDouble()-.5)*.03,-.04-random.nextDouble()*.05,aim.z*.02+(random.nextDouble()-.5)*.03));
+            // Each beat, and each push of the knife (tools/blade_moves.py: deeper on the ninth and nineteenth): a spurt forced out past it.
+            boolean push=age==3||age==13,beat=age%6==0;
+            if(push||beat) {
+                for(int i=0;i<(push?40:16);i++) {
+                    double speed=(push?.1:.05)+random.nextDouble()*(push?.24:.12);
+                    Vec3 side=new Vec3(-aim.z,0,aim.x).scale((random.nextDouble()-.5)*1.4);
+                    Vfx.spark(HexGodOfStories.BLOOD.get(),at,aim.add(side).normalize().scale(speed).add(0,.02+random.nextDouble()*.1,0));
+                }
+                drop(mc,e,at.add(aim.scale(.3+random.nextDouble()*(push?1.2:.5))).add((random.nextDouble()-.5)*.4,0,(random.nextDouble()-.5)*.4),
+                    random.nextDouble()*.25+.2,PUDDLE_LIFE,24);
+            }
+            if(random.nextInt(3)==0)drop(mc,e,null,random.nextDouble()*.3+.3,PUDDLE_LIFE,40);
+        });
+    }
+
+    /**
      * A blade's cut or stab (BladeCombo, the ordinary attacks, the charge's slam, a thrown knife): a heavy sheet of
      * blood flung off the edge the way the blade went, the fastest drops thrown furthest; thick gobs arcing out of the
      * wound and a fine spray bursting from it; then the wound pumping two or three spurts after the blade has gone, and

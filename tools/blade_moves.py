@@ -342,15 +342,43 @@ move('blade_sword_idle', 54, [
     (34, 'inoutsine', IDLE_BREATH),
     (54, 'inoutsine', IDLE)], loop=14)
 
+# --- Gravity Grasp's stab (Anchor Being's key held, the black hole's catch): the dagger forms in the outstretched hand
+#     already in an icepick grip, and the arm goes up with it; the free hand seizes the body by the shoulder; then the
+#     knife is driven down into the side of its neck and left there, leaned on, pushed deeper, for a second, before it
+#     is torn out across the throat and away. GravityGrasp's timings: in on the sixth tick, out on the twenty-seventh.
+GRAB = (-80, 18, 0, -16)
+STAB_IN = P(body=(0, -.06, -.12, -10, 12, 0), head=(8, 12, 0), la=(-74, 24, 0, -34), rl=(26, 0, 0, 14), ll=(-34, 0, 0, 36),
+            rev=True, aim=((.12, 1.56, .74), (-.35, -.5, .8)))
+STAB_DEEP = P(body=(0, -.09, -.15, -13, 14, 0), head=(10, 14, 0), la=(-70, 26, 0, -44), rl=(28, 0, 0, 16), ll=(-36, 0, 0, 40),
+              rev=True, aim=((.08, 1.52, .8), (-.38, -.52, .77)))
+move('blade_grasp_stab', 40, [
+    # It forms already turned over in the hand that held the hole open.
+    (0, 'linear', P(la=(0, 0, 0, 0), rev=True, aim=((.32, 1.36, .6), (0, -.55, .83)))),
+    (3, 'outquad', P(body=(0, .02, .03, 6, -14, 0), head=(-6, -14, 0), la=GRAB, rl=(14, 0, 0, 18), ll=(-18, 0, 0, 22),
+                     rev=True, aim=((.4, 1.95, .2), (-.1, -.62, .78)))),
+    (6, 'inexpo', STAB_IN),
+    (9, 'outquad', STAB_DEEP),
+    (15, 'inoutsine', STAB_IN),
+    (19, 'inoutsine', STAB_DEEP),
+    (24, 'inoutsine', P(body=(0, -.07, -.12, -9, 10, 0), head=(6, 10, 0), la=(-72, 24, 0, -30), rl=(26, 0, 0, 14), ll=(-34, 0, 0, 36),
+                        rev=True, aim=((.14, 1.58, .72), (-.32, -.48, .82)))),
+    # Torn out across the throat and flung away to the right, the body turning with it.
+    (27, 'inexpo', P(body=(0, -.04, -.06, -4, -22, 0), head=(0, -12, 0), la=(-40, 20, 0, -50), rl=(20, 0, 0, 16), ll=(-24, 0, 0, 24),
+                     rev=True, aim=((.72, 1.62, .38), (.8, .1, .55)))),
+    (30, 'outquad', P(body=(0, -.03, -.04, -2, -28, 0), head=(0, -16, 0), la=(-30, 14, 0, -50), rl=(18, 0, 0, 14), ll=(-22, 0, 0, 22),
+                      rev=True, aim=((.85, 1.45, .12), (.75, -.25, -.6)))),
+    (40, 'inoutsine', P(ra=(0, 0, 0, 0), item=(180, 0, 0), rl=(0, 0, 0, 0), ll=(0, 0, 0, 0)))])
+
 # ------------------------------------------------------------------ what the server must agree with
 # The tick of each cut's contact, and where its blood goes (the caster's right, up, forward). server/BladeCombo and
 # HexServer's ordinary attacks use these same numbers; check() in generate_blades.py holds each cut's point to its swing.
 CONTACT = {'blade_dagger_0': 4, 'blade_dagger_1': 3, 'blade_dagger_2': 5, 'blade_dagger_3': 6, 'blade_dagger_kick': 5,
            'blade_sword_0': 5, 'blade_sword_1': 7, 'blade_sword_2': 5, 'blade_sword_3': 6,
            'blade_m_dagger_0': 4, 'blade_m_dagger_1': 4, 'blade_m_dagger_2': 4, 'blade_m_dagger_3': 4,
-           'blade_m_sword_0': 6, 'blade_m_sword_1': 6, 'blade_m_sword_2': 6, 'blade_m_sword_3': 6, 'blade_sword_dash': 6}
+           'blade_m_sword_0': 6, 'blade_m_sword_1': 6, 'blade_m_sword_2': 6, 'blade_m_sword_3': 6, 'blade_sword_dash': 6,
+           'blade_grasp_stab': 6}
 SWINGS = {'blade_dagger_0': (1, 0, 0), 'blade_dagger_1': (0, -.8, .6), 'blade_dagger_2': (0, 0, 1), 'blade_dagger_3': (1, 0, 0),
           'blade_sword_0': (-.7, -.7, 0), 'blade_sword_1': (1, 0, 0), 'blade_sword_2': (0, 0, 1), 'blade_sword_3': (0, 1, 0),
           'blade_m_dagger_0': (-.7, -.7, 0), 'blade_m_dagger_1': (1, 0, 0), 'blade_m_dagger_2': (-.7, -.7, 0), 'blade_m_dagger_3': (0, 0, 1),
           'blade_m_sword_0': (-.7, -.7, 0), 'blade_m_sword_1': (.6, .8, 0), 'blade_m_sword_2': (-1, 0, 0), 'blade_m_sword_3': (0, -.8, .6),
-          'blade_sword_dash': (0, -.8, .6)}
+          'blade_sword_dash': (0, -.8, .6), 'blade_grasp_stab': (-.2, -.5, .85)}
