@@ -23,6 +23,8 @@ public abstract class WoundBodyMixin {
     @Inject(method="render",at=@At(value="INVOKE",target="Lnet/minecraft/client/model/EntityModel;renderToBuffer(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;IIFFFF)V"),require=0)
     private void hgos$bodyBegin(LivingEntity entity,float yaw,float partial,PoseStack pose,MultiBufferSource buffers,int light,CallbackInfo ci) {
         WoundAnchor.body(true);
+        // A half of a body cut in two goes limp: its limbs posed over whatever its own animation gave them.
+        com.hexgodofstories.client.Halving.limp(entity,((LivingEntityRenderer<?,?>)(Object)this).getModel());
     }
 
     @Inject(method="render",at=@At(value="INVOKE",target="Lnet/minecraft/client/model/EntityModel;renderToBuffer(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;IIFFFF)V",shift=At.Shift.AFTER),require=0)

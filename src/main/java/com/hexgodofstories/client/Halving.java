@@ -2,10 +2,18 @@ package com.hexgodofstories.client;
 
 import com.hexgodofstories.HexGodOfStories;
 import com.hexgodofstories.data.HoleHeat;
+import com.hexgodofstories.mixin.ModelPartAccessor;
+import com.hexgodofstories.mixin.QuadrupedModelAccessor;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.EntityModel;
+import net.minecraft.client.model.HierarchicalModel;
+import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.client.model.PlayerModel;
+import net.minecraft.client.model.QuadrupedModel;
+import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
@@ -32,9 +40,12 @@ import org.joml.Vector3f;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
 /**
@@ -44,31 +55,39 @@ import java.util.Set;
  * vanilla mob, a player, GeckoLib, any mod's), each time through buffers that keep only what lies on one side of the
  * cut's plane: every quad or triangle handed to them is clipped against it as it arrives, in the space its corners
  * arrive in, and what is left goes on in pieces. Where a closed surface (a cube of a model) is cut, the points where
- * its faces cross the plane close into a loop, and the loop is filled: the cut face. It is drawn as a Scepter hole
- * in a body is, burned: red-hot as the blade leaves it, cooling through orange to a dim glow and then a charred dark
- * red (HoleHeat), smoking while it is hot, the blood pouring out of it.
+ * its faces cross the plane close into a loop, and the loop is filled: the cut face, raw and blood red. Only when the
+ * blade was burning (transformed) is it seared instead, as a Scepter hole in a body is: red-hot as the blade leaves
+ * it, cooling through orange to a dim glow (HoleHeat), smoking while it is hot.
  *
  * <p>Each half is its own body from then on: thrown apart by the cut (the upper one along the blade's line and away,
  * the lower one buckling a beat later), turning over under its own weight about its middle (the upper) or its far
- * foot (the lower) until it lies on the ground, landing on whatever is really under it with a wet thud. They lie
- * there ten seconds, then sink out of sight. The body itself is never drawn meanwhile, alive or dead, and is drawn
- * from its last state after the world has let it go.
+ * foot (the lower) until it lies on the ground, landing on whatever is really under it with a wet thud and slumping
+ * back. And it goes limp, as a body does: every limb of a model built of parts (the humanoids, the four-legged, every
+ * model built as one tree of named parts) that lies wholly on that half's side of the cut flops loose as it falls and
+ * is thrown about again when it lands, settling splayed. A limb the cut went through stays as it was, so nothing slides
+ * across the cut. Both halves pour blood, heavily, for ten seconds. They lie there ten seconds, then sink out of
+ * sight. The body itself is never drawn meanwhile, alive or dead, and is drawn from its last state after the world has
+ * let it go.
  */
 public final class Halving {
     private Halving() {}
 
-    /** Ticks the halves lie on the ground before they sink, and ticks they take to sink. */
-    private static final int LIE = 200, SINK = 30;
+    /** Ticks the halves lie on the ground before they sink, and ticks they take to sink; ticks their cut faces pour. */
+    private static final int LIE = 200, SINK = 30, POUR = 200;
     /** Cuts at once; a body that is gone and still not drawn is given up on after this long. */
     private static final int MAX = 24, ABANDON = 2400;
     private static final float GRAVITY = .075f, MOST_SPIN = .5f;
-    /** Ticks for the cut face to cool from red-hot to nothing, as a Scepter hole in a body does. */
+    /** Ticks for a seared cut face to cool from red-hot to nothing, as a Scepter hole in a body does. */
     private static final float COOLING = HoleHeat.BODY;
     /** How near two of a loop's points must be to be one (blocks, squared). */
     private static final float JOIN = 1e-6f;
     private static final int MOST_SEGMENTS = 4096;
-    /** Raw flesh at the middle of a cut face and charred at its edge, under the heat's own light. */
-    private static final float[] FLESH = {.5f, .05f, .045f}, CHAR = {.16f, .03f, .02f};
+    /** A raw cut face: blood red at the middle, darker at the rim. Seared, the rim is charred and the heat's light over both. */
+    private static final float[] RAW = {.72f, .03f, .03f}, RAW_RIM = {.48f, .015f, .015f}, FLESH = {.5f, .05f, .045f}, CHAR = {.16f, .03f, .02f};
+    /** The least light a raw cut face is drawn in, so it reads red at night too. */
+    private static final int RAW_LIGHT = 9;
+    /** Where a part of the body lies against the cut, found the first time it is drawn: unknown, wholly kept, wholly the other half's, cut through. */
+    private static final int UNKNOWN = 0, WHOLE = 1, GONE = 2, CUT = 3;
 
     /** One half: which side of the cut it keeps, and where it is and how it is turned (both from the anchor). */
     private static final class Piece {
@@ -83,6 +102,10 @@ public final class Halving {
         final Quaternionf rot = new Quaternionf(), prevRot = new Quaternionf();
         float angle, spin;
         boolean grounded;
+        /** The tick it first came down, from the cut; -1 while it has not. */
+        float landed = -1;
+        /** Each part of the body, by where it lies against the cut on this side. */
+        final Map<ModelPart, Integer> parts = new IdentityHashMap<>();
 
         Piece(float side, Vector3f pivot, List<Vector3f> hull, Vec3 vel, Vector3f axis, float topple, float spin, float accel, int delay) {
             this.side = side;
@@ -113,10 +136,11 @@ public final class Halving {
         final Vector3f point, normal;
         final long start;
         final float height;
+        final boolean burning;
         final Piece upper, lower;
         boolean broken;
 
-        Cut(Entity body, ClientLevel level, Vec3 anchor, Vector3f point, Vector3f normal, long start, float height, Piece upper, Piece lower) {
+        Cut(Entity body, ClientLevel level, Vec3 anchor, Vector3f point, Vector3f normal, long start, float height, boolean burning, Piece upper, Piece lower) {
             this.body = body;
             this.level = level;
             this.anchor = anchor;
@@ -124,12 +148,22 @@ public final class Halving {
             this.normal = normal;
             this.start = start;
             this.height = height;
+            this.burning = burning;
             this.upper = upper;
             this.lower = lower;
         }
     }
 
     private static final Map<Integer, Cut> CUTS = new HashMap<>();
+    /** What is being drawn right now, for the model's own hooks (limp, partBegin): the cut, the half, its clipper, the part, the moment. */
+    private static Cut drawingCut;
+    private static Piece drawingPiece;
+    private static Clipper drawingClipper;
+    private static ModelPart drawingPart;
+    private static float drawingAge;
+    /** The limbs posed limp for this half, and how they were before, to be put back once it is drawn. */
+    private static final List<ModelPart> POSED = new ArrayList<>();
+    private static final List<float[]> WAS = new ArrayList<>();
 
     public static void clear() {CUTS.clear();}
 
@@ -154,6 +188,7 @@ public final class Halving {
         Vec3 line = new Vec3(n.getDouble("lx"), n.getDouble("ly"), n.getDouble("lz")).normalize();
         Vec3 forward = new Vec3(n.getDouble("fx"), 0, n.getDouble("fz")).normalize();
         Vec3 right = new Vec3(-forward.z, 0, forward.x);
+        boolean burning = n.getBoolean("burning");
         // Bigger bodies are heavier: thrown slower and further, turning over slower.
         float size = (float) Math.sqrt(Math.max(.5, Math.max(h, w)) / 1.8), slow = 1 / (float) Math.sqrt(size);
 
@@ -179,19 +214,23 @@ public final class Halving {
         Vec3 knocked = forward.scale(.14).add(line.scale(-.04)).add(0, .05, 0).scale(Math.sqrt(size));
         Piece lower = new Piece(-1, foot, down.isEmpty() ? List.of(lowerMiddle) : down, knocked,
             vec(right.scale(-1).add(forward.scale(-.45))), (float) Math.toRadians(84 + random.nextFloat() * 10), 0, .028f * slow, 3);
-        CUTS.put(id, new Cut(body, mc.level, anchor, point, normal, ClientState.now(), h, upper, lower));
+        CUTS.put(id, new Cut(body, mc.level, anchor, point, normal, ClientState.now(), h, burning, upper, lower));
         if (body instanceof LivingEntity living) {living.hurtTime = 0; living.deathTime = 0;}
 
-        // The blade's line through the body: blood thrown off both ways along it, and the cut seared as it opens.
-        Vec3 middle = anchor.add(0, point.y, 0);
-        for (int i = 0; i < 80; i++) {
+        // The blade's line through the body: blood thrown out of the whole length of it, both ways and every way,
+        // pools all along under it, and, if the blade burned, the cut seared as it opens.
+        Vec3 middle = anchor.add(0, point.y, 0), across = new Vec3(normal.x, normal.y, normal.z);
+        for (int i = 0; i < 360; i++) {
             double along = (random.nextDouble() - .5) * Math.max(w, h * .8);
             Vec3 at = middle.add(line.scale(along)).add(forward.scale((random.nextDouble() - .5) * w));
-            Vec3 out = new Vec3(normal.x, normal.y, normal.z).scale((random.nextBoolean() ? 1 : -1) * (.05 + random.nextDouble() * .12));
-            Vfx.spark(HexGodOfStories.BLOOD.get(), at, out.add(line.scale(.12 + random.nextDouble() * .2)).add(0, .05, 0));
-            if (i % 4 == 0) Vfx.spark(ParticleTypes.SMOKE, at, new Vec3(0, .03, 0));
-            if (i % 8 == 0) Vfx.spark(ParticleTypes.SMALL_FLAME, at, out.scale(.3));
+            Vec3 out = across.scale((random.nextBoolean() ? 1 : -1) * (.05 + random.nextDouble() * .2));
+            Vfx.spark(HexGodOfStories.BLOOD.get(), at, out.add(line.scale((random.nextDouble() - .3) * .35)).add(0, .02 + random.nextDouble() * .2, 0));
+            if (burning && i % 6 == 0) Vfx.spark(ParticleTypes.SMOKE, at, new Vec3(0, .03, 0));
+            if (burning && i % 12 == 0) Vfx.spark(ParticleTypes.SMALL_FLAME, at, out.scale(.3));
         }
+        for (int i = 0; i < 14; i++)
+            Blood.pool(body, middle.add(line.scale((random.nextDouble() - .5) * Math.max(w, h))).add((random.nextDouble() - .5) * 1.4, 0, (random.nextDouble() - .5) * 1.4),
+                .35 + random.nextDouble() * .5);
     }
 
     private static Vector3f middle(List<Vector3f> points, Vector3f otherwise) {
@@ -203,7 +242,7 @@ public final class Halving {
 
     private static Vector3f vec(Vec3 v) {return new Vector3f((float) v.x, (float) v.y, (float) v.z);}
 
-    /** Every client tick: the halves fall, turn over, land and lie; their cut faces pour and smoke. */
+    /** Every client tick: the halves fall, turn over, land and lie; their cut faces pour, and smoke if seared. */
     public static void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) {CUTS.clear(); return;}
@@ -232,7 +271,7 @@ public final class Halving {
         if (age > LIE) {p.pos = p.pos.add(0, -cut.height / SINK, 0); return;}
         if (age >= p.delay && p.angle < p.topple) {
             p.spin = Math.min(p.spin + p.accel, MOST_SPIN);
-            p.angle = Math.min(p.topple, p.angle + p.spin);
+            p.angle = Math.max(0, Math.min(p.topple, p.angle + p.spin));
             p.rot.rotationAxis(p.angle, p.axis);
         }
         p.vel = p.vel.add(0, -GRAVITY, 0);
@@ -258,7 +297,12 @@ public final class Halving {
         double bottom = cut.anchor.y + low;
         if (bottom < ground) {
             p.pos = p.pos.add(0, ground - bottom, 0);
-            if (!p.grounded && p.vel.y < -.1) land(cut, p, cut.anchor.add(sum.x, ground - cut.anchor.y + .05, sum.z));
+            if (!p.grounded) {
+                p.landed = age;
+                // It slumps back off the blow of landing before it goes on over.
+                if (p.angle < p.topple) p.spin *= -.3f;
+                if (p.vel.y < -.1) land(cut, p, cut.anchor.add(sum.x, ground - cut.anchor.y + .05, sum.z));
+            }
             if (p.vel.y < 0) p.vel = new Vec3(p.vel.x * .5, -p.vel.y * .15, p.vel.z * .5);
             p.grounded = true;
         }
@@ -271,39 +315,47 @@ public final class Halving {
         return hit.getType() == HitResult.Type.MISS ? cut.anchor.y - 64 : hit.getLocation().y;
     }
 
-    /** A half coming down: a wet, heavy thud, and the blood it lands in. */
+    /** A half coming down: a wet, heavy thud, and the blood it lands in, thrown up all round it. */
     private static void land(Cut cut, Piece p, Vec3 at) {
         float weight = Math.min(1.5f, .6f + cut.height * .25f);
         cut.level.playLocalSound(at.x, at.y, at.z, SoundEvents.HONEY_BLOCK_FALL, SoundSource.PLAYERS, weight, .55f, false);
         cut.level.playLocalSound(at.x, at.y, at.z, SoundEvents.GENERIC_BIG_FALL, SoundSource.PLAYERS, weight * .7f, .7f, false);
         var random = cut.level.random;
-        for (int i = 0; i < 40; i++)
-            Vfx.spark(HexGodOfStories.BLOOD.get(), at, new Vec3((random.nextDouble() - .5) * .3, .05 + random.nextDouble() * .15, (random.nextDouble() - .5) * .3));
-        for (int i = 0; i < 4; i++)
-            Blood.pool(cut.body, at.add((random.nextDouble() - .5) * cut.height * .5, 0, (random.nextDouble() - .5) * cut.height * .5),
-                .3 + random.nextDouble() * .4);
+        for (int i = 0; i < 140; i++)
+            Vfx.spark(HexGodOfStories.BLOOD.get(), at, new Vec3((random.nextDouble() - .5) * .45, .05 + random.nextDouble() * .22, (random.nextDouble() - .5) * .45));
+        for (int i = 0; i < 10; i++)
+            Blood.pool(cut.body, at.add((random.nextDouble() - .5) * cut.height * .8, 0, (random.nextDouble() - .5) * cut.height * .8),
+                .35 + random.nextDouble() * .5);
     }
 
-    /** The cut face of a half: pouring blood, heavily at first, and smoking while it is hot. */
+    /** The cut face of a half: pouring blood, very heavily at first and spurting with the last beats, smoking if seared. */
     private static void pour(Cut cut, Piece p, long age) {
-        if (age > 120) return;
+        if (age > POUR) return;
         var random = cut.level.random;
         Vector3f face = p.place(cut.point, 1);
         Vector3f out = new Vector3f(cut.normal).mul(-p.side).rotate(p.rot);
         Vec3 at = cut.anchor.add(face.x, face.y, face.z);
-        float flow = 1 - age / 120f;
-        for (int i = 0; i < Math.round(14 * flow * flow) + 1; i++) {
-            Vec3 spot = at.add((random.nextDouble() - .5) * cut.height * .25, (random.nextDouble() - .5) * .1, (random.nextDouble() - .5) * cut.height * .25);
+        float flow = 1 - age / (float) POUR, spread = cut.height * .3f;
+        for (int i = 0; i < Math.round(44 * flow * flow) + 4; i++) {
+            Vec3 spot = at.add((random.nextDouble() - .5) * spread, (random.nextDouble() - .5) * .12, (random.nextDouble() - .5) * spread);
             Vfx.spark(HexGodOfStories.BLOOD.get(), spot,
-                new Vec3(out.x * (.04 + random.nextDouble() * .1), out.y * .06 - .02, out.z * (.04 + random.nextDouble() * .1)));
+                new Vec3(out.x * (.04 + random.nextDouble() * .14), out.y * .08 - .02, out.z * (.04 + random.nextDouble() * .14)));
         }
-        if (age % 3 == 0) Blood.pool(cut.body, at.add((random.nextDouble() - .5) * .6, 0, (random.nextDouble() - .5) * .6), .25 + random.nextDouble() * .35 * flow);
+        // The last beats of the heart: a spurt thrown out of the cut, up and away, every fifth tick for four seconds.
+        if (age < 80 && age % 5 == 0)
+            for (int i = 0; i < 40; i++) {
+                double speed = (.15 + random.nextDouble() * .25) * (1 - age / 100f);
+                Vfx.spark(HexGodOfStories.BLOOD.get(), at, new Vec3(out.x * speed + (random.nextDouble() - .5) * .08, .08 + random.nextDouble() * .18,
+                    out.z * speed + (random.nextDouble() - .5) * .08));
+            }
+        Blood.pool(cut.body, at.add((random.nextDouble() - .5) * .9, 0, (random.nextDouble() - .5) * .9), .3 + random.nextDouble() * .45 * flow);
+        if (!cut.burning) return;
         float heat = heat(age);
         if (heat > .25f && age % 2 == 0) Vfx.spark(ParticleTypes.SMOKE, at.add((random.nextDouble() - .5) * .3, 0, (random.nextDouble() - .5) * .3), new Vec3(0, .02 + .03 * heat, 0));
         if (heat > .7f && age % 5 == 0) Vfx.spark(ParticleTypes.SMALL_FLAME, at, new Vec3(out.x * .02, .01, out.z * .02));
     }
 
-    /** How hot the cut face is, red-hot as the blade leaves it and cooling as a Scepter hole in a body does. */
+    /** How hot a seared cut face is, red-hot as the blade leaves it and cooling as a Scepter hole in a body does. */
     private static float heat(float age) {return HoleHeat.heat(age + HoleHeat.RISE, COOLING, 0, 0);}
 
     /** After the world's entities: each cut body's halves, where they are now. */
@@ -322,7 +374,6 @@ public final class Halving {
             if (cut.body == mc.getCameraEntity() && !e.getCamera().isDetached()) continue;
             @SuppressWarnings("unchecked")
             EntityRenderer<Entity> renderer = (EntityRenderer<Entity>) mc.getEntityRenderDispatcher().getRenderer(cut.body);
-            float heat = heat(age);
             for (Piece piece : new Piece[]{cut.upper, cut.lower}) {
                 // A pose of its own, so a renderer that fails part way cannot leave the world's unbalanced.
                 PoseStack pose = new PoseStack();
@@ -342,23 +393,145 @@ public final class Halving {
                 int light = LevelRenderer.getLightColor(mc.level, BlockPos.containing(cut.anchor.x + world.x, cut.anchor.y + world.y, cut.anchor.z + world.z));
                 Clipper clipper = new Clipper(buffers, plane, keep, used);
                 if (cut.body instanceof LivingEntity living) {living.hurtTime = 0; living.deathTime = 0;}
+                drawingCut = cut;
+                drawingPiece = piece;
+                drawingClipper = clipper;
+                drawingAge = age;
                 try {
                     renderer.render(cut.body, cut.body.getYRot(), 1, pose, clipper, light);
                 } catch (Throwable failed) {
                     // A renderer that cannot draw its body like this: the body goes back to being drawn its own way.
                     cut.broken = true;
-                    break;
+                } finally {
+                    drawingCut = null;
+                    drawingPiece = null;
+                    drawingClipper = null;
+                    drawingPart = null;
+                    unlimp();
                 }
-                clipper.faces(heat, light);
+                if (cut.broken) break;
+                clipper.faces(cut.burning, heat(age), light);
             }
         }
         for (RenderType type : used) buffers.endBatch(type);
     }
 
+    // ------------------------------------------------------------------ the model's own hooks
+
+    /** A model part about to emit its quads (WoundPartMixin): which part, and, the first time, where it lies against the cut. */
+    public static void partBegin(ModelPart part, PoseStack.Pose pose, List<ModelPart.Cube> cubes) {
+        if (drawingPiece == null) return;
+        drawingPart = part;
+        if (!drawingPiece.parts.containsKey(part)) drawingPiece.parts.put(part, drawingClipper.lies(pose.pose(), cubes));
+    }
+
+    public static void partEnd() {drawingPart = null;}
+
+    /**
+     * Before a living body's model is emitted (WoundBodyMixin): while one of its halves is being drawn, each limb of it
+     * that lies wholly on that half's side goes limp: swinging loose as the half falls, thrown about again as it lands,
+     * settling splayed. Posed over whatever its own animation gave it, and put back once the half is drawn.
+     */
+    public static void limp(Entity entity, EntityModel<?> model) {
+        if (drawingPiece == null || drawingCut == null || entity != drawingCut.body || model == null) return;
+        List<Limb> limbs = limbs(model);
+        if (limbs.isEmpty()) return;
+        Random random = new Random(entity.getId() * 31L + (drawingPiece.side > 0 ? 7 : 13));
+        float t = drawingAge, ease = 1 - (float) Math.exp(-t / 6);
+        float landed = drawingPiece.landed < 0 || t < drawingPiece.landed ? 0 : t - drawingPiece.landed;
+        for (Limb limb : limbs) {
+            float restX = limb.kind.restX(random), restZ = limb.kind.restZ(random), phase = random.nextFloat() * 6.28f, phase2 = random.nextFloat() * 6.28f;
+            if (drawingPiece.parts.getOrDefault(limb.part, UNKNOWN) != WHOLE) continue;
+            float swing = .85f * (float) Math.exp(-t / 9) * (float) Math.sin(t * .6f + phase);
+            if (landed > 0) swing += .7f * (float) Math.exp(-landed / 7) * (float) Math.sin(landed * .9f + phase2);
+            pose(limb.part, restX * ease + swing, restZ * ease + swing * .6f);
+            for (ModelPart follower : limb.followers)
+                if (drawingPiece.parts.getOrDefault(follower, UNKNOWN) == WHOLE) {keep(follower); follower.copyFrom(limb.part);}
+        }
+    }
+
+    private static void pose(ModelPart part, float x, float z) {
+        keep(part);
+        part.xRot += x;
+        part.zRot += z;
+    }
+
+    private static void keep(ModelPart part) {
+        POSED.add(part);
+        WAS.add(new float[]{part.xRot, part.yRot, part.zRot});
+    }
+
+    /** Every limb put back as its own animation had it: a model is shared by every body of its kind. */
+    private static void unlimp() {
+        for (int i = POSED.size() - 1; i >= 0; i--) {
+            float[] r = WAS.get(i);
+            POSED.get(i).setRotation(r[0], r[1], r[2]);
+        }
+        POSED.clear();
+        WAS.clear();
+    }
+
+    /** How a kind of limb goes limp: how far over it settles, in radians. */
+    private enum Kind {
+        HEAD(.3f, .9f, .5f), ARM(-1.5f, .6f, .9f), LEG(-.6f, .6f, .4f), LOOSE(-.7f, .7f, .7f);
+
+        final float lowX, highX, z;
+
+        Kind(float lowX, float highX, float z) {this.lowX = lowX; this.highX = highX; this.z = z;}
+
+        float restX(Random r) {return lowX + r.nextFloat() * (highX - lowX);}
+        float restZ(Random r) {return (r.nextFloat() * 2 - 1) * z;}
+    }
+
+    /** A limb, and the parts its own model copies it to (a player's sleeves and trouser legs, a humanoid's hat). */
+    private record Limb(ModelPart part, Kind kind, List<ModelPart> followers) { }
+
+    private static final Map<EntityModel<?>, List<Limb>> LIMBS = new IdentityHashMap<>();
+
+    private static List<Limb> limbs(EntityModel<?> model) {
+        return LIMBS.computeIfAbsent(model, m -> {
+            List<Limb> out = new ArrayList<>();
+            if (m instanceof PlayerModel<?> player) {
+                out.add(new Limb(player.head, Kind.HEAD, List.of(player.hat)));
+                out.add(new Limb(player.rightArm, Kind.ARM, List.of(player.rightSleeve)));
+                out.add(new Limb(player.leftArm, Kind.ARM, List.of(player.leftSleeve)));
+                out.add(new Limb(player.rightLeg, Kind.LEG, List.of(player.rightPants)));
+                out.add(new Limb(player.leftLeg, Kind.LEG, List.of(player.leftPants)));
+            } else if (m instanceof HumanoidModel<?> humanoid) {
+                out.add(new Limb(humanoid.head, Kind.HEAD, List.of(humanoid.hat)));
+                out.add(new Limb(humanoid.rightArm, Kind.ARM, List.of()));
+                out.add(new Limb(humanoid.leftArm, Kind.ARM, List.of()));
+                out.add(new Limb(humanoid.rightLeg, Kind.LEG, List.of()));
+                out.add(new Limb(humanoid.leftLeg, Kind.LEG, List.of()));
+            } else if (m instanceof QuadrupedModel<?> && m instanceof QuadrupedModelAccessor four) {
+                out.add(new Limb(four.hgos$head(), Kind.HEAD, List.of()));
+                for (ModelPart leg : new ModelPart[]{four.hgos$rightHindLeg(), four.hgos$leftHindLeg(), four.hgos$rightFrontLeg(), four.hgos$leftFrontLeg()})
+                    out.add(new Limb(leg, Kind.LEG, List.of()));
+            } else if (m instanceof HierarchicalModel<?> tree) {
+                named(tree.root(), out, 0);
+            }
+            return out;
+        });
+    }
+
+    /** A model built as one tree: its limbs are the parts named as limbs (the names are the model's own, never remapped). */
+    private static void named(ModelPart part, List<Limb> out, int depth) {
+        if (depth > 6 || !((Object) part instanceof ModelPartAccessor tree)) return;
+        for (Map.Entry<String, ModelPart> child : tree.hgos$children().entrySet()) {
+            String name = child.getKey().toLowerCase(Locale.ROOT);
+            Kind kind = name.contains("head") ? Kind.HEAD : name.contains("arm") ? Kind.ARM : name.contains("leg") ? Kind.LEG
+                : name.contains("tail") || name.contains("wing") || name.contains("fin") ? Kind.LOOSE : null;
+            if (kind != null) out.add(new Limb(child.getValue(), kind, List.of()));
+            // A limb's own parts go with it; only what is not a limb is looked into further.
+            else named(child.getValue(), out, depth + 1);
+        }
+    }
+
     /**
      * Buffers that keep only what is on one side of a plane, given in the space the corners arrive in: each quad or
      * triangle clipped against it as it is handed over, and where one is cut, the line it is cut along kept, to
-     * close into the cut face.
+     * close into the cut face. A part of the model wholly on the kept side goes through whole (so it may go limp
+     * without being cut), one wholly on the other is left out.
      */
     private static final class Clipper implements MultiBufferSource {
         private final MultiBufferSource buffers;
@@ -381,9 +554,23 @@ public final class Halving {
             return new Half(buffers.getBuffer(type), mode == VertexFormat.Mode.QUADS ? 4 : 3);
         }
 
-        private float side(float[] p, int o) {
-            float d = (p[o] - point.x) * keep.x + (p[o + 1] - point.y) * keep.y + (p[o + 2] - point.z) * keep.z;
+        private float side(float x, float y, float z) {
+            float d = (x - point.x) * keep.x + (y - point.y) * keep.y + (z - point.z) * keep.z;
             return Math.abs(d) < 1e-6f ? 1e-6f : d;
+        }
+
+        /** Where a model part's cubes lie against the plane, posed as they are now. */
+        int lies(Matrix4f pose, List<ModelPart.Cube> cubes) {
+            if (cubes.isEmpty()) return UNKNOWN;
+            int kept = 0, gone = 0;
+            Vector3f corner = new Vector3f();
+            for (ModelPart.Cube cube : cubes)
+                for (int c = 0; c < 8; c++) {
+                    corner.set(((c & 1) == 0 ? cube.minX : cube.maxX) / 16, ((c & 2) == 0 ? cube.minY : cube.maxY) / 16, ((c & 4) == 0 ? cube.minZ : cube.maxZ) / 16);
+                    pose.transformPosition(corner);
+                    if (side(corner.x, corner.y, corner.z) >= 0) kept++; else gone++;
+                }
+            return gone == 0 ? WHOLE : kept == 0 ? GONE : CUT;
         }
 
         /** What of a polygon (corners of {@link QuadCarver#STRIDE} floats) is on the kept side, its cut line noted. */
@@ -394,7 +581,7 @@ public final class Halving {
             int kept = 0, crossings = 0;
             for (int i = 0; i < n; i++) {
                 int a = i * s, b = (i + 1) % n * s;
-                float da = side(polygon, a), db = side(polygon, b);
+                float da = side(polygon[a], polygon[a + 1], polygon[a + 2]), db = side(polygon[b], polygon[b + 1], polygon[b + 2]);
                 if (da >= 0) {System.arraycopy(polygon, a, out, kept * s, s); kept++;}
                 if (da >= 0 != db >= 0) {
                     float t = da / (da - db);
@@ -410,14 +597,26 @@ public final class Halving {
             return left;
         }
 
-        /** The cut faces: each closed loop of cut lines, filled, red-hot and cooling from its rim in. */
-        void faces(float heat, int light) {
+        /**
+         * The cut faces: each closed loop of cut lines, filled. Raw blood red, darker at the rim, never too dark to see;
+         * seared instead when the blade burned, charred at the rim with the heat's light over it.
+         */
+        void faces(boolean seared, float heat, int light) {
             if (lines.isEmpty()) return;
             VertexConsumer out = buffers.getBuffer(RenderType.entitySolid(WorldEffects.WHITE));
             used.add(RenderType.entitySolid(WorldEffects.WHITE));
-            float[] glow = HoleHeat.glow(heat, new float[3]);
-            int bright = Math.max(LightTexture.block(light), Math.round(15 * heat));
-            int lit = LightTexture.pack(bright, LightTexture.sky(light));
+            float[] in, rim;
+            int lit;
+            if (seared) {
+                float[] glow = HoleHeat.glow(heat, new float[3]);
+                in = new float[]{Math.min(1, FLESH[0] + glow[0] * .55f), Math.min(1, FLESH[1] + glow[1] * .55f), Math.min(1, FLESH[2] + glow[2] * .55f)};
+                rim = new float[]{Math.min(1, CHAR[0] + glow[0]), Math.min(1, CHAR[1] + glow[1]), Math.min(1, CHAR[2] + glow[2])};
+                lit = LightTexture.pack(Math.max(LightTexture.block(light), Math.round(15 * heat)), LightTexture.sky(light));
+            } else {
+                in = RAW;
+                rim = RAW_RIM;
+                lit = LightTexture.pack(Math.max(LightTexture.block(light), RAW_LIGHT), LightTexture.sky(light));
+            }
             Vector3f outward = new Vector3f(keep).negate();
             boolean[] done = new boolean[lines.size()];
             for (int first = 0; first < lines.size(); first++) {
@@ -445,12 +644,12 @@ public final class Halving {
                     end = far;
                 }
                 if (!closed || loop.size() < 3) continue;
-                fill(out, loop, outward, glow, lit);
+                fill(out, loop, outward, in, rim, lit);
             }
         }
 
-        /** One loop, a fan from its middle: raw at the middle, charred at the rim, the heat's light over both. */
-        private static void fill(VertexConsumer out, List<Vector3f> loop, Vector3f outward, float[] glow, int light) {
+        /** One loop, a fan from its middle. */
+        private static void fill(VertexConsumer out, List<Vector3f> loop, Vector3f outward, float[] in, float[] rim, int light) {
             Vector3f middle = new Vector3f(), turn = new Vector3f();
             for (int i = 0; i < loop.size(); i++) {
                 Vector3f a = loop.get(i), b = loop.get((i + 1) % loop.size());
@@ -460,8 +659,6 @@ public final class Halving {
             middle.div(loop.size());
             // Wound to face out of the half, so only its outside is drawn.
             if (turn.dot(outward) < 0) java.util.Collections.reverse(loop);
-            float[] in = {Math.min(1, FLESH[0] + glow[0] * .55f), Math.min(1, FLESH[1] + glow[1] * .55f), Math.min(1, FLESH[2] + glow[2] * .55f)};
-            float[] rim = {Math.min(1, CHAR[0] + glow[0]), Math.min(1, CHAR[1] + glow[1]), Math.min(1, CHAR[2] + glow[2])};
             for (int i = 0; i < loop.size(); i++) {
                 Vector3f a = loop.get(i), b = loop.get((i + 1) % loop.size());
                 corner(out, middle, in, light, outward);
@@ -485,7 +682,9 @@ public final class Halving {
             }
 
             @Override void finish(float[] polygon) {
-                float[] left = clip(polygon);
+                int lies = drawingPart == null || drawingPiece == null ? UNKNOWN : drawingPiece.parts.getOrDefault(drawingPart, UNKNOWN);
+                if (lies == GONE) return;
+                float[] left = lies == WHOLE ? polygon : clip(polygon);
                 int s = QuadCarver.STRIDE, n = left.length / s;
                 if (n < 3) return;
                 if (size == 4) {QuadCarver.quads(out, left, overlay, nx, ny, nz); return;}

@@ -395,10 +395,12 @@ move('blade_sword_run_6', 14, [
 #     and the sword brought down from high on the left through the body to the right hip, fast and with everything
 #     behind it, cutting it in two along that line.
 EVIS_COCKED = P(body=(0, -.06, 0, -16, -14, 0), head=(-12, -14, 0), la=(-85, 15, 0, -6), aim=((.32, 1.14, .06), (0, .08, 1)), hint=(-20, 10, 0, -80))
-EVIS_IN = P(body=(0, -.15, -.36, -14, 4, 0), head=(-6, 4, 0), la=(40, 0, -40, -58), rl=(42, 0, 0, 2), ll=(-62, 0, 0, 62),
-            aim=((.15, 1.25, .8), (-.08, -.05, 1)), hint=(-85, 0, 0, -5))
-EVIS_DEEP = P(body=(0, -.16, -.39, -15, 5, 0), head=(-6, 5, 0), la=(42, 0, -42, -60), rl=(44, 0, 0, 2), ll=(-64, 0, 0, 64),
-              aim=((.15, 1.24, .84), (-.08, -.05, 1)), hint=(-85, 0, 0, -5))
+# The thrust at full stretch: the lunge deeper, the right shoulder driven through after the arm (the body turned a
+# little to the left), so the point comes well out of the back of the body.
+EVIS_IN = P(body=(0, -.18, -.5, -18, 16, 0), head=(-8, 16, 0), la=(44, 0, -44, -60), rl=(50, 0, 0, 2), ll=(-70, 0, 0, 66),
+            aim=((.3, 1.24, .82), (.2, -.05, 1)), hint=(-85, 0, 0, -5))
+EVIS_DEEP = P(body=(0, -.19, -.53, -19, 17, 0), head=(-8, 17, 0), la=(46, 0, -46, -62), rl=(52, 0, 0, 2), ll=(-72, 0, 0, 68),
+              aim=((.3, 1.23, .86), (.2, -.05, 1)), hint=(-85, 0, 0, -5))
 move('blade_sword_evis_dash', 16, [
     (0, 'linear', STILL),
     (2, 'outquad', EVIS_COCKED),

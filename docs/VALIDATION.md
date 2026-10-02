@@ -462,3 +462,9 @@ directional streaking. Cuboids spinning off in all directions read as rubble and
   faces close (a model whose surfaces are not closed leaves its cut open), the halves' fall and landing on slopes,
   stairs and ledges, and the frame rate with several at once.
 - A renderer that cannot draw a dead body this way: the body is then drawn its own way again.
+- The limp limbs: zombies, players (sleeves and trousers following), skeletons, cows, spiders and creepers; that a
+  limb wholly on one side flops without being cut, and the halves' slump on landing.
+- The raw red cut face at night and in daylight, and the seared one with a burning blade.
+- The parry's half-second stun on a creature and on a player.
+- The longer thrust: the point visibly out of the back of a zombie, a pig (looked down at) and a wider body, and the
+  fist meeting the body rather than going into it.

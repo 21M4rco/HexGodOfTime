@@ -4,23 +4,32 @@
   and it does again): it is Complete Evisceration, a tap, with a ten-second recovery of its own shown under the
   spell. You dash at the body you are looking at (up to nine blocks, a block a tick), the sword arm cocked back at the
   hip and the point straight ahead, your free hand reaching for it. When you reach it the arm is thrown out to its full
-  length in a deep lunge and the blade goes in at the gut and out of the back. The dash and the thrust follow your look
-  up and down, so the point goes in wherever you aim. Blood bursts out of the front round the blade and out of the back
-  after the point, the wound pumps round the blade while it is in, and you hear the same blade-piercing recording as
-  Gravity Grasp's stab.
+  length in a deep lunge, the shoulder driven through after it, the fist meeting the body and the point coming well out
+  of its back (some seven tenths of a block out of a zombie). The dash and the thrust follow your look up and down, so
+  the point goes in wherever you aim. Blood bursts up and pours down out of both wounds, the one in front and the one
+  in the back, and keeps pumping up and down the body while the blade is in: never across the blade's line, so the
+  blade and its point stay in plain sight. You hear the same blade-piercing recording as Gravity Grasp's stab.
 - **If it lives through it**, it is held on the blade a moment, five hearts down and bleeding (two stacks, six
   seconds), and let off it as the blade is torn out, a gush out of both wounds, staggering back.
 - **If it would die of it, it does not, yet.** The blade is torn back out of it, you step back off it, and the sword
   comes down from high on your left through it to your right hip, fast, the whole body behind it, and that kills it
   and cuts it in two along that line, as in your drawing. Any body: every mob, any size, a player, any mod's creature.
   Every client draws it twice through its own renderer, each time keeping only what lies on one side of the cut, so
-  nothing about the body needs to be known. The cut faces are burned like a Scepter hole: red-hot as the blade leaves
-  them, cooling through orange to a charred dark red, smoking, with the blood pouring out of them. The upper half
-  slides off down the cut, thrown away from you, its top going over to the right; the lower half stands a beat, then
-  buckles and goes over the far way. Both land on whatever is really under them with a wet thud, in pools of their own
-  blood, lie there ten seconds and sink away. A totem of undying that saves a player from the cut leaves them cut,
+  nothing about the body needs to be known. The cut faces are raw, blood red, red enough to see at night; only when the
+  blade is burning (transformed) are they seared like a Scepter hole instead, red-hot and cooling through orange, and
+  smoking. The upper half slides off down the cut, thrown away from you, its top going over to the right; the lower
+  half stands a beat, then buckles and goes over the far way. They fall limp, like a rag doll: every limb wholly on a
+  half's side of the cut (head, arms, legs, a tail or wings) swings loose as it falls, is thrown about again as the
+  half hits the ground with a wet thud and slumps back, and settles splayed. That is every humanoid, every four-legged
+  model, and every model built as one tree of named parts; a body drawn some other way (GeckoLib) falls as two rigid
+  halves. A limb the cut went through stays as it was, so nothing slides across the cut. The blood: the cut throws it
+  out of its whole length every way, nine sprays as heavy as any blade throws and a sheet four times the first one's,
+  pools all along under it; each half's cut face pours, heavily, for ten seconds, spurting with the last beats of the
+  heart for four, and splashes it up all round where it lands. They lie there ten seconds and sink away. A totem of undying that saves a player from the cut leaves them cut,
   not halved.
 - **Nothing reached** and the thrust goes into the air, with a three-second recovery. A shield turns it aside.
+- **The guard's parry stuns.** A blow parried from The Deceiver's guard (use held) no longer throws its striker back:
+  it is stunned where it stands, in reach, for half a second, creature or player, so you can answer it.
 
 ## The Deceiver cuts on the run, and the stab is heard going in and pours
 

@@ -191,6 +191,37 @@ public final class Blood {
     }
 
     /**
+     * Complete Evisceration's blade through a body: both wounds, where it went in and where its point comes out of the
+     * back, pump with every beat, running down the body and spurting up and down it, and pool under it. Nothing is thrown
+     * across the blade's line, which stays in plain sight.
+     */
+    public static void skewer(Entity e,Vec3 front,Vec3 back,int ticks) {
+        var mc=Minecraft.getInstance();
+        if(mc.level==null||mc.player==null||e.position().distanceToSqr(mc.player.getEyePosition())>RANGE)return;
+        var random=mc.level.random;
+        Vec3 through=back.subtract(front);
+        Vfx.bloom(e.getId(),front,new Vec3(0,1,0),Math.max(1,ticks),(at,aim,t)->{
+            int age=Math.round(t*ticks);
+            for(Vec3 wound:new Vec3[]{at,at.add(through)}) {
+                // Running down the body from it.
+                for(int i=0;i<10;i++)
+                    Vfx.spark(HexGodOfStories.BLOOD.get(),wound.add((random.nextDouble()-.5)*.2,(random.nextDouble()-.5)*.14,(random.nextDouble()-.5)*.2),
+                        new Vec3((random.nextDouble()-.5)*.03,-.05-random.nextDouble()*.06,(random.nextDouble()-.5)*.03));
+                // Each beat, a spurt up the body and a gush down it.
+                if(age<=1||age%4==0) {
+                    for(int i=0;i<44;i++) {
+                        boolean up=i%2==0;
+                        double speed=.08+random.nextDouble()*(up?.3:.18);
+                        Vfx.spark(HexGodOfStories.BLOOD.get(),wound,new Vec3((random.nextDouble()-.5)*.09,up?speed:-speed,(random.nextDouble()-.5)*.09));
+                    }
+                    drop(mc,e,wound.add((random.nextDouble()-.5)*.7,0,(random.nextDouble()-.5)*.7),random.nextDouble()*.3+.25,PUDDLE_LIFE,24);
+                }
+            }
+            drop(mc,e,null,random.nextDouble()*.4+.35,PUDDLE_LIFE,40);
+        });
+    }
+
+    /**
      * A blade's cut or stab (BladeCombo, the ordinary attacks, the charge's slam, a thrown knife): a heavy sheet of
      * blood flung off the edge the way the blade went, the fastest drops thrown furthest; thick gobs arcing out of the
      * wound and a fine spray bursting from it; then the wound pumping two or three spurts after the blade has gone, and

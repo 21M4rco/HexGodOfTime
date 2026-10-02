@@ -49,8 +49,11 @@ public final class Evisceration {
     /** The dash: blocks a tick, and ticks at most. */
     private static final double SPEED = 1.05;
     private static final int DASH = 8;
-    /** How near a body's side the dash stops: the thrust then puts the blade through it and out of the back. */
-    private static final double REACH = .9;
+    /**
+     * How near a body's side the dash stops: at the thrust's full stretch the fist meets it, as a blade driven in to the
+     * hilt, and the point comes out of the back (some seven tenths of a block out of a zombie).
+     */
+    private static final double REACH = 1.2;
     /** Ticks from the thrust's start to the blade going in (tools/blade_moves.py, blade_sword_evis_thrust's contact). */
     private static final int THRUST = 2;
     /** Lived through it: ticks after the blade goes in that it is torn out, and the move is over. */
@@ -193,11 +196,13 @@ public final class Evisceration {
         if (!run.doomed) BladeFire.burn(p, target);
         ServerLevel level = p.serverLevel();
         Vec3 f = forward(p), gut = gut(target), front = gut.subtract(f.scale(target.getBbWidth() / 2)), back = gut.add(f.scale(target.getBbWidth() / 2));
-        // In at the front, bursting back out round the blade; out of the back, thrown on after the point.
-        BladeCombo.spray(level, target, front, f.scale(-1).add(0, .3, 0).normalize(), BLOOD, p);
-        BladeCombo.spray(level, target, back, f.add(0, .15, 0).normalize(), BLOOD, null);
-        BladeCombo.spray(level, target, back, f.add(0, -.3, 0).normalize(), BLOOD, null);
-        impaleBlood(level, target, p, PULL + (run.doomed ? 0 : 2));
+        // Out of both wounds, up and down along the body, never across the blade's line: the blade, and its point out
+        // of the back, stay in plain sight.
+        BladeCombo.spray(level, target, front.add(0, .12, 0), f.scale(-.25).add(0, 1, 0).normalize(), BLOOD, p);
+        BladeCombo.spray(level, target, front.add(0, -.12, 0), f.scale(-.15).add(0, -1, 0).normalize(), BLOOD, null);
+        BladeCombo.spray(level, target, back.add(0, .12, 0), f.scale(.5).add(0, 1, 0).normalize(), BLOOD, null);
+        BladeCombo.spray(level, target, back.add(0, -.12, 0), f.scale(.4).add(0, -1, 0).normalize(), BLOOD, null);
+        skewered(level, target, front, back, PULL + (run.doomed ? 0 : 2));
         // The same recording as Gravity Grasp's stab, played as that is: twice at once, carried twice as far.
         for (int i = 0; i < 2; i++)
             level.playSound(null, target.getX(), gut.y, target.getZ(), HexGodOfStories.BLADE_PIERCE.get(), SoundSource.PLAYERS, 2, .94f);
@@ -218,8 +223,9 @@ public final class Evisceration {
             run.since = now;
             HexNetwork.animate(p, "blade_sword_evis_cut");
             // Torn out, and a step back off it.
-            Vec3 f = forward(p);
-            BladeCombo.spray(p.serverLevel(), target, gut(target).subtract(f.scale(target.getBbWidth() / 2)), f.scale(-1).add(0, .2, 0).normalize(), BLOOD, null);
+            Vec3 f = forward(p), front = gut(target).subtract(f.scale(target.getBbWidth() / 2));
+            BladeCombo.spray(p.serverLevel(), target, front.add(0, .1, 0), f.scale(-.3).add(0, 1, 0).normalize(), BLOOD, null);
+            BladeCombo.spray(p.serverLevel(), target, front.add(0, -.1, 0), f.scale(-.2).add(0, -1, 0).normalize(), BLOOD, null);
             p.level().playSound(null, target.blockPosition(), SoundEvents.HONEY_BLOCK_BREAK, SoundSource.PLAYERS, 1, .5f);
             p.level().playSound(null, p.blockPosition(), HexGodOfStories.BLADE_SWING.get(), SoundSource.PLAYERS, 1, .7f);
             move(p, f.scale(-.32), Math.min(0, p.getDeltaMovement().y));
@@ -263,11 +269,19 @@ public final class Evisceration {
             return;
         }
         halve(p, target);
-        // Thrown out of the whole length of the cut, both ways along it and up out of it.
+        // Out of the whole length of the cut, every way: along it both ways, up out of it, on after the blade, down the
+        // legs and back over the bearer.
+        Vec3 n = normal(p), f = forward(p), r = right(p);
+        double reach = Math.max(target.getBbWidth(), target.getBbHeight() * .5) * .4;
         BladeCombo.spray(level, target, gut, line, BLOOD, p);
-        BladeCombo.spray(level, target, gut, line.scale(-1).add(0, .6, 0).normalize(), BLOOD, null);
-        BladeCombo.spray(level, target, gut, normal(p).add(forward(p).scale(.5)).normalize(), BLOOD, null);
-        BladeCombo.spray(level, target, gut.add(0, -target.getBbHeight() * .2, 0), forward(p).add(0, -.2, 0).normalize(), BLOOD, null);
+        BladeCombo.spray(level, target, gut.add(line.scale(reach)), line.add(0, -.4, 0).normalize(), BLOOD, null);
+        BladeCombo.spray(level, target, gut.subtract(line.scale(reach)), line.scale(-1).add(0, .6, 0).normalize(), BLOOD, null);
+        BladeCombo.spray(level, target, gut, n.add(f.scale(.5)).normalize(), BLOOD, null);
+        BladeCombo.spray(level, target, gut, n.add(f.scale(-.4)).add(0, .5, 0).normalize(), BLOOD, null);
+        BladeCombo.spray(level, target, gut, n.scale(-1).add(f.scale(.6)).normalize(), BLOOD, null);
+        BladeCombo.spray(level, target, gut.add(0, -target.getBbHeight() * .2, 0), f.add(0, -.2, 0).normalize(), BLOOD, null);
+        BladeCombo.spray(level, target, gut.add(r.scale(target.getBbWidth() * .3)), r.add(0, .3, 0).normalize(), BLOOD, null);
+        BladeCombo.spray(level, target, gut.subtract(r.scale(target.getBbWidth() * .3)), r.scale(-1).add(0, .3, 0).normalize(), BLOOD, null);
         level.playSound(null, target.blockPosition(), SoundEvents.HONEY_BLOCK_BREAK, SoundSource.PLAYERS, 1.4f, .4f);
         level.playSound(null, target.blockPosition(), HexGodOfStories.SCEPTER_BURN.get(), SoundSource.PLAYERS, 1.2f, .7f);
         for (int i = 0; i < 2; i++)
@@ -289,16 +303,22 @@ public final class Evisceration {
         d.putDouble("fx", f.x); d.putDouble("fz", f.z);
         d.putDouble("x", target.getX()); d.putDouble("y", target.getY()); d.putDouble("z", target.getZ());
         d.putFloat("yaw", target.yBodyRot);
+        // Pure blood red at the cut, unless the blade was burning: then it is seared, and cools as a Scepter hole does.
+        d.putBoolean("burning", BladeFire.burning(p));
         d.putLong("start", target.level().getGameTime());
         HexNetwork.tracking(target, new HexNetwork.Message(HexNetwork.HALVE, target.getId(), d));
     }
 
-    /** The wound pumping round the blade while the body is on it (client Blood.impale, from the front). */
-    private static void impaleBlood(ServerLevel level, LivingEntity target, ServerPlayer by, int ticks) {
+    /**
+     * Both wounds pumping while the body is on the blade (client Blood.skewer): running and spurting up and down the
+     * body from where the blade goes in and where it comes out, nothing across its line.
+     */
+    private static void skewered(ServerLevel level, LivingEntity target, Vec3 front, Vec3 back, int ticks) {
         CompoundTag n = new CompoundTag();
-        n.putString("state", "impale");
+        n.putString("state", "skewer");
         n.putInt("id", target.getId());
-        n.putInt("by", by.getId());
+        n.putDouble("fx", front.x); n.putDouble("fy", front.y); n.putDouble("fz", front.z);
+        n.putDouble("bx", back.x); n.putDouble("by", back.y); n.putDouble("bz", back.z);
         n.putInt("ticks", ticks);
         HexNetwork.near(level, target.position(), 64, new HexNetwork.Message(HexNetwork.ARSENAL, target.getId(), n));
     }

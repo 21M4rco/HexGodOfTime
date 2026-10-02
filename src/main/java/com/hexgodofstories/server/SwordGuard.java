@@ -25,7 +25,8 @@ import java.util.UUID;
  * The Deceiver's guard: the use key held with the sword in hand. The bearer stands easy (Malenia's stance: the sword
  * arm loose, the long blade angled down and out), walks freely, and turns aside whatever comes at them from the front:
  * a shot is slapped back the way it came and becomes theirs; a blow is parried, the blades clashing in sparks and the
- * attacker thrown back a step. Each costs a little Temporal Energy, enough to make it a choice and little enough to make
+ * striker staggered where it stands, stunned for half a second ({@link #PARRY_STUN}): the bearer's chance to answer
+ * it. Each costs a little Temporal Energy, enough to make it a choice and little enough to make
  * it a habit; with none left the guard is only a stance.
  */
 public final class SwordGuard {
@@ -35,6 +36,8 @@ public final class SwordGuard {
     public static final String GUARD = "swordGuard";
     /** Energy a turned shot costs, and a parried blow. */
     static final float SHOT_COST = 1.5f, BLOW_COST = 2.5f;
+    /** Ticks a parried striker, creature or player, is stunned for. */
+    static final int PARRY_STUN = 10;
 
     private static final Set<UUID> GUARDS = new HashSet<>();
 
@@ -93,18 +96,17 @@ public final class SwordGuard {
         return true;
     }
 
-    /** A blow about to land on a guarding bearer, parried and its striker thrown back. @return true if it was. */
+    /** A blow about to land on a guarding bearer, parried and its striker stunned. @return true if it was. */
     public static boolean parry(ServerPlayer p, DamageSource source) {
         if (!guarding(p) || !(source.is(DamageTypes.MOB_ATTACK) || source.is(DamageTypes.PLAYER_ATTACK) || source.is(DamageTypes.MOB_ATTACK_NO_AGGRO)))
             return false;
         if (!(source.getEntity() instanceof LivingEntity attacker) || source.getDirectEntity() != attacker || attacker == p) return false;
         if (!facing(p, attacker.getEyePosition()) || HexData.energy(p) < BLOW_COST) return false;
         HexData.spend(p, BLOW_COST);
-        Vec3 away = attacker.position().subtract(p.position());
-        away = new Vec3(away.x, 0, away.z);
-        away = away.lengthSqr() < 1e-6 ? right(p).cross(new Vec3(0, -1, 0)) : away.normalize();
-        attacker.setDeltaMovement(attacker.getDeltaMovement().add(away.x * .9, .28, away.z * .9));
+        // Staggered where it stands, in reach, for half a second: no throw, which would only carry it out of reach.
+        attacker.setDeltaMovement(0, Math.min(0, attacker.getDeltaMovement().y), 0);
         attacker.hurtMarked = true;
+        ScepterBlast.stun(attacker, PARRY_STUN);
         Vec3 eye = p.getEyePosition();
         clash(p, eye.add(attacker.getEyePosition().subtract(eye).scale(.45)).add(0, -.3, 0), attacker.getEyePosition(), 1);
         return true;

@@ -404,6 +404,11 @@ public final class ArsenalClient {
                 Entity by = Minecraft.getInstance().level.getEntity(data.getInt("by"));
                 if (body != null) Blood.impale(body, by, data.getInt("ticks"));
             }
+            case "skewer" -> {
+                Entity body = Minecraft.getInstance().level.getEntity(data.getInt("id"));
+                if (body != null) Blood.skewer(body, new Vec3(data.getDouble("fx"), data.getDouble("fy"), data.getDouble("fz")),
+                    new Vec3(data.getDouble("bx"), data.getDouble("by"), data.getDouble("bz")), data.getInt("ticks"));
+            }
             case "anchor_flash" -> anchorFlash(data);
             case "gotcha" -> {
                 ArsenalMeshes.preload(FLASH, FLARE);
