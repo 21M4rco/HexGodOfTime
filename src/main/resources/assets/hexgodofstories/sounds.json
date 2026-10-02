@@ -32,6 +32,14 @@
       }
     ]
   },
+  "blade_pierce": {
+    "subtitle": "subtitles.hexgodofstories.blade_pierce",
+    "sounds": [
+      {
+        "name": "hexgodofstories:blade/pierce"
+      }
+    ]
+  },
   "blade_swing": {
     "subtitle": "subtitles.hexgodofstories.blade_swing",
     "sounds": [

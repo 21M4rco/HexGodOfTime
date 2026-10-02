@@ -1,3 +1,24 @@
+## The Deceiver cuts on the run, and the stab is heard going in
+
+- **Running cuts.** Attacking while sprinting with The Deceiver is no longer the same slam every time. Each attack is
+  one of seven running cuts, one-handed, the body leaning into the run and the legs left running under it: flat across
+  to the left, flat back across to the right at head height, down from the right shoulder to the left hip, down from
+  high on the left to the right hip, rising from the left hip past the right shoulder, rising from the right hip past
+  the left shoulder, and a rising cut up the middle to high overhead. Each starts on the side the last one ended, so
+  the blade always goes back and forth, and the next is picked at random from the ones that do, never the last cut
+  and never the one before it while another will do. The slam (the lunge and the two-handed cut straight down that
+  drives the body into the ground) is still there: it comes down out of the rising cut, the sword already overhead.
+  A cut lands on its fifth tick and the next can follow on the twelfth, so you keep running and keep cutting; a body
+  hit is thrown the way the blade went and on ahead of you, and a rising cut lifts it.
+- **The blood goes where the blade went.** Cut to the left and the blood is thrown to the left; to the right, to the
+  right; up, down, and across the same way. `tools/generate_blades.py` holds every running cut's point to its blood
+  through the game's own render chain, as it does for every other cut.
+- **As much blood as anything throws.** Every running cut, and the slam, throws the heaviest blood the game draws,
+  the same as Gravity Grasp tearing the knife out across the throat: the full sheet off the edge, the gobs, the spray,
+  the spurts after and the pools.
+- **Gravity Grasp's stab is heard going in.** The moment the dagger goes into the neck, a recording of a blade
+  piercing a body plays, on its own, from that tick (supplied by the mod's author; see SCEPTER_AUDIO_CREDITS.md).
+
 ## Paradise's price, kept; the fire sword points and burns like its blade
 
 - **Warping pools are oil, not a trapdoor.** Whatever touches the liquid, it takes: a foot over the rim, a corner of

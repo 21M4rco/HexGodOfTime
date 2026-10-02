@@ -329,6 +329,64 @@ move('blade_sword_dash', 20, [
                         aim=((.06, .84, .72), (0, -.8, .6)), two=True)),
     (20, 'inoutsine', NEUTRAL)])
 
+# --- The running cuts (sprinting, the attack key, one after another): one hand, the body leaning into the run and the
+#     legs left to it, each cut out of the run and back into it. Every one a different line, and each starts on the
+#     side the one before ended (server/HexServer, RUN_CUTS): flat across to the left and back across to the right,
+#     down from either shoulder, rising from either hip, and the rising cut up the middle that the slam comes down out of.
+# 1. Flat across to the left: the sword drawn out wide on the right and whipped across at the chest, the hips turning in.
+move('blade_sword_run_0', 14, [
+    (0, 'linear', RUNNING),
+    (3, 'outquad', P(body=(0, -.02, .02, -10, -34, 0), head=(-8, -34, 0), la=(-70, 20, 0, -20), aim=((.62, 1.3, .16), (.9, .08, .25)))),
+    (5, 'inquad', P(body=(0, -.06, -.1, -16, 8, 0), head=(-12, 8, 0), la=(0, 0, -50, -20), aim=((.05, 1.3, .66), (-.2, 0, 1)))),
+    (7, 'outquad', P(body=(0, -.06, -.1, -16, 30, 0), head=(-12, 26, 0), la=(20, 0, -60, -20), aim=((-.4, 1.22, .46), (-.95, -.05, .25)))),
+    (14, 'inoutsine', RUNNING)])
+# 2. Flat back across to the right at the head: the blade carried back past the left shoulder, then out to the right.
+move('blade_sword_run_1', 14, [
+    (0, 'linear', RUNNING),
+    (3, 'outquad', P(body=(0, -.02, .02, -10, 30, 0), head=(-8, 26, 0), la=(-30, 20, 0, -70), aim=((-.18, 1.34, .38), (-.65, .45, -.6)),
+                     hint=(-80, -30, 0, -60))),
+    (5, 'inquad', P(body=(0, -.06, -.08, -16, -4, 0), head=(-12, -4, 0), la=(-4, 0, -64, -12), aim=((.1, 1.42, .64), (.05, 0, 1)))),
+    (7, 'outquad', P(body=(0, -.06, -.08, -15, -28, 0), head=(-11, -22, 0), la=(0, 0, -78, -8), aim=((.66, 1.4, .28), (.97, 0, .12)))),
+    (14, 'inoutsine', RUNNING)])
+# 3. The rising cut up the middle: the blade trailing low on the right, then brought up through the body to high
+#    overhead, the bearer coming up out of the lean with it.
+move('blade_sword_run_2', 14, [
+    (0, 'linear', RUNNING),
+    (3, 'outquad', P(body=(0, -.08, .02, -20, -22, 0), head=(-14, -22, 0), la=(-40, 15, 0, -20), aim=((.46, .74, .12), (.35, -.6, -.7)))),
+    (5, 'inexpo', P(body=(0, 0, -.06, -6, 4, 0), head=(-8, 4, 0), la=(20, 0, -50, -20), aim=((.2, 1.45, .58), (0, .75, .65)))),
+    (7, 'outquad', P(body=(0, .03, -.06, 6, 10, 0), head=(-14, 10, 0), la=(30, 0, -60, -20), aim=((.18, 1.95, .3), (0, 1, -.1)))),
+    (14, 'inoutsine', RUNNING)])
+# 4. Down from over the right shoulder through the left hip, the body folding over the cut.
+move('blade_sword_run_3', 14, [
+    (0, 'linear', RUNNING),
+    (3, 'outquad', P(body=(0, -.02, .02, -8, -28, 0), head=(-6, -28, 0), la=(-75, 15, 0, -10), aim=((.45, 1.68, -.02), (.15, .75, -.65)))),
+    (5, 'inquad', P(body=(0, -.08, -.1, -20, 20, 0), head=(-10, 20, 0), la=(20, -10, -25, -30), aim=((.02, 1.18, .62), (-.5, -.35, .8)))),
+    (7, 'outquad', P(body=(0, -.09, -.1, -22, 32, 0), head=(-10, 28, 0), la=(34, -10, -30, -36), aim=((-.33, .85, .45), (-.7, -.6, .4)))),
+    (14, 'inoutsine', RUNNING)])
+# 5. Rising from the left hip, a backhand up and out past the right shoulder.
+move('blade_sword_run_4', 14, [
+    (0, 'linear', RUNNING),
+    (3, 'outquad', P(body=(0, -.08, .02, -16, 26, 0), head=(-10, 26, 0), la=(10, 0, -30, -20), aim=((-.28, .82, .44), (-.5, -.6, .6)))),
+    (5, 'inquad', P(body=(0, -.04, -.06, -12, 0, 0), head=(-10, 0, 0), la=(-20, 0, -40, -24), aim=((.15, 1.25, .64), (.4, .5, .75)))),
+    (7, 'outquad', P(body=(0, 0, -.06, -4, -20, 0), head=(-14, -20, 0), la=(-40, 0, -40, -30), aim=((.55, 1.72, .22), (.4, .85, -.1)))),
+    (14, 'inoutsine', RUNNING)])
+# 6. Down from high on the left to the right hip: the arm reaching across in front of the face, the blade up and out to
+#    the left (never up and back over the shoulder), and a backhand down through the body.
+move('blade_sword_run_5', 14, [
+    (0, 'linear', RUNNING),
+    (3, 'outquad', P(body=(0, -.01, .02, -8, 24, 0), head=(-6, 22, 0), la=(10, 0, -30, -20), aim=((-.15, 1.65, .34), (-.7, .55, .3)),
+                     hint=(-120, -30, 0, -40))),
+    (5, 'inquad', P(body=(0, -.07, -.1, -18, -6, 0), head=(-10, -6, 0), la=(-10, 0, -50, -20), aim=((.2, 1.2, .64), (.45, -.4, .8)))),
+    (7, 'outquad', P(body=(0, -.08, -.1, -20, -26, 0), head=(-10, -22, 0), la=(0, 0, -70, -10), aim=((.55, .85, .42), (.7, -.6, .35)))),
+    (14, 'inoutsine', RUNNING)])
+# 7. Rising from the right hip up across the body and out past the left shoulder.
+move('blade_sword_run_6', 14, [
+    (0, 'linear', RUNNING),
+    (3, 'outquad', P(body=(0, -.08, .02, -16, -26, 0), head=(-10, -26, 0), la=(-60, 20, 0, -40), aim=((.55, .78, .22), (.55, -.6, .55)))),
+    (5, 'inquad', P(body=(0, -.04, -.06, -12, 4, 0), head=(-10, 4, 0), la=(0, 0, -50, -20), aim=((.05, 1.3, .64), (-.35, .5, .8)))),
+    (7, 'outquad', P(body=(0, 0, -.06, -4, 26, 0), head=(-14, 22, 0), la=(20, 0, -60, -20), aim=((-.28, 1.66, .46), (-.45, .85, .15)))),
+    (14, 'inoutsine', RUNNING)])
+
 # --- The Deceiver at rest (in hand, the bearer standing still a while): weight on one leg, the sword hanging from a
 #     loose wrist a little ahead, its point resting on the ground in front, the free hand on the hip. The head is the
 #     player's own.
@@ -407,9 +465,11 @@ CONTACT = {'blade_dagger_0': 4, 'blade_dagger_1': 3, 'blade_dagger_2': 5, 'blade
            'blade_sword_0': 5, 'blade_sword_1': 7, 'blade_sword_2': 5, 'blade_sword_3': 6,
            'blade_m_dagger_0': 4, 'blade_m_dagger_1': 4, 'blade_m_dagger_2': 4, 'blade_m_dagger_3': 4,
            'blade_m_sword_0': 6, 'blade_m_sword_1': 6, 'blade_m_sword_2': 6, 'blade_m_sword_3': 6, 'blade_sword_dash': 6,
-           'blade_grasp_stab': 6}
+           'blade_grasp_stab': 6, **{f'blade_sword_run_{i}': 5 for i in range(7)}}
 SWINGS = {'blade_dagger_0': (1, 0, 0), 'blade_dagger_1': (0, -.8, .6), 'blade_dagger_2': (0, 0, 1), 'blade_dagger_3': (1, 0, 0),
           'blade_sword_0': (-.7, -.7, 0), 'blade_sword_1': (1, 0, 0), 'blade_sword_2': (0, 0, 1), 'blade_sword_3': (0, 1, 0),
           'blade_m_dagger_0': (-.7, -.7, 0), 'blade_m_dagger_1': (1, 0, 0), 'blade_m_dagger_2': (-.7, -.7, 0), 'blade_m_dagger_3': (0, 0, 1),
           'blade_m_sword_0': (-.7, -.7, 0), 'blade_m_sword_1': (.6, .8, 0), 'blade_m_sword_2': (-1, 0, 0), 'blade_m_sword_3': (0, -.8, .6),
-          'blade_sword_dash': (0, -.8, .6), 'blade_grasp_stab': (-.2, -.5, .85)}
+          'blade_sword_dash': (0, -.8, .6), 'blade_grasp_stab': (-.2, -.5, .85),
+          'blade_sword_run_0': (-1, 0, 0), 'blade_sword_run_1': (1, 0, 0), 'blade_sword_run_2': (0, 1, 0), 'blade_sword_run_3': (-.7, -.7, 0),
+          'blade_sword_run_4': (.7, .7, 0), 'blade_sword_run_5': (.7, -.7, 0), 'blade_sword_run_6': (-.7, .7, 0)}

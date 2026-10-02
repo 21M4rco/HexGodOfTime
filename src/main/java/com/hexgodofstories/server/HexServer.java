@@ -34,12 +34,39 @@ public final class HexServer {
     public static final int TIME_HALT=0,TIME_REWIND=2;
     public record Moment(Vec3 position,float yaw,float pitch,float health) {}
     private record Charm(Mob mob,UUID owner,long end,UUID previous) {}
-    private record Strike(int weapon,int combo,long contact,long end,boolean slam) {
-        Strike(int weapon,int combo,long contact,long end){this(weapon,combo,contact,end,false);}
+    /** cut: which of RUN_CUTS this is (-1 for any other blow); earlier: the running cut before it, if it followed one. */
+    private record Strike(int weapon,int combo,long contact,long end,boolean slam,int cut,int earlier) {
+        Strike(int weapon,int combo,long contact,long end){this(weapon,combo,contact,end,false,-1,-1);}
     }
     /** The charge's slam (sprinting, The Deceiver's attack): its reach from where the lunge has carried the bearer, its weight. */
     private static final double SLAM_REACH=4.2;
     private static final float SLAM_DAMAGE=9;
+    /**
+     * The running cuts (sprinting with The Deceiver, the attack key, again and again): each its own move
+     * (tools/blade_moves.py), the sides it may follow on from (L, R, or H high overhead), the side it ends on, and where its
+     * blood goes in the caster's right, up and forward (blade_moves.SWINGS, which generate_blades.py holds each cut's point
+     * to). Each is drawn at random from the ones that start where the last ended, so the blade always goes back and forth,
+     * never the same cut twice and never back to the one before that while another will do. The slam comes down only out
+     * of the rising cut, and the run carries the sword on the right, so a string of them always opens from there.
+     */
+    private record RunCut(String animation,String after,char end,double right,double up,double forward) {}
+    private static final RunCut[] RUN_CUTS={
+        new RunCut("blade_sword_run_0","R",'L',-1,0,0),         // flat across to the left
+        new RunCut("blade_sword_run_1","L",'R',1,0,0),          // flat back across to the right
+        new RunCut("blade_sword_run_2","R",'H',0,1,0),          // rising up the middle to overhead
+        new RunCut("blade_sword_run_3","RH",'L',-.7,-.7,0),     // down from the right shoulder to the left hip
+        new RunCut("blade_sword_run_4","L",'R',.7,.7,0),        // rising from the left hip past the right shoulder
+        new RunCut("blade_sword_run_5","LH",'R',.7,-.7,0),      // down from high on the left to the right hip
+        new RunCut("blade_sword_run_6","R",'L',-.7,.7,0),       // rising from the right hip past the left shoulder
+        new RunCut("blade_sword_dash","H",'R',0,-.8,.6)};       // the slam, straight down
+    private static final int SLAM_CUT=7;
+    /** A running cut's contact and recovery (ticks), its reach and how nearly ahead a body must be, and how long after the
+     *  last a string of them goes on. */
+    private static final int RUN_CONTACT=5,RUN_RECOVERY=12,RUN_CHAIN=18;
+    private static final double RUN_REACH=4.0;
+    /** The running cuts' and the slam's blood: as heavy as any blade throws (Gravity Grasp's cut across the throat), and
+     *  as much as a client draws (Blood.slash). */
+    private static final float RUN_BLOOD=2.5f;
     /** Where each ordinary attack's blood goes, in the caster's right, up and forward (tools/blade_moves.py, SWINGS). */
     private static final double[][] DAGGER_SWINGS={{-.7,-.7,0},{1,0,0},{-.7,-.7,0},{0,0,1}},
         SWORD_SWINGS={{-.7,-.7,0},{.6,.8,0},{-1,0,0},{0,-.8,.6}};
@@ -484,16 +511,23 @@ public final class HexServer {
         // Deceiver's, slower and heavier, on their sixth.
         boolean sword=w.kind==3;
         if(sword&&p.isSprinting()) {
-            // The charge's slam (blade_sword_dash): both hands on the grip, a lunge off the stride with the sword swung
-            // up overhead, and on the sixth tick it comes straight down. It ends a string of cuts: the next starts over.
-            Vec3 look=p.getLookAngle(),ahead=new Vec3(look.x,0,look.z);
-            ahead=ahead.lengthSqr()<1e-6?Vec3.ZERO:ahead.normalize();
-            p.setDeltaMovement(p.getDeltaMovement().multiply(.5,1,.5).add(ahead.x*.62,p.onGround()?.12:0,ahead.z*.62));
-            p.hurtMarked=true;
-            STRIKES.put(p.getUUID(),new Strike(3,3,now+6,now+20,true));
-            HexNetwork.animate(p,"blade_sword_dash");
+            // A running cut (RUN_CUTS), never the one before; the run carries on through it. Either way it ends a string of
+            // standing cuts: the next starts over.
+            boolean going=prior!=null&&prior.cut>=0&&now-prior.end<=RUN_CHAIN;
+            int cut=nextCut(p,going?prior.cut:-1,going?prior.earlier:-1);
+            boolean slam=cut==SLAM_CUT;
+            if(slam) {
+                // The charge's slam (blade_sword_dash): both hands on the grip, a lunge off the stride with the sword swung
+                // up overhead, and on the sixth tick it comes straight down.
+                Vec3 look=p.getLookAngle(),ahead=new Vec3(look.x,0,look.z);
+                ahead=ahead.lengthSqr()<1e-6?Vec3.ZERO:ahead.normalize();
+                p.setDeltaMovement(p.getDeltaMovement().multiply(.5,1,.5).add(ahead.x*.62,p.onGround()?.12:0,ahead.z*.62));
+                p.hurtMarked=true;
+            }
+            STRIKES.put(p.getUUID(),new Strike(3,3,now+(slam?6:RUN_CONTACT),now+(slam?20:RUN_RECOVERY),slam,cut,going?prior.cut:-1));
+            HexNetwork.animate(p,RUN_CUTS[cut].animation);
             HexNetwork.fx(p,"slash");
-            p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,1,.82f);
+            p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,slam?1:.9f,slam?.82f:.94f+p.getRandom().nextFloat()*.14f);
             return;
         }
         boolean twin=!sword&&p.getOffhandItem().is(HexGodOfStories.DAGGER.get());
@@ -553,17 +587,23 @@ public final class HexServer {
         Strike strike=STRIKES.get(p.getUUID());
         if(strike!=null&&strike.contact==now) {
             boolean sword=strike.weapon==3,slam=strike.slam;
-            double reach=slam?SLAM_REACH:sword?3.8:2.9;
-            boolean finisher=strike.combo==3;
+            RunCut run=strike.cut>=0?RUN_CUTS[strike.cut]:null;
+            double reach=slam?SLAM_REACH:run!=null?RUN_REACH:sword?3.8:2.9;
+            // Only the standing string's fourth cut and the slam leave the body bleeding; the running cuts just open it.
+            boolean finisher=slam||run==null&&strike.combo==3;
             if(slam)slamGround(p);
             for(LivingEntity e:p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(reach),e->validTarget(p,e)&&p.hasLineOfSight(e))) {
                 Vec3 direction=e.getEyePosition().subtract(p.getEyePosition()).normalize();
-                if(direction.dot(p.getLookAngle())<(slam?.25:.35)||p.distanceToSqr(e)>reach*reach)continue;
+                if(direction.dot(p.getLookAngle())<(slam?.25:run!=null?.3:.35)||p.distanceToSqr(e)>reach*reach)continue;
                 if(!e.hurt(p.damageSources().playerAttack(p),(slam?SLAM_DAMAGE:sword?5:4)+(sword?BladeFire.scorch(p,e):0)))continue;
                 if(sword)BladeFire.burn(p,e);
-                // The blood goes the way this swing's edge went (blade_moves.SWINGS), and a sword's cut lands heavy.
-                double[] swing=(sword?SWORD_SWINGS:DAGGER_SWINGS)[strike.combo&3];
-                BladeCombo.blood(p,e,swing[0],swing[1],swing[2],slam?2.4f:sword?1.5f:1.1f);
+                // The blood goes the way this swing's edge went (blade_moves.SWINGS), and a sword's cut lands heavy; a
+                // running cut's, and the slam's, as heavy as any.
+                if(run!=null)BladeCombo.blood(p,e,run.right,run.up,run.forward,RUN_BLOOD);
+                else {
+                    double[] swing=(sword?SWORD_SWINGS:DAGGER_SWINGS)[strike.combo&3];
+                    BladeCombo.blood(p,e,swing[0],swing[1],swing[2],sword?1.5f:1.1f);
+                }
                 if(sword) {
                     p.serverLevel().sendParticles(net.minecraft.core.particles.ParticleTypes.CRIT,e.getX(),e.getY()+e.getBbHeight()*.6,e.getZ(),10,.25,.3,.25,.35);
                     p.level().playSound(null,e.blockPosition(),net.minecraft.sounds.SoundEvents.PLAYER_ATTACK_STRONG,SoundSource.PLAYERS,.9f,.8f+p.getRandom().nextFloat()*.1f);
@@ -574,6 +614,15 @@ public final class HexServer {
                     e.hurtMarked=true;
                     ScepterBlast.stun(e,14);
                 }
+                else if(run!=null) {
+                    // Thrown the way the blade went, and on ahead of the run; a rising cut lifts it besides.
+                    Vec3 look=p.getLookAngle(),ahead=new Vec3(look.x,0,look.z);
+                    ahead=ahead.lengthSqr()<1e-6?new Vec3(0,0,1):ahead.normalize();
+                    Vec3 push=new Vec3(-ahead.z,0,ahead.x).scale(run.right).add(ahead.scale(.6));
+                    e.knockback(.55,-push.x,-push.z);
+                    if(run.up>.5)e.setDeltaMovement(e.getDeltaMovement().add(0,.15*run.up,0));
+                    e.hurtMarked=true;
+                }
                 else e.knockback(sword?.55:.25,p.getX()-e.getX(),p.getZ()-e.getZ());
                 if(finisher)Bleed.apply(p,e,1,120);
                 reward(p,Discipline.CONJURATION,55);
@@ -581,6 +630,22 @@ public final class HexServer {
                 p.level().playSound(null,e.blockPosition(),HexGodOfStories.BLADE_HIT.get(),SoundSource.PLAYERS,.85f,1+p.getRandom().nextFloat()*.14f);
             }
         }
+    }
+
+    /**
+     * The next running cut after `last` (and `before` that), or the first of a string when last is -1: one that starts on
+     * the side `last` ended, never `last` itself, and not `before` either while another will do.
+     */
+    private static int nextCut(ServerPlayer p,int last,int before) {
+        char end=last<0?'R':RUN_CUTS[last].end;
+        List<Integer> fresh=new ArrayList<>(),any=new ArrayList<>();
+        for(int i=0;i<RUN_CUTS.length;i++) {
+            if(i==last||RUN_CUTS[i].after.indexOf(end)<0)continue;
+            any.add(i);
+            if(i!=before)fresh.add(i);
+        }
+        List<Integer> from=fresh.isEmpty()?any:fresh;
+        return from.get(p.getRandom().nextInt(from.size()));
     }
 
     /** Where the charge's slam comes down, a stride ahead: the ground cracks and throws up what it is made of. */

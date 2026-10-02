@@ -200,11 +200,10 @@ public final class GravityGrasp {
             n.putInt("by", p.getId());
             n.putInt("ticks", STAB_OUT - STAB_IN);
             HexNetwork.near(level, body.position(), 64, new HexNetwork.Message(HexNetwork.ARSENAL, body.getId(), n));
-            level.playSound(null, body.getX(), body.getY(), body.getZ(), HexGodOfStories.BLADE_HIT.get(), SoundSource.PLAYERS, 1, .7f);
-            level.playSound(null, body.getX(), body.getY(), body.getZ(), SoundEvents.HONEY_BLOCK_BREAK, SoundSource.PLAYERS, 1, .55f);
-            level.playSound(null, body.getX(), body.getY(), body.getZ(), SoundEvents.PLAYER_ATTACK_CRIT, SoundSource.PLAYERS, .8f, .6f);
-        } else if (t == 9 || t == 19) {
-            // Leaned on, pushed deeper.
+            // The recording of a blade going into a body, from the tick it goes in, alone: nothing laid over it.
+            level.playSound(null, body.getX(), body.getEyeY(), body.getZ(), HexGodOfStories.BLADE_PIERCE.get(), SoundSource.PLAYERS, 1, 1);
+        } else if (t == 19) {
+            // Leaned on, pushed deeper. (The first push, on the ninth, is the loudest moment of the recording itself.)
             level.playSound(null, body.getX(), body.getY(), body.getZ(), SoundEvents.HONEY_BLOCK_SLIDE, SoundSource.PLAYERS, .9f, .5f);
         } else if (t == STAB_OUT) {
             // Out: torn across the throat and away to the right, a sheet of blood thrown after it.

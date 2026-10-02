@@ -34,3 +34,15 @@ Mirrors used (pinned in the import tool): Kenney files from
 https://github.com/Mcamento8/open-game-sfx-index (commit 34bbe8b), Warfork files from
 https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (commit f2b6264, folder `warfork-cc0`,
 which carries Team Forbidden's CC0 notice). CC0 needs no attribution; it is given here anyway.
+
+## Blade sounds
+
+Gravity Grasp's stab, the dagger going into the neck, is a recording supplied for the mod by its author as
+`universfield-blade-piercing-body-352462.mp3` (the name of a Universfield "blade piercing body" effect). It is kept
+as supplied in `tools/audio_sources/blade/pierce.mp3` and prepared by `tools/prepare_blade_audio.py`: mono
+down-mix, leading silence trimmed so it sounds on the tick the blade goes in, the silent tail cut, peak-normalised
+to -1 dBFS, a 12 ms tail fade, and Ogg Vorbis.
+
+| Mod sound | Source file | Author | Note |
+|---|---|---|---|
+| `blade/pierce` | `pierce.mp3` | supplied by the mod's author | 1.51 s, played alone as the stab goes in |
