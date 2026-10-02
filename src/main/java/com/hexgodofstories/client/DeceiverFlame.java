@@ -37,10 +37,9 @@ import java.util.UUID;
  *
  * <p>The fire is drawn on the blade itself, in the weapon's own space, so it is wherever the blade is: either hand
  * view, every move and stance. It is tongues of flame along the blade, each rising the way the world's up is (not
- * the blade's), licking up, stretching, tearing away and fading as the next comes up under it, swaying as it goes:
- * red at the edges, orange through the body, a white-hot core low in it, and blue where it touches the steel. Light,
- * so it is only ever added to what is behind it. In the world around a blade in sight: embers and smoke rising off
- * it, the odd spit of flame, and its crackle.
+ * the blade's) from under the steel so it wraps the whole of it, licking up, stretching, tearing away and fading as
+ * the next comes up under it, swaying as it goes: red at the edges, orange through the body, a white-hot core low in
+ * it, and blue where it touches the steel. In the world around a blade in sight: smoke rising off it, and its crackle.
  */
 public final class DeceiverFlame {
     private DeceiverFlame() {}
@@ -49,12 +48,12 @@ public final class DeceiverFlame {
     static final int IGNITE = 50;
     /** Where the blade runs, in weapon space (tools/generate_blades.py: the guard to the point). */
     private static final float FOOT = .28f, POINT = 1.52f;
-    private static final int TONGUES = 34, LICKS = 14;
+    private static final int TONGUES = 40, LICKS = 14;
     private static final int RED = 0xff4a12, ORANGE = 0xff9628, CORE = 0xfff0c4, BLUE = 0x3a62ff, HEAT = 0xff7a24;
 
     /** Since when each player's blade has been alight, by id. */
     private static final Map<Integer, Long> LIT = new HashMap<>();
-    /** Where each burning blade was drawn in the world this frame (third person), for its embers. */
+    /** Where each burning blade was drawn in the world this frame (third person), for its smoke. */
     private record Drawn(Vec3 foot, Vec3 point, long tick) {}
     private static final Map<Integer, Drawn> DRAWN = new HashMap<>();
     private static final Map<Integer, Long> CRACKLE = new HashMap<>();
@@ -102,50 +101,66 @@ public final class DeceiverFlame {
             Vec3 foot = ScepterFx.world(m, 0, FOOT, 0), point = ScepterFx.world(m, 0, FOOT + (POINT - FOOT) * caught, 0);
             if (foot != null) DRAWN.put(holder.getId(), new Drawn(foot, point, ClientState.now()));
         }
-        VertexConsumer out = buffers.getBuffer(Types.light(flameSheet()));
         float front = FOOT + (POINT - FOOT) * caught;
-        // Blue licks hugging the steel, low and quick, strongest toward the guard.
-        for (int i = 0; i < LICKS; i++) {
-            float along = (i + .5f) / LICKS, y = FOOT + (POINT - FOOT) * along;
-            float grown = Mth.clamp((front - y) / .12f, 0, 1);
-            if (grown <= 0) continue;
-            double s = frac(time * .11 + i * .618);
-            float h = (float) (.08 + .06 * s) * grown * (1.3f - .6f * along);
-            float a = (float) Math.pow(Math.sin(Math.PI * s), .6) * .8f * grown * (1.2f - .7f * along);
-            tongue(out, pose, eye, rise, new Vector3f(0, y, 0), h, h * .75f, 0, BLUE, a);
-        }
-        // The tongues, spread unevenly along the blade and overlapping into one body of fire: each licks up off a blue
-        // root, stretches, tears away and fades as the next comes up under it. The tallest are toward the point,
+        // The tongues, spread unevenly along the blade and overlapping into one body of fire. Each is rooted under the
+        // steel (the side away from the sky), so the fire wraps the whole blade rather than sitting along its top; it
+        // licks up, stretches, tears away and fades as the next comes up under it. The tallest are toward the point,
         // which carries the fire of the whole blade above it.
+        int count = 0;
         for (int i = 0; i < TONGUES; i++) {
             double r1 = hash(i + .1), r2 = hash(i + .2), r3 = hash(i + .3), r4 = hash(i + .4);
             float along = (float) ((i + .5 + (r1 - .5) * .9) / TONGUES), y = FOOT + (POINT - FOOT) * along;
             float grown = Mth.clamp((front - y) / .22f, 0, 1);
             if (grown <= 0) continue;
             double s = frac(time * (.05 + .035 * r2) + r3);
-            double reach = (.22 + .3 * r4) * (1 + .9 * along * along);
+            double reach = (.34 + .34 * r4) * (1 + .55 * along * along);
             float tall = (float) (reach * (.5 + .75 * s) * (.85 + .15 * Math.sin(time * .9 + i * 2.3))) * (.35f + .65f * grown);
-            float fade = (float) Math.pow(Math.sin(Math.PI * s), .6) * grown;
-            float sway = (float) (.3 * Math.sin(time * .17 + i * 1.7) + .14 * Math.sin(time * .47 + i * 3.1) + (r1 - .5) * .3);
             Vector3f foot = new Vector3f((float) (r2 - .5) * .07f, y, (float) (r3 - .5) * .05f);
-            foot.add(new Vector3f(rise).mul((float) (s * s) * tall * .3f + .04f));
-            float wide = (float) (.45 + .28 * r1);
-            tongue(out, pose, eye, rise, foot, tall, tall * wide, sway, RED, .3f * fade);
-            tongue(out, pose, eye, rise, foot, tall * .8f, tall * wide * .62f, sway * .8f, ORANGE, .36f * fade);
-            tongue(out, pose, eye, rise, foot, tall * .5f, tall * wide * .28f, sway * .5f, CORE, .4f * fade);
+            foot.add(new Vector3f(rise).mul((float) (s * s) * tall * .3f - .1f - .08f * (float) r4));
+            FEET[count] = foot;
+            TALL[count] = tall;
+            WIDE[count] = (float) (.5 + .3 * r1);
+            SWAY[count] = (float) (.3 * Math.sin(time * .17 + i * 1.7) + .14 * Math.sin(time * .47 + i * 3.1) + (r1 - .5) * .3);
+            FADE[count] = (float) Math.pow(Math.sin(Math.PI * s), .6) * grown;
+            count++;
         }
+        // Their red edges and orange bodies are colour laid over what is behind (fire is orange against a bright
+        // sky, not white); the blue at the steel, the white-hot cores and the steel's glow are light added to it. All of
+        // the colour first, then all of the light: each kind is drawn as its own batch, in that order.
+        VertexConsumer veil = buffers.getBuffer(Types.veil(flameSheet()));
+        for (int k = 0; k < count; k++) tongue(veil, pose, eye, rise, FEET[k], TALL[k], TALL[k] * WIDE[k], SWAY[k], RED, .5f * FADE[k]);
+        for (int k = 0; k < count; k++)
+            tongue(veil, pose, eye, rise, FEET[k], TALL[k] * .8f, TALL[k] * WIDE[k] * .62f, SWAY[k] * .8f, ORANGE, .55f * FADE[k]);
+        VertexConsumer out = buffers.getBuffer(Types.light(flameSheet()));
+        // Blue licks hugging the steel, low and quick, strongest toward the guard.
+        for (int i = 0; i < LICKS; i++) {
+            float along = (i + .5f) / LICKS, y = FOOT + (POINT - FOOT) * along;
+            float grown = Mth.clamp((front - y) / .12f, 0, 1);
+            if (grown <= 0) continue;
+            double s = frac(time * .11 + i * .618);
+            float h = (float) (.1 + .07 * s) * grown * (1.3f - .6f * along);
+            float a = (float) Math.pow(Math.sin(Math.PI * s), .6) * .85f * grown * (1.2f - .7f * along);
+            tongue(out, pose, eye, rise, new Vector3f(0, y, 0).sub(new Vector3f(rise).mul(.05f)), h, h * .8f, 0, BLUE, a);
+        }
+        for (int k = 0; k < count; k++)
+            tongue(out, pose, eye, rise, new Vector3f(FEET[k]).add(new Vector3f(rise).mul(.05f)), TALL[k] * .55f, TALL[k] * WIDE[k] * .3f,
+                SWAY[k] * .5f, CORE, .5f * FADE[k]);
         // The steel itself glowing with it, along what has caught.
         VertexConsumer glow = buffers.getBuffer(Types.light(glowSheet()));
         Vector3f axis = new Vector3f(0, 1, 0), mid = new Vector3f(0, (FOOT + front) / 2, 0);
         Vector3f toward = new Vector3f(eye).sub(mid);
         Vector3f side = new Vector3f(axis).cross(toward);
         if (side.lengthSquared() > 1e-9f) {
-            side.normalize().mul(.11f);
+            side.normalize().mul(.13f);
             float flicker = (float) (.8 + .2 * Math.sin(time * 1.7) * Math.sin(time * .63));
             quad(glow, pose, new Vector3f(0, front + .08f, 0).add(side), new Vector3f(0, front + .08f, 0).sub(side),
-                new Vector3f(0, FOOT - .06f, 0).sub(side), new Vector3f(0, FOOT - .06f, 0).add(side), HEAT, .4f * caught * flicker);
+                new Vector3f(0, FOOT - .06f, 0).sub(side), new Vector3f(0, FOOT - .06f, 0).add(side), HEAT, .45f * caught * flicker);
         }
     }
+
+    /** The tongues of the blade being drawn, worked out once and drawn in passes (render thread only). */
+    private static final Vector3f[] FEET = new Vector3f[TONGUES];
+    private static final float[] TALL = new float[TONGUES], WIDE = new float[TONGUES], SWAY = new float[TONGUES], FADE = new float[TONGUES];
 
     /** One tongue of flame: from `foot`, up along `rise` for `tall`, `wide` across, facing the eye, its tip swayed. */
     private static void tongue(VertexConsumer out, PoseStack pose, Vector3f eye, Vector3f rise, Vector3f foot, float tall, float wide,
@@ -178,7 +193,7 @@ public final class DeceiverFlame {
 
     // ------------------------------------------------------------------ the world round it
 
-    /** Every client tick: who is alight, and the embers, smoke, spits and crackle off every burning blade in sight. */
+    /** Every client tick: who is alight, and the smoke and crackle off every burning blade in sight. */
     public static void tick() {
         var mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) {clear(); return;}
@@ -204,20 +219,11 @@ public final class DeceiverFlame {
             } else if (drawn != null && now - drawn.tick <= 2) {foot = drawn.foot; point = drawn.point;}
             else continue;
             Vec3 along = point.subtract(foot);
-            int embers = 1 + random.nextInt(2 + Math.round(2 * caught));
-            for (int i = 0; i < embers; i++) {
-                Vec3 at = foot.add(along.scale(random.nextDouble()));
-                mc.level.addParticle(HexGodOfStories.GOLD_EMBER.get(), at.x, at.y + .1, at.z,
-                    (random.nextDouble() - .5) * .03, .03 + random.nextDouble() * .05, (random.nextDouble() - .5) * .03);
-            }
-            if (random.nextInt(3) == 0) {
-                Vec3 at = foot.add(along.scale(.4 + random.nextDouble() * .6));
-                mc.level.addParticle(ParticleTypes.SMOKE, at.x, at.y + .35, at.z, (random.nextDouble() - .5) * .01, .03 + random.nextDouble() * .02,
+            // Smoke off the fire, nothing else: the fire itself is drawn on the blade.
+            if (random.nextInt(2) == 0) {
+                Vec3 at = foot.add(along.scale(.2 + random.nextDouble() * .8));
+                mc.level.addParticle(ParticleTypes.SMOKE, at.x, at.y + .45, at.z, (random.nextDouble() - .5) * .01, .03 + random.nextDouble() * .03,
                     (random.nextDouble() - .5) * .01);
-            }
-            if (random.nextInt(9) == 0) {
-                Vec3 at = foot.add(along.scale(random.nextDouble()));
-                mc.level.addParticle(ParticleTypes.FLAME, at.x, at.y + .15, at.z, 0, .04, 0);
             }
             if (caught > .3f && now >= CRACKLE.getOrDefault(id, 0L)) {
                 CRACKLE.put(id, now + 22 + random.nextInt(30));
@@ -273,7 +279,7 @@ public final class DeceiverFlame {
         return Minecraft.getInstance().getTextureManager().register(name, new DynamicTexture(image));
     }
 
-    /** Added to what is behind it, weighted by the sheet's alpha; hidden by what is in front, hiding nothing itself. */
+    /** The fire's two kinds of drawing: colour laid over, and light added. */
     private static final class Types extends RenderType {
         private Types(String name, VertexFormat format, VertexFormat.Mode mode, int size, boolean crumbling, boolean sorted, Runnable setup, Runnable clear) {
             super(name, format, mode, size, crumbling, sorted, setup, clear);
@@ -281,6 +287,22 @@ public final class DeceiverFlame {
 
         private static final Map<ResourceLocation, RenderType> LIGHT = new HashMap<>();
 
+        private static final Map<ResourceLocation, RenderType> VEIL = new HashMap<>();
+
+        /** Laid over what is behind it, by the sheet's alpha; hidden by what is in front, hiding nothing itself. */
+        static RenderType veil(ResourceLocation texture) {
+            return VEIL.computeIfAbsent(texture, t -> create("hexgodofstories_deceiver_flame_veil", DefaultVertexFormat.NEW_ENTITY,
+                VertexFormat.Mode.QUADS, 1 << 14, false, false,
+                CompositeState.builder()
+                    .setShaderState(RENDERTYPE_EYES_SHADER)
+                    .setTextureState(new TextureStateShard(t, false, false))
+                    .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                    .setCullState(NO_CULL)
+                    .setWriteMaskState(COLOR_WRITE)
+                    .createCompositeState(false)));
+        }
+
+        /** Added to what is behind it, weighted by the sheet's alpha; hidden by what is in front, hiding nothing itself. */
         static RenderType light(ResourceLocation texture) {
             return LIGHT.computeIfAbsent(texture, t -> create("hexgodofstories_deceiver_flame", DefaultVertexFormat.NEW_ENTITY,
                 VertexFormat.Mode.QUADS, 1 << 14, false, false,

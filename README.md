@@ -3,10 +3,11 @@
 - **Transformed, The Deceiver burns.** Hold it in the full transformation and the blade slowly catches, the fire
   creeping up from the guard to the point over two and a half seconds, and it burns for as long as it stays in your
   hand: switch away, drop it, dismiss it or let the transformation end and it goes out. The fire is after Beric
-  Dondarrion's sword: tongues of flame rising off the whole blade the way the world's up is, whatever angle you hold
-  it at, licking up, tearing away and fading as the next rises under it, red at the edges, orange through the body, a
-  white-hot core and blue where it touches the steel, the tallest plume over the point; the steel glows with it.
-  Embers and smoke rise off it, it spits the odd flame, and you hear it crackle. It is drawn on the blade itself, so
+  Dondarrion's sword: the whole blade engulfed, tongues of flame rooted under the steel and rising round it the way
+  the world's up is, whatever angle you hold it at, licking up, tearing away and fading as the next rises under it,
+  red at the edges, orange through the body (orange against a bright sky too, not washed white), a white-hot core and
+  blue where it touches the steel, the tallest plume over the point; the steel glows with it. Smoke rises off it and
+  you hear it crackle; no pixel flames or sparks. It is drawn on the blade itself, so
   it is there in first person, in third, and through every move, stance and combo.
 - **Telekinesis throws a touch harder.** About 15% faster off the hand and a little higher; where it lands hurts
   the same as before.
