@@ -542,6 +542,7 @@ public final class HexServer {
         Architecture.tick(p);
         BladeCombo.tick(p);
         SwordGuard.tick(p);
+        BladeFire.tick(p);
         Strike strike=STRIKES.get(p.getUUID());
         if(strike!=null&&strike.contact==now) {
             boolean sword=strike.weapon==3,slam=strike.slam;
@@ -551,7 +552,8 @@ public final class HexServer {
             for(LivingEntity e:p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(reach),e->validTarget(p,e)&&p.hasLineOfSight(e))) {
                 Vec3 direction=e.getEyePosition().subtract(p.getEyePosition()).normalize();
                 if(direction.dot(p.getLookAngle())<(slam?.25:.35)||p.distanceToSqr(e)>reach*reach)continue;
-                if(!e.hurt(p.damageSources().playerAttack(p),slam?SLAM_DAMAGE:sword?5:4))continue;
+                if(!e.hurt(p.damageSources().playerAttack(p),(slam?SLAM_DAMAGE:sword?5:4)+(sword?BladeFire.scorch(p,e):0)))continue;
+                if(sword)BladeFire.burn(p,e);
                 // The blood goes the way this swing's edge went (blade_moves.SWINGS), and a sword's cut lands heavy.
                 double[] swing=(sword?SWORD_SWINGS:DAGGER_SWINGS)[strike.combo&3];
                 BladeCombo.blood(p,e,swing[0],swing[1],swing[2],slam?2.4f:sword?1.5f:1.1f);
@@ -776,7 +778,7 @@ public final class HexServer {
         GravityGrasp.forget(p);
         Glorious.forget(p);
         BladeCombo.forget(p);
-        SwordGuard.forget(p);
+        SwordGuard.forget(p);BladeFire.forget(p);
         HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());ScepterBlast.forget(p);INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         HexData.clearTransient(p,death);
     }
@@ -786,6 +788,6 @@ public final class HexServer {
         Warping.reset();
         Telekinesis.reset();Architecture.reset();Bleed.reset();Frostbite.reset();ScepterBlast.reset();PocketRealm.reset();TemporalEngine.reset();
         Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();Arsenal.reset();GravityGrasp.reset();
-        Delusion.reset();Glorious.reset();BladeCombo.reset();SwordGuard.reset();
+        Delusion.reset();Glorious.reset();BladeCombo.reset();SwordGuard.reset();BladeFire.reset();
     }
 }

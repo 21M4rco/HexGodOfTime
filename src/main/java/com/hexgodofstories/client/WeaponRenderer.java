@@ -118,6 +118,8 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
         pose.mulPose(Axis.ZP.rotationDegrees(reverse?135:-45));
         if(fit.scale!=1)pose.scale(fit.scale,fit.scale,fit.scale);
         draw(w.kind,pose,buffers,light,growth);
+        // The Deceiver in a transformed hand burns.
+        if(w.kind==3)DeceiverFlame.draw(stack,context,pose,buffers);
         pose.popPose();
     }
 

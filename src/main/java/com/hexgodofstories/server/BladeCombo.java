@@ -177,7 +177,10 @@ public final class BladeCombo {
         target.invulnerableTime = 0;
         boolean hit;
         dealing = true;
-        try {hit = target.hurt(p.damageSources().playerAttack(p), move.damage);} finally {dealing = false;}
+        // The Master Cuts with a burning Deceiver in hand burn what they cut (never the Flurry: that is the knife's).
+        boolean fire = run.kind != 0;
+        try {hit = target.hurt(p.damageSources().playerAttack(p), move.damage + (fire ? BladeFire.scorch(p, target) : 0));} finally {dealing = false;}
+        if (hit && fire) BladeFire.burn(p, target);
         Vec3 forward = forward(p);
         if (hit && (move.right != 0 || move.up != 0 || move.forward != 0))
             blood(p, target, move.right, move.up, move.forward, run.kind == 0 ? 1.3f : 1.7f);

@@ -108,6 +108,16 @@ public final class ScepterFx {
         DRAWN.put(holder.getId(),new Drawn(camera.add(at.x,at.y,at.z),frame));
     }
 
+    /**
+     * A point drawn this frame with {@code pose} in the world (the level's own render: third person, never the
+     * first-person hand, which is drawn in a space of its own), or null before the first frame.
+     */
+    static Vec3 world(Matrix4f pose,float x,float y,float z) {
+        if(inverseView==null)return null;
+        Vector3f at=new Matrix4f(inverseView).mul(pose).transformPosition(new Vector3f(x,y,z));
+        return camera.add(at.x,at.y,at.z);
+    }
+
     private static void register(Emitter emitter,Vec3 at) {
         Minecraft mc=Minecraft.getInstance();
         if(mc.level==null)return;

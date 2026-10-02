@@ -1,3 +1,16 @@
+## The Deceiver on fire
+
+- **Transformed, The Deceiver burns.** Hold it in the full transformation and the blade slowly catches, the fire
+  creeping up from the guard to the point over two and a half seconds, and it burns for as long as it stays in your
+  hand: switch away, drop it, dismiss it or let the transformation end and it goes out. The fire is after Beric
+  Dondarrion's sword: tongues of flame rising off the whole blade the way the world's up is, whatever angle you hold
+  it at, licking up, tearing away and fading as the next rises under it, red at the edges, orange through the body, a
+  white-hot core and blue where it touches the steel, the tallest plume over the point; the steel glows with it.
+  Embers and smoke rise off it, it spits the odd flame, and you hear it crackle. It is drawn on the blade itself, so
+  it is there in first person, in third, and through every move, stance and combo.
+- **Its blows burn.** Once it has caught, every hit of it (attacks, the slam, the Master Cuts) sets what it strikes
+  alight for half a second, with half a heart of burn dealt in the blow.
+
 ## The sword's slam and its rest, no more spins, a held stab, and far more blood
 
 - **No more full turns.** The Master Cuts' second cut spun the whole body round 360°, and the cuts after it carried that
