@@ -112,7 +112,9 @@ public final class HexAnimations {
                // The burning Deceiver's fire: the sword arm follows the look up and down, so the blade (and the jet out of
                // its point) goes where the bearer looks.
                IAnimation played=keyframeanimationplayer;
-               if(name.equals("blade_sword_flame")) {
+               // So do Complete Evisceration's dash and thrust: the point goes in wherever the bearer looks, a pig's gut or a
+               // giant's.
+               if(name.equals("blade_sword_flame")||name.equals("blade_sword_evis_dash")||name.equals("blade_sword_evis_thrust")) {
                   // Linked through addModifierLast and setAnimation: ModifierLayer's constructor that takes modifiers
                   // only lists them, never hands them the animation, and a modifier with nothing in it plays nothing.
                   ModifierLayer<IAnimation> follow=new ModifierLayer<>();

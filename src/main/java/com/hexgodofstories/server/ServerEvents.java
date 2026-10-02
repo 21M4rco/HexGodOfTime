@@ -206,7 +206,7 @@ public final class ServerEvents {
      * Bleeding takes health over time and nothing else: no knockback from any tick of it. Nor from a blade combo's own
      * cuts, which must leave the body where the next one will find it (BladeCombo throws it itself at the end).
      */
-    @SubscribeEvent public static void bleedKnockback(LivingKnockBackEvent e) {if(Bleed.dealing()||BladeCombo.dealing())e.setCanceled(true);}
+    @SubscribeEvent public static void bleedKnockback(LivingKnockBackEvent e) {if(Bleed.dealing()||BladeCombo.dealing()||Evisceration.dealing())e.setCanceled(true);}
 
     /**
      * A bleeding body cannot jump (Bleed): a creature's jump is undone here, where it is made. A player's is made on

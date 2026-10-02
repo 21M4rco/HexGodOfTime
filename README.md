@@ -1,3 +1,27 @@
+## Complete Evisceration
+
+- **The Deceiver's G.** With The Deceiver in your hand, G no longer opens Warping's destinations (put the sword away
+  and it does again): it is Complete Evisceration, a tap, with a ten-second recovery of its own shown under the
+  spell. You dash at the body you are looking at (up to nine blocks, a block a tick), the sword arm cocked back at the
+  hip and the point straight ahead, your free hand reaching for it. When you reach it the arm is thrown out to its full
+  length in a deep lunge and the blade goes in at the gut and out of the back. The dash and the thrust follow your look
+  up and down, so the point goes in wherever you aim. Blood bursts out of the front round the blade and out of the back
+  after the point, the wound pumps round the blade while it is in, and you hear the same blade-piercing recording as
+  Gravity Grasp's stab.
+- **If it lives through it**, it is held on the blade a moment, five hearts down and bleeding (two stacks, six
+  seconds), and let off it as the blade is torn out, a gush out of both wounds, staggering back.
+- **If it would die of it, it does not, yet.** The blade is torn back out of it, you step back off it, and the sword
+  comes down from high on your left through it to your right hip, fast, the whole body behind it, and that kills it
+  and cuts it in two along that line, as in your drawing. Any body: every mob, any size, a player, any mod's creature.
+  Every client draws it twice through its own renderer, each time keeping only what lies on one side of the cut, so
+  nothing about the body needs to be known. The cut faces are burned like a Scepter hole: red-hot as the blade leaves
+  them, cooling through orange to a charred dark red, smoking, with the blood pouring out of them. The upper half
+  slides off down the cut, thrown away from you, its top going over to the right; the lower half stands a beat, then
+  buckles and goes over the far way. Both land on whatever is really under them with a wet thud, in pools of their own
+  blood, lie there ten seconds and sink away. A totem of undying that saves a player from the cut leaves them cut,
+  not halved.
+- **Nothing reached** and the thrust goes into the air, with a three-second recovery. A shield turns it aside.
+
 ## The Deceiver cuts on the run, and the stab is heard going in and pours
 
 - **Running cuts.** Attacking while sprinting with The Deceiver is no longer the same slam every time. Each attack is

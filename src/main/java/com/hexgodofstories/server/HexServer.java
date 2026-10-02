@@ -29,7 +29,9 @@ public final class HexServer {
         /** One of the seven bind slots' keys: choose whatever ability that slot holds. */
         SLOT=24,
         /** The Deceiver's guard: the use key held with it in hand, and let go (SwordGuard). */
-        GUARD_BEGIN=25,GUARD_END=26;
+        GUARD_BEGIN=25,GUARD_END=26,
+        /** G with The Deceiver in hand: Complete Evisceration (Evisceration). */
+        EVISCERATE=27;
     /** Keep rewind's wire value for saved clients; the B/resume action is retired. */
     public static final int TIME_HALT=0,TIME_REWIND=2;
     public record Moment(Vec3 position,float yaw,float pitch,float health) {}
@@ -105,7 +107,7 @@ public final class HexServer {
         // Paradise's candy took both arms: nothing is cast, conjured or swung. Letting go, choosing and flying still are.
         if(com.hexgodofstories.warping.CandyCorruption.noArms(p)&&(action==CAST||action==ALTERNATE||action==UTILITY||action==TRANSFORM||action==WEAPON
             ||action==HOLD_BEGIN||action==TIME||action==BRANCH_TAP||action==BRANCH_BEGIN||action==SCEPTER_PRESS||action==GRASP_BEGIN||action==SLOT
-            ||action==GUARD_BEGIN||action==WARP_RECALL)){
+            ||action==GUARD_BEGIN||action==WARP_RECALL||action==EVISCERATE)){
             notice(p,"You have no arms.");return;
         }
         if(action==SELECT) {
@@ -168,6 +170,7 @@ public final class HexServer {
         // The wall's dismissal lives here, now that there is no alternate key: with it chosen, letting go takes it down.
         if(action==UTILITY){Telekinesis.release(p,false);Architecture.forget(p);if(HexData.selected(p)==Ability.ARCHITECTURE)Architecture.dismiss(p);TemporalEngine.clear(p);dismissRift(p);return;}
         if(action==WEAPON){weapon(p,value!=0);return;}
+        if(action==EVISCERATE){Evisceration.start(p);return;}
         if(action==FLIGHT){CosmicFlight.toggle(p);return;}
         if(action==TIME){time(p,value);return;}
         Ability a=action==TRANSFORM?Ability.ASCENSION:HexData.selected(p);
@@ -489,8 +492,9 @@ public final class HexServer {
         if(!ConjuredWeapon.belongsTo(held,p)){p.setItemInHand(hand,ItemStack.EMPTY);return;}
         // The Scepter's right click is a hold, carried by SCEPTER_PRESS and SCEPTER_RELEASE. The Deceiver is never thrown.
         if(w.kind==1||secondary&&w.kind==3)return;
-        // A combo starter in progress owns the blade arm until it ends; so does the guard while it is held.
-        if(BladeCombo.running(p)||SwordGuard.guarding(p)||FlameStream.pouring(p))return;
+        // A combo starter in progress owns the blade arm until it ends; so does the guard while it is held, and so does
+        // Complete Evisceration.
+        if(BladeCombo.running(p)||SwordGuard.guarding(p)||FlameStream.pouring(p)||Evisceration.running(p))return;
         long now=HexData.now(p);Strike prior=STRIKES.get(p.getUUID());
         if(prior!=null&&prior.end>now)return;
         int combo=prior==null||now-prior.end>18?0:(prior.combo+1)%4;
@@ -581,6 +585,7 @@ public final class HexServer {
         Telekinesis.tick(p);
         Architecture.tick(p);
         BladeCombo.tick(p);
+        Evisceration.tick(p);
         SwordGuard.tick(p);
         BladeFire.tick(p);
         FlameStream.tick(p);
@@ -873,6 +878,7 @@ public final class HexServer {
         GravityGrasp.forget(p);
         Glorious.forget(p);
         BladeCombo.forget(p);
+        Evisceration.forget(p);
         SwordGuard.forget(p);BladeFire.forget(p);FlameStream.forget(p);
         HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());ScepterBlast.forget(p);INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         HexData.clearTransient(p,death);
@@ -883,6 +889,6 @@ public final class HexServer {
         Warping.reset();
         Telekinesis.reset();Architecture.reset();Bleed.reset();Frostbite.reset();ScepterBlast.reset();PocketRealm.reset();TemporalEngine.reset();
         Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();Arsenal.reset();GravityGrasp.reset();
-        Delusion.reset();Glorious.reset();BladeCombo.reset();SwordGuard.reset();BladeFire.reset();FlameStream.reset();
+        Delusion.reset();Glorious.reset();BladeCombo.reset();Evisceration.reset();SwordGuard.reset();BladeFire.reset();FlameStream.reset();
     }
 }

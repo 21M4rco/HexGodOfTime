@@ -123,7 +123,7 @@ public final class BladeCombo {
     public static void start(ServerPlayer p, Ability a) {
         int kind = a == Ability.DAGGERS ? 0 : 3;
         if (!HexData.unlocked(p, a)) {HexServer.notice(p, "This chapter of your story is still locked."); return;}
-        if (RUNS.containsKey(p.getUUID()) || Arsenal.active(p) || GravityGrasp.holding(p) || ScepterBlast.stunned(p)) return;
+        if (RUNS.containsKey(p.getUUID()) || Arsenal.active(p) || GravityGrasp.holding(p) || ScepterBlast.stunned(p) || Evisceration.running(p)) return;
         SwordGuard.end(p);
         if (recovering(p, kind)) {HexServer.notice(p, name(kind) + " is recovering."); return;}
         LivingEntity target = aimed(p, reach(kind));

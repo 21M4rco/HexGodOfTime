@@ -29,7 +29,7 @@ public abstract class ErasureRenderMixin {
     @Redirect(method="render",at=@At(value="INVOKE",target="Lnet/minecraft/client/renderer/entity/EntityRenderer;render(Lnet/minecraft/world/entity/Entity;FFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V"))
     private <E extends Entity> void hgos$fade(EntityRenderer<E> renderer,E entity,float yaw,float partial,
                                              PoseStack pose,MultiBufferSource buffers,int light) {
-        if(ErasureRenderer.consumed(entity))return;
+        if(ErasureRenderer.consumed(entity)||com.hexgodofstories.client.Halving.hidden(entity))return;
         float instant=ClientState.suspended(entity)?1f:partial;
         WoundAnchor.beginEntity(entity,instant);
         try {

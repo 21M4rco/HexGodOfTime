@@ -306,6 +306,13 @@ public final class Blood {
         }
     }
 
+    /** A pool laid on whatever is under {@code at}, as a wound's: under a piece of a body cut in two (Halving), say. */
+    public static void pool(Entity e,Vec3 at,double size) {
+        var mc=Minecraft.getInstance();
+        if(mc.level==null||mc.player==null||at.distanceToSqr(mc.player.getEyePosition())>RANGE)return;
+        drop(mc,e,at,size,PUDDLE_LIFE,30);
+    }
+
     /**
      * Lays one pool on the surface below {@code over} (anywhere under the body when null), following steps and
      * slabs rather than assuming flat. Each lies a hair above or below the next, so where pools overlap into a

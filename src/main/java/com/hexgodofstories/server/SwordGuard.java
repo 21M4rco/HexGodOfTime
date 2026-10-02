@@ -41,7 +41,7 @@ public final class SwordGuard {
     public static void begin(ServerPlayer p) {
         // Burning (transformed), the key looses the blade's fire instead: no guard while it burns.
         if (BladeFire.lit(p)) {FlameStream.begin(p); return;}
-        if (!armed(p) || BladeCombo.running(p)) return;
+        if (!armed(p) || BladeCombo.running(p) || Evisceration.running(p)) return;
         if (GUARDS.add(p.getUUID())) {HexData.get(p).putBoolean(GUARD, true); HexNetwork.sync(p);}
     }
 

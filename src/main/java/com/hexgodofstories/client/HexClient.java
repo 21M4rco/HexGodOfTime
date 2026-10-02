@@ -18,7 +18,8 @@ import org.lwjgl.glfw.GLFW;
  * Seven bind slots along the bottom row of the keyboard, one mastery key, and one cast key. Pressing a slot's key
  * chooses the ability bound to it and casts it, at once; the cast key casts the last one chosen again. A spell with a
  * second move makes it on the same key held rather than tapped, so there is no alternate key to reach for: G is
- * Warping's alone, where the pool leads. Abilities that charge are driven by the press and release of their key
+ * Warping's, where the pool leads, except with The Deceiver in hand, where it is Complete Evisceration. Abilities that
+ * charge are driven by the press and release of their key
  * rather than a second binding, so the scheme stays small no matter how much progression adds.
  *
  * <p>The time controls are the exception, and deliberately so. Stopping, rewinding and branching are
@@ -104,7 +105,7 @@ public final class HexClient {
         @SubscribeEvent public static void reload(RegisterClientReloadListenersEvent e) {
             e.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)r->{
                 WarpRenderer.clear();HexLayer.clear();WeaponRenderer.clear();RiftRenderer.clear();RealmSky.clear();CosmicNebula.clear();
-                BranchVfx.clear();TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();
+                BranchVfx.clear();TimeBranchRenderer.clear();ErasureRenderer.clear();Halving.clear();BranchAudio.clear();MeteorAudio.clear();
                 DisguiseRenderer.clear();DisguiseRenderer.forgive();Blood.clear();WoundAnchor.clear();TemporalScreen.close();
             });
         }
@@ -171,8 +172,10 @@ public final class HexClient {
 
             // G is Warping's key, whatever is chosen: where the pool leads, in ordinary worlds. Inside any Warping
             // realm (including the World Tree), it opens the World Tree exit selector instead. No other spell has an
-            // alternate key any more; their second moves are their own keys held.
+            // alternate key any more; their second moves are their own keys held. The one exception is The Deceiver
+            // in hand: G is then its Complete Evisceration, and nothing of Warping's.
             while(SECONDARY.consumeClick()) {
+                if(BladeClient.deceiverInHand(mc.player)){if(!ClientState.frozen(mc.player.getId()))HexNetwork.send(HexServer.EVISCERATE,0);continue;}
                 if(!MasteryScreen.unlocked(ClientState.self(),Ability.WARPING))continue;
                 if(com.hexgodofstories.server.PocketRealm.inside(mc.player.level())
                     || com.hexgodofstories.warping.Destination.from(mc.player.level())!=null)FractureScreen.open();
@@ -369,7 +372,7 @@ public final class HexClient {
         }
         @SubscribeEvent public static void world(RenderLevelStageEvent e) {
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);BeamWounds.beginFrame(e);ScepterFx.beginFrame(e);}
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES){WarpRenderer.renderRealm(e);BlockWounds.render(e);ArsenalClient.render(e);}
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES){WarpRenderer.renderRealm(e);BlockWounds.render(e);ArsenalClient.render(e);Halving.render(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES){WorldEffects.render(e);WarpRenderer.render(e);ArsenalClient.renderLight(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL){BeamWounds.endFrame();TemporalScreen.render(e.getPartialTick());}
         }

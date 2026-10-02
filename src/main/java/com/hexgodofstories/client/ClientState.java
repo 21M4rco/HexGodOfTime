@@ -129,6 +129,7 @@ public final class ClientState {
             case HexNetwork.BRANCH -> TimeBranchRenderer.charge(m.entity(),m.data());
             case HexNetwork.TORRENT -> TimeBranchRenderer.torrent(m.entity(),m.data());
             case HexNetwork.ERASURE -> ErasureRenderer.begin(m.entity(),m.data());
+            case HexNetwork.HALVE -> Halving.begin(m.entity(),m.data());
             case HexNetwork.DISGUISE -> {
                 if(m.data().getBoolean("clear"))DISGUISES.remove(m.entity());
                 else {
@@ -146,7 +147,7 @@ public final class ClientState {
             WarpRenderer.clear();PLAYERS.clear();FROZEN.clear();STUNNED.clear();SLOWED.clear();THREADS.clear();DISGUISES.clear();WarpCrossingClient.clear();WarpEmergenceClient.clear();CandyCorruptionClient.clear();
             WorldEffects.clear();HexSkin.clear();HexLayer.clear();DisguiseRenderer.clear();TemporalScreen.close();FrostClient.clear();
             com.hexgodofstories.client.leviathan.LeviathanEffects.clear();
-            TimeBranchRenderer.clear();ErasureRenderer.clear();BranchAudio.clear();MeteorAudio.clear();GripRenderer.clear();
+            TimeBranchRenderer.clear();ErasureRenderer.clear();Halving.clear();BranchAudio.clear();MeteorAudio.clear();GripRenderer.clear();
             ScepterClient.clear();BeamWounds.clear();BlockWounds.clear();ArsenalClient.clear();
             HexClient.ForgeBus.releaseHeldCast();
             world=mc.level;
@@ -173,6 +174,7 @@ public final class ClientState {
         WorldEffects.tick();
         TimeBranchRenderer.tick();
         ErasureRenderer.tick();
+        Halving.tick();
         BranchAudio.tick();
         MeteorAudio.tick();
         RealmAmbience.tick();

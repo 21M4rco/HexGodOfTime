@@ -99,6 +99,12 @@ public final class BladeClient {
         STILL_SINCE.keySet().removeIf(id->mc.level.getEntity(id)==null);
     }
 
+    /** Whether this player holds their own Deceiver in the main hand: G is then Complete Evisceration's. */
+    public static boolean deceiverInHand(net.minecraft.world.entity.player.Player p) {
+        ItemStack held=p.getMainHandItem();
+        return held.is(HexGodOfStories.DECEIVER.get())&&com.hexgodofstories.entity.ConjuredWeapon.belongsTo(held,p);
+    }
+
     /** The blade in this player's hand that is not really there, or empty when there is none to draw. */
     public static ItemStack phantom(AbstractClientPlayer p) {
         CompoundTag d=ClientState.data(p.getId());

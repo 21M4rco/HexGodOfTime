@@ -70,6 +70,22 @@ public final class LastMoments {
         return spared && victim.isAlive();
     }
 
+    /** What {@link #spare} did: nothing landed, a blow it lives through, or a lethal blow left at its last breath. */
+    static final int MISSED = 0, HURT = 1, CAPPED = 2;
+
+    /**
+     * Hurts any body, players and bosses too, but a blow that would kill it leaves it on its last breath, with no stand
+     * after it: whoever capped it decides what comes next (Complete Evisceration's cut).
+     */
+    static int spare(LivingEntity victim, DamageSource source, float amount) {
+        sparing = victim;
+        spared = false;
+        boolean landed;
+        try {landed = victim.hurt(source, amount);}
+        finally {sparing = null;}
+        return spared && victim.isAlive() ? CAPPED : landed ? HURT : MISSED;
+    }
+
     /** Lowest-priority LivingDamageEvent: the amount here is final, after armour, resistance and absorption. */
     public static void damage(LivingDamageEvent e) {
         if (e.getEntity() != sparing || e.getAmount() < e.getEntity().getHealth()) return;

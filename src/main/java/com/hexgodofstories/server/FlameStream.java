@@ -59,7 +59,7 @@ public final class FlameStream {
 
     /** The use key pressed with the blade burning. @return whether it pours. */
     public static boolean begin(ServerPlayer p) {
-        if (pouring(p) || !BladeFire.burning(p) || HexData.energy(p) < START || BladeCombo.running(p)) return false;
+        if (pouring(p) || !BladeFire.burning(p) || HexData.energy(p) < START || BladeCombo.running(p) || Evisceration.running(p)) return false;
         long now = HexData.now(p);
         POURS.put(p.getUUID(), new Pour(now));
         HexData.get(p).putLong(POURING, now);

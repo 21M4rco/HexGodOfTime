@@ -78,6 +78,10 @@ public final class HexHud {
             long combo=d.getLong(dagger?com.hexgodofstories.server.BladeCombo.FLURRY_READY:com.hexgodofstories.server.BladeCombo.CUTS_READY)-ClientState.now();
             int whole=dagger?com.hexgodofstories.server.BladeCombo.FLURRY_RECOVERY:com.hexgodofstories.server.BladeCombo.CUTS_RECOVERY;
             if(combo>0&&combo<=whole)hint=String.format(Locale.ROOT,"%s %.1fs",dagger?"Flurry":"Master Cuts",combo/20f);
+            // The Deceiver's G, Complete Evisceration, keeps its own recovery too.
+            long evis=dagger?0:d.getLong(com.hexgodofstories.server.Evisceration.READY)-ClientState.now();
+            if(evis>0&&evis<=com.hexgodofstories.server.Evisceration.RECOVERY)
+                hint=(combo>0&&combo<=whole?hint+"  \u00b7  ":"")+String.format(Locale.ROOT,"Evisceration %.1fs",evis/20f);
         }
         if(a==Ability.THREADS) {
             // Gravity Grasp keeps its own recovery, apart from Anchor Being's shown above.
@@ -159,7 +163,7 @@ public final class HexHud {
             case BLINK -> "Teleport toward your aim.";
             case WARD -> "Raise a defensive veil.";
             case DAGGERS -> "Conjure a dagger; again: put it away.";
-            case TWIN_DAGGERS -> "Conjure The Deceiver. Hold use: guard and parry. Sprint and attack: running cuts and the slam.";
+            case TWIN_DAGGERS -> "Conjure The Deceiver. Hold use: guard and parry. Sprint and attack: running cuts and the slam. G: Complete Evisceration.";
             case LAEVATEINN -> "Conjure/recall the Scepter. Hold right click 1-10s: beam.";
             case ENCHANT -> "Charm a creature to follow you.";
             case MEMORY -> "Reveal a target's recent steps.";

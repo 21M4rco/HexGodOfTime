@@ -442,3 +442,23 @@ directional streaking. Cuboids spinning off in all directions read as rubble and
   two plays add without phasing or clipping, and that nothing else plays over it.
 - Gravity Grasp's heavier blood (two sprays in, two out, the heavier welling, spurts, sheet and pools) seen in game,
   and the frame rate while it pours.
+
+## Complete Evisceration
+
+- **Checked offline.** `tools/generate_blades.py` solved the three new moves (`blade_sword_evis_dash`, `_thrust`,
+  `_cut`) and passed its checks on all of them: the handle in the fist at every half tick, no forearm in the body, the
+  thrust's point travelling forward at its contact (agreement 0.82) and the cut's travelling down to the right along
+  the line the server parts the body on (0.92 against `Evisceration.ANGLE`'s 50 degrees). The thrust reaches 2.25 blocks
+  ahead with the arm straight. Every move was looked at frame by frame on contact sheets.
+- **Not compiled locally.** Forge's Maven and Mojang's servers are closed to this environment; the build is CI's.
+
+### Not verified — needs a recorded in-game session
+
+- G with The Deceiver in hand sending the move, and G without it still opening Warping's destinations.
+- The dash reaching a body and stopping at it; the thrust's point going in where the bearer looks; a whiff.
+- The survive path: damage, bleeding, the hold and the let-off; and the lethal path's cut landing on its tick.
+- The halving on vanilla mobs of every shape (zombie, spider, cow, slime, ghast, ender dragon, armour stand), a player
+  in first and third person, GeckoLib and other modded creatures: that each half keeps only its side, that the cut
+  faces close (a model whose surfaces are not closed leaves its cut open), the halves' fall and landing on slopes,
+  stairs and ledges, and the frame rate with several at once.
+- A renderer that cannot draw a dead body this way: the body is then drawn its own way again.

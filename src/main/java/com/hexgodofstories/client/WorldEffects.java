@@ -46,7 +46,7 @@ public final class WorldEffects {
     public static void clear() {
         ECHOES.clear();PROJECTIONS.clear();FIELDS.clear();BLEEDING.clear();GripRenderer.clear();
         POSED.clear();REFORMING.clear();SLIPPING.clear();
-        Vfx.clear();Blood.clear();DeceiverFlame.clear();FireStream.clear();TimeBranchRenderer.clear();ErasureRenderer.clear();ScepterFx.clear();
+        Vfx.clear();Blood.clear();DeceiverFlame.clear();FireStream.clear();TimeBranchRenderer.clear();ErasureRenderer.clear();Halving.clear();ScepterFx.clear();
     }
 
     public static void add(int entity,CompoundTag n) {

@@ -387,6 +387,50 @@ move('blade_sword_run_6', 14, [
     (7, 'outquad', P(body=(0, 0, -.06, -4, 26, 0), head=(-14, 22, 0), la=(20, 0, -60, -20), aim=((-.28, 1.66, .46), (-.45, .85, .15)))),
     (14, 'inoutsine', RUNNING)])
 
+# --- Complete Evisceration (G with The Deceiver in hand). The dash: the sword arm cocked back at the hip, the point
+#     straight ahead, the free hand reaching out at the body, the bearer leaning into it; the legs are left to the run.
+#     Held until the body is reached (server/Evisceration), then the thrust: the arm thrown out to its full length
+#     in a deep lunge, the blade driven in at the gut and out of the back, held there and leaned on. A body it would not
+#     kill is let off it (the thrust's pull-out); one it would is finished by the cut: the blade torn out, a step back,
+#     and the sword brought down from high on the left through the body to the right hip, fast and with everything
+#     behind it, cutting it in two along that line.
+EVIS_COCKED = P(body=(0, -.06, 0, -16, -14, 0), head=(-12, -14, 0), la=(-85, 15, 0, -6), aim=((.32, 1.14, .06), (0, .08, 1)), hint=(-20, 10, 0, -80))
+EVIS_IN = P(body=(0, -.15, -.36, -14, 4, 0), head=(-6, 4, 0), la=(40, 0, -40, -58), rl=(42, 0, 0, 2), ll=(-62, 0, 0, 62),
+            aim=((.15, 1.25, .8), (-.08, -.05, 1)), hint=(-85, 0, 0, -5))
+EVIS_DEEP = P(body=(0, -.16, -.39, -15, 5, 0), head=(-6, 5, 0), la=(42, 0, -42, -60), rl=(44, 0, 0, 2), ll=(-64, 0, 0, 64),
+              aim=((.15, 1.24, .84), (-.08, -.05, 1)), hint=(-85, 0, 0, -5))
+move('blade_sword_evis_dash', 16, [
+    (0, 'linear', STILL),
+    (2, 'outquad', EVIS_COCKED),
+    (12, 'linear', EVIS_COCKED),
+    (16, 'inoutsine', STILL)])
+move('blade_sword_evis_thrust', 20, [
+    (0, 'linear', EVIS_COCKED),
+    (2, 'inexpo', EVIS_IN),
+    (5, 'outquad', EVIS_DEEP),
+    (9, 'linear', EVIS_DEEP),
+    # Torn back out of it, the bearer rising out of the lunge.
+    (12, 'inquad', P(body=(0, -.06, -.1, -6, -10, 0), head=(-4, -10, 0), la=(-30, 10, -20, -40), rl=(20, 0, 0, 10), ll=(-24, 0, 0, 24),
+                     aim=((.32, 1.14, .12), (0, .06, 1)), hint=(-20, 10, 0, -80))),
+    (20, 'inoutsine', STILL)])
+move('blade_sword_evis_cut', 20, [
+    (0, 'linear', EVIS_DEEP),
+    # Out, and a step back off it.
+    (2, 'outquad', P(body=(0, -.04, .12, -4, -6, 0), head=(-2, -6, 0), la=(-40, 10, -20, -40), rl=(30, 0, 0, 8), ll=(-20, 0, 0, 22),
+                     aim=((.3, 1.14, .3), (0, .1, 1)), hint=(-20, 10, 0, -80))),
+    # Up high on the left, the arm across the front of the face, the blade up and out to the left.
+    (4, 'outquad', P(body=(0, -.01, .1, -4, 26, 0), head=(-6, 22, 0), la=(10, 0, -30, -20), rl=(30, 0, 0, 8), ll=(-20, 0, 0, 22),
+                     aim=((-.15, 1.68, .32), (-.7, .55, .3)), hint=(-120, -30, 0, -40))),
+    # Down through it, everything behind it: the weight thrown onto the front foot.
+    (6, 'inquad', P(body=(0, -.1, -.08, -18, -6, 0), head=(-6, -6, 0), la=(-10, 0, -50, -20), rl=(24, 0, 0, 14), ll=(-34, 0, 0, 36),
+                    aim=((.2, 1.16, .66), (.6, -.6, .55)))),
+    (8, 'outquad', P(body=(0, -.13, -.1, -22, -30, 0), head=(-6, -26, 0), la=(0, 0, -70, -10), rl=(26, 0, 0, 16), ll=(-36, 0, 0, 40),
+                     aim=((.6, .74, .4), (.7, -.62, .35)))),
+    # Held there a moment, the blade low and out to the right, before it comes up again.
+    (12, 'inoutsine', P(body=(0, -.12, -.09, -20, -28, 0), head=(-6, -24, 0), la=(4, 0, -66, -12), rl=(24, 0, 0, 14), ll=(-34, 0, 0, 36),
+                        aim=((.6, .76, .38), (.7, -.6, .36)))),
+    (20, 'inoutsine', STILL)])
+
 # --- The Deceiver at rest (in hand, the bearer standing still a while): weight on one leg, the sword hanging from a
 #     loose wrist a little ahead, its point resting on the ground in front, the free hand on the hip. The head is the
 #     player's own.
@@ -465,11 +509,14 @@ CONTACT = {'blade_dagger_0': 4, 'blade_dagger_1': 3, 'blade_dagger_2': 5, 'blade
            'blade_sword_0': 5, 'blade_sword_1': 7, 'blade_sword_2': 5, 'blade_sword_3': 6,
            'blade_m_dagger_0': 4, 'blade_m_dagger_1': 4, 'blade_m_dagger_2': 4, 'blade_m_dagger_3': 4,
            'blade_m_sword_0': 6, 'blade_m_sword_1': 6, 'blade_m_sword_2': 6, 'blade_m_sword_3': 6, 'blade_sword_dash': 6,
-           'blade_grasp_stab': 6, **{f'blade_sword_run_{i}': 5 for i in range(7)}}
+           'blade_grasp_stab': 6, **{f'blade_sword_run_{i}': 5 for i in range(7)},
+           'blade_sword_evis_thrust': 2, 'blade_sword_evis_cut': 6}
 SWINGS = {'blade_dagger_0': (1, 0, 0), 'blade_dagger_1': (0, -.8, .6), 'blade_dagger_2': (0, 0, 1), 'blade_dagger_3': (1, 0, 0),
           'blade_sword_0': (-.7, -.7, 0), 'blade_sword_1': (1, 0, 0), 'blade_sword_2': (0, 0, 1), 'blade_sword_3': (0, 1, 0),
           'blade_m_dagger_0': (-.7, -.7, 0), 'blade_m_dagger_1': (1, 0, 0), 'blade_m_dagger_2': (-.7, -.7, 0), 'blade_m_dagger_3': (0, 0, 1),
           'blade_m_sword_0': (-.7, -.7, 0), 'blade_m_sword_1': (.6, .8, 0), 'blade_m_sword_2': (-1, 0, 0), 'blade_m_sword_3': (0, -.8, .6),
           'blade_sword_dash': (0, -.8, .6), 'blade_grasp_stab': (-.2, -.5, .85),
           'blade_sword_run_0': (-1, 0, 0), 'blade_sword_run_1': (1, 0, 0), 'blade_sword_run_2': (0, 1, 0), 'blade_sword_run_3': (-.7, -.7, 0),
-          'blade_sword_run_4': (.7, .7, 0), 'blade_sword_run_5': (.7, -.7, 0), 'blade_sword_run_6': (-.7, .7, 0)}
+          'blade_sword_run_4': (.7, .7, 0), 'blade_sword_run_5': (.7, -.7, 0), 'blade_sword_run_6': (-.7, .7, 0),
+          # The thrust goes straight in; the cut comes down along the line it parts the body on (server/Evisceration, CUT).
+          'blade_sword_evis_thrust': (0, 0, 1), 'blade_sword_evis_cut': (.64, -.77, 0)}
