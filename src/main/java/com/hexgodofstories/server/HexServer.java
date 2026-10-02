@@ -276,7 +276,7 @@ public final class HexServer {
             case RIFT -> {return false;} // legacy tombstone; Fracture moved into Warping
             case BOLT -> {SpellProjectile.cast(p,p.getEyePosition().add(look.scale(.5)),look,secondary?1:0,false);gesture(p,"bolt","cast",HexGodOfStories.SORCERY.get());return true;}
             case PUSH -> {for(Entity e:p.level().getEntities(p,p.getBoundingBox().inflate(5),e->validTarget(p,e))){Vec3 away=e.position().subtract(p.position()).normalize();e.setDeltaMovement(away.scale(1.1).add(0,.25,0));e.hurtMarked=true;}gesture(p,"push","push",HexGodOfStories.SORCERY.get());return true;}
-            case BLINK -> {Vec3 destination=safeAim(p,8+HexData.mastery(p,Discipline.SORCERY)/90.0);if(destination==null)return false;gesture(p,"blink","depart",HexGodOfStories.TELEPORT.get());teleport(p,destination);HexNetwork.arrival(p);return true;}
+            case BLINK -> {Vec3 destination=safeAim(p,8+HexData.mastery(p,Discipline.SORCERY)/90.0);if(destination==null)return false;gesture(p,"blink","depart",HexGodOfStories.TELEPORT.get());teleport(p,destination);HexNetwork.arrival(p);veil(p);return true;}
             case WARD -> {HexData.get(p).putLong("wardUntil",now+100);gesture(p,"ward","ward",HexGodOfStories.SORCERY.get());return true;}
             case TELEKINESIS -> {
                 if(!Telekinesis.grab(p,t))return false;
@@ -731,6 +731,29 @@ public final class HexServer {
         for(int i=0;i<8;i++){Vec3 v=goal.add(0,i*.5,0);if(safe(p,v))return v;}
         return null;
     }
+    /** How long Veilstep leaves its caster unseen, and unknown to every creature, after the step. */
+    static final int VEIL=20;
+    /**
+     * Veilstep's after-step: for one second the caster is gone from every eye (body, armour, what they hold and their
+     * name: the vanish) and from every creature's mind. Whatever was hunting them loses them, and nothing can take them
+     * up again until the second is out (ServerEvents#target). A moment to open a combo from, no more.
+     */
+    static void veil(ServerPlayer p) {
+        long now=HexData.now(p);
+        CompoundTag d=HexData.get(p);
+        d.putLong("vanishUntil",Math.max(d.getLong("vanishUntil"),now+VEIL));
+        d.putLong("veiledUntil",now+VEIL);
+        p.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.INVISIBILITY,VEIL,0,false,false));
+        for(Mob mob:p.serverLevel().getEntitiesOfClass(Mob.class,p.getBoundingBox().inflate(48),m->m.getTarget()==p)) {
+            mob.setTarget(null);
+            mob.getNavigation().stop();
+            mob.getBrain().eraseMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.ATTACK_TARGET);
+        }
+        HexNetwork.sync(p);
+    }
+    /** Whether Veilstep has this player out of every creature's mind just now. */
+    public static boolean veiled(ServerPlayer p) {return HexData.get(p).getLong("veiledUntil")>HexData.now(p);}
+
     static void teleport(ServerPlayer p,Vec3 v) {
         Telekinesis.release(p,false);p.stopRiding();
         p.connection.teleport(v.x,v.y,v.z,p.getYRot(),p.getXRot());

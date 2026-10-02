@@ -271,6 +271,8 @@ public final class ServerEvents {
         LivingEntity wanted=e.getNewTarget();
         if(HexServer.charmedAgainst(mob,wanted)){e.setCanceled(true);return;}
         if(wanted==null)return;
+        // A second after Veilstep, its caster is in no creature's mind: nothing takes them up.
+        if(wanted instanceof ServerPlayer veiled&&HexServer.veiled(veiled)){e.setCanceled(true);return;}
         if(wanted instanceof ServerPlayer worn&&Masquerade.deceives(mob,worn)){e.setCanceled(true);return;}
         if(wanted instanceof com.hexgodofstories.entity.IllusionEntity){Decoy.observe(mob,wanted);return;}
         LivingEntity chosen=Decoy.resolve(mob,wanted);

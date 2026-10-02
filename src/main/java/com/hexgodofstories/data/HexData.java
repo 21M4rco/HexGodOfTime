@@ -137,7 +137,7 @@ public final class HexData {
     }
 
     public static void clearTransient(Player p,boolean death) {
-        CompoundTag d=get(p);d.remove("disguise");d.remove("vanishUntil");d.remove("wardUntil");d.remove("mirrorUntil");d.remove("held");d.remove("transformStart");d.remove("grip");d.remove("stopWindup");d.remove("timeStopped");
+        CompoundTag d=get(p);d.remove("disguise");d.remove("vanishUntil");d.remove("veiledUntil");d.remove("wardUntil");d.remove("mirrorUntil");d.remove("held");d.remove("transformStart");d.remove("grip");d.remove("stopWindup");d.remove("timeStopped");
         d.remove("arsenalStart");d.remove("arsenalEnd");d.remove("arsenalEnding");
         d.remove("bladeHeld");d.remove("bladeKind");d.remove("bladeFormed");d.remove("swordGuard");
         d.remove("graspStart");d.remove("graspStab");d.remove("graspDagger");d.remove("flameStream");

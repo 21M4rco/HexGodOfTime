@@ -1,5 +1,8 @@
 ## Paradise's price, kept; the fire sword points and burns like its blade
 
+- **Veilstep opens a combo.** For one second after the step (and after its transformed Behind You) you are gone:
+  invisible to every eye (body, armour, what you hold, your name, no swirl of particles), every creature that was
+  hunting you loses you, and none can take you up again until the second is out. No longer than that.
 - **What Paradise's candy takes stays taken.** Leaving the realm used to give the limbs back: the server had never
   given them, but the new world's client started the body afresh and was never told otherwise. Now it is told on every
   crossing; the limbs come back only with death.

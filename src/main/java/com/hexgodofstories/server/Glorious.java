@@ -267,6 +267,7 @@ public final class Glorious {
                     p.setDeltaMovement(Vec3.ZERO);
                     p.fallDistance = 0;
                     HexNetwork.arrival(p);
+                    HexServer.veil(p);
                     return true;
                 }
             HexServer.notice(p, "There is no room behind it.");
@@ -277,6 +278,7 @@ public final class Glorious {
         HexServer.gesture(p, "blink", "depart", HexGodOfStories.TELEPORT.get());
         HexServer.teleport(p, destination);
         HexNetwork.arrival(p);
+        HexServer.veil(p);
         return true;
     }
 
