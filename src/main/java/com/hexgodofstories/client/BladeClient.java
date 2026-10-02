@@ -41,6 +41,21 @@ public final class BladeClient {
         return stack;
     }
 
+    /**
+     * A bleeding player cannot jump (Bleed). The jump is made on their own client, so it is here it is undone: no rise,
+     * and no sprint-jump's push either.
+     */
+    @SubscribeEvent public static void bleedJump(net.minecraftforge.event.entity.living.LivingEvent.LivingJumpEvent e) {
+        var mc=Minecraft.getInstance();
+        if(mc.player==null||e.getEntity()!=mc.player||!WorldEffects.grounded(mc.player.getId()))return;
+        var v=mc.player.getDeltaMovement();
+        if(mc.player.isSprinting()) {
+            float yaw=mc.player.getYRot()*Mth.DEG_TO_RAD;
+            v=v.add(Mth.sin(yaw)*.2f,0,-Mth.cos(yaw)*.2f);
+        }
+        mc.player.setDeltaMovement(v.x,Math.min(0,v.y),v.z);
+    }
+
     /** First person, between the moves: the formed blade held where vanilla would hold it, swing and all. */
     @SubscribeEvent public static void hand(RenderHandEvent e) {
         var mc=Minecraft.getInstance();

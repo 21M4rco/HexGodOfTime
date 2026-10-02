@@ -126,9 +126,15 @@ public final class WorldEffects {
     }
 
     public static void bleeding(int entity,int stacks,boolean pouring) {
-        if(stacks<=0)BLEEDING.remove(entity);else BLEEDING.put(entity,stacks);
+        if(stacks<=0){if(BLEEDING.remove(entity)!=null)GROUNDED.put(entity,ClientState.now()+40);}
+        else{BLEEDING.put(entity,stacks);GROUNDED.remove(entity);}
         Blood.pouring(entity,stacks>0&&pouring);
     }
+    /** Bodies that stopped bleeding a moment ago and may not jump yet (Bleed's linger), by id, until when. */
+    private static final Map<Integer,Long> GROUNDED=new HashMap<>();
+
+    /** Whether this body is bleeding, or stopped only a moment ago: too hurt to jump (Bleed). */
+    public static boolean grounded(int entity) {return BLEEDING.containsKey(entity)||GROUNDED.getOrDefault(entity,0L)>ClientState.now();}
     public static void memory(int entity,CompoundTag n) {
         int count=Math.min(24,n.getInt("count"));
         for(int i=0;i<count;i+=2) {

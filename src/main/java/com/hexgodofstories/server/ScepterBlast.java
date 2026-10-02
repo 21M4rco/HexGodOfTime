@@ -304,13 +304,13 @@ public final class ScepterBlast {
         stun(victim, stunFor(power));
         daze(victim);
         // Slowness I: the stun's own slowdown is stronger and shorter, so this waits under it and then runs on.
-        victim.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, SLOW, 0, false, true));
+        victim.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, SLOW, 0, false, false, true));
     }
 
     /** Two seconds of the world reeling and going dark, whatever the charge. */
     private static void daze(LivingEntity victim) {
-        victim.addEffect(new MobEffectInstance(MobEffects.CONFUSION, DAZE, 0, false, true));
-        victim.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, DAZE, 0, false, true));
+        victim.addEffect(new MobEffectInstance(MobEffects.CONFUSION, DAZE, 0, false, false, true));
+        victim.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, DAZE, 0, false, false, true));
         if (!(victim instanceof ServerPlayer player)) return;
         // Vanilla never draws nausea this short, so the victim's own client is told to draw it; sent
         // after the effect, so it arrives to find the nausea already there. See ScepterClient.sway.
@@ -395,8 +395,8 @@ public final class ScepterBlast {
             mob.setNoAi(true);
             if (!hadNoAi) victim.getPersistentData().putBoolean(STUN_TAG, true);
         }
-        victim.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, ticks, 255, false, true));
-        victim.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, ticks, 255, false, true));
+        victim.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, ticks, 255, false, false, true));
+        victim.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, ticks, 255, false, false, true));
         CompoundTag state = new CompoundTag();
         state.putLong("until", until);
         HexNetwork.tracking(victim, new HexNetwork.Message(HexNetwork.STUN, victim.getId(), state));

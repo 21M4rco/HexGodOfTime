@@ -198,6 +198,16 @@ public final class ServerEvents {
      */
     @SubscribeEvent public static void bleedKnockback(LivingKnockBackEvent e) {if(Bleed.dealing()||BladeCombo.dealing())e.setCanceled(true);}
 
+    /**
+     * A bleeding body cannot jump (Bleed): a creature's jump is undone here, where it is made. A player's is made on
+     * their own client, and undone there too (WorldEffects); this catches the server's copy of it.
+     */
+    @SubscribeEvent public static void bleedJump(net.minecraftforge.event.entity.living.LivingEvent.LivingJumpEvent e) {
+        if(e.getEntity().level().isClientSide||!Bleed.grounded(e.getEntity()))return;
+        net.minecraft.world.phys.Vec3 v=e.getEntity().getDeltaMovement();
+        e.getEntity().setDeltaMovement(v.x,Math.min(0,v.y),v.z);
+    }
+
     /** Vanilla's real Scepter hit deals four health (two hearts) and bleeds for one second. */
     @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
     public static void swordDamage(LivingDamageEvent e) {

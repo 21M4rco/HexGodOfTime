@@ -21,6 +21,10 @@
   body's blood off toward the side the blade travelled: a cut to the right sprays right, a rising cut sprays up, a
   thrust goes out through the back, and it pools where it lands. (The moves were posed against where the blade's point
   really goes in the game's own held-item chain, and tools/generate_blades.py checks each against its blood.)
+- **Bleeding cripples.** Whatever opened the wound (a blade, a thrown dagger, the Scepter's beam, a bite), a bleeding
+  body is slowed to a quarter of its speed (slowness V), reels with nausea and cannot jump at all, for as long as it
+  bleeds and two seconds after. None of it shows a potion's swirl of particles, and neither do the Scepter's stun and
+  daze any more: the blood is all there is to see.
 - **Fixed:** the Gotcha! Swarm's missiles could leave a ball of fire hanging in the air where one burst. And a Crown
   missile's crater now grows back from its floor up, so sand and gravel come back onto ground instead of falling in.
 

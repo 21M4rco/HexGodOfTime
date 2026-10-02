@@ -10,6 +10,10 @@ import java.util.*;
 /**
  * Stacking wounds from embedded blades, and the steady flow a Scepter beam's hole leaves. Damage is
  * credited to the caster so kills read as theirs.
+ *
+ * <p>A bleeding body is also badly hampered, whatever opened the wound: slowness V (three quarters of its speed gone),
+ * nausea, and no jumping at all, for as long as it bleeds and {@link #LINGER} ticks after. None of it shows a single
+ * particle: the blood is all there is to see.
  */
 public final class Bleed {
     /** True only while a bleed tick's damage is being dealt, so that it knocks nobody back (see ServerEvents). */
@@ -28,6 +32,29 @@ public final class Bleed {
     /** How hard a flowing hole bleeds to look at, in stacks: about what a heart a second would take. */
     private static final int FLOW_SHOWN=3;
     private static final Map<UUID,Wound> WOUNDS=new HashMap<>();
+    /** How long the hampering outlasts the bleeding, and how often it is renewed while the wound is open. */
+    private static final int LINGER=40,RENEW=10,SLOWNESS=4,NAUSEA_LEAST=100;
+    /** Bodies that may not jump, until when: bleeding, and a moment after. */
+    private static final Map<UUID,Long> GROUNDED=new HashMap<>();
+
+    /** Whether this body is still too hurt to jump. */
+    public static boolean grounded(LivingEntity e) {
+        Long until=GROUNDED.get(e.getUUID());
+        return until!=null&&until>e.level().getGameTime();
+    }
+
+    /**
+     * Slowness V and nausea, renewed to last out the wound and a little after; and the body kept off its feet as long.
+     * Invisible (no swirl of particles) but for the icons on a player's screen.
+     */
+    private static void hamper(LivingEntity victim,Wound wound,long now) {
+        long left=Math.max(Math.max(wound.expires,wound.flowing)-now,0);
+        int slow=(int)Math.min(20*60,left+LINGER);
+        victim.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.MOVEMENT_SLOWDOWN,slow,SLOWNESS,false,false,true));
+        // Vanilla only draws nausea past three seconds left, so it is always given at least five.
+        victim.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.CONFUSION,(int)Math.max(NAUSEA_LEAST,slow+60),0,false,false,true));
+        GROUNDED.put(victim.getUUID(),now+slow);
+    }
 
     public static int stacks(LivingEntity e) {Wound w=WOUNDS.get(e.getUUID());return w==null?0:w.stacks;}
 
@@ -56,6 +83,7 @@ public final class Bleed {
             wound.stacks=Math.min(MAX_STACKS,wound.stacks+stacks);
             wound.expires=Math.max(wound.expires,now+duration);
         }
+        hamper(victim,wound,now);
         notifyClients(victim,wound,now);
     }
 
@@ -76,11 +104,13 @@ public final class Bleed {
         // One tick past the end, so the last second's heart lands whatever beat the wound is already on.
         wound.flowing=Math.max(wound.flowing,now+duration+1);
         wound.flowOwner=owner.getUUID();
+        hamper(victim,wound,now);
         notifyClients(victim,wound,now);
     }
 
     public static void tick(ServerLevel level) {
         long now=level.getGameTime();
+        if(now%20==0&&level.dimension()==ServerLevel.OVERWORLD)forgetGrounded(now);
         // Snapshot the keys: a wound that finishes its victim fires a death event, and that clears
         // entries from this very map while we are still walking it.
         for(UUID id:new ArrayList<>(WOUNDS.keySet())) {
@@ -88,6 +118,7 @@ public final class Bleed {
             if(wound==null)continue;
             if(!(level.getEntity(id) instanceof LivingEntity victim))continue;
             if(!victim.isAlive()||now>=wound.expires&&now>=wound.flowing){WOUNDS.remove(id);notifyClients(victim,0,false);continue;}
+            if((now+victim.getId())%RENEW==0)hamper(victim,wound,now);
             if(now<wound.next)continue;
             wound.next=now+INTERVAL;
             boolean flowing=now<wound.flowing;
@@ -127,6 +158,9 @@ public final class Bleed {
         CompoundTag n=new CompoundTag();n.putInt("stacks",stacks);n.putBoolean("pouring",pouring);
         HexNetwork.tracking(victim,new HexNetwork.Message(HexNetwork.BLEED,victim.getId(),n));
     }
-    public static void clear(LivingEntity e) {if(WOUNDS.remove(e.getUUID())!=null)notifyClients(e,0,false);}
-    public static void reset() {WOUNDS.clear();}
+    public static void clear(LivingEntity e) {GROUNDED.remove(e.getUUID());if(WOUNDS.remove(e.getUUID())!=null)notifyClients(e,0,false);}
+    public static void reset() {WOUNDS.clear();GROUNDED.clear();}
+
+    /** Once a second or so: forget the bodies that may jump again (or are gone). */
+    public static void forgetGrounded(long now) {GROUNDED.values().removeIf(until->until<=now);}
 }
