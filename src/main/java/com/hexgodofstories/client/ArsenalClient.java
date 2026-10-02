@@ -2,6 +2,7 @@ package com.hexgodofstories.client;
 
 import com.hexgodofstories.HexGodOfStories;
 import com.hexgodofstories.data.ArsenalLayout;
+import com.hexgodofstories.entity.SeekerMissile;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -104,6 +105,8 @@ public final class ArsenalClient {
      */
     private static final double[] FIRST_MISSILE = {.72, .16, .95}, FIRST_MISSILE_LEAN = {.30, 1, .35}, MISSILE_LEAN = {.40, 1, .30};
     private static final double FIRST_MISSILE_SCALE = .45;
+    /** The swarm's missiles, against the Crown's own: a little under half the size. */
+    private static final double SEEKER_SCALE = .42;
     /** Ticks a missile takes to settle from where it was seen forming onto its own path. */
     private static final int SETTLE = 10;
     /** Ticks a blast's rings take to spread and fade. */
@@ -294,6 +297,8 @@ public final class ArsenalClient {
 
     private static final Map<Integer, Crown> CROWNS = new HashMap<>();
     private static final Map<Integer, Missile> MISSILES = new HashMap<>();
+    /** The swarm's missiles whose motors are already heard. */
+    private static final java.util.Set<SeekerMissile> HEARD = java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>());
     private static final List<Tracer> TRACERS = new ArrayList<>();
     private static final List<Casing> CASINGS = new ArrayList<>();
     private static final List<Wave> WAVES = new ArrayList<>();
@@ -354,6 +359,8 @@ public final class ArsenalClient {
         SHOTS.clear();
         SNEAKS.clear();
         QUAKES.clear();
+        SeekerMissile.LIVE.clear();
+        HEARD.clear();
         ArsenalFx.clear();
     }
 
@@ -378,6 +385,7 @@ public final class ArsenalClient {
                 if (c != null && c.held() && c.start == data.getLong("start")) ended(c, data.getLong("at"), data.getString("state"));
             }
             case "launch" -> launch(entity, data);
+            case "swarm" -> swarm(data);
             case "impact" -> impact(data);
             case "anchor_burst" -> anchorBurst(data);
             case "throat" -> {
@@ -484,11 +492,72 @@ public final class ArsenalClient {
         }
     }
 
+    /** Kneel: the ground round the caster struck, a green ring rolling out over it, and the blow felt underfoot. */
+    public static void kneel(Vec3 at) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+        quake(at, mc.level, 12);
+        WAVES.add(new Wave(at, ClientState.now(), true, .9));
+        while (WAVES.size() > 8) WAVES.remove(0);
+        double d = mc.gameRenderer.getMainCamera().getPosition().distanceTo(at);
+        if (d < 24) com.hexgodofstories.client.leviathan.LeviathanEffects.quake((float) (1.4 * (1 - d / 24)));
+    }
+
+    /** The swarm leaving: four launches, a beat apart, each a little higher than the Crown's. */
+    private static void swarm(CompoundTag n) {
+        Vec3 at = new Vec3(n.getDouble("x"), n.getDouble("y"), n.getDouble("z"));
+        ArsenalMeshes.preload(FLASH, FLARE);
+        Minecraft mc = Minecraft.getInstance();
+        double d = mc.gameRenderer.getMainCamera().getPosition().distanceTo(at);
+        float v = (float) (.7 * Math.max(0, 1 - d / 72));
+        if (v <= .01f) return;
+        for (int i = 0; i < 4; i++)
+            mc.getSoundManager().playDelayed(new SimpleSoundInstance(HexGodOfStories.ARSENAL_MISSILE_LAUNCH.get().getLocation(), SoundSource.PLAYERS, v,
+                1.3f + i * .06f, SoundInstance.createUnseededRandom(), false, 0, SoundInstance.Attenuation.NONE, 0, 0, 0, true), i * 2);
+    }
+
+    /** One of the swarm as drawn: the Crown's missile, shrunk, nose along its flight, turning on its length as it goes. */
+    private static Rocket seeker(SeekerMissile s, float partial) {
+        Vec3 at = new Vec3(Mth.lerp(partial, s.xo, s.getX()), Mth.lerp(partial, s.yo, s.getY()), Mth.lerp(partial, s.zo, s.getZ()));
+        Vec3 v = s.getDeltaMovement();
+        Vec3 forward = v.lengthSqr() < 1e-8 ? new Vec3(0, 1, 0) : v.normalize();
+        Vec3[] axes = axes(forward, (s.tickCount + partial) * .3);
+        return new Rocket(at, forward, axes[0], axes[1], (float) (ArsenalLayout.MISSILE_SCALE * SEEKER_SCALE), 1);
+    }
+
+    /** A seeker's fire and a thin smoke behind it, every tick it flies. */
+    private static void seekerTrail(SeekerMissile s, RandomSource random) {
+        Rocket r = seeker(s, 1);
+        Vec3 tail = tail(r), back = r.forward().scale(-1);
+        Particle flame = ArsenalFx.create(HexGodOfStories.METEOR_FIRE.get(), tail, back.x * .04 + random.nextGaussian() * .01,
+            back.y * .04 + random.nextGaussian() * .01, back.z * .04 + random.nextGaussian() * .01);
+        if (flame != null) flame.setLifetime(4 + random.nextInt(3));
+        if (random.nextInt(3) == 0) return;
+        Particle puff = ArsenalFx.create(HexGodOfStories.ASH.get(), tail, random.nextGaussian() * .006, .003 + random.nextDouble() * .006,
+            random.nextGaussian() * .006);
+        if (puff == null) return;
+        float grey = .74f + random.nextFloat() * .14f;
+        puff.setColor(grey, grey, grey * .97f);
+        puff.setLifetime(40 + random.nextInt(30));
+    }
+
     private static void impact(CompoundTag n) {
         Minecraft mc = Minecraft.getInstance();
         Missile m = MISSILES.remove(n.getInt("id"));
         if (m != null) m.gone = true;
         Vec3 at = new Vec3(n.getDouble("x"), n.getDouble("y"), n.getDouble("z"));
+        if (n.getBoolean("small")) {
+            // One of the swarm: the same blast, a fraction of the size, and a sharper, smaller crack.
+            ArsenalFx.explode(at, (float) SEEKER_SCALE, false);
+            WAVES.add(new Wave(at, ClientState.now(), false, .36));
+            while (WAVES.size() > 8) WAVES.remove(0);
+            float pitch = 1.25f + mc.level.random.nextFloat() * .15f;
+            play(HexGodOfStories.ARSENAL_EXPLOSION.get(), at, .55f, pitch);
+            play(HexGodOfStories.ARSENAL_EXPLOSION_FAR.get(), at, .4f, pitch * .9f);
+            double d = mc.gameRenderer.getMainCamera().getPosition().distanceTo(at);
+            if (d < 22) com.hexgodofstories.client.leviathan.LeviathanEffects.scepterRecoil((float) (.75 * (1 - d / 22) * (1 - d / 22)));
+            return;
+        }
         ArsenalFx.explode(at);
         quake(at, mc.level, QUAKE_REACH);
         WAVES.add(new Wave(at, ClientState.now(), false, 1));
@@ -543,6 +612,11 @@ public final class ArsenalClient {
             rumble(q, age, level);
         }
         for (Missile m : MISSILES.values()) trail(m, now, level.random);
+        SeekerMissile.LIVE.removeIf(s -> s.isRemoved() || s.level() != level);
+        for (SeekerMissile s : SeekerMissile.LIVE) {
+            seekerTrail(s, level.random);
+            if (HEARD.add(s)) mc.getSoundManager().play(new SeekerSound(s));
+        }
         MISSILES.values().removeIf(m -> {
             if (now - m.launch <= m.flight.duration + 60) return false;
             m.gone = true;
@@ -760,7 +834,8 @@ public final class ArsenalClient {
     public static void render(RenderLevelStageEvent e) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level != null && !QUAKES.isEmpty()) ground(e, mc.level);
-        if (mc.level == null || failed || CROWNS.isEmpty() && MISSILES.isEmpty() && CASINGS.isEmpty() && SNEAKS.isEmpty()) return;
+        if (mc.level == null || failed || CROWNS.isEmpty() && MISSILES.isEmpty() && CASINGS.isEmpty() && SNEAKS.isEmpty()
+            && SeekerMissile.LIVE.isEmpty()) return;
         frame++;
         float partial = e.getPartialTick();
         double time = ClientState.time(partial);
@@ -807,6 +882,12 @@ public final class ArsenalClient {
             }
             if (rocket != null) for (Missile m : MISSILES.values()) {
                 Rocket r = m.pose(ClientState.since(m.launch, partial));
+                int light = lit(LevelRenderer.getLightColor(mc.level, BlockPos.containing(r.middle())));
+                draw(rocket, view, projection, eye, r.middle(), r.right(), r.up(), r.forward(), r.scale(), 1, 0, light, MISSILE_RIM);
+            }
+            if (rocket != null) for (SeekerMissile s : SeekerMissile.LIVE) {
+                if (s.isRemoved() || s.level() != mc.level || s.distanceToSqr(eye) > DRAW_RANGE * DRAW_RANGE) continue;
+                Rocket r = seeker(s, partial);
                 int light = lit(LevelRenderer.getLightColor(mc.level, BlockPos.containing(r.middle())));
                 draw(rocket, view, projection, eye, r.middle(), r.right(), r.up(), r.forward(), r.scale(), 1, 0, light, MISSILE_RIM);
             }
@@ -1218,7 +1299,8 @@ public final class ArsenalClient {
 
     public static void renderLight(RenderLevelStageEvent e) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || failed || CROWNS.isEmpty() && MISSILES.isEmpty() && TRACERS.isEmpty() && WAVES.isEmpty() && SNEAKS.isEmpty()) return;
+        if (mc.level == null || failed || CROWNS.isEmpty() && MISSILES.isEmpty() && TRACERS.isEmpty() && WAVES.isEmpty() && SNEAKS.isEmpty()
+            && SeekerMissile.LIVE.isEmpty()) return;
         float partial = e.getPartialTick();
         double time = ClientState.time(partial);
         Vec3 camera = e.getCamera().getPosition();
@@ -1259,6 +1341,9 @@ public final class ArsenalClient {
                 tr.bright ? .055f : .035f, 1, .5f, .15f, 0, 1, .92f, .7f, bright, 0, .5f);
         }
         for (Missile m : MISSILES.values()) flame(out, view, camera, m, ClientState.since(m.launch, partial), time);
+        for (SeekerMissile s : SeekerMissile.LIVE)
+            if (!s.isRemoved() && s.level() == mc.level && s.distanceToSqr(camera) < DRAW_RANGE * DRAW_RANGE)
+                flame(out, view, camera, seeker(s, partial), s.tickCount + partial, s.getId(), time);
         buffers.endBatch(type);
 
         if (!WAVES.isEmpty()) {
@@ -1283,10 +1368,13 @@ public final class ArsenalClient {
     /** The fire pushing a missile: a long outer flame, a white core, and the glow of the nozzle. */
     private static void flame(VertexConsumer out, Matrix4f view, Vec3 camera, Missile m, double ticks, double time) {
         if (ticks < 0) return;
-        Rocket r = m.pose(ticks);
+        flame(out, view, camera, m.pose(ticks), ticks, m.id, time);
+    }
+
+    private static void flame(VertexConsumer out, Matrix4f view, Vec3 camera, Rocket r, double ticks, int id, double time) {
         Vec3 tail = tail(r);
-        float power = (float) Math.min(1, .35 + ticks / 5), flicker = .86f + .1f * Mth.sin((float) (time * 2.9 + m.id * 1.7))
-            + .06f * Mth.sin((float) (time * 7.3 + m.id));
+        float power = (float) Math.min(1, .35 + ticks / 5), flicker = .86f + .1f * Mth.sin((float) (time * 2.9 + id * 1.7))
+            + .06f * Mth.sin((float) (time * 7.3 + id));
         float k = r.scale() / (float) ArsenalLayout.MISSILE_SCALE;
         Vector3f nozzle = at(view, camera, tail);
         streak(out, nozzle, at(view, camera, tail.subtract(r.forward().scale(2.1 * flicker * power * k))), .7f * power * k,
@@ -1437,6 +1525,31 @@ public final class ArsenalClient {
                 return;
             }
             volume = LOUD * Math.min(1, ++age / 6f);
+        }
+    }
+
+    /** A seeker's motor, higher and thinner than a full missile's, following it until it bursts or goes out of sight. */
+    private static final class SeekerSound extends AbstractTickableSoundInstance {
+        private final SeekerMissile missile;
+
+        SeekerSound(SeekerMissile missile) {
+            super(HexGodOfStories.ARSENAL_MISSILE_FLIGHT.get(), SoundSource.PLAYERS, SoundInstance.createUnseededRandom());
+            this.missile = missile;
+            looping = true;
+            delay = 0;
+            volume = .55f;
+            pitch = 1.32f + random.nextFloat() * .16f;
+            attenuation = SoundInstance.Attenuation.LINEAR;
+            x = missile.getX();
+            y = missile.getY();
+            z = missile.getZ();
+        }
+
+        @Override public void tick() {
+            if (missile.isRemoved()) {volume = 0; stop(); return;}
+            x = missile.getX();
+            y = missile.getY();
+            z = missile.getZ();
         }
     }
 

@@ -624,6 +624,38 @@ public final class Arsenal {
         return null;
     }
 
+    /**
+     * Gotcha! in the full transformation: no gun, but four small missiles thrown out from beside the caster's head,
+     * which fan away and then hunt the body looked at, slow and wandering, each bursting on what it meets
+     * ({@link com.hexgodofstories.entity.SeekerMissile}). It shares Gotcha!'s recovery, a little longer.
+     *
+     * @return why it could not be done, or null once it has begun
+     */
+    public static String swarm(ServerPlayer p) {
+        if (active(p) || p.isPassenger() || p.isSpectator()) return "Not now.";
+        LivingEntity body = looked(p, REACH);
+        if (body == null) return "Look at a body: the swarm needs something to hunt.";
+        long now = HexData.now(p);
+        HexData.get(p).putLong(GOTCHA_READY, now + SWARM_RECOVERY);
+        Vec3 eye = p.getEyePosition(), look = p.getLookAngle();
+        Vec3 right = look.cross(new Vec3(0, 1, 0));
+        right = right.lengthSqr() < 1e-6 ? new Vec3(1, 0, 0) : right.normalize();
+        Vec3 up = right.cross(look).normalize();
+        for (int i = 0; i < 4; i++) {
+            double side = i < 2 ? -1 : 1, high = i % 2 == 0 ? 1 : -.25;
+            Vec3 from = eye.add(right.scale(side * .7)).add(up.scale(.3 * high)).add(look.scale(.35));
+            // Thrown out and up from either side of the head, as a salvo leaves its rails, before each turns to hunt.
+            Vec3 out = right.scale(side * (.5 + .15 * i)).add(up.scale(.65 + .2 * high)).add(look.scale(.5));
+            com.hexgodofstories.entity.SeekerMissile.launch(p, body, from, out, i);
+        }
+        CompoundTag n = new CompoundTag();
+        n.putString("state", "swarm");
+        n.putDouble("x", eye.x); n.putDouble("y", eye.y); n.putDouble("z", eye.z);
+        HexNetwork.near(p.serverLevel(), eye, 96, new HexNetwork.Message(HexNetwork.ARSENAL, p.getId(), n));
+        HexNetwork.animate(p, "gotcha");
+        return null;
+    }
+
     /** Whether Gotcha! is still recovering. A tick further off than its recovery could reach (a world clock that has moved) counts as ready. */
     public static boolean gotchaRecovering(ServerPlayer p) {
         long left = HexData.get(p).getLong(GOTCHA_READY) - HexData.now(p);

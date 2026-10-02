@@ -137,7 +137,11 @@ public final class HexServer {
         if(!HexData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return;}
         if(HexData.cooldown(p,a)>0){notice(p,"The spell is recovering.");return;}
         if(HexData.energy(p)<a.cost){notice(p,"Not enough Temporal Energy.");return;}
-        if(a==Ability.WARPING){if(action==HOLD_BEGIN||action==CAST)Warping.begin(p);return;}
+        if(a==Ability.WARPING){
+            // Wide Open: worn, the mantle opens the pool at its full size in one movement.
+            if(action==HOLD_BEGIN||action==CAST){if(Transformation.transformed(p))Warping.instant(p);else Warping.begin(p);}
+            return;
+        }
         // Held or nothing: a plain press never starts the crown, which would then fire itself out unheld.
         if(a==Ability.ARSENAL){if(action==HOLD_BEGIN&&Arsenal.begin(p))HexData.spend(p,a.cost);HexNetwork.sync(p);return;}
         if(action==HOLD_BEGIN) {
@@ -151,8 +155,10 @@ public final class HexServer {
         if(a.hold){Architecture.begin(p);return;}
         if(cast(p,a,action==ALTERNATE)) {
             // Anchor Being cast in the full transformation is its secret, sixty-block variation, and costs two minutes.
-            // The mantle's own recovery starts only once it is off (see dismissMantle).
+            // The mantle's own recovery starts only once it is off (see dismissMantle). Other spells the mantle changes
+            // keep their variant's own recovery (Ascended).
             int recovery=a==Ability.THREADS&&HexData.get(p).getBoolean("ascended")?AnchorBeing.GRAND_RECOVERY:a==Ability.ASCENSION?0:a.cooldown;
+            if(action!=ALTERNATE&&a!=Ability.ASCENSION&&Transformation.transformed(p)&&Ascended.recovery(a)>=0)recovery=Ascended.recovery(a);
             HexData.spend(p,a.cost);HexData.get(p).putLong("cd_"+a.name(),now+recovery);
             reward(p,a.discipline,90);HexNetwork.sync(p);
         }
@@ -187,7 +193,8 @@ public final class HexServer {
         if(a==Ability.ARSENAL){
             if(!HexData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return true;}
             if(Arsenal.gotchaRecovering(p)){notice(p,"Gotcha! is recovering.");return true;}
-            String refused=Arsenal.gotcha(p);
+            // Worn, the mantle makes it a swarm of four seeking missiles instead of one gun.
+            String refused=Transformation.transformed(p)?Arsenal.swarm(p):Arsenal.gotcha(p);
             if(refused!=null)notice(p,refused);
             return true;
         }
@@ -223,6 +230,8 @@ public final class HexServer {
 
     private static boolean cast(ServerPlayer p,Ability a,boolean secondary) {
         Entity t=target(p,24);Vec3 look=p.getLookAngle();long now=HexData.now(p);
+        // Worn, the mantle makes most spells something bigger (Glorious); a null answer is the plain spell.
+        if(!secondary&&Transformation.transformed(p)){Boolean done=Glorious.cast(p,a,t);if(done!=null)return done;}
         switch(a) {
             case DUPLICATE -> {return duplicate(p,false,false);}
             case MIRAGE -> {if(!duplicate(p,true,false))return false;HexData.get(p).putLong("vanishUntil",now+50);p.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.INVISIBILITY,50,0,false,false));return true;}
@@ -231,6 +240,8 @@ public final class HexServer {
                 if(t==null){notice(p,"Look at a creature to borrow its shape.");return false;}
                 if(!(t instanceof LivingEntity)){notice(p,"Only a living shape can be worn.");return false;}
                 if(!Masquerade.assume(p,t)){notice(p,"That shape refuses to be read.");return false;}
+                // Impostor: worn, the mantle leaves the one copied the stranger, and everything near it turns on it.
+                if(Transformation.transformed(p)&&t instanceof LivingEntity victim&&validTarget(p,victim))Glorious.impostor(p,victim);
                 gesture(p,"illusion","disguise",HexGodOfStories.ILLUSION_SOUND.get());return true;
             }
             case RIFT -> {return false;} // legacy tombstone; Fracture moved into Warping
@@ -246,15 +257,11 @@ public final class HexServer {
             case ENCHANT -> {
                 if(t instanceof ServerPlayer other&&validTarget(p,t)){other.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.CONFUSION,50,0,false,false));HexNetwork.fx(other,"enchant");gesture(p,"enchant","cast",HexGodOfStories.SORCERY.get());return true;}
                 if(!(t instanceof Mob mob)||!validTarget(p,mob)||mob.getMaxHealth()>30+HexData.mastery(p,Discipline.ENCHANTMENT)*.25)return false;
-                CHARMS.put(mob.getUUID(),new Charm(mob,p.getUUID(),now+240+HexData.mastery(p,Discipline.ENCHANTMENT)/2,mob.getTarget()==null?null:mob.getTarget().getUUID()));
-                mob.setTarget(null);gesture(p,"enchant","enchant",HexGodOfStories.ILLUSION_SOUND.get());HexNetwork.fx(mob,"enchant");return true;
+                charm(p,mob,240+HexData.mastery(p,Discipline.ENCHANTMENT)/2);
+                gesture(p,"enchant","enchant",HexGodOfStories.ILLUSION_SOUND.get());return true;
             }
             case MEMORY -> {
-                if(t==null)return false;ArrayDeque<Vec3> path=WATCHED.get(t.getUUID());
-                if(path==null||path.isEmpty()){notice(p,"Stay near the target while its memory gathers.");return false;}
-                CompoundTag n=new CompoundTag();int i=0;
-                for(Vec3 v:path){CompoundTag point=new CompoundTag();point.putDouble("x",v.x);point.putDouble("y",v.y);point.putDouble("z",v.z);n.put("p"+i++,point);}
-                n.putInt("count",i);HexNetwork.tracking(p,new HexNetwork.Message(HexNetwork.MEMORY,t.getId(),n));
+                if(t==null||!memoryTrail(p,t))return false;
                 gesture(p,"enchant","memory",HexGodOfStories.ILLUSION_SOUND.get());return true;
             }
             case REWIND -> {
@@ -513,6 +520,7 @@ public final class HexServer {
             if(now%10==0){if(c.mob.getTarget()==owner)c.mob.setTarget(null);if(c.mob.getTarget()==null&&c.mob.distanceToSqr(owner)>9)c.mob.getNavigation().moveTo(owner,1.05);}
         }
         Bleed.tick(level);
+        Delusion.tick(level);
         Frostbite.tick(level);
         ScepterBlast.tick(level);
         Arsenal.tickLevel(level);
@@ -527,6 +535,48 @@ public final class HexServer {
         WarpEmergence.tick(level);
         Warping.tick(level);WarpRealms.tick(level);
         if(now%200==0)WATCHED.entrySet().removeIf(e->level.getEntity(e.getKey())==null);
+    }
+
+    /** A creature charmed into following the caster for {@code ticks}, its old quarry remembered for when it ends. */
+    static void charm(ServerPlayer p,Mob mob,int ticks) {
+        CHARMS.put(mob.getUUID(),new Charm(mob,p.getUUID(),HexData.now(p)+ticks,mob.getTarget()==null?null:mob.getTarget().getUUID()));
+        mob.setTarget(null);HexNetwork.fx(mob,"enchant");
+    }
+    static boolean charmed(Mob mob) {return CHARMS.containsKey(mob.getUUID());}
+    /** Memory Echo's trail of a body's recent steps, for the caster's eyes only. False when none has gathered yet. */
+    static boolean memoryTrail(ServerPlayer p,Entity t) {
+        ArrayDeque<Vec3> path=WATCHED.get(t.getUUID());
+        if(path==null||path.isEmpty()){notice(p,"Stay near the target while its memory gathers.");return false;}
+        CompoundTag n=new CompoundTag();int i=0;
+        for(Vec3 v:path){CompoundTag point=new CompoundTag();point.putDouble("x",v.x);point.putDouble("y",v.y);point.putDouble("z",v.z);n.put("p"+i++,point);}
+        n.putInt("count",i);HexNetwork.tracking(p,new HexNetwork.Message(HexNetwork.MEMORY,t.getId(),n));
+        return true;
+    }
+    /**
+     * Slipstream (Time Slip in the full transformation): the caster slips back exactly three seconds, whatever their
+     * mastery, and every creature or player within ten blocks is dragged back three seconds along its own path.
+     */
+    static boolean slipstream(ServerPlayer p) {
+        ArrayDeque<Moment> h=HISTORY.get(p.getUUID());if(h==null||h.size()<16)return false;
+        List<Moment> history=new ArrayList<>(h);
+        Moment m=history.get(history.size()-15);if(!safe(p,m.position))return false;
+        // Everyone near is taken first, from where they stand now, before the caster has moved away from them.
+        List<LivingEntity> near=p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(10),e->validTarget(p,e)&&!Glorious.huge(e)&&!e.isPassenger());
+        gesture(p,"time_slip","slip",HexGodOfStories.SLIP.get());teleport(p,m.position);p.setYRot(m.yaw);p.setXRot(m.pitch);
+        HexNetwork.fx(p,"slip");
+        for(LivingEntity e:near) {
+            ArrayDeque<Vec3> path=WATCHED.get(e.getUUID());
+            if(path==null||path.size()<2)continue;
+            List<Vec3> steps=new ArrayList<>(path);
+            Vec3 back=steps.get(Math.max(0,steps.size()-12));
+            if(!e.level().noCollision(e,e.getBoundingBox().move(back.subtract(e.position()))))continue;
+            HexNetwork.fx(e,"slip");
+            if(e instanceof ServerPlayer q){q.stopRiding();q.connection.teleport(back.x,back.y,back.z,q.getYRot(),q.getXRot());}
+            else e.teleportTo(back.x,back.y,back.z);
+            e.setDeltaMovement(Vec3.ZERO);e.hurtMarked=true;e.fallDistance=0;
+            e.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.MOVEMENT_SLOWDOWN,20,1,false,false));
+        }
+        return true;
     }
 
     public static boolean charmedAgainst(Mob mob,LivingEntity target) {Charm c=CHARMS.get(mob.getUUID());return c!=null&&target!=null&&target.getUUID().equals(c.owner);}
@@ -566,11 +616,13 @@ public final class HexServer {
         for(UUID id:ids)list.add((IllusionEntity)p.serverLevel().getEntity(id));
         return list;
     }
-    private static boolean duplicate(ServerPlayer p,boolean multiple,boolean aimed) {
-        int max=1+HexData.mastery(p,Discipline.MISCHIEF)/180;
+    static boolean duplicate(ServerPlayer p,boolean multiple,boolean aimed) {
+        // Living Legion: worn, the mantle makes a plain projection two at a time, two past the usual limit.
+        boolean legion=!multiple&&!aimed&&Transformation.transformed(p);
+        int max=1+HexData.mastery(p,Discipline.MISCHIEF)/180+(legion?2:0);
         List<IllusionEntity> existing=illusions(p);
         if(existing.size()>=max){notice(p,"Your projections are already at capacity.");return false;}
-        int count=multiple?max-existing.size():1,spawned=0,mirrored=heldLoadout(p);
+        int count=multiple?max-existing.size():legion?Math.min(2,max-existing.size()):1,spawned=0,mirrored=heldLoadout(p);
         for(int i=0;i<count;i++) {
             double angle=p.getYRot()*Math.PI/180+i*Math.PI*2/count;
             Vec3 pos=aimed?safeAim(p,12):p.position().add(Math.cos(angle)*2,0,Math.sin(angle)*2);
@@ -605,14 +657,14 @@ public final class HexServer {
             &&p.level().noCollision(p,p.getBoundingBox().move(pos.subtract(p.position())))
             &&!p.level().containsAnyLiquid(p.getBoundingBox().move(pos.subtract(p.position())));
     }
-    private static Vec3 safeAim(ServerPlayer p,double range) {
+    static Vec3 safeAim(ServerPlayer p,double range) {
         Vec3 from=p.getEyePosition();
         BlockHitResult hit=p.level().clip(new ClipContext(from,from.add(p.getLookAngle().scale(range)),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,p));
         Vec3 goal=hit.getLocation().subtract(p.getLookAngle().scale(.8)).add(0,-.5,0);
         for(int i=0;i<8;i++){Vec3 v=goal.add(0,i*.5,0);if(safe(p,v))return v;}
         return null;
     }
-    private static void teleport(ServerPlayer p,Vec3 v) {
+    static void teleport(ServerPlayer p,Vec3 v) {
         Telekinesis.release(p,false);p.stopRiding();
         p.connection.teleport(v.x,v.y,v.z,p.getYRot(),p.getXRot());
         p.setDeltaMovement(Vec3.ZERO);p.fallDistance=0;
@@ -625,12 +677,12 @@ public final class HexServer {
     }
     /** Flourishes the copies share, so a burst of sorcery never singles out the body that cast it. */
     private static final Set<String> MIRRORED=Set.of("cast","conjure","slash","throw","ward","push","hold","disguise");
-    private static void gesture(ServerPlayer p,String animation,String fx,SoundEvent sound) {
+    static void gesture(ServerPlayer p,String animation,String fx,SoundEvent sound) {
         HexNetwork.animate(p,animation);HexNetwork.fx(p,fx);
         if(MIRRORED.contains(fx))for(IllusionEntity e:illusions(p))HexNetwork.fx(e,fx);
         p.level().playSound(null,p.blockPosition(),sound,SoundSource.PLAYERS,.75f,1);
     }
-    private static void notice(ServerPlayer p,String text) {p.displayClientMessage(Component.literal(text),true);}
+    static void notice(ServerPlayer p,String text) {p.displayClientMessage(Component.literal(text),true);}
 
     /** Persisted administrative switch. Turning it off immediately tears down player-owned power state. */
     public static void access(ServerPlayer p,boolean enabled) {
@@ -664,6 +716,7 @@ public final class HexServer {
         TimeBranch.forget(p);BranchFist.clear(p);Erasure.forget(p);Transformation.strip(p);
         Arsenal.forget(p);
         GravityGrasp.forget(p);
+        Glorious.forget(p);
         HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());ScepterBlast.forget(p);INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         HexData.clearTransient(p,death);
     }
@@ -673,5 +726,6 @@ public final class HexServer {
         Warping.reset();
         Telekinesis.reset();Architecture.reset();Bleed.reset();Frostbite.reset();ScepterBlast.reset();PocketRealm.reset();TemporalEngine.reset();
         Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();Arsenal.reset();GravityGrasp.reset();
+        Delusion.reset();Glorious.reset();
     }
 }

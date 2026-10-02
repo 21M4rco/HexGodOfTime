@@ -144,6 +144,7 @@ public final class ServerEvents {
         LastMoments.forget(e.getEntity());
         Threat.forget(e.getEntity());
         Decoy.release(e.getEntity());
+        Delusion.forget(e.getEntity());
         Starfall.forget(e.getEntity());
         SanctumWard.forget(e.getEntity());
         if(e.getEntity() instanceof ServerPlayer p){PersonalRewind.clear(p);com.hexgodofstories.warping.CandyCorruption.reset(p);HexServer.clear(p,true);}
@@ -168,6 +169,10 @@ public final class ServerEvents {
     }
     @SubscribeEvent public static void wardProjectile(net.minecraftforge.event.entity.ProjectileImpactEvent e) {
         if(!(e.getRayTraceResult() instanceof net.minecraft.world.phys.EntityHitResult hit))return;
+        // Mirror Ward: turned round in the air and sent back at whoever loosed it.
+        if(hit.getEntity() instanceof ServerPlayer warded&&Glorious.mirrored(warded)&&e.getProjectile().getOwner()!=warded){
+            Glorious.rebound(warded,e.getProjectile());e.setCanceled(true);return;
+        }
         if(SanctumWard.evade(hit.getEntity()))e.setCanceled(true);
     }
     @SubscribeEvent public static void attack(AttackEntityEvent e) {
@@ -217,7 +222,12 @@ public final class ServerEvents {
         if(e.getSource().getEntity() instanceof LivingEntity attacker&&ScepterBlast.stunned(attacker)){e.setCanceled(true);return;}
         // A suspended body cannot be wounded in a moment that is not passing; the harm waits for time to resume.
         if(TemporalEngine.bank(e.getEntity(),e.getAmount(),e.getSource().getEntity())){e.setCanceled(true);return;}
+        // Mirror Ward: three quarters of the blow, as it was dealt, goes back to whoever dealt it.
+        if(e.getEntity() instanceof ServerPlayer warded&&Glorious.mirrored(warded)&&e.getSource().getEntity() instanceof LivingEntity attacker&&attacker!=warded)
+            Glorious.reflect(warded,attacker,e.getAmount()*.75f);
         if(e.getEntity() instanceof ServerPlayer p&&HexData.get(p).getLong("wardUntil")>HexData.now(p))e.setAmount(e.getAmount()*.25f);
+        // Kept ten seconds for Return to Sender.
+        if(e.getEntity() instanceof ServerPlayer kept)Glorious.wounded(kept,e.getSource().getEntity(),e.getAmount());
         // Being hit is the only thing that takes a fracture away from the caster holding it open.
         // Turning the camera away deliberately does not; concentration is not aim.
         if(e.getEntity() instanceof ServerPlayer struck&&e.getAmount()>0)com.hexgodofstories.warping.Warping.interrupt(struck);
@@ -232,6 +242,9 @@ public final class ServerEvents {
      */
     @SubscribeEvent public static void target(LivingChangeTargetEvent e) {
         if(!(e.getEntity() instanceof Mob mob)||mob.level().isClientSide)return;
+        // A creature turned by a lie (Mass Delusion, Impostor) keeps the target it was turned on until the lie is over.
+        LivingEntity forced=Delusion.forced(mob);
+        if(forced!=null){if(e.getNewTarget()!=forced)e.setNewTarget(forced);return;}
         LivingEntity wanted=e.getNewTarget();
         if(HexServer.charmedAgainst(mob,wanted)){e.setCanceled(true);return;}
         if(wanted==null)return;

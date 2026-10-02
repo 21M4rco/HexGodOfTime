@@ -37,6 +37,8 @@ public final class Warping {
          * that difference.
          */
         boolean recall;ArrayDeque<UUID> summons;long nextArrival;int recallWindow,arrivals;
+        /** Wide Open (the full transformation): opened at its full size in one movement, with no hold to buy the width. */
+        boolean instant;
         int openTicks(){return recall?(recallWindow>0?recallWindow:RECALL_OPEN):WarpMath.OPEN_TICKS;}
         /** The opened pool, built once: held stops changing the moment the portal is released. */
         private double[] shape;private double extent;
@@ -62,6 +64,18 @@ public final class Warping {
         if(h.getType()!=HitResult.Type.BLOCK||h.getDirection()!=Direction.UP||!p.level().getBlockState(h.getBlockPos()).isFaceSturdy(p.level(),h.getBlockPos(),Direction.UP))return null;
         return h;
     }
+    /**
+     * Wide Open: Warping in the full transformation. No hold: the pool opens at once, at its full size, where the
+     * caster looks, for the full cost; if its realm is still being built it opens the moment it is ready.
+     */
+    public static void instant(ServerPlayer p){
+        begin(p);
+        Charge c=CHARGES.get(p.getUUID());
+        if(c==null||c.recall)return;
+        c.instant=true;
+        release(p);
+    }
+
     public static void begin(ServerPlayer p){
         if(charging(p)||PORTALS.containsKey(p.getUUID()))return;
         BlockHitResult hit=aim(p);
@@ -81,11 +95,13 @@ public final class Warping {
     }
     public static void release(ServerPlayer p){
         Charge c=CHARGES.get(p.getUUID());if(c==null||c.opened>=0||c.recall)return;
-        int held=Math.min((int)(c.level.getGameTime()-c.start),WarpMath.FULL_CHARGE);
+        boolean ready=c.destination==Destination.SANCTUM||WarpRealms.ready(p.server.getLevel(c.destination.key),c.cell);
+        // A pool opened in one movement waits for its realm to be built rather than failing (see tick).
+        if(c.instant&&!ready)return;
+        int held=c.instant?WarpMath.FULL_CHARGE:Math.min((int)(c.level.getGameTime()-c.start),WarpMath.FULL_CHARGE);
         // The tear is as wide as it was paid for. A caster who held past what their energy covers
         // opens the largest break that energy buys rather than being told it did not stabilize.
         held=Math.min(held,WarpMath.affordable(HexData.energy(p),Ability.WARPING.cost));
-        boolean ready=c.destination==Destination.SANCTUM||WarpRealms.ready(p.server.getLevel(c.destination.key),c.cell);
         if(held<WarpMath.MIN_CHARGE||!valid(p,c)||!ready){cancel(p);notice(p,"The fracture did not stabilize.");return;}
         c.held=held;c.opened=c.level.getGameTime();
         CHARGES.remove(p.getUUID());PORTALS.put(p.getUUID(),c);
@@ -136,6 +152,7 @@ public final class Warping {
             if(!valid(p,c)){cancel(p);continue;}
             // A recall is not held open by anybody: it spreads for a fixed count and then opens.
             if(c.recall){if(now-c.start>=RECALL_FORM)openRecall(p,c);else if(now%2==0)send(c,false);continue;}
+            if(c.instant&&(c.destination==Destination.SANCTUM||WarpRealms.ready(level.getServer().getLevel(c.destination.key),c.cell))){release(p);continue;}
             if(now-c.start>=WarpMath.MAX_HOLD){release(p);continue;}
             if(now%4==0)send(c,false);
         }

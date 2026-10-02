@@ -422,6 +422,43 @@ public final class WorldEffects {
                 Vfx.dome(veil,at.add(0,1.1,0),1.1+.5*Vfx.ease(t),Vfx.count(swell*1.6f),.006);
                 if(t>.85f)Vfx.spark(star,at.add(0,1.2,0),Vec3.ZERO);
             });
+            // Kneel: the ground struck flat round the caster, a hard green ring rolling out across it, the air above
+            // pressing down on everything in reach.
+            case "kneel" -> {
+                ArsenalClient.kneel(pos);
+                Vfx.bloom(-1,pos,look,22,(at,aim,t)->{
+                    float swell=Vfx.swell(t);
+                    double radius=.8+11.2*Vfx.ease(Math.min(1,t*1.6f));
+                    Vfx.ring(green,at.add(0,.15,0),radius,Vfx.count(swell*16f),.05,.02);
+                    Vfx.ring(nebula,at.add(0,.4,0),radius*.92,Vfx.count(swell*5f),.02,.01);
+                    if(t<.3f)Vfx.cone(gold,at.add(0,4.5,0),new Vec3(0,-1,0),Vfx.count(swell*10f),.55,.4);
+                    if(t<.1f)Vfx.spark(star,at.add(0,1,0),Vec3.ZERO);
+                });
+            }
+            case "kneel_hit" -> Vfx.bloom(entity,pos,look,10,(at,aim,t)->{
+                float swell=Vfx.swell(t);
+                Vfx.cone(green,at.add(0,2.2,0),new Vec3(0,-1,0),Vfx.count(swell*5f),.32,.07);
+                Vfx.ring(nebula,at.add(0,.1,0),.4+.8*Vfx.ease(t),Vfx.count(swell*3f),.08,.01);
+            });
+            // Mirror Ward: a shell of glass-bright motes, and a glint where a blow or a projectile is turned back.
+            case "mirror" -> Vfx.bloom(entity,pos,look,18,(at,aim,t)->{
+                float swell=Vfx.swell(t);
+                Vfx.dome(star,at.add(0,1,0),1.15,Vfx.count(swell*4f),.01);
+                Vfx.dome(gold,at.add(0,1,0),1.05,Vfx.count(swell*3f),-.01);
+            });
+            // Mass Delusion: the lie spreading out across everything near, a wide ring of nebula and gold.
+            case "delusion" -> Vfx.bloom(entity,pos,look,30,(at,aim,t)->{
+                float swell=Vfx.swell(t);
+                double radius=1+15*Vfx.ease(Math.min(1,t*1.3f));
+                Vfx.ring(nebula,at.add(0,1,0),radius,Vfx.count(swell*10f),.02,.01);
+                Vfx.ring(gold,at.add(0,1.6,0),radius*.9,Vfx.count(swell*6f),.02,.02);
+            });
+            // Total Recall: a ring of gold running out from the caster's eyes to the edge of what it reveals.
+            case "recall" -> Vfx.bloom(entity,pos,look,24,(at,aim,t)->{
+                float swell=Vfx.swell(t);
+                Vfx.ring(gold,at.add(0,1.5,0),1+30*Vfx.ease(t),Vfx.count(swell*14f),.01,0);
+                if(t<.15f)Vfx.glyph(at.add(0,1.8,0));
+            });
             default -> {}
         }
     }

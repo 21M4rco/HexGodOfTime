@@ -31,7 +31,13 @@ public final class SpellProjectile extends ThrowableProjectile {
     private static final EntityDataAccessor<Float> SPIN=SynchedEntityData.defineId(SpellProjectile.class,EntityDataSerializers.FLOAT);
     /** How far a charged throw's burst reaches past the body it struck. */
     private static final double BURST=2.4;
+    /** Emerald Storm's bolts: how far they look for something to turn after, how much of a turn a tick, and their sting. */
+    private static final double SEEK_REACH=20,SEEK_TURN=.11;
+    private static final float SEEK_DAMAGE=2.5f;
     private boolean illusion;
+    /** One of Emerald Storm's five: it turns after the nearest creature ahead of it. Server only, never saved. */
+    private boolean seek;
+    private int quarry;
 
     public SpellProjectile(EntityType<? extends SpellProjectile> type,Level level) {super(type,level);}
     @Override protected void defineSynchedData() {entityData.define(STYLE,0);entityData.define(SPIN,0f);}
@@ -41,8 +47,11 @@ public final class SpellProjectile extends ThrowableProjectile {
     /** 0 as it leaves the hand, 1 once it has fully opened; the throw follows through rather than popping. */
     public float opened(float partial) {return Math.min(1,(tickCount+partial)/4f);}
 
-    public static void cast(ServerPlayer p,Vec3 from,Vec3 aim,int style,boolean fake) {
+    public static void cast(ServerPlayer p,Vec3 from,Vec3 aim,int style,boolean fake) {cast(p,from,aim,style,fake,false);}
+
+    public static void cast(ServerPlayer p,Vec3 from,Vec3 aim,int style,boolean fake,boolean seek) {
         SpellProjectile e=new SpellProjectile(HexGodOfStories.PROJECTILE.get(),p.level());
+        e.seek=seek;
         e.setOwner(p);
         e.setPos(from);
         e.entityData.set(STYLE,style);
@@ -63,7 +72,7 @@ public final class SpellProjectile extends ThrowableProjectile {
         if(level().isClientSide)return;
         boolean charged=style()==1;
         if(!illusion&&getOwner() instanceof ServerPlayer p) {
-            hit.getEntity().hurt(damageSources().thrown(this,p),charged?9:3.5f);
+            hit.getEntity().hurt(damageSources().thrown(this,p),charged?9:seek?SEEK_DAMAGE:3.5f);
             if(charged&&hit.getEntity() instanceof LivingEntity struck) {
                 struck.knockback(.42,getX()-struck.getX(),getZ()-struck.getZ());
                 // A charged throw does not stop dead on one body; it opens where it lands.
@@ -84,7 +93,34 @@ public final class SpellProjectile extends ThrowableProjectile {
         HexNetwork.fx(this,style()==1?"emerald_burst":"impact");
         discard();
     }
-    @Override public void tick() {super.tick();if(tickCount>100&&!level().isClientSide)discard();}
+    @Override public void tick() {
+        if(seek&&!level().isClientSide&&tickCount>=3)seek();
+        super.tick();if(tickCount>100&&!level().isClientSide)discard();
+    }
+
+    /** Turns, a little a tick and at the same speed, after the nearest creature ahead of it worth hitting. */
+    private void seek() {
+        Vec3 v=getDeltaMovement();
+        double speed=v.length();
+        if(speed<1e-4||!(getOwner() instanceof ServerPlayer p))return;
+        Vec3 heading=v.scale(1/speed);
+        Entity held=quarry==0?null:level().getEntity(quarry);
+        if(!(held instanceof LivingEntity alive)||!alive.isAlive()||tickCount%5==0) {
+            held=null;quarry=0;double best=Double.MAX_VALUE;
+            for(LivingEntity e:level().getEntitiesOfClass(LivingEntity.class,getBoundingBox().inflate(SEEK_REACH),e->e.isAlive()&&HexServer.validTarget(p,e))) {
+                Vec3 to=e.getBoundingBox().getCenter().subtract(position());
+                double d=to.length();
+                if(d>SEEK_REACH||d<1e-3||to.scale(1/d).dot(heading)<.55)continue;
+                if(d<best){best=d;held=e;}
+            }
+            if(held!=null)quarry=held.getId();
+        }
+        if(held==null)return;
+        Vec3 want=held.getBoundingBox().getCenter().subtract(position());
+        if(want.lengthSqr()<1e-6)return;
+        Vec3 turned=heading.add(want.normalize().subtract(heading).scale(SEEK_TURN)).normalize();
+        setDeltaMovement(turned.scale(speed));
+    }
     @Override protected void addAdditionalSaveData(CompoundTag n) {
         super.addAdditionalSaveData(n);
         n.putInt("style",style());n.putFloat("spin",spin());n.putBoolean("illusion",illusion);

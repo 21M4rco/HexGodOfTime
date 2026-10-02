@@ -379,6 +379,8 @@ public final class IllusionEntity extends PathfinderMob {
         getLookControl().setLookAt(enemy,45,45);
         float base=switch(loadout()){case SWORD->3.5f;case TWIN->1.8f;default->2.2f;};
         float damage=base+Math.min(3.5f,HexData.mastery(p,Discipline.MISCHIEF)*.0035f);
+        // Living Legion: a copy made in the full transformation hits as hard as two.
+        if(finalForm())damage*=2;
         if(enemy.hurt(damageSources().mobAttack(this),damage)) {
             enemy.knockback(loadout()==SWORD?.24:.16,getX()-enemy.getX(),getZ()-enemy.getZ());
             // The threat ledger is written from the damage event itself, so the copy is already on it.
@@ -453,7 +455,26 @@ public final class IllusionEntity extends PathfinderMob {
             }
             return true;
         }
-        if(spec.dispelOnHit)dispel();return true;
+        if(spec.dispelOnHit) {
+            // Living Legion: a copy of the full transformation struck down goes in a burst of seidr shards.
+            if(finalForm()&&(source.getEntity()!=null||source.getDirectEntity()!=null))shatter();
+            dispel();
+        }
+        return true;
+    }
+
+    /** Two hearts, a moment's blindness and a slowing to everything its caster could harm around it. */
+    private void shatter() {
+        if(!(level() instanceof ServerLevel level)||owner()==null)return;
+        ServerPlayer caster=level.getServer().getPlayerList().getPlayer(owner());
+        if(caster==null)return;
+        for(LivingEntity e:level.getEntitiesOfClass(LivingEntity.class,getBoundingBox().inflate(3),e->e!=this&&HexServer.validTarget(caster,e))) {
+            e.invulnerableTime=0;
+            e.hurt(damageSources().indirectMagic(this,caster),4);
+            e.addEffect(new MobEffectInstance(MobEffects.BLINDNESS,30,0,false,false));
+            e.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,60,1,false,false));
+        }
+        HexNetwork.fx(this,"emerald_burst");
     }
     @Override public boolean isPushable() {return spec.collision;}
     @Override public boolean canCollideWith(Entity e) {return spec.collision&&super.canCollideWith(e);}

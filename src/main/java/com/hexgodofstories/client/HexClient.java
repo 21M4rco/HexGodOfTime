@@ -80,6 +80,8 @@ public final class HexClient {
             e.registerEntityRenderer(HexGodOfStories.RIFT.get(),RiftRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.STARFALL.get(),MeteorRenderer::new);
             e.registerEntityRenderer(HexGodOfStories.THRONE_SEAT.get(),net.minecraft.client.renderer.entity.NoopRenderer::new);
+            // Drawn by the Crown's own renderer, with the Crown's missile model, not as an entity.
+            e.registerEntityRenderer(HexGodOfStories.SEEKER.get(),net.minecraft.client.renderer.entity.NoopRenderer::new);
         }
         @SubscribeEvent public static void layers(EntityRenderersEvent.AddLayers e) {
             for(String skin:e.getSkins()) {

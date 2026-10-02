@@ -57,8 +57,11 @@ public final class Telekinesis {
         return false;
     }
 
-    /** One body at a time: casting again lets it go rather than taking another. */
-    private static int capacity(ServerPlayer p) {return 1;}
+    /**
+     * One body at a time: casting again lets it go rather than taking another. In the full transformation, Many Hands
+     * lifts up to five at once (Glorious), all in the one grip.
+     */
+    private static int capacity(ServerPlayer p) {return Transformation.transformed(p)?5:1;}
     private static double maxDistance(ServerPlayer p) {return 6+HexData.mastery(p,Discipline.SORCERY)*.016;}
     /**
      * What the hand can lift. Deliberately generous from the moment the spell unlocks — an unseen hand

@@ -25,7 +25,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class IllusoryWalls {
     private IllusoryWalls() {}
 
-    public record Wall(UUID owner,ResourceKey<Level> dimension,int scale,long expires,Set<Long> solid,Set<Long> avoid,AABB bounds,int axis) {}
+    /** {@code real}: raised in the full transformation (Reality Made), it stops players and projectiles too. */
+    public record Wall(UUID owner,ResourceKey<Level> dimension,int scale,long expires,Set<Long> solid,Set<Long> avoid,AABB bounds,int axis,boolean real) {}
     /** One standing wall per caster: raising another lets the previous one go. */
     private static final Map<UUID,Wall> WALLS=new ConcurrentHashMap<>();
 
@@ -53,12 +54,17 @@ public final class IllusoryWalls {
             for(int y=1;y<=2;y++)avoid.add(BlockPos.asLong(x,column.getValue()+y,z));
         }
         AABB bounds=new AABB(minX,minY,minZ,maxX+1,maxY+1,maxZ+1);
-        Wall wall=new Wall(owner.getUUID(),owner.level().dimension(),IllusoryWall.clamp(scale),expires,solid,avoid,bounds,bounds.getXsize()<=bounds.getZsize()?0:1);
+        Wall wall=new Wall(owner.getUUID(),owner.level().dimension(),IllusoryWall.clamp(scale),expires,solid,avoid,bounds,bounds.getXsize()<=bounds.getZsize()?0:1,false);
         WALLS.put(owner.getUUID(),wall);
         return wall;
     }
 
     public static boolean dismiss(UUID owner) {return WALLS.remove(owner)!=null;}
+
+    /** Reality Made: this caster's standing wall becomes real to everyone but them. */
+    public static void realize(UUID owner) {
+        WALLS.computeIfPresent(owner,(id,w)->new Wall(w.owner(),w.dimension(),w.scale(),w.expires(),w.solid(),w.avoid(),w.bounds(),w.axis(),true));
+    }
     public static void reset() {WALLS.clear();}
 
     /** @return true when these coordinates sit inside a wall, or on the clearance above one. */
@@ -109,6 +115,33 @@ public final class IllusoryWalls {
                 // the route it was taking, or it grinds against the face until the lie expires.
                 if(mob.getNavigation().isInProgress()&&mob.getRandom().nextInt(4)==0)mob.getNavigation().stop();
             }
+            if(wall.real)hold(level,wall,centre,thickness);
+        }
+    }
+
+    /**
+     * Reality Made: a real wall is real to everyone but the one who raised it (and their allies). Other players are
+     * turned back from its face as the creatures are, and anything thrown or shot into it is swallowed.
+     */
+    private static void hold(ServerLevel level,Wall wall,double centre,double thickness) {
+        ServerPlayer owner=level.getServer().getPlayerList().getPlayer(wall.owner);
+        for(Player player:level.getEntitiesOfClass(Player.class,wall.bounds.inflate(1,0,1),q->q.isAlive()&&!q.isSpectator()&&!q.isCreative())) {
+            if(player.getUUID().equals(wall.owner)||owner!=null&&player.isAlliedTo(owner))continue;
+            AABB box=player.getBoundingBox();
+            if(!box.intersects(wall.bounds))continue;
+            double delta=(wall.axis==0?player.getX():player.getZ())-centre;
+            if(Math.abs(delta)<1e-4)delta=wall.axis==0?-player.getLookAngle().x:-player.getLookAngle().z;
+            if(Math.abs(delta)<1e-4)delta=1;
+            if(thickness+player.getBbWidth()/2+.02-Math.abs(delta)<=0)continue;
+            Vec3 motion=player.getDeltaMovement();
+            double out=Math.signum(delta)*.45;
+            player.setDeltaMovement(wall.axis==0?new Vec3(out,motion.y,motion.z):new Vec3(motion.x,motion.y,out));
+            player.hurtMarked=true;
+        }
+        for(net.minecraft.world.entity.projectile.Projectile thrown:level.getEntitiesOfClass(net.minecraft.world.entity.projectile.Projectile.class,wall.bounds,
+            pr->pr.isAlive()&&(pr.getOwner()==null||!pr.getOwner().getUUID().equals(wall.owner)))) {
+            com.hexgodofstories.network.HexNetwork.fx(thrown,"dispel");
+            thrown.discard();
         }
     }
 

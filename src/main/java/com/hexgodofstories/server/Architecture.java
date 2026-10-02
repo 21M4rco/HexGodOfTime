@@ -25,8 +25,10 @@ public final class Architecture {
     public static final int MAX_SCALE=IllusoryWall.SIZES,GROW_TICKS=16;
     private static final class Cast {
         final long started;final int seed;
+        /** Cast in the full transformation (Reality Made): grows twice as fast, stands longer, and is real to all but its caster. */
+        final boolean real;
         BlockPos anchor;float yaw;int announced;long lastPreview;
-        Cast(long started,int seed) {this.started=started;this.seed=seed;}
+        Cast(long started,int seed,boolean real) {this.started=started;this.seed=seed;this.real=real;}
     }
     private static final Map<UUID,Cast> CASTING=new HashMap<>();
 
@@ -35,7 +37,7 @@ public final class Architecture {
     /** @return false when there is no ground in view to build on, so nothing is charged for a miss. */
     public static boolean begin(ServerPlayer p) {
         if(CASTING.containsKey(p.getUUID()))return false;
-        Cast cast=new Cast(HexData.now(p),p.getRandom().nextInt(1<<16));
+        Cast cast=new Cast(HexData.now(p),p.getRandom().nextInt(1<<16),Transformation.transformed(p));
         cast.anchor=aim(p);cast.yaw=p.getYRot();
         if(cast.anchor==null){p.displayClientMessage(Component.literal("Look at the ground you would build on."),true);return false;}
         CASTING.put(p.getUUID(),cast);
@@ -67,13 +69,14 @@ public final class Architecture {
         if(cast==null)return;
         long now=HexData.now(p);
         int scale=scale(cast,now);
-        int duration=Math.min(1200,260+HexData.mastery(p,Discipline.MISCHIEF));
+        int duration=Math.min(1200,260+HexData.mastery(p,Discipline.MISCHIEF))*(cast.real?3:2)/2;
         IllusoryWalls.dismiss(p.getUUID());
         if(IllusoryWalls.raise(p,cast.anchor,scale,cast.seed,cast.yaw,now+duration)==null) {
             p.displayClientMessage(Component.literal("There is nothing here to build against."),true);
             HexNetwork.animate(p,"__clear__");
             return;
         }
+        if(cast.real)IllusoryWalls.realize(p.getUUID());
         broadcast(p,describe(cast,scale,now+duration,false),cast.anchor);
         p.level().playSound(null,cast.anchor,HexGodOfStories.ILLUSION_SOUND.get(),SoundSource.PLAYERS,1.1f,.72f);
         HexServer.reward(p,Discipline.MISCHIEF,110);
@@ -99,7 +102,7 @@ public final class Architecture {
             if(viewer.blockPosition().distSqr(around)<10000)HexNetwork.to(viewer,new HexNetwork.Message(HexNetwork.ARCHITECTURE,p.getId(),payload));
     }
 
-    private static int scale(Cast cast,long now) {return (int)Math.max(1,Math.min(MAX_SCALE,1+(now-cast.started)/GROW_TICKS));}
+    private static int scale(Cast cast,long now) {return (int)Math.max(1,Math.min(MAX_SCALE,1+(now-cast.started)/(cast.real?GROW_TICKS/2:GROW_TICKS)));}
 
     private static CompoundTag describe(Cast cast,int scale,long until,boolean preview) {
         CompoundTag n=new CompoundTag();
