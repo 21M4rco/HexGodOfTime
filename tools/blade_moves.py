@@ -28,8 +28,9 @@ guard, Malenia: upright and easy, the sword arm hanging loose, the long blade an
 def P(body=(0, 0, 0, 0, 0, 0), head=(0, 0, 0), la=(0, 0, 0, 0), rl=None, ll=None, aim=None, two=False, spin=0, ra=None, item=None, rev=False):
     """body (x, y, z, pitch, yaw, roll); head (pitch, yaw, roll); arms and legs (pitch, yaw, roll, bend)."""
     f = {'body': dict(zip(('x', 'y', 'z', 'pitch', 'yaw', 'roll'), body)),
-         'head': dict(zip(('pitch', 'yaw', 'roll'), head)),
          'leftArm': dict(zip(('pitch', 'yaw', 'roll', 'bend'), la))}
+    # head=None leaves the head to the player: it goes on looking wherever they look (the guard and its slaps).
+    if head is not None: f['head'] = dict(zip(('pitch', 'yaw', 'roll'), head))
     if ra is not None: f['rightArm'] = dict(zip(('pitch', 'yaw', 'roll', 'bend'), ra))
     if item is not None: f['rightItem'] = dict(zip(('pitch', 'yaw', 'roll'), item))
     if rl is not None: f['rightLeg'] = dict(zip(('pitch', 'yaw', 'roll', 'bend'), rl))
@@ -43,7 +44,7 @@ def turned(frame, yaw):
     """The same pose with the whole body (and the eyes with it) turned a further `yaw`: for moves after a full spin."""
     out = {k: dict(v) for k, v in frame.items()}
     out['body']['yaw'] = out['body'].get('yaw', 0) + yaw
-    out['head']['yaw'] = out['head'].get('yaw', 0) + yaw
+    if 'head' in out: out['head']['yaw'] = out['head'].get('yaw', 0) + yaw
     return out
 
 
@@ -265,18 +266,20 @@ move('blade_m_sword_3', 18, [
 
 # --- The Deceiver's guard (the use key held): Malenia's ease, upright, the sword arm loose at the side and the long
 #     blade angled down and out with its point near the ground ahead. Its walk, the charge, and the slaps.
-GUARD = P(body=(0, 0, 0, 0, -8, 0), head=(0, -8, 0), la=(4, 0, -6, -8), aim=((.46, .8, 0), (.72, -.5, .48)))
-GUARD_BREATH = P(body=(0, -.008, 0, 0, -9, 0), head=(-2, -9, 0), la=(5, 0, -7, -9), aim=((.46, .79, .01), (.72, -.52, .46)))
+#     The head is never keyed here: it goes on looking wherever the player looks. Nor is the body turned (Player
+#     Animator's body turn carries the head with it), only leaned and swayed; the arm and the legs carry the rest.
+GUARD = P(body=(0, 0, 0, 0, 0, 1), head=None, la=(4, 0, -6, -8), aim=((.46, .8, 0), (.72, -.5, .48)))
+GUARD_BREATH = P(body=(0, -.008, 0, 0, 0, 2), head=None, la=(6, 0, -8, -10), aim=((.46, .79, .01), (.72, -.52, .46)))
 # Into the guard: from the ordinary carry, the sword swept up and out to the side, then let fall into the stance.
-CARRY = P(la=(0, 0, 0, 0), aim=((.32, .95, .25), (0, .5, .85)))
+CARRY = P(head=None, la=(0, 0, 0, 0), aim=((.32, .95, .25), (0, .5, .85)))
 move('blade_guard_enter', 12, [
     (0, 'linear', CARRY),
-    (4, 'outquad', P(body=(0, -.02, 0, 2, -14, 0), head=(0, -12, 0), la=(-12, 0, -14, -10), aim=((.52, 1.25, .12), (.65, .7, .3)))),
+    (4, 'outquad', P(body=(0, -.02, 0, 2, 0, 3), head=None, la=(-12, 0, -14, -10), aim=((.52, 1.25, .12), (.65, .7, .3)))),
     (9, 'outback', GUARD),
     (12, 'inoutsine', GUARD)])
 move('blade_guard', 44, [(0, 'inoutsine', GUARD), (4, 'inoutsine', GUARD), (24, 'inoutsine', GUARD_BREATH), (44, 'inoutsine', GUARD)], loop=4)
-WALK_A = P(body=(0, 0, 0, -2, -8, 2), head=(0, -8, -2), la=(-22, 0, -6, -14), aim=((.46, .82, .04), (.72, -.48, .5)))
-WALK_B = P(body=(0, 0, 0, -2, -8, -2), head=(0, -8, 2), la=(22, 0, -6, -6), aim=((.46, .8, -.03), (.72, -.52, .46)))
+WALK_A = P(body=(0, 0, 0, -2, 0, 3), head=None, la=(-22, 0, -6, -14), aim=((.46, .82, .04), (.72, -.48, .5)))
+WALK_B = P(body=(0, 0, 0, -2, 0, -1), head=None, la=(22, 0, -6, -6), aim=((.46, .8, -.03), (.72, -.52, .46)))
 move('blade_guard_walk', 22, [(0, 'inoutsine', GUARD), (2, 'inoutsine', WALK_A), (12, 'inoutsine', WALK_B), (22, 'inoutsine', WALK_A)], loop=2)
 RUN_A = P(body=(0, 0, 0, -16, 0, 0), head=(-14, 0, 0), la=(-58, 0, 0, -70), aim=((.4, .82, -.3), (.2, -.35, -.9)))
 RUN_B = P(body=(0, 0, 0, -16, 0, 0), head=(-14, 0, 0), la=(46, 0, 0, -60), aim=((.42, .86, -.38), (.2, -.3, -.92)))
@@ -286,24 +289,24 @@ move('blade_run', 14, [(0, 'inoutsine', RUN_A), (2, 'inoutsine', RUN_A), (8, 'in
 # only then sinks back into the guard.
 move('blade_deflect_r', 16, [
     (0, 'linear', GUARD),
-    (1, 'outquad', P(body=(0, -.02, .02, 2, -6, 0), head=(0, -6, 0), la=(-20, 10, 0, -30), aim=((.4, .95, .05), (.5, -.2, .6)),
+    (1, 'outquad', P(body=(0, -.02, .02, 2, 0, -2), head=None, la=(-20, 10, 0, -30), aim=((.4, .95, .05), (.5, -.2, .6)),
                      rl=(6, 0, 0, 8), ll=(-6, 0, 0, 8))),
-    (3, 'inexpo', P(body=(0, -.06, -.06, -6, -36, 0), head=(0, -18, 0), la=(-40, 30, 0, -50), aim=((.78, 1.48, .42), (.75, .62, .2)),
-                    rl=(18, 0, 0, 16), ll=(-22, 0, 0, 22))),
-    (5, 'outquad', P(body=(0, -.07, -.07, -6, -44, 0), head=(0, -22, 0), la=(-36, 30, 0, -50), aim=((.86, 1.6, .05), (.6, .7, -.4)),
-                     rl=(18, 0, 0, 16), ll=(-22, 0, 0, 22))),
-    (8, 'outquad', P(body=(0, -.05, -.04, -4, -30, 0), head=(0, -16, 0), la=(-30, 20, 0, -40), aim=((.8, 1.5, .1), (.7, .6, -.3)),
+    (3, 'inexpo', P(body=(0, -.07, -.06, -7, -8, 6), head=None, la=(-40, 30, 0, -50), aim=((.8, 1.5, .42), (.75, .62, .2)),
+                    rl=(20, 0, 0, 18), ll=(-24, 0, 0, 24))),
+    (5, 'outquad', P(body=(0, -.08, -.07, -7, -10, 8), head=None, la=(-36, 30, 0, -50), aim=((.88, 1.62, .05), (.6, .7, -.4)),
+                     rl=(20, 0, 0, 18), ll=(-24, 0, 0, 24))),
+    (8, 'outquad', P(body=(0, -.05, -.04, -4, -6, 5), head=None, la=(-30, 20, 0, -40), aim=((.82, 1.5, .1), (.7, .6, -.3)),
                      rl=(14, 0, 0, 12), ll=(-16, 0, 0, 16))),
     (16, 'inoutsine', GUARD)])
 move('blade_deflect_l', 16, [
     (0, 'linear', GUARD),
-    (1, 'outquad', P(body=(0, -.02, .02, 2, -14, 0), head=(0, -12, 0), la=(-10, 0, -20, -20), aim=((.5, .95, .05), (.7, -.2, .5)),
+    (1, 'outquad', P(body=(0, -.02, .02, 2, 0, 2), head=None, la=(-10, 0, -20, -20), aim=((.5, .95, .05), (.7, -.2, .5)),
                      rl=(6, 0, 0, 8), ll=(-6, 0, 0, 8))),
-    (3, 'inexpo', P(body=(0, -.06, -.06, -6, 34, 0), head=(0, 18, 0), la=(10, 0, -50, -30), aim=((-.42, 1.45, .55), (-.8, .55, .25)),
-                    rl=(18, 0, 0, 16), ll=(-22, 0, 0, 22))),
-    (5, 'outquad', P(body=(0, -.07, -.07, -6, 44, 0), head=(0, 22, 0), la=(16, 0, -56, -30), aim=((-.62, 1.4, .25), (-.85, .45, -.25)),
-                     rl=(18, 0, 0, 16), ll=(-22, 0, 0, 22))),
-    (8, 'outquad', P(body=(0, -.05, -.04, -4, 30, 0), head=(0, 16, 0), la=(10, 0, -46, -26), aim=((-.5, 1.35, .3), (-.8, .5, -.2)),
+    (3, 'inexpo', P(body=(0, -.07, -.06, -7, 8, -6), head=None, la=(10, 0, -50, -30), aim=((-.4, 1.45, .55), (-.8, .55, .25)),
+                    rl=(20, 0, 0, 18), ll=(-24, 0, 0, 24))),
+    (5, 'outquad', P(body=(0, -.08, -.07, -7, 10, -8), head=None, la=(16, 0, -56, -30), aim=((-.6, 1.4, .25), (-.85, .45, -.25)),
+                     rl=(20, 0, 0, 18), ll=(-24, 0, 0, 24))),
+    (8, 'outquad', P(body=(0, -.05, -.04, -4, 6, -5), head=None, la=(10, 0, -46, -26), aim=((-.5, 1.35, .3), (-.8, .5, -.2)),
                      rl=(14, 0, 0, 12), ll=(-16, 0, 0, 16))),
     (16, 'inoutsine', GUARD)])
 

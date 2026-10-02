@@ -23,16 +23,16 @@
      "yaw": -370,
      "roll": 0
     },
-    "head": {
-     "pitch": 0,
-     "yaw": -370,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": -58,
      "yaw": 38,
      "roll": 0,
      "bend": -78
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": -370,
+     "roll": 0
     },
     "rightLeg": {
      "pitch": 12,
@@ -96,16 +96,16 @@
      "yaw": -380,
      "roll": 0
     },
-    "head": {
-     "pitch": -10,
-     "yaw": -380,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": -40,
      "yaw": 15,
      "roll": 0,
      "bend": -20
+    },
+    "head": {
+     "pitch": -10,
+     "yaw": -380,
+     "roll": 0
     },
     "rightLeg": {
      "pitch": 14,
@@ -145,16 +145,16 @@
      "yaw": -350,
      "roll": 0
     },
-    "head": {
-     "pitch": -14,
-     "yaw": -350,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": 30,
      "yaw": 0,
      "roll": -60,
      "bend": -20
+    },
+    "head": {
+     "pitch": -14,
+     "yaw": -350,
+     "roll": 0
     },
     "rightLeg": {
      "pitch": 10,
@@ -194,16 +194,16 @@
      "yaw": -346,
      "roll": 0
     },
-    "head": {
-     "pitch": -18,
-     "yaw": -346,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": 36,
      "yaw": 0,
      "roll": -64,
      "bend": -20
+    },
+    "head": {
+     "pitch": -18,
+     "yaw": -346,
+     "roll": 0
     },
     "rightLeg": {
      "pitch": 8,
@@ -243,16 +243,16 @@
      "yaw": -370,
      "roll": 0
     },
-    "head": {
-     "pitch": 0,
-     "yaw": -370,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": -58,
      "yaw": 38,
      "roll": 0,
      "bend": -78
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": -370,
+     "roll": 0
     },
     "rightLeg": {
      "pitch": 12,
@@ -292,16 +292,16 @@
      "yaw": -360,
      "roll": 0
     },
-    "head": {
-     "pitch": 0,
-     "yaw": -360,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": 0,
      "yaw": 0,
      "roll": 0,
      "bend": 0
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": -360,
+     "roll": 0
     },
     "rightArm": {
      "pitch": 0,

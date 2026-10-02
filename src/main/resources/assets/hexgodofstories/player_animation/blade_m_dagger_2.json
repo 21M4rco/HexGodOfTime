@@ -23,16 +23,16 @@
      "yaw": 0,
      "roll": 0
     },
-    "head": {
-     "pitch": 0,
-     "yaw": 0,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": 0,
      "yaw": 0,
      "roll": 0,
      "bend": 0
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": 0,
+     "roll": 0
     },
     "rightArm": {
      "pitch": 0,
@@ -84,16 +84,16 @@
      "yaw": -16,
      "roll": 0
     },
-    "head": {
-     "pitch": 0,
-     "yaw": -16,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": -60,
      "yaw": 24,
      "roll": 0,
      "bend": -62
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": -16,
+     "roll": 0
     },
     "rightArm": {
      "pitch": -113.9,
@@ -121,16 +121,16 @@
      "yaw": 16,
      "roll": 0
     },
-    "head": {
-     "pitch": 4,
-     "yaw": 16,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": -40,
      "yaw": 24,
      "roll": 0,
      "bend": -60
+    },
+    "head": {
+     "pitch": 4,
+     "yaw": 16,
+     "roll": 0
     },
     "rightLeg": {
      "pitch": 18,
@@ -170,16 +170,16 @@
      "yaw": 22,
      "roll": 0
     },
-    "head": {
-     "pitch": 4,
-     "yaw": 20,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": -36,
      "yaw": 24,
      "roll": 0,
      "bend": -58
+    },
+    "head": {
+     "pitch": 4,
+     "yaw": 20,
+     "roll": 0
     },
     "rightLeg": {
      "pitch": 18,
@@ -255,16 +255,16 @@
      "yaw": 0,
      "roll": 0
     },
-    "head": {
-     "pitch": 0,
-     "yaw": 0,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": 0,
      "yaw": 0,
      "roll": 0,
      "bend": 0
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": 0,
+     "roll": 0
     },
     "rightArm": {
      "pitch": 0,
@@ -292,16 +292,16 @@
      "yaw": 0,
      "roll": 0
     },
-    "head": {
-     "pitch": 0,
-     "yaw": 0,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": 0,
      "yaw": 0,
      "roll": 0,
      "bend": 0
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": 0,
+     "roll": 0
     },
     "rightArm": {
      "pitch": 0,

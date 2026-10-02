@@ -23,16 +23,16 @@
      "yaw": -12,
      "roll": 0
     },
-    "head": {
-     "pitch": 0,
-     "yaw": -12,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": -70,
      "yaw": 26,
      "roll": 0,
      "bend": -78
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": -12,
+     "roll": 0
     },
     "rightLeg": {
      "pitch": 16,
@@ -72,16 +72,16 @@
      "yaw": 22,
      "roll": 0
     },
-    "head": {
-     "pitch": 0,
-     "yaw": 22,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": -60,
      "yaw": 30,
      "roll": 0,
      "bend": -60
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": 22,
+     "roll": 0
     },
     "rightLeg": {
      "pitch": 14,
@@ -121,16 +121,16 @@
      "yaw": -170,
      "roll": 0
     },
-    "head": {
-     "pitch": 0,
-     "yaw": -150,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": -40,
      "yaw": 30,
      "roll": -20,
      "bend": -50
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": -150,
+     "roll": 0
     },
     "rightLeg": {
      "pitch": 0,
@@ -170,16 +170,16 @@
      "yaw": -338,
      "roll": 0
     },
-    "head": {
-     "pitch": 0,
-     "yaw": -348,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": -50,
      "yaw": 26,
      "roll": -10,
      "bend": -56
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": -348,
+     "roll": 0
     },
     "rightLeg": {
      "pitch": 12,
@@ -219,16 +219,16 @@
      "yaw": -378,
      "roll": 0
     },
-    "head": {
-     "pitch": 0,
-     "yaw": -372,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": -62,
      "yaw": 20,
      "roll": 0,
      "bend": -66
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": -372,
+     "roll": 0
     },
     "rightLeg": {
      "pitch": 14,
@@ -268,16 +268,16 @@
      "yaw": -372,
      "roll": 0
     },
-    "head": {
-     "pitch": 0,
-     "yaw": -372,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": -70,
      "yaw": 26,
      "roll": 0,
      "bend": -78
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": -372,
+     "roll": 0
     },
     "rightLeg": {
      "pitch": 16,
@@ -317,16 +317,16 @@
      "yaw": -372,
      "roll": 0
     },
-    "head": {
-     "pitch": 0,
-     "yaw": -372,
-     "roll": 0
-    },
     "leftArm": {
      "pitch": -70,
      "yaw": 26,
      "roll": 0,
      "bend": -78
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": -372,
+     "roll": 0
     },
     "rightLeg": {
      "pitch": 16,
