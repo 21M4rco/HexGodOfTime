@@ -421,8 +421,12 @@ public final class HexorTest {
         String residency=Files.readString(root.resolve("src/main/java/com/hexgodofstories/warping/WarpResidency.java"));
         check(residency.contains("record TransportState(boolean known,boolean noGravity,boolean noAi)"),
             "residency records the transport-sensitive AI and gravity state");
-        check(residency.contains("transportStateKnown")&&residency.contains("entity.isNoGravity()")
-                &&residency.contains("mob.isNoAi()"),
+        // Captured through BodyFlags, which reads the body's own flags past any hold still on it (a stun, an erasure, a
+        // HexKagunes tendril) and falls back on the flags themselves when nothing holds it.
+        String flags=Files.readString(root.resolve("src/main/java/com/hexgodofstories/server/BodyFlags.java"));
+        check(residency.contains("transportStateKnown")&&residency.contains("BodyFlags.of(entity)")
+                &&residency.contains("own.noGravity()")&&residency.contains("own.noAi()")
+                &&flags.contains("e.isNoGravity()")&&flags.contains("mob.isNoAi()"),
             "the snapshot is captured and persisted with the resident");
 
         String warping=Files.readString(root.resolve("src/main/java/com/hexgodofstories/warping/Warping.java"));
