@@ -134,6 +134,36 @@ public final class Blood {
     }
 
     /**
+     * A blade's cut (BladeCombo): a sheet of blood flung off the edge the way the blade went, the faster drops thrown
+     * the furthest, and a few of them pooling where they come down on that side.
+     */
+    public static void slash(int id,net.minecraft.nbt.CompoundTag n) {
+        var mc=Minecraft.getInstance();
+        if(mc.level==null||mc.player==null)return;
+        Vec3 at=new Vec3(n.getDouble("x"),n.getDouble("y"),n.getDouble("z"));
+        if(at.distanceToSqr(mc.player.getEyePosition())>RANGE)return;
+        Vec3 swing=new Vec3(n.getDouble("dx"),n.getDouble("dy"),n.getDouble("dz"));
+        if(swing.lengthSqr()<1e-6)return;
+        swing=swing.normalize();
+        float power=Math.max(.2f,Math.min(1.5f,n.getFloat("power")));
+        var random=mc.level.random;
+        // Across the cut, square to the swing: the line the edge opened.
+        Vec3 across=swing.cross(new Vec3(0,1,0));
+        if(across.lengthSqr()<1e-4)across=swing.cross(new Vec3(1,0,0));
+        across=across.normalize();
+        for(int i=0;i<Math.round(46*power);i++) {
+            Vec3 from=at.add(across.scale((random.nextDouble()-.5)*.35)).add(swing.scale(random.nextDouble()*.12));
+            double speed=(.1+random.nextDouble()*.34)*(.6+.4*power);
+            Vfx.spark(HexGodOfStories.BLOOD.get(),from,swing.scale(speed).add((random.nextDouble()-.5)*.08,.02+random.nextDouble()*.09,(random.nextDouble()-.5)*.08));
+        }
+        net.minecraft.world.entity.Entity e=mc.level.getEntity(id);
+        if(e==null)return;
+        for(int i=0;i<Math.round(3*power)+1;i++)
+            drop(mc,e,at.add(swing.scale(.35+random.nextDouble()*1.6*power)).add((random.nextDouble()-.5)*.5,0,(random.nextDouble()-.5)*.5),
+                random.nextDouble()*.22+.14,LIFE,18);
+    }
+
+    /**
      * A Scepter beam's hole, pouring: a stream from the hole itself, a spurt thrown out of it with every
      * heartbeat, and a puddle spreading under the body — or a trail behind it, pool after pool, if it moves.
      */

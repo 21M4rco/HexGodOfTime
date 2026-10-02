@@ -19,7 +19,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import java.util.function.Consumer;
 
 public final class ConjuredWeapon extends Item {
-    /** 0 dagger, 1 Scepter (the old Laevateinn registry ID), 2 time stick. */
+    /** 0 dagger, 1 Scepter (the old Laevateinn registry ID), 2 time stick, 3 The Deceiver. */
     public final int kind;
     public ConjuredWeapon(int kind) {super(new Properties().stacksTo(1).rarity(kind==2?Rarity.RARE:Rarity.UNCOMMON));this.kind=kind;}
     /** Vanilla's normal attack cooldown and hit path apply to the Scepter alone. */
@@ -65,8 +65,9 @@ public final class ConjuredWeapon extends Item {
     }
     @Override public InteractionResultHolder<ItemStack> use(Level level,Player player,InteractionHand hand) {
         if(!belongsTo(player.getItemInHand(hand),player))return InteractionResultHolder.fail(player.getItemInHand(hand));
-        // The Scepter's right click is a press-and-hold the client reports on its own; nothing fires here.
-        if(kind==1)return InteractionResultHolder.pass(player.getItemInHand(hand));
+        // The Scepter's right click is a press-and-hold the client reports on its own; nothing fires here. The
+        // Deceiver has no right click at all: it is never thrown.
+        if(kind==1||kind==3)return InteractionResultHolder.pass(player.getItemInHand(hand));
         if(player instanceof ServerPlayer p) {
             if(kind==0)HexServer.weapon(p,true,hand);
             else HexServer.weapon(p,true);

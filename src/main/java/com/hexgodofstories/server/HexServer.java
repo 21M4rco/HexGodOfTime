@@ -195,7 +195,9 @@ public final class HexServer {
         if(a==Ability.TELEKINESIS&&Telekinesis.holding(p)){Telekinesis.release(p,true);return true;}
         if(a==Ability.ENCHANT){direct(p);return true;}
         if(a==Ability.SELECTIVE_STOP&&HexData.unlocked(p,a)){Entity t=target(p,20);if(t!=null){TemporalEngine.exempt(p,t);notice(p,"Your chosen companion may walk through your stopped time.");}return true;}
-        if(a==Ability.DAGGERS||a==Ability.TWIN_DAGGERS||a==Ability.LAEVATEINN){dismissWeapons(p);return true;}
+        // The blades' keys held are their combo starters (BladeCombo); the Scepter's still puts it away.
+        if(a==Ability.DAGGERS||a==Ability.TWIN_DAGGERS){BladeCombo.start(p,a);return true;}
+        if(a==Ability.LAEVATEINN){dismissWeapons(p);return true;}
         // The ultimate has no alternate action, and says so rather than falling through to the cast path.
         if(a==Ability.TIME_BRANCH){notice(p,"Tap for a charged right fist; hold and release for the torrent.");return true;}
         // Gotcha!: the crown's key tapped rather than held. It keeps its own recovery, apart from the crown's, and asks nothing else of the caster.
@@ -379,18 +381,21 @@ public final class HexServer {
     }
 
     private static boolean conjure(ServerPlayer p,Ability a) {
+        // A blade's key tapped with that very blade already in hand puts it away again, for nothing.
+        if(a!=Ability.LAEVATEINN&&p.getMainHandItem().getItem() instanceof ConjuredWeapon held&&held.kind==(a==Ability.DAGGERS?0:3)
+            &&ConjuredWeapon.belongsTo(p.getMainHandItem(),p)) {
+            p.setItemInHand(InteractionHand.MAIN_HAND,ItemStack.EMPTY);
+            p.level().playSound(null,p.blockPosition(),HexGodOfStories.CONJURE.get(),SoundSource.PLAYERS,.5f,.7f);
+            return false;
+        }
         // Calling the Scepter already carried trades places with whatever is in hand, so it loses nothing
         // and needs no free hand; only forming a new weapon does.
         boolean calling=a==Ability.LAEVATEINN&&!ConjuredWeapon.scepter(p).isEmpty();
         if(!calling&&!p.getMainHandItem().isEmpty()&&!(p.getMainHandItem().getItem() instanceof ConjuredWeapon)){notice(p,"Free your main hand to conjure.");return false;}
-        if(a==Ability.TWIN_DAGGERS&&!p.getOffhandItem().isEmpty()&&!(p.getOffhandItem().getItem() instanceof ConjuredWeapon)){notice(p,"Free your other hand for twin daggers.");return false;}
-        ItemStack item=a==Ability.LAEVATEINN?summonScepter(p):new ItemStack(HexGodOfStories.DAGGER.get());
+        // The Deceiver (the old Twin Deceivers' place in the story): one long sword, in the main hand alone.
+        ItemStack item=a==Ability.LAEVATEINN?summonScepter(p):new ItemStack(a==Ability.TWIN_DAGGERS?HexGodOfStories.DECEIVER.get():HexGodOfStories.DAGGER.get());
         item.getOrCreateTag().putUUID("conjurer",p.getUUID());item.getOrCreateTag().putLong("formed",HexData.now(p));
         p.setItemInHand(InteractionHand.MAIN_HAND,item);
-        if(a==Ability.TWIN_DAGGERS) {
-            ItemStack off=item.copy();off.getOrCreateTag().putBoolean("reverse",true);
-            p.setItemInHand(InteractionHand.OFF_HAND,off);
-        }
         gesture(p,a==Ability.LAEVATEINN?"scepter_manifest":"conjure","conjure",HexGodOfStories.CONJURE.get());return true;
     }
     /**
@@ -430,8 +435,10 @@ public final class HexServer {
         if(!HexData.access(p)||TemporalEngine.frozen(p)||!p.isAlive()||p.isSpectator()||!(held.getItem() instanceof ConjuredWeapon w))return;
         if(hand==InteractionHand.OFF_HAND&&(!secondary||w.kind!=0))return;
         if(!ConjuredWeapon.belongsTo(held,p)){p.setItemInHand(hand,ItemStack.EMPTY);return;}
-        // The Scepter's right click is a hold, carried by SCEPTER_PRESS and SCEPTER_RELEASE.
-        if(w.kind==1)return;
+        // The Scepter's right click is a hold, carried by SCEPTER_PRESS and SCEPTER_RELEASE. The Deceiver is never thrown.
+        if(w.kind==1||secondary&&w.kind==3)return;
+        // A combo starter in progress owns the blade arm until it ends.
+        if(BladeCombo.running(p))return;
         long now=HexData.now(p);Strike prior=STRIKES.get(p.getUUID());
         if(prior!=null&&prior.end>now)return;
         int combo=prior==null||now-prior.end>18?0:(prior.combo+1)%4;
@@ -448,10 +455,12 @@ public final class HexServer {
             gesture(p,"time_stop","bind",HexGodOfStories.STOP.get());
             STRIKES.put(p.getUUID(),new Strike(2,combo,0,now+40));return;
         }
-        int windup=4,recovery=10;
-        boolean twin=p.getOffhandItem().is(HexGodOfStories.DAGGER.get());
+        // The Deceiver swings slower and longer than a dagger, and cuts deeper (see tick).
+        boolean sword=w.kind==3;
+        int windup=sword?7:4,recovery=sword?16:10;
+        boolean twin=!sword&&p.getOffhandItem().is(HexGodOfStories.DAGGER.get());
         STRIKES.put(p.getUUID(),new Strike(w.kind,combo,now+windup,now+recovery));
-        HexNetwork.animate(p,(twin?"twin_":"dagger_")+combo);
+        HexNetwork.animate(p,(sword?"sword_":twin?"twin_":"dagger_")+combo);
         HexNetwork.fx(p,"slash");
         p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,.85f,1.08f+combo*.04f);
     }
@@ -498,14 +507,18 @@ public final class HexServer {
         }
         Telekinesis.tick(p);
         Architecture.tick(p);
+        BladeCombo.tick(p);
         Strike strike=STRIKES.get(p.getUUID());
         if(strike!=null&&strike.contact==now) {
-            double reach=2.8;
+            boolean sword=strike.weapon==3;
+            double reach=sword?3.4:2.8;
             boolean finisher=strike.combo==3;
             for(LivingEntity e:p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(reach),e->validTarget(p,e)&&p.hasLineOfSight(e))) {
                 Vec3 direction=e.getEyePosition().subtract(p.getEyePosition()).normalize();
                 if(direction.dot(p.getLookAngle())<.35||p.distanceToSqr(e)>reach*reach)continue;
-                if(!e.hurt(p.damageSources().playerAttack(p),4))continue;
+                if(!e.hurt(p.damageSources().playerAttack(p),sword?5:4))continue;
+                // The swings alternate: the even ones come through to the right and down, the odd ones to the left.
+                BladeCombo.blood(p,e,strike.combo%2==0?.8:-.8,-.45,0,sword?.9f:.7f);
                 e.knockback(.25,p.getX()-e.getX(),p.getZ()-e.getZ());
                 if(finisher)Bleed.apply(p,e,1,120);
                 reward(p,Discipline.CONJURATION,55);
@@ -699,6 +712,7 @@ public final class HexServer {
         Arsenal.forget(p);
         GravityGrasp.forget(p);
         Glorious.forget(p);
+        BladeCombo.forget(p);
         HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());ScepterBlast.forget(p);INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         HexData.clearTransient(p,death);
     }
@@ -708,6 +722,6 @@ public final class HexServer {
         Warping.reset();
         Telekinesis.reset();Architecture.reset();Bleed.reset();Frostbite.reset();ScepterBlast.reset();PocketRealm.reset();TemporalEngine.reset();
         Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();Arsenal.reset();GravityGrasp.reset();
-        Delusion.reset();Glorious.reset();
+        Delusion.reset();Glorious.reset();BladeCombo.reset();
     }
 }

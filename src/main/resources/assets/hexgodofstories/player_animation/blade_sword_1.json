@@ -1,0 +1,130 @@
+{
+  "version": 3,
+  "name": "blade_sword_1",
+  "author": "HexGodOfStories",
+  "description": "A blade combo starter move: upper body only (the kick takes the right leg for its length); locomotion stays free.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 18,
+    "stopTick": 18,
+    "isLoop": false,
+    "returnTick": 18,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -58,
+          "yaw": -38,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": -52,
+          "yaw": 54,
+          "roll": 10
+        },
+        "torso": {
+          "pitch": -2,
+          "yaw": -25,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 3,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -58,
+          "yaw": -38,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": -52,
+          "yaw": 54,
+          "roll": 10
+        },
+        "torso": {
+          "pitch": -2,
+          "yaw": -25,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 4,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -58,
+          "yaw": -6,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": -52,
+          "yaw": 54,
+          "roll": 14
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 6,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -72,
+          "yaw": -6,
+          "roll": -72
+        },
+        "leftArm": {
+          "pitch": -74,
+          "yaw": 46,
+          "roll": 14
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 25,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 9,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -60,
+          "yaw": -6,
+          "roll": -30
+        },
+        "leftArm": {
+          "pitch": -70,
+          "yaw": 50,
+          "roll": 10
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 8,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 18,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}

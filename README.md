@@ -1,3 +1,29 @@
+## Real blades, and combo starters
+
+- **The dagger is remade.** A long, double-edged fighting dagger with a fullered blade and green runes cut down the
+  fuller (they shine in the dark, as do its emeralds), horned gold quillons, a green leather grip bound in gold wire
+  and a stone-capped pommel; about a fifth bigger than before, in the hand, thrown and in first person. Its throw is
+  unchanged. Tapping its key with the dagger already in hand now puts it away.
+- **Flurry: hold Conjure Daggers' key** within reach of a body you are looking at. The body is held stunned while you
+  cut it forehand, backhand, down from high on the right and rising back, then push-kick it away; a second of
+  bleeding after, four hearts in all. Only your upper body plays the moves, so you walk, turn and circle freely; leave
+  its reach or look away and the combo ends there. With no dagger in hand one forms for it with a flick of the wrist
+  and is gone at the end; nothing enters your inventory. 6 s recovery.
+- **The Deceiver replaces Twin Deceivers.** A long, very thin, fine sword in the dagger's style (nothing caged or swept
+  about its hilt): a slender fullered blade with its runes, a slim cross guard whose quillons dip and curl up, a long
+  grip for both hands. Tap to conjure it, tap again to put it away; its attacks are slower, longer cuts that hit
+  harder than the dagger's. It is not thrown.
+- **Master Cuts: hold The Deceiver's key**, after the German longsword masters: the Zornhau (the wrath cut, down from
+  the right shoulder), the Zwerchhau (the thwart cut, flat across at the head), the Zornort (a thrust out of the bind)
+  and an Unterhau rising from below that lifts the body off its feet for your follow-up. Five and a half hearts and a
+  second's bleeding; the same free movement and the same rules for reach and looking. 8 s recovery.
+- **Every cut bleeds the way it went.** Each of the combos' cuts and each ordinary attack with either blade throws the
+  body's blood off toward the side the blade travelled: a cut to the right sprays right, a rising cut sprays up, a
+  thrust goes out through the back, and it pools where it lands. (The moves were posed against where the blade's point
+  really goes in the game's own held-item chain, and tools/generate_blades.py checks each against its blood.)
+- **Fixed:** the Gotcha! Swarm's missiles could leave a ball of fire hanging in the air where one burst. And a Crown
+  missile's crater now grows back from its floor up, so sand and gravel come back onto ground instead of falling in.
+
 ## Seven keys, a remade mantle, a standing sea
 
 - **Seven bind slots on the bottom row of the keyboard: Z X C V B N M.** Pressing a slot's key casts its
@@ -13,7 +39,9 @@
   | Sleight of Place | Place a projection at your aim |
   | Masquerade | Take the disguise off |
   | Emerald Throw | The charged throw that bursts where it lands |
-  | Daggers, Twin Deceivers, Scepter | Dismiss the conjured weapons |
+  | Conjure Daggers | Flurry, the dagger's combo starter (see above) |
+  | The Deceiver | Master Cuts, the sword's combo starter (see above) |
+  | Scepter | Dismiss it |
   | Whispered Allegiance | Direct your charmed creatures at your aim |
   | Chosen Moment | Spare an ally from your stopped field |
   | Anchor Being | Gravity Grasp, for as long as you hold |
@@ -439,7 +467,7 @@ The time controls are never bound to a slot. They are permanent commands on thei
   damage if it hits a wall. Players can be held for three and a half seconds, creatures for fifteen.
 - **Borrowed Reality** — hold the cast key and a wall grows where you aim, through Small, Medium, Big and Massive. No block is ever placed: viewers are handed an origin, a size and a seed and build the courses locally, while the server keeps the same columns in memory so that everything which is not a player treats the wall as masonry — mobs path around it, lose sight of you behind it and are turned back when they walk into it. You walk through your own lie; Utility, with the wall chosen, takes it down.
 - **Fracture** — shatters the air where you look. From the outside it leads one place: in, taking anything beside you with it if you hold the key. From inside, where the break leads is chosen in the selector on the alternate key and stays chosen: a named player, whoever is nearest, the Nether, your bed, or the place you left. The break holds for seven seconds, and anything that walks through it follows your destination rather than its own history. Inside your sanctum you cannot be hit, and the island throws falling stars at anyone who tries.
-- **Twin Deceivers** — two daggers, the off hand reversed. Thrown blades fly point-first, bury themselves in what they hit and open bleeding wounds before dissolving.
+- **The Deceiver** — a long, thin, fine sword in place of the old Twin Deceivers; its held key is the Master Cuts. Thrown daggers fly point-first, bury themselves in what they hit and open bleeding wounds before dissolving.
 - **Masquerade** — wear any living thing in the game, vanilla or modded, keeping that individual creature's variant, colour, size and carried gear rather than its species' default. Creatures read the shape and mostly ignore it, until you attack one.
 - **Stillness** — local suspension that decelerates into and out of a stop rather than snapping, and holds bodies, shots, loose items, falling blocks and the weather alike. Harm you deal to a suspended body is banked and lands the instant time resumes.
 - **Dilation** — everything nearby runs at roughly a third speed, smoothly. Movement, attacks and arcing shots slow together; nothing stutters.

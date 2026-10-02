@@ -99,6 +99,7 @@ public final class ClientState {
             case HexNetwork.SCEPTER -> ScepterClient.receive(m.entity(),m.data());
             case HexNetwork.WOUND -> BeamWounds.receive(m.entity(),m.data());
             case HexNetwork.ARSENAL -> ArsenalClient.receive(m.entity(),m.data());
+            case HexNetwork.BLADE -> Blood.slash(m.entity(),m.data());
             case HexNetwork.STUN -> {long until=m.data().getLong("until");if(until>now())STUNNED.put(m.entity(),until);else STUNNED.remove(m.entity());}
             case HexNetwork.PILGRIM_PATH -> {
                 var world = net.minecraft.client.Minecraft.getInstance().level;

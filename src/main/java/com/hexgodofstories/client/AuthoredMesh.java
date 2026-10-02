@@ -189,6 +189,12 @@ public final class AuthoredMesh {
    }
 
    public void drawManifesting(PoseStack pose, VertexConsumer out, int light, float presence, float gripY, AuthoredMesh.Paint paint) {
+      this.drawManifesting(pose, out, light, presence, gripY, paint, null);
+   }
+
+   /** The same, drawing only the groups {@code only} accepts (all of them when it is null). */
+   public void drawManifesting(PoseStack pose, VertexConsumer out, int light, float presence, float gripY, AuthoredMesh.Paint paint,
+                               java.util.function.Predicate<String> only) {
       float growth = Math.max(0.0F, Math.min(1.0F, presence));
       if (!(growth <= 0.0F)) {
          float boundary = growth * Math.max(Math.abs(this.minY - gripY), Math.abs(this.maxY - gripY));
@@ -196,7 +202,7 @@ public final class AuthoredMesh {
             pose,
             out,
             light,
-            (group, v) -> Math.abs(v.y - gripY) > boundary
+            (group, v) -> only != null && !only.test(group) || Math.abs(v.y - gripY) > boundary
                   ? null
                   : new AuthoredMesh.Point(v.x * (0.55F + 0.45F * growth), v.y, v.z * (0.55F + 0.45F * growth), v.u, v.v),
             paint

@@ -72,6 +72,13 @@ public final class HexHud {
         if(a==Ability.WARPING){hint=com.hexgodofstories.warping.Destination.at(d.getInt("warpDestination")).title;lead=secondary;}
         if(a==Ability.TELEKINESIS){hint="Again: throw  \u00b7  "+release+": let go";lead="";}
         if(a==Ability.ARCHITECTURE){hint=release+": take the wall down";lead="";}
+        if(a==Ability.DAGGERS||a==Ability.TWIN_DAGGERS) {
+            // The combo starters keep their own recoveries, apart from the conjuring's shown above.
+            boolean dagger=a==Ability.DAGGERS;
+            long combo=d.getLong(dagger?com.hexgodofstories.server.BladeCombo.FLURRY_READY:com.hexgodofstories.server.BladeCombo.CUTS_READY)-ClientState.now();
+            int whole=dagger?com.hexgodofstories.server.BladeCombo.FLURRY_RECOVERY:com.hexgodofstories.server.BladeCombo.CUTS_RECOVERY;
+            if(combo>0&&combo<=whole)hint=String.format(Locale.ROOT,"%s %.1fs",dagger?"Flurry":"Master Cuts",combo/20f);
+        }
         if(a==Ability.THREADS) {
             // Gravity Grasp keeps its own recovery, apart from Anchor Being's shown above.
             long grasp=d.getLong(com.hexgodofstories.server.GravityGrasp.READY)-ClientState.now();
@@ -151,8 +158,8 @@ public final class HexHud {
             case TELEKINESIS -> "Grab; again: throw. Scroll: closer/further.";
             case BLINK -> "Teleport toward your aim.";
             case WARD -> "Raise a defensive veil.";
-            case DAGGERS -> "Conjure a dagger in an empty hand.";
-            case TWIN_DAGGERS -> "Conjure twin daggers. Use: throw.";
+            case DAGGERS -> "Conjure a dagger; again: put it away.";
+            case TWIN_DAGGERS -> "Conjure The Deceiver; again: put it away.";
             case LAEVATEINN -> "Conjure/recall the Scepter. Hold right click 1-10s: beam.";
             case ENCHANT -> "Charm a creature to follow you.";
             case MEMORY -> "Reveal a target's recent steps.";

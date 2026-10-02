@@ -1,0 +1,92 @@
+{
+  "version": 3,
+  "name": "blade_draw",
+  "author": "HexGodOfStories",
+  "description": "A blade combo starter move: upper body only (the kick takes the right leg for its length); locomotion stays free.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 12,
+    "stopTick": 12,
+    "isLoop": false,
+    "returnTick": 12,
+    "degrees": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -15,
+          "yaw": 0,
+          "roll": -5
+        },
+        "leftArm": {
+          "pitch": -15,
+          "yaw": 0,
+          "roll": 5
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 3,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -85,
+          "yaw": 20,
+          "roll": -40
+        },
+        "leftArm": {
+          "pitch": -30,
+          "yaw": 10,
+          "roll": 8
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 8,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 6,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": -60,
+          "yaw": -10,
+          "roll": -10
+        },
+        "leftArm": {
+          "pitch": -66,
+          "yaw": 32,
+          "roll": 10
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 12,
+        "easing": "inoutquad",
+        "rightArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "leftArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}

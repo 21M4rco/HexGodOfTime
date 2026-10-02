@@ -123,7 +123,9 @@ public final class QuickBar {
             case PROJECTION_SWAP -> "Place a decoy at your aim";
             case MASQUERADE -> "Remove disguise";
             case BOLT -> "Charged throw, bursts on impact";
-            case DAGGERS,TWIN_DAGGERS,LAEVATEINN -> "Dismiss weapons";
+            case DAGGERS -> "Flurry (combo starter)";
+            case TWIN_DAGGERS -> "Master Cuts (combo starter)";
+            case LAEVATEINN -> "Dismiss the Scepter";
             case ENCHANT -> "Direct charmed creatures";
             case SELECTIVE_STOP -> "Spare an ally from the field";
             case THREADS -> "Gravity Grasp";
@@ -149,7 +151,7 @@ public final class QuickBar {
             case WARD -> "Ward";
             case RIFT -> "Rift";
             case DAGGERS -> "Dagger";
-            case TWIN_DAGGERS -> "Twins";
+            case TWIN_DAGGERS -> "Sword";
             case LAEVATEINN -> "Scepter";
             case ENCHANT -> "Charm";
             case MEMORY -> "Echo";

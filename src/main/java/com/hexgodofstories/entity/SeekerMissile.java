@@ -21,8 +21,8 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.NetworkHooks;
 
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Set;
-import java.util.WeakHashMap;
 
 /**
  * One of the four small missiles Gotcha! sends in the full transformation: the Crown's own missile, shrunk, and
@@ -50,16 +50,30 @@ public final class SeekerMissile extends ThrowableProjectile {
     private static final float DIRECT = 10, BLAST = 6;
     private static final double CORE = 1.6, REACH = 3.4;
 
-    /** Live on this client, for drawing: the renderer reads them here, so it never has to sweep the level for them. */
-    public static final Set<SeekerMissile> LIVE = Collections.newSetFromMap(new WeakHashMap<>());
+    /**
+     * Live on this client, for drawing: the renderer reads them here, so it never has to sweep the level for them.
+     * Held by identity, never by {@code equals}: an entity's equality and hash are its id, and a client's copy is given
+     * its real id only after it is built, so a set keyed on the id it was built with could never find it again to
+     * let it go. One that lingered here went on laying its fire where it burst, a ball of flame left hanging in the
+     * air. Entered once it is really in the level, and let go as it leaves (and by the renderer each tick besides).
+     */
+    public static final Set<SeekerMissile> LIVE = Collections.newSetFromMap(new IdentityHashMap<>());
 
     private int target;
     private double wander;
 
     public SeekerMissile(EntityType<? extends SeekerMissile> type, Level level) {
         super(type, level);
-        // A client's copy is built only from the server's spawn packet; the renderer drops it once it is removed.
-        if (level.isClientSide) LIVE.add(this);
+    }
+
+    @Override public void onAddedToWorld() {
+        super.onAddedToWorld();
+        if (level().isClientSide) LIVE.add(this);
+    }
+
+    @Override public void onRemovedFromWorld() {
+        super.onRemovedFromWorld();
+        LIVE.remove(this);
     }
 
     @Override protected void defineSynchedData() { }

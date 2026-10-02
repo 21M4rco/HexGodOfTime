@@ -24,7 +24,13 @@ import java.util.*;
 public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
     /** Grip position inside the item cube and an overall size trim, one entry per weapon kind. */
     private record Fit(float grip,float scale) {}
-    private static final Fit[] FITS={new Fit(.24f,1f),new Fit(.29f,.72f),new Fit(.27f,1f)};
+    private static final Fit[] FITS={new Fit(.24f,1f),new Fit(.29f,.72f),new Fit(.27f,1f),new Fit(.24f,1f)};
+    /**
+     * The dagger's and The Deceiver's own steel, gold, leather and stones (tools/generate_blades.py). Their runes and
+     * emeralds (the "glow" group) are drawn again at full light, so they shine in the dark the way the Scepter's stone does.
+     */
+    public static final net.minecraft.resources.ResourceLocation BLADE=com.hexgodofstories.HexGodOfStories.id("textures/blade.png");
+    private static final int FULL_BRIGHT=0xF000F0;
     private static final float DIAGONAL=(float)(1/Math.sqrt(2));
     /** Full-length staff in the hand; the grip stays on the shaft where the hand is. */
     private static final float STAFF=2.30f;
@@ -49,7 +55,9 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
     public WeaponRenderer(){super(Minecraft.getInstance().getBlockEntityRenderDispatcher(),Minecraft.getInstance().getEntityModels());}
     public static WeaponRenderer instance(){if(INSTANCE==null)INSTANCE=new WeaponRenderer();return INSTANCE;}
     public static void clear(){MODELS.clear();ScepterModel.clear();}
-    public static AuthoredMesh mesh(int kind) {return MODELS.computeIfAbsent(kind,k->new AuthoredMesh(k==1?"laevateinn":k==2?"time_stick":"dagger"));}
+    public static AuthoredMesh mesh(int kind) {return MODELS.computeIfAbsent(kind,k->new AuthoredMesh(k==1?"laevateinn":k==2?"time_stick":k==3?"deceiver":"dagger"));}
+    /** The dagger and The Deceiver: the blades with their own texture and glowing runes. */
+    private static boolean blade(int kind) {return kind==0||kind==3;}
 
     /** Draws in weapon space: grip at the origin, blade toward +Y. Used by the hand, the projectile and the decoys. */
     public static void draw(int kind,PoseStack pose,MultiBufferSource buffers,int light,float growth) {
@@ -59,7 +67,13 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
                 false,growth,1,time,false);
             return;
         }
-        mesh(kind).drawManifesting(pose,buffers.getBuffer(RenderType.entityCutoutNoCull(HexLayer.MATERIAL)),light,growth,0);
+        if(!blade(kind)) {
+            mesh(kind).drawManifesting(pose,buffers.getBuffer(RenderType.entityCutoutNoCull(HexLayer.MATERIAL)),light,growth,0);
+            return;
+        }
+        var out=buffers.getBuffer(RenderType.entityCutoutNoCull(BLADE));
+        mesh(kind).drawManifesting(pose,out,light,growth,0,null,group->!group.equals("glow"));
+        mesh(kind).drawManifesting(pose,out,FULL_BRIGHT,growth,0,null,group->group.equals("glow"));
     }
 
     /** Hand-local magic rings follow both reveal fronts; no world-space drift while moving. */

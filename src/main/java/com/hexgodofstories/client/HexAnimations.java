@@ -59,6 +59,8 @@ public final class HexAnimations {
             boolean manifest=name.startsWith("scepter_manifest")||name.startsWith("scepter_fire");
             // Gotcha!'s pointing arm, and the arm held out toward whatever telekinesis holds: seen in first person too.
             boolean pointing=name.equals("gotcha")||name.equals("telekinesis");
+            // A blade combo's moves (BladeCombo): the sword arm is seen in first person, blade and all.
+            boolean blade=name.startsWith("blade_");
             ResourceLocation resourcelocation = HexGodOfStories.id(name);
             KeyframeAnimation keyframeanimation = PlayerAnimationRegistry.getAnimation(resourcelocation);
             if (keyframeanimation == null) {
@@ -68,10 +70,11 @@ public final class HexAnimations {
                KeyframeAnimationPlayer keyframeanimationplayer = new KeyframeAnimationPlayer(keyframeanimation)
                   .setFirstPersonMode(flag ? FirstPersonMode.NONE : FirstPersonMode.THIRD_PERSON_MODEL)
                   .setFirstPersonConfiguration(
-                     new FirstPersonConfiguration().setShowRightArm(manifest&&!left||pointing).setShowLeftArm(manifest&&left).setShowRightItem(true).setShowLeftItem(true)
+                     new FirstPersonConfiguration().setShowRightArm(manifest&&!left||pointing||blade&&!left).setShowLeftArm(manifest&&left||blade&&left).setShowRightItem(true).setShowLeftItem(true)
                   );
                // Shots cut straight in so the kick lands on the tick it fires; raising to aim eases in.
-               int fade=name.startsWith("scepter_fire")||name.startsWith("scepter_shot")?0:name.startsWith("scepter_aim")?2:Math.max(0,fadeTicks);
+               // A combo's moves follow each other within a few ticks: each cuts in almost at once, or the wind-up is lost in the blend.
+               int fade=name.startsWith("scepter_fire")||name.startsWith("scepter_shot")?0:name.startsWith("scepter_aim")||blade?(blade?1:2):Math.max(0,fadeTicks);
                modifierlayer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(fade, Ease.INOUTQUAD), keyframeanimationplayer);
             }
          }

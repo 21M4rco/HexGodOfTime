@@ -213,6 +213,13 @@ public final class ArsenalClient {
             this.seen = seen;
         }
 
+        /**
+         * Whether it has reached the end of its flight, where the server bursts it the same tick. Past that it is
+         * never drawn, whether or not word of the burst got here: one whose burst went unheard (or that the server let
+         * go of in ground nobody had loaded) would otherwise hang at its mark, burning, until it was forgotten.
+         */
+        boolean arrived(double ticks) {return ticks > flight.duration + 1;}
+
         /** Where it is and which way it points, {@code ticks} after it left. */
         Rocket pose(double ticks) {
             ticks = Math.max(0, ticks);
@@ -614,6 +621,7 @@ public final class ArsenalClient {
         for (Missile m : MISSILES.values()) trail(m, now, level.random);
         SeekerMissile.LIVE.removeIf(s -> s.isRemoved() || s.level() != level);
         for (SeekerMissile s : SeekerMissile.LIVE) {
+            if (s.isRemoved()) continue;
             seekerTrail(s, level.random);
             if (HEARD.add(s)) mc.getSoundManager().play(new SeekerSound(s));
         }
@@ -881,6 +889,7 @@ public final class ArsenalClient {
                     s.gun.reveal(), s.gun.flash(), LevelRenderer.getLightColor(mc.level, BlockPos.containing(s.at)), GUN_RIM);
             }
             if (rocket != null) for (Missile m : MISSILES.values()) {
+                if (m.arrived(ClientState.since(m.launch, partial))) continue;
                 Rocket r = m.pose(ClientState.since(m.launch, partial));
                 int light = lit(LevelRenderer.getLightColor(mc.level, BlockPos.containing(r.middle())));
                 draw(rocket, view, projection, eye, r.middle(), r.right(), r.up(), r.forward(), r.scale(), 1, 0, light, MISSILE_RIM);
@@ -1367,7 +1376,7 @@ public final class ArsenalClient {
 
     /** The fire pushing a missile: a long outer flame, a white core, and the glow of the nozzle. */
     private static void flame(VertexConsumer out, Matrix4f view, Vec3 camera, Missile m, double ticks, double time) {
-        if (ticks < 0) return;
+        if (ticks < 0 || m.arrived(ticks)) return;
         flame(out, view, camera, m.pose(ticks), ticks, m.id, time);
     }
 

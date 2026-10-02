@@ -87,24 +87,7 @@ def grip_wrap(mesh, low, high, radius, group='grip_wire', band=2, turns=9):
                   [radius * .17] * 13, group, band, 6)
 
 
-# The conjured dagger: a broad leaf blade, swept quillons and a wrapped grip.
-dagger = Mesh()
-dagger.blade([(.060, .050, .048, 0, 0),
-              (.115, .073, .046, 0, 0),
-              (.225, .066, .037, .006, 0),
-              (.360, .048, .025, .010, 0),
-              (.445, .027, .015, .010, 0),
-              (.490, .003, .004, .006, 0)])
-# Fuller: a shallow raised rib down the centre of the blade.
-dagger.blade([(.10, .010, .052, 0, 0), (.34, .007, .030, .008, 0), (.42, .003, .018, .009, 0)], 'engraving', 2)
-dagger.tube([(-.115, .036, .030), (-.086, .052, .018), (-.040, .060, 0), (0, .052, 0),
-             (.040, .060, 0), (.086, .052, .018), (.115, .036, .030)],
-            [.007, .016, .022, .024, .022, .016, .007], 'guard', 2)
-dagger.tube([(0, y, 0) for y in [-.150, -.132, -.100, -.040, .005, .030]],
-            [.020, .031, .026, .026, .029, .022], 'grip', 3)
-grip_wrap(dagger, -.125, .010, .029)
-dagger.facet((0, -.168, 0), .034, .050, 'pommel', 7)
-dagger.save('dagger')
+# The conjured dagger (and The Deceiver) live in generate_blades.py, with their own texture and moves.
 
 # Laevateinn: longer, heavier, rune-etched along both flats.
 sword = Mesh()

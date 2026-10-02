@@ -538,7 +538,8 @@ public final class Arsenal {
      * vanilla's own rays so that hard blocks shrug it off as they would any blast, and offered to every mod that
      * guards the world (Forge's explosion events) before anything is touched. Nothing drops and nothing is lost: each
      * block is written down whole, contents and all, and grows back as Paradise's ground does, beginning some eight
-     * seconds later and one by one over the ten after that ({@link Nothingness#takeCrater}).
+     * seconds later and one by one over the ten after that, from the bottom of the crater up
+     * ({@link Nothingness#takeCrater}).
      */
     private static void crater(ServerLevel level, Vec3 at, ServerPlayer caster, DamageSource source) {
         Explosion explosion = new Explosion(level, caster, source, null, at.x, at.y, at.z, CRATER, false, Explosion.BlockInteraction.DESTROY);
@@ -547,6 +548,11 @@ public final class Arsenal {
         ForgeEventFactory.onExplosionDetonate(level, explosion, new ArrayList<>(), CRATER * 2);
         long now = level.getGameTime();
         List<BlockPos> blown = new ArrayList<>(explosion.getToBlow());
+        // The crater fills from its floor up, a course at a time: each block returns only once everything below it in
+        // the crater is back, so sand and gravel always come back onto ground and never fall into the hole.
+        int lowest = Integer.MAX_VALUE, highest = Integer.MIN_VALUE;
+        for (BlockPos pos : blown) {lowest = Math.min(lowest, pos.getY()); highest = Math.max(highest, pos.getY());}
+        int courses = Math.max(1, highest - lowest + 1), course = Math.max(1, KNIT_SCATTER / courses);
         int debris = 0;
         for (BlockPos pos : blown) {
             BlockState state = level.getBlockState(pos);
@@ -557,7 +563,7 @@ public final class Arsenal {
                 level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, state), pos.getX() + .5, pos.getY() + .5, pos.getZ() + .5,
                     8, .4, .4, .4, .45);
             }
-            Nothingness.takeCrater(level, pos, now + KNIT_DELAY + level.random.nextInt(KNIT_SCATTER));
+            Nothingness.takeCrater(level, pos, now + KNIT_DELAY + (long) (pos.getY() - lowest) * course + level.random.nextInt(course));
         }
     }
 

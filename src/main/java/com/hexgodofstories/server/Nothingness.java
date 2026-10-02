@@ -164,6 +164,9 @@ public final class Nothingness extends SavedData {
             ready.add(w);
         }
         if(ready.isEmpty())return;
+        // A crater's blocks that come due together return lowest first, so none is ever put back over the hole it
+        // would fall into. Everything else keeps the order it was carved in.
+        ready.sort(Comparator.comparingInt(w->w.crater?w.pos.getY():Integer.MIN_VALUE));
         for(Wound w:ready) {
             if(!level.hasChunkAt(w.pos)&&++w.waited<PATIENCE) {
                 // The record is on disk, so waiting costs nothing and loses nothing. Past all patience it

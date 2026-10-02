@@ -192,8 +192,11 @@ public final class ServerEvents {
     @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
     public static void branchPunch(LivingDamageEvent e) {BranchFist.damage(e);}
 
-    /** Bleeding takes health over time and nothing else: no knockback from any tick of it. */
-    @SubscribeEvent public static void bleedKnockback(LivingKnockBackEvent e) {if(Bleed.dealing())e.setCanceled(true);}
+    /**
+     * Bleeding takes health over time and nothing else: no knockback from any tick of it. Nor from a blade combo's own
+     * cuts, which must leave the body where the next one will find it (BladeCombo throws it itself at the end).
+     */
+    @SubscribeEvent public static void bleedKnockback(LivingKnockBackEvent e) {if(Bleed.dealing()||BladeCombo.dealing())e.setCanceled(true);}
 
     /** Vanilla's real Scepter hit deals four health (two hearts) and bleeds for one second. */
     @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
