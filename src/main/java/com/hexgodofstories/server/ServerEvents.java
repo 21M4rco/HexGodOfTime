@@ -192,6 +192,9 @@ public final class ServerEvents {
     @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
     public static void branchPunch(LivingDamageEvent e) {BranchFist.damage(e);}
 
+    /** Bleeding takes health over time and nothing else: no knockback from any tick of it. */
+    @SubscribeEvent public static void bleedKnockback(LivingKnockBackEvent e) {if(Bleed.dealing())e.setCanceled(true);}
+
     /** Vanilla's real Scepter hit deals four health (two hearts) and bleeds for one second. */
     @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
     public static void swordDamage(LivingDamageEvent e) {

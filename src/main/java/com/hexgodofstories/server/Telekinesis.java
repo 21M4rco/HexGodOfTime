@@ -59,9 +59,9 @@ public final class Telekinesis {
 
     /**
      * One body at a time: casting again lets it go rather than taking another. In the full transformation, Many Hands
-     * lifts up to five at once (Glorious), all in the one grip.
+     * lifts up to twelve at once (Glorious), arrows in the air among them, all in the one grip.
      */
-    private static int capacity(ServerPlayer p) {return Transformation.transformed(p)?5:1;}
+    private static int capacity(ServerPlayer p) {return Transformation.transformed(p)?Glorious.HANDS_MOST:1;}
     private static double maxDistance(ServerPlayer p) {return 6+HexData.mastery(p,Discipline.SORCERY)*.016;}
     /**
      * What the hand can lift. Deliberately generous from the moment the spell unlocks — an unseen hand
@@ -163,7 +163,8 @@ public final class Telekinesis {
     public static void release(ServerPlayer p,boolean thrown) {
         Grip grip=GRIPS.remove(p.getUUID());
         if(grip==null)return;
-        double power=2.6+HexData.mastery(p,Discipline.SORCERY)*.006;
+        // A throw, not a cannon: about a block and a half a tick at first, under three at full mastery.
+        double power=1.4+HexData.mastery(p,Discipline.SORCERY)*.0014;
         for(Held h:grip.held) {
             restore(h);
             if(thrown) {
@@ -193,7 +194,7 @@ public final class Telekinesis {
             if(!(slam.entity.horizontalCollision||slam.entity.verticalCollision&&slam.entity.getDeltaMovement().y<-.35))continue;
             ServerPlayer owner=level.getServer().getPlayerList().getPlayer(slam.owner);
             if(owner!=null&&slam.entity instanceof LivingEntity living) {
-                living.hurt(owner.damageSources().playerAttack(owner),(float)Math.min(13,3.5+slam.power*2.4));
+                living.hurt(owner.damageSources().playerAttack(owner),(float)Math.min(8,2.5+slam.power*2));
                 HexNetwork.fx(living,"impact");
                 HexServer.reward(owner,Discipline.SORCERY,45);
             }

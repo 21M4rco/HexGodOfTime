@@ -63,9 +63,7 @@ public final class Glorious {
             case WARD: return mirror(p);
             case ENCHANT: return silverTongue(p, aimed);
             case MEMORY: return totalRecall(p, aimed);
-            case TIME_SLIP: return HexServer.slipstream(p);
             case REWIND: return sender(p);
-            case SELECTIVE_STOP: return chosenMany(p, aimed);
             default: return null;
         }
     }
@@ -207,28 +205,44 @@ public final class Glorious {
 
     // ------------------------------------------------------------------ Many Hands
 
-    /** Everything in front of the caster lifted at once, up to five bodies, the one in the look first. */
+    /** How far Many Hands reaches, how wide its cone is (the cosine of half of it: about a hundred degrees across), and how much it takes. */
+    private static final double HANDS_REACH = 18, HANDS_CONE = .64;
+    public static final int HANDS_MOST = 12;
+
+    /**
+     * Everything in a wide cone in front of the caster lifted at once, the one in the look first: creatures, players,
+     * and anything thrown or shot that is still in the air, which becomes the caster's own to throw back.
+     */
     private static boolean manyHands(ServerPlayer p, Entity aimed) {
         Vec3 eye = p.getEyePosition(), look = p.getLookAngle();
         List<Entity> bodies = new ArrayList<>();
         List<Entity> rest = new ArrayList<>();
         if (aimed != null) bodies.add(aimed);
-        for (Entity e : p.level().getEntities(p, p.getBoundingBox().inflate(14), e -> e instanceof LivingEntity && e != aimed && HexServer.foe(p, e))) {
+        for (Entity e : p.level().getEntities(p, p.getBoundingBox().inflate(HANDS_REACH), e -> e != aimed && handled(p, e))) {
             Vec3 to = e.getBoundingBox().getCenter().subtract(eye);
             double d = to.length();
-            if (d > 14 || d < 1e-3 || to.scale(1 / d).dot(look) < .82 || !p.hasLineOfSight(e)) continue;
+            if (d > HANDS_REACH || d < 1e-3 || to.scale(1 / d).dot(look) < HANDS_CONE || !p.hasLineOfSight(e)) continue;
             rest.add(e);
         }
         rest.sort(Comparator.comparingDouble(p::distanceToSqr));
         bodies.addAll(rest);
         int taken = 0;
         for (Entity e : bodies) {
-            if (taken >= 5) break;
-            if (Telekinesis.grab(p, e)) taken++;
+            if (taken >= HANDS_MOST) break;
+            if (!Telekinesis.grab(p, e)) continue;
+            taken++;
+            // Caught in the air, it is the caster's now: thrown, it hits for them.
+            if (e instanceof Projectile caught) caught.setOwner(p);
         }
         if (taken == 0) return false;
         HexServer.gesture(p, "telekinesis", "hold", HexGodOfStories.SORCERY.get());
         return true;
+    }
+
+    /** What Many Hands takes: a creature or player it could harm, or a projectile still flying. */
+    private static boolean handled(ServerPlayer p, Entity e) {
+        if (e instanceof LivingEntity) return HexServer.foe(p, e);
+        return e instanceof Projectile flying && flying.isAlive() && flying.getOwner() != p && flying.getDeltaMovement().lengthSqr() > .0025;
     }
 
     // ------------------------------------------------------------------ Behind You
@@ -380,27 +394,6 @@ public final class Glorious {
             dealt.hurt(p.damageSources().indirectMagic(p, p), Math.min(40, debt.getValue()));
             HexNetwork.fx(dealt, "slip");
         }
-        return true;
-    }
-
-    // ------------------------------------------------------------------ Chosen Many
-
-    /** The one in the look, and every creature within six blocks of it, up to six, suspended together. */
-    private static boolean chosenMany(ServerPlayer p, Entity aimed) {
-        if (aimed == null || !HexServer.foe(p, aimed)) return false;
-        List<Entity> bodies = new ArrayList<>();
-        bodies.add(aimed);
-        List<Entity> near = p.level().getEntities(p, aimed.getBoundingBox().inflate(6),
-            e -> e != aimed && e instanceof LivingEntity && HexServer.foe(p, e) && !(e instanceof IllusionEntity));
-        near.sort(Comparator.comparingDouble(aimed::distanceToSqr));
-        for (Entity e : near) {
-            if (bodies.size() >= 6) break;
-            bodies.add(e);
-        }
-        int held = 0;
-        for (Entity e : bodies) if (!e.isPassenger() && TemporalEngine.field(p, true, e, e instanceof Player ? 40 : 100)) held++;
-        if (held == 0) return false;
-        HexServer.gesture(p, "time_stop", "bind", HexGodOfStories.STOP.get());
         return true;
     }
 

@@ -559,33 +559,6 @@ public final class HexServer {
         n.putInt("count",i);HexNetwork.tracking(p,new HexNetwork.Message(HexNetwork.MEMORY,t.getId(),n));
         return true;
     }
-    /**
-     * Slipstream (Time Slip in the full transformation): the caster slips back exactly three seconds, whatever their
-     * mastery, and every creature or player within ten blocks is dragged back three seconds along its own path.
-     */
-    static boolean slipstream(ServerPlayer p) {
-        ArrayDeque<Moment> h=HISTORY.get(p.getUUID());if(h==null||h.size()<16)return false;
-        List<Moment> history=new ArrayList<>(h);
-        Moment m=history.get(history.size()-15);if(!safe(p,m.position))return false;
-        // Everyone near is taken first, from where they stand now, before the caster has moved away from them.
-        List<LivingEntity> near=p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(10),e->foe(p,e)&&!Glorious.huge(e)&&!e.isPassenger());
-        gesture(p,"time_slip","slip",HexGodOfStories.SLIP.get());teleport(p,m.position);p.setYRot(m.yaw);p.setXRot(m.pitch);
-        HexNetwork.fx(p,"slip");
-        for(LivingEntity e:near) {
-            ArrayDeque<Vec3> path=WATCHED.get(e.getUUID());
-            if(path==null||path.size()<2)continue;
-            List<Vec3> steps=new ArrayList<>(path);
-            Vec3 back=steps.get(Math.max(0,steps.size()-12));
-            if(!e.level().noCollision(e,e.getBoundingBox().move(back.subtract(e.position()))))continue;
-            HexNetwork.fx(e,"slip");
-            if(e instanceof ServerPlayer q){q.stopRiding();q.connection.teleport(back.x,back.y,back.z,q.getYRot(),q.getXRot());}
-            else e.teleportTo(back.x,back.y,back.z);
-            e.setDeltaMovement(Vec3.ZERO);e.hurtMarked=true;e.fallDistance=0;
-            e.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.MOVEMENT_SLOWDOWN,20,1,false,false));
-        }
-        return true;
-    }
-
     public static boolean charmedAgainst(Mob mob,LivingEntity target) {Charm c=CHARMS.get(mob.getUUID());return c!=null&&target!=null&&target.getUUID().equals(c.owner);}
     private static void direct(ServerPlayer p) {
         Entity t=target(p,24);

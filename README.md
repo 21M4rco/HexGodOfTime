@@ -22,14 +22,12 @@
   | Borrowed Reality | Reality Made | Grows twice as fast, stands half as long again, and is real to everyone but you: players are shoved back, projectiles are swallowed. |
   | Emerald Throw | Emerald Storm | Five bolts fanned out, each turning after the nearest creature ahead of it. 2 s. |
   | Sovereign Push | Kneel | Everything within twelve blocks is hammered to the ground: three hearts, held three seconds, slowed after. 15 s. |
-  | Telekinesis | Many Hands | Lift everything in front of you at once, up to five bodies; G throws them all. 6 s. |
+  | Telekinesis | Many Hands | Lift everything in a wide cone in front of you, up to twelve, arrows and thrown things in the air included (they become yours to throw back); G throws them all. 6 s. |
   | Veilstep | Behind You | Step out right behind the creature or player you aim at, facing its back; aimed at nothing, twice as far. 5 s. |
   | Runic Ward | Mirror Ward | Six seconds of the veil, and three quarters of every blow returns to whoever dealt it; projectiles rebound. 15 s. |
   | Whispered Allegiance | Silver Tongue | Charm up to six creatures within ten blocks at once, for twice as long; a player you aim at drops what they hold. 15 s. |
   | Memory Echo | Total Recall | Everything living within forty eight blocks glows through walls for twelve seconds. 20 s. |
-  | Time Slipping | Slipstream | Slip back exactly three seconds, and drag everything within ten blocks back three seconds along its own path. 12 s. |
   | Personal Rewind | Return to Sender | Rewind as ever, and every blow you took in those ten seconds lands on whoever dealt it. |
-  | Chosen Moment | Chosen Many | The one you aim at and every creature within six blocks of it (up to six) is suspended together. 15 s. |
   | Warping | Wide Open | No hold: a tap opens the pool at its full size where you look, for the full cost. |
   | Crown of Barrels | Gotcha! Swarm | G sends four small missiles that hunt the body you looked at (see below). |
   | Anchor Being | Grand Anchor | The sixty-block blast, as before. |

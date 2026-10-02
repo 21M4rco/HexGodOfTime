@@ -12,6 +12,10 @@ import java.util.*;
  * credited to the caster so kills read as theirs.
  */
 public final class Bleed {
+    /** True only while a bleed tick's damage is being dealt, so that it knocks nobody back (see ServerEvents). */
+    private static boolean dealing;
+    public static boolean dealing() {return dealing;}
+
     private static final class Wound {
         final UUID owner;int stacks;long expires,next;
         /** A Scepter beam's hole: pouring until this tick, credited to the caster whose beam opened it. */
@@ -103,7 +107,9 @@ public final class Bleed {
             else if(level.getEntity(credited) instanceof com.hexgodofstories.warping.leviathan.AbyssalPilgrimEntity hexor)
                 source=hexor.attackDamage(victim);
             else source=level.damageSources().magic();
-            victim.hurt(source,amount);
+            // Bleeding is a passive loss of health: credited to whoever opened the wound, but it never shoves.
+            dealing=true;
+            try{victim.hurt(source,amount);}finally{dealing=false;}
             if(owner!=null)HexServer.reward(owner,Discipline.CONJURATION,20);
             if(WOUNDS.containsKey(id))notifyClients(victim,wound,now);
         }
