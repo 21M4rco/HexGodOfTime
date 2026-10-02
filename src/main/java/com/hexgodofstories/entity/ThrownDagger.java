@@ -262,12 +262,19 @@ public final class ThrownDagger extends ThrowableProjectile {
 
     @Override protected void addAdditionalSaveData(CompoundTag n) {
         super.addAdditionalSaveData(n);n.putInt("state",state());n.putInt("life",life);n.putFloat("roll",roll());n.putBoolean("illusory",illusory());
+        n.putFloat("entryYaw",entryYaw());n.putFloat("entryPitch",entryPitch());
     }
     @Override protected void readAdditionalSaveData(CompoundTag n) {
         super.readAdditionalSaveData(n);
-        // A carried blade cannot be restored to a body that may not reload; drop it to a short-lived prop.
-        entityData.set(STATE,n.getInt("state")==FLYING?FLYING:IN_BLOCK);
+        int state=n.getInt("state");
+        // Flying and lodged blades come back as they were. One that was falling, or carried in a body (which may not
+        // reload, and is not held to it if it does), comes back falling, and lies where it lands.
+        entityData.set(STATE,state==FLYING||state==IN_BLOCK?state:FALLING);
         life=Math.min(140,Math.max(1,n.getInt("life")));entityData.set(ROLL,n.getFloat("roll"));entityData.set(ILLUSORY,n.getBoolean("illusory"));
+        // The angle it went in at. Saves from before it was kept have only the entity's own turn, which is what a
+        // lodged blade was drawn at then.
+        entityData.set(ENTRY_YAW,n.contains("entryYaw")?n.getFloat("entryYaw"):getYRot());
+        entityData.set(ENTRY_PITCH,n.contains("entryPitch")?n.getFloat("entryPitch"):getXRot());
     }
     @Override public Packet<ClientGamePacketListener> getAddEntityPacket() {return NetworkHooks.getEntitySpawningPacket(this);}
 }

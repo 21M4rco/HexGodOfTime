@@ -83,6 +83,7 @@ public final class ServerEvents {
         HexData.get(p).remove(BranchFistState.UNTIL);
         HexData.get(p).remove(BranchFistState.START);
         HexData.get(p).remove(BranchFistState.IMPACT);
+        HexData.clearSessionOnly(p);
         Arsenal.login(p);
         // Attribute modifiers are saved with the player, so a session that ended mid-transformation would
         // otherwise hand the armour back for free. Re-derived from the mantle, never inherited.
