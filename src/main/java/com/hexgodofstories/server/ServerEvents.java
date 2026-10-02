@@ -105,7 +105,7 @@ public final class ServerEvents {
         // A borrowed shape is sent once, not every second, so a new viewer has to be told separately.
         Masquerade.resend(p,q);
     }
-    @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p){PersonalRewind.clear(p);HexServer.clear(p,false);com.hexgodofstories.warping.CandyCorruption.forget(p);}}
+    @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p){Evisceration.loggedOut(p);PersonalRewind.clear(p);HexServer.clear(p,false);com.hexgodofstories.warping.CandyCorruption.forget(p);}}
     @SubscribeEvent public static void dimension(PlayerEvent.PlayerChangedDimensionEvent e) {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
         HexServer.clear(p,false);HexNetwork.sync(p);com.hexgodofstories.warping.WarpRealms.greet(p,e.getTo());
@@ -236,6 +236,22 @@ public final class ServerEvents {
     /** Ahead of everything else, so nothing clears a body that a partial Scepter beam is leaving standing. */
     @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.HIGHEST)
     public static void lastBreath(LivingDeathEvent e) {LastMoments.death(e);}
+
+    /**
+     * A player cut in two (Evisceration) lies helpless for five seconds and then dies of it: nothing hurts them meanwhile
+     * but that, and they strike, use, touch and break nothing.
+     */
+    @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.HIGHEST)
+    public static void halvedHurt(net.minecraftforge.event.entity.living.LivingAttackEvent e) {
+        if(Evisceration.halved(e.getEntity())&&!Evisceration.finishing())e.setCanceled(true);
+    }
+    @SubscribeEvent public static void halvedAttack(net.minecraftforge.event.entity.player.AttackEntityEvent e) {if(Evisceration.halved(e.getEntity()))e.setCanceled(true);}
+    @SubscribeEvent public static void halvedBlock(net.minecraftforge.event.entity.player.PlayerInteractEvent.RightClickBlock e) {if(Evisceration.halved(e.getEntity()))e.setCanceled(true);}
+    @SubscribeEvent public static void halvedItem(net.minecraftforge.event.entity.player.PlayerInteractEvent.RightClickItem e) {if(Evisceration.halved(e.getEntity()))e.setCanceled(true);}
+    @SubscribeEvent public static void halvedEntity(net.minecraftforge.event.entity.player.PlayerInteractEvent.EntityInteract e) {if(Evisceration.halved(e.getEntity()))e.setCanceled(true);}
+    @SubscribeEvent public static void halvedEntityAt(net.minecraftforge.event.entity.player.PlayerInteractEvent.EntityInteractSpecific e) {if(Evisceration.halved(e.getEntity()))e.setCanceled(true);}
+    @SubscribeEvent public static void halvedDig(net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock e) {if(Evisceration.halved(e.getEntity()))e.setCanceled(true);}
+    @SubscribeEvent public static void halvedBreak(net.minecraftforge.event.level.BlockEvent.BreakEvent e) {if(Evisceration.halved(e.getPlayer()))e.setCanceled(true);}
 
     @SubscribeEvent public static void hurt(LivingHurtEvent e) {
         if(e.getSource().is(DamageTypes.GENERIC_KILL))return;

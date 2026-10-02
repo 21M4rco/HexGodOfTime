@@ -471,5 +471,10 @@ directional streaking. Cuboids spinning off in all directions read as rubble and
   limb wholly on one side flops without being cut, and the halves' slump on landing.
 - The raw red cut face at night and in daylight, and the seared one with a burning blade.
 - The parry's half-second stun on a creature and on a player.
+- A creature's halves lying 45 seconds with no death animation or puff, its loot and experience on the ground at once;
+  a boss's own death still running underneath.
+- A player cut in two: the view riding the falling upper half and rolling, the lower half in sight, every key, click,
+  wheel and screen refused for five seconds while the mouse still looks, no damage taken, then death credited to the
+  cutter and the death screen; leaving meanwhile; a totem in hand.
 - The longer thrust: the point visibly out of the back of a zombie, a pig (looked down at) and a wider body, and the
   fist meeting the body rather than going into it.

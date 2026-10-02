@@ -253,7 +253,14 @@ public final class Evisceration {
         if (target == null || target.isRemoved()) return;
         ServerLevel level = p.serverLevel();
         ScepterBlast.clear(target);
-        if (target.isAlive()) {
+        // A player is not killed by it, not yet: five seconds as two halves on the ground, seeing it, able to do nothing
+        // but look, and only then dead (tickHalved). A totem in hand still saves one, below, the ordinary way.
+        boolean player = target instanceof ServerPlayer victim && victim.isAlive() && !totem(victim);
+        if (player) {
+            HALVED.put(target.getUUID(), new Halved(p.getUUID(), level.getGameTime() + PLAYER_LIES));
+            target.setDeltaMovement(0, Math.min(0, target.getDeltaMovement().y), 0);
+            target.hurtMarked = true;
+        } else if (target.isAlive()) {
             target.invulnerableTime = 0;
             dealing = true;
             try {target.hurt(p.damageSources().playerAttack(p), FINISH);}
@@ -263,7 +270,7 @@ public final class Evisceration {
         level.playSound(null, target.blockPosition(), SoundEvents.PLAYER_ATTACK_STRONG, SoundSource.PLAYERS, 1.2f, .7f);
         Vec3 line = line(p), gut = gut(target);
         // A body that lived even through that (a totem): only cut, and bleeding hard.
-        if (target.isAlive()) {
+        if (target.isAlive() && !player) {
             BladeCombo.spray(level, target, gut, line, BLOOD, p);
             Bleed.apply(p, target, BLEED_STACKS + 2, BLEED);
             return;
@@ -287,6 +294,62 @@ public final class Evisceration {
         for (int i = 0; i < 2; i++)
             level.playSound(null, target.getX(), gut.y, target.getZ(), HexGodOfStories.BLADE_PIERCE.get(), SoundSource.PLAYERS, 2, 1.25f);
         HexServer.reward(p, Discipline.CONJURATION, 120);
+        // A creature's own death is over at once, its loot and experience already dropped: no fall, no red flash, no puff
+        // of smoke. Its halves are all that is left of it (the blood above is sent first, while the body is still there to
+        // pool under). A boss keeps its own death, which may do more than die: the dragon's makes the way home.
+        if (!player && !(target instanceof net.minecraft.world.entity.player.Player) && !target.isRemoved()
+            && !target.getType().is(net.minecraftforge.common.Tags.EntityTypes.BOSSES))
+            target.remove(net.minecraft.world.entity.Entity.RemovalReason.KILLED);
+    }
+
+    // ------------------------------------------------------------------ a player cut in two
+
+    /** Ticks a player cut in two lies before dying of it; ticks a creature's halves lie (client Halving). */
+    public static final int PLAYER_LIES = 100, CREATURE_LIES = 900;
+
+    /** A player cut in two: who cut them, and when they die of it. */
+    private record Halved(UUID by, long until) { }
+
+    private static final Map<UUID, Halved> HALVED = new HashMap<>();
+    private static boolean finishing;
+
+    /** Whether this body is a player lying cut in two: nothing hurts it, and it does nothing. */
+    public static boolean halved(net.minecraft.world.entity.Entity e) {return e instanceof ServerPlayer && HALVED.containsKey(e.getUUID());}
+
+    /** The blow that finally kills a player cut in two is the one hurt that lands on them. */
+    public static boolean finishing() {return finishing;}
+
+    /** Every tick of every player, before anything else of theirs: held still, and dead when their time is up. */
+    public static void tickHalved(ServerPlayer p) {
+        Halved h = HALVED.get(p.getUUID());
+        if (h == null) return;
+        if (!p.isAlive()) {HALVED.remove(p.getUUID()); return;}
+        p.setDeltaMovement(0, Math.min(0, p.getDeltaMovement().y), 0);
+        if (p.level().getGameTime() >= h.until) die(p, h);
+    }
+
+    /** Dead of the cut, credited to whoever made it; nothing saves them now. */
+    private static void die(ServerPlayer p, Halved h) {
+        HALVED.remove(p.getUUID());
+        ServerPlayer by = p.getServer() == null ? null : p.getServer().getPlayerList().getPlayer(h.by);
+        p.invulnerableTime = 0;
+        finishing = true;
+        try {p.hurt(by != null ? p.damageSources().playerAttack(by) : p.damageSources().genericKill(), FINISH);}
+        finally {finishing = false;}
+        if (p.isAlive()) {
+            finishing = true;
+            try {p.kill();} finally {finishing = false;}
+        }
+    }
+
+    /** Leaving while cut in two is dying of it, there and then. */
+    public static void loggedOut(ServerPlayer p) {
+        Halved h = HALVED.get(p.getUUID());
+        if (h != null) die(p, h);
+    }
+
+    private static boolean totem(ServerPlayer p) {
+        return p.getMainHandItem().is(net.minecraft.world.item.Items.TOTEM_OF_UNDYING) || p.getOffhandItem().is(net.minecraft.world.item.Items.TOTEM_OF_UNDYING);
     }
 
     /**
@@ -303,6 +366,8 @@ public final class Evisceration {
         d.putDouble("fx", f.x); d.putDouble("fz", f.z);
         d.putDouble("x", target.getX()); d.putDouble("y", target.getY()); d.putDouble("z", target.getZ());
         d.putFloat("yaw", target.yBodyRot);
+        // How long the halves lie: a player's until they die of it, a creature's for three quarters of a minute.
+        d.putInt("lie", target instanceof ServerPlayer && HALVED.containsKey(target.getUUID()) ? PLAYER_LIES : CREATURE_LIES);
         // Pure blood red at the cut, unless the blade was burning: then it is seared, and cools as a Scepter hole does.
         d.putBoolean("burning", BladeFire.burning(p));
         d.putLong("start", target.level().getGameTime());
@@ -331,11 +396,12 @@ public final class Evisceration {
 
     /** A death, a logout, a crossing: nothing of it outlives them. */
     public static void forget(ServerPlayer p) {
+        HALVED.remove(p.getUUID());
         Run run = RUNS.remove(p.getUUID());
         if (run != null && run.target != null && run.target.isAlive()) ScepterBlast.clear(run.target);
     }
 
-    public static void reset() {RUNS.clear();}
+    public static void reset() {RUNS.clear(); HALVED.clear();}
 
     /** The bearer moved by their own client: the velocity is sent straight to it. */
     private static void move(ServerPlayer p, Vec3 flat, double y) {

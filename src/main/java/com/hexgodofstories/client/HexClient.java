@@ -114,6 +114,8 @@ public final class HexClient {
     @Mod.EventBusSubscriber(modid=HexGodOfStories.ID,value=Dist.CLIENT)
     public static final class ForgeBus {
         @SubscribeEvent public static void stopHand(RenderHandEvent e) {
+            // Cut in two (Halving): no hands in front of the eyes, which are lying on the ground in the upper half.
+            if(Halving.helpless()){e.setCanceled(true);return;}
             if(e.getHand()!=net.minecraft.world.InteractionHand.MAIN_HAND)return;
             var data=ClientState.self();
             if(!data.contains("stopWindup"))return;
@@ -122,6 +124,18 @@ public final class HexClient {
             float swing=Math.max(0,Math.min(1,(ticks-19f)/3f));
             e.getPoseStack().translate(-.08*raised,-.1*raised,-.15*raised);
             e.getPoseStack().mulPose(com.mojang.math.Axis.XN.rotationDegrees(105*raised-135*swing));
+        }
+        /**
+         * Cut in two (Halving), a player can do nothing but look about: before the game reads a single key this tick,
+         * every key is let go, and whatever screen is open closed but the pause menu. The mouse still turns the view.
+         */
+        @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.HIGHEST)
+        public static void helpless(TickEvent.ClientTickEvent e) {
+            if(e.phase!=TickEvent.Phase.START||!Halving.helpless())return;
+            Minecraft mc=Minecraft.getInstance();
+            KeyMapping.releaseAll();
+            if(mc.screen!=null&&!(mc.screen instanceof net.minecraft.client.gui.screens.PauseScreen))mc.setScreen(null);
+            if(mc.options.getCameraType()!=net.minecraft.client.CameraType.FIRST_PERSON)mc.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON);
         }
         @SubscribeEvent public static void tick(TickEvent.ClientTickEvent e) {
             if(e.phase!=TickEvent.Phase.END)return;
@@ -218,10 +232,11 @@ public final class HexClient {
          * clicks one of them; the event reaches every listener whatever else is bound there.
          */
         @SubscribeEvent public static void slotKey(InputEvent.Key e) {
-            if(e.getAction()==GLFW.GLFW_REPEAT)return;
+            if(e.getAction()==GLFW.GLFW_REPEAT||Halving.helpless())return;
             for(int i=0;i<SLOTS.length;i++)if(SLOTS[i].matches(e.getKey(),e.getScanCode())){slotEdge(i,e.getAction()==GLFW.GLFW_PRESS);return;}
         }
         @SubscribeEvent public static void slotMouse(InputEvent.MouseButton.Post e) {
+            if(Halving.helpless())return;
             for(int i=0;i<SLOTS.length;i++)if(SLOTS[i].matchesMouse(e.getButton())){slotEdge(i,e.getAction()==GLFW.GLFW_PRESS);return;}
         }
 
@@ -294,6 +309,7 @@ public final class HexClient {
 
         @SubscribeEvent public static void scroll(InputEvent.MouseScrollingEvent e) {
             var mc=Minecraft.getInstance();
+            if(Halving.helpless()&&mc.screen==null){e.setCanceled(true);return;}
             if(mc.player==null||mc.screen!=null||!enabled())return;
             if(ClientState.self().getInt("grip")>0) {
                 // Both hands are busy holding something; the wheel pushes and pulls it instead of the hotbar.
@@ -303,6 +319,7 @@ public final class HexClient {
         }
         @SubscribeEvent public static void mouse(InputEvent.InteractionKeyMappingTriggered e) {
             var mc=Minecraft.getInstance();
+            if(Halving.helpless()){e.setCanceled(true);e.setSwingHand(false);return;}
             if(mc.player==null||mc.screen!=null||!enabled())return;
             if(!(mc.player.getMainHandItem().getItem() instanceof ConjuredWeapon weapon)||!(e.isAttack()||e.isUseItem()))return;
             // The Scepter keeps vanilla left-click combat. Its right click is a press and hold that
@@ -317,6 +334,13 @@ public final class HexClient {
          * mouse is left alone, so a planted caster can still aim what they are about to fire.
          */
         @SubscribeEvent public static void movement(MovementInputUpdateEvent e) {
+            if(Halving.helpless()) {
+                var input=e.getInput();
+                input.forwardImpulse=0;input.leftImpulse=0;input.jumping=false;input.shiftKeyDown=false;
+                input.up=input.down=input.left=input.right=false;
+                e.getEntity().setSprinting(false);
+                return;
+            }
             // Both arms up and the crown firing over them: a slow, deliberate walk, and the feet stay on the ground.
             if(ArsenalClient.channeling(e.getEntity())) {
                 var input=e.getInput();
@@ -398,7 +422,13 @@ public final class HexClient {
         @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
         public static void fov(ViewportEvent.ComputeFov e){ScepterFx.fov(e.getFOV(),e.usedConfiguredFov());}
         /** Breaches, impacts and the standing tremor of something enormous passing underneath. */
+        /** A body cut in two draws no name over its halves. */
+        @SubscribeEvent public static void halvedName(net.minecraftforge.client.event.RenderNameTagEvent e) {
+            if(Halving.drawing())e.setResult(net.minecraftforge.eventbus.api.Event.Result.DENY);
+        }
         @SubscribeEvent public static void pilgrimCamera(net.minecraftforge.client.event.ViewportEvent.ComputeCameraAngles e){
+            // One's own head turning over as the upper half falls (Halving).
+            Halving.angles(e);
             com.hexgodofstories.client.leviathan.LeviathanEffects.camera(e);
             // A player caught in stopped time sees exactly what they saw when it stopped: the mouse
             // cannot turn a frozen view between the ticks that pin it.

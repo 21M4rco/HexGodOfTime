@@ -65,15 +65,18 @@ import java.util.Set;
  * back. And it goes limp, as a body does: every limb of a model built of parts (the humanoids, the four-legged, every
  * model built as one tree of named parts) that lies wholly on that half's side of the cut flops loose as it falls and
  * is thrown about again when it lands, settling splayed. A limb the cut went through stays as it was, so nothing slides
- * across the cut. Both halves pour blood, heavily, for ten seconds. They lie there ten seconds, then sink out of
- * sight. The body itself is never drawn meanwhile, alive or dead, and is drawn from its last state after the world has
- * let it go.
+ * across the cut. Both halves pour blood, heavily, for ten seconds, and drip after. A creature's halves lie there three
+ * quarters of a minute, then sink out of sight; its own death is over at once on the server (its loot dropped), so no
+ * fall, flash or puff of smoke of the game's own is ever seen, and it is drawn from its last state after the world has
+ * let it go. A player's lie until they die of it, five seconds on, and are gone with them. Meanwhile the player cut in
+ * two sees it from inside: their eyes ride the upper half's head as it tumbles and rolls to the ground, and they can
+ * look about, at their own lower half lying there, and do nothing else at all (HexClient lets go of every key).
  */
 public final class Halving {
     private Halving() {}
 
-    /** Ticks the halves lie on the ground before they sink, and ticks they take to sink; ticks their cut faces pour. */
-    private static final int LIE = 200, SINK = 30, POUR = 200;
+    /** Ticks a creature's halves lie (when the server does not say), and take to sink; ticks their cut faces pour. */
+    private static final int LIE = 900, SINK = 30, POUR = 200;
     /** Cuts at once; a body that is gone and still not drawn is given up on after this long. */
     private static final int MAX = 24, ABANDON = 2400;
     private static final float GRAVITY = .075f, MOST_SPIN = .5f;
@@ -119,6 +122,12 @@ public final class Halving {
             this.delay = delay;
         }
 
+        /** How far over it has turned, between its last tick and this one. */
+        float prevAngle(float partial) {
+            float before = 2 * (float) Math.acos(Math.min(1, Math.abs(prevRot.w)));
+            return before + (angle - before) * partial;
+        }
+
         /** A point of this piece, from the anchor, where the piece now is (or between its last tick and this one). */
         Vector3f place(Vector3f local, float partial) {
             Quaternionf q = partial >= 1 ? new Quaternionf(rot) : new Quaternionf(prevRot).slerp(rot, partial);
@@ -138,9 +147,14 @@ public final class Halving {
         final float height;
         final boolean burning;
         final Piece upper, lower;
+        /** Ticks the halves lie, and take to sink: a player's are gone at once when they die of it. */
+        final int lie, sink;
         boolean broken;
 
-        Cut(Entity body, ClientLevel level, Vec3 anchor, Vector3f point, Vector3f normal, long start, float height, boolean burning, Piece upper, Piece lower) {
+        Cut(Entity body, ClientLevel level, Vec3 anchor, Vector3f point, Vector3f normal, long start, float height, boolean burning,
+            Piece upper, Piece lower, int lie, int sink) {
+            this.lie = lie;
+            this.sink = sink;
             this.body = body;
             this.level = level;
             this.anchor = anchor;
@@ -214,7 +228,9 @@ public final class Halving {
         Vec3 knocked = forward.scale(.14).add(line.scale(-.04)).add(0, .05, 0).scale(Math.sqrt(size));
         Piece lower = new Piece(-1, foot, down.isEmpty() ? List.of(lowerMiddle) : down, knocked,
             vec(right.scale(-1).add(forward.scale(-.45))), (float) Math.toRadians(84 + random.nextFloat() * 10), 0, .028f * slow, 3);
-        CUTS.put(id, new Cut(body, mc.level, anchor, point, normal, ClientState.now(), h, burning, upper, lower));
+        boolean player = body instanceof net.minecraft.world.entity.player.Player;
+        CUTS.put(id, new Cut(body, mc.level, anchor, point, normal, ClientState.now(), h, burning, upper, lower,
+            n.contains("lie") ? n.getInt("lie") : LIE, player ? 1 : SINK));
         if (body instanceof LivingEntity living) {living.hurtTime = 0; living.deathTime = 0;}
 
         // The blade's line through the body: blood thrown out of the whole length of it, both ways and every way,
@@ -252,9 +268,11 @@ public final class Halving {
             Cut cut = it.next().getValue();
             long age = now - cut.start;
             if (cut.level != mc.level || age > ABANDON || age < 0) {it.remove(); continue;}
-            // Gone from sight once sunk; let go of only once the body itself is gone (or alive again).
-            if (age > LIE + SINK) {
-                if (cut.body.isRemoved() || cut.body.isAlive()) it.remove();
+            // Gone from sight once sunk; let go of only once the body itself is gone, or alive again (a player respawned,
+            // given a moment for the word of their death to arrive).
+            if (age > cut.lie + cut.sink) {
+                if (cut.body.isRemoved() || mc.level.getEntity(cut.body.getId()) != cut.body || cut.body.isAlive() && age > cut.lie + cut.sink + 40)
+                    it.remove();
                 continue;
             }
             if (cut.body instanceof LivingEntity living) {living.hurtTime = 0; living.deathTime = 0;}
@@ -268,7 +286,7 @@ public final class Halving {
     private static void step(Cut cut, Piece p, long age) {
         p.prevPos = p.pos;
         p.prevRot.set(p.rot);
-        if (age > LIE) {p.pos = p.pos.add(0, -cut.height / SINK, 0); return;}
+        if (age > cut.lie) {p.pos = p.pos.add(0, -cut.height / cut.sink, 0); return;}
         if (age >= p.delay && p.angle < p.topple) {
             p.spin = Math.min(p.spin + p.accel, MOST_SPIN);
             p.angle = Math.max(0, Math.min(p.topple, p.angle + p.spin));
@@ -330,8 +348,17 @@ public final class Halving {
 
     /** The cut face of a half: pouring blood, very heavily at first and spurting with the last beats, smoking if seared. */
     private static void pour(Cut cut, Piece p, long age) {
-        if (age > POUR) return;
+        if (age > cut.lie) return;
         var random = cut.level.random;
+        if (age > POUR) {
+            // Dripping after, for as long as it lies there.
+            if (age % 4 == 0) {
+                Vector3f face = p.place(cut.point, 1);
+                Vfx.spark(HexGodOfStories.BLOOD.get(), cut.anchor.add(face.x + (random.nextDouble() - .5) * .3, face.y, face.z + (random.nextDouble() - .5) * .3),
+                    new Vec3(0, -.03, 0));
+            }
+            return;
+        }
         Vector3f face = p.place(cut.point, 1);
         Vector3f out = new Vector3f(cut.normal).mul(-p.side).rotate(p.rot);
         Vec3 at = cut.anchor.add(face.x, face.y, face.z);
@@ -369,12 +396,12 @@ public final class Halving {
         Set<RenderType> used = new HashSet<>();
         for (Cut cut : CUTS.values()) {
             float age = ClientState.since(cut.start, partial);
-            if (cut.broken || cut.level != mc.level || age > LIE + SINK) continue;
-            // One's own halves are not drawn from inside one's own eyes.
-            if (cut.body == mc.getCameraEntity() && !e.getCamera().isDetached()) continue;
+            if (cut.broken || cut.level != mc.level || age > cut.lie + cut.sink) continue;
+            // One's own upper half is not drawn: the eyes are in its head. The lower one is there to be seen.
+            boolean own = cut.body == mc.getCameraEntity() && !e.getCamera().isDetached();
             @SuppressWarnings("unchecked")
             EntityRenderer<Entity> renderer = (EntityRenderer<Entity>) mc.getEntityRenderDispatcher().getRenderer(cut.body);
-            for (Piece piece : new Piece[]{cut.upper, cut.lower}) {
+            for (Piece piece : own ? new Piece[]{cut.lower} : new Piece[]{cut.upper, cut.lower}) {
                 // A pose of its own, so a renderer that fails part way cannot leave the world's unbalanced.
                 PoseStack pose = new PoseStack();
                 pose.last().pose().set(e.getPoseStack().last().pose());
@@ -414,6 +441,48 @@ public final class Halving {
             }
         }
         for (RenderType type : used) buffers.endBatch(type);
+    }
+
+    // ------------------------------------------------------------------ one's own body, cut in two
+
+    /** This client's own player, cut in two and not yet dead of it. */
+    private static Cut own() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || !mc.player.isAlive()) return null;
+        Cut cut = CUTS.get(mc.player.getId());
+        return cut != null && cut.body == mc.player && !cut.broken && ClientState.now() - cut.start <= cut.lie ? cut : null;
+    }
+
+    /** Whether this client's player is lying cut in two: they can do nothing but look about (HexClient). */
+    public static boolean helpless() {return own() != null;}
+
+    /** Whether one of the halves is being drawn right now: no name is drawn over it. */
+    public static boolean drawing() {return drawingPiece != null;}
+
+    /** Where this client's eyes are while it lies cut in two: in the upper half's head, wherever that has fallen (HalvedCameraMixin). */
+    public static Vec3 eye(float partial) {
+        Cut cut = own();
+        if (cut == null) return null;
+        Vector3f eye = cut.upper.place(new Vector3f(0, cut.body.getEyeHeight(), 0), Math.min(1, Math.max(0, partial)));
+        return cut.anchor.add(eye.x, eye.y, eye.z);
+    }
+
+    /**
+     * The view turning over with the head as the upper half falls: the half's turn about the way one is looking rolls the
+     * view, and its turn about one's right tips it up or down. Looking about, one sees the world lying as the head does.
+     */
+    public static void angles(net.minecraftforge.client.event.ViewportEvent.ComputeCameraAngles e) {
+        Cut cut = own();
+        if (cut == null) return;
+        float partial = (float) e.getPartialTick();
+        Piece upper = cut.upper;
+        float angle = upper.prevAngle(partial);
+        if (angle == 0) return;
+        double yaw = Math.toRadians(e.getYaw());
+        Vector3f look = new Vector3f((float) -Math.sin(yaw), 0, (float) Math.cos(yaw)), right = new Vector3f(-look.z, 0, look.x);
+        float degrees = (float) Math.toDegrees(angle);
+        e.setRoll(e.getRoll() + degrees * upper.axis.dot(look));
+        e.setPitch(Math.max(-90, Math.min(90, e.getPitch() - degrees * .5f * upper.axis.dot(right))));
     }
 
     // ------------------------------------------------------------------ the model's own hooks

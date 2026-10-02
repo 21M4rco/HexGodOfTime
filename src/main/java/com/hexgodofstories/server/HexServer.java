@@ -98,6 +98,8 @@ public final class HexServer {
     public static void input(ServerPlayer p,int action,int value) {
         long now=HexData.now(p);
         if(action==RESYNC){HexNetwork.sync(p);return;}
+        // Cut in two, a player does nothing at all but look.
+        if(Evisceration.halved(p))return;
         // Escaping a trap is available to ordinary players too; the live passage validates it.
         if(action==WARP_STRUGGLE){com.hexgodofstories.warping.WarpCrossing.struggle(p);return;}
         // Letting go is always heard, so a charge can never be left held open by a refused press.
@@ -543,6 +545,8 @@ public final class HexServer {
     }
 
     public static void tick(ServerPlayer p) {
+        // A player cut in two (Evisceration) is held still and dies when their time is up, powers or none.
+        Evisceration.tickHalved(p);
         long now=HexData.now(p);CompoundTag d=HexData.get(p);
         if(!p.isAlive()){ScepterBlast.cancel(p);Arsenal.forget(p);GravityGrasp.forget(p);Transformation.strip(p);return;}
         if(!HexData.access(p)){ScepterBlast.cancel(p);Arsenal.forget(p);GravityGrasp.forget(p);Transformation.strip(p);CosmicFlight.revoke(p);dismissWeapons(p);return;}

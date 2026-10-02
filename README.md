@@ -25,7 +25,17 @@
   halves. A limb the cut went through stays as it was, so nothing slides across the cut. The blood: the cut throws it
   out of its whole length every way, nine sprays as heavy as any blade throws and a sheet four times the first one's,
   pools all along under it; each half's cut face pours, heavily, for ten seconds, spurting with the last beats of the
-  heart for four, and splashes it up all round where it lands. They lie there ten seconds and sink away. A totem of undying that saves a player from the cut leaves them cut,
+  heart for four, and splashes it up all round where it lands, then drips for as long as it lies there.
+- **Instead of the game's own death.** A creature cut in two drops its loot and experience at once and is gone from the
+  world the same moment, so its own death (the fall onto its side, the red flash, the puff of smoke) is never seen: its
+  halves lie on the floor three quarters of a minute, then sink away. A boss keeps its own death (the dragon's makes the
+  way home) but is still only ever seen as its halves.
+- **A player cut in two** is not killed by the cut. For five seconds they lie as two halves: their own view rides the
+  head of their upper half as it tumbles and rolls to the ground, the world turning over with it; they can look about
+  with the mouse and see their own lower half lying there, and nothing else works: no key, no click, no wheel, every
+  screen but the pause menu closed. Nothing can hurt them meanwhile and they touch nothing. Then they die of it,
+  credited to whoever cut them, their halves gone with them, and the death screen comes up as ever. Leaving the game
+  meanwhile is dying of it there and then. A totem of undying that saves a player from the cut leaves them cut,
   not halved.
 - **Nothing reached** and the thrust goes into the air, with a three-second recovery. A shield turns it aside.
 - **Seen before it ships.** `tools/preview_evisceration.py` simulates the whole move on a zombie and on a player
