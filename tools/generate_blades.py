@@ -380,6 +380,18 @@ def check(resolved):
         grip = {'dagger': (-.290, .118), 'deceiver': (-.330, .172)}[model]
         assert grip[0] + .1 < f[1] < grip[1] - .1 and abs(f[0]) < .02 and abs(f[2]) < .02, f'{model}: the fist is at {f}, not on the grip {grip}'
         print(f'{model:9} fist at {f[1]:+.3f} along the blade: on the grip {grip}, {f[1] - grip[0]:.2f} of handle below it, {grip[1] - f[1]:.2f} above')
+    # The handle in the fist all the way through every move, not only at its keys: every half tick.
+    worst = (0, ''); offs = {}
+    for name, move in resolved.items():
+        model = 'deceiver' if any(k in name for k in ('sword', 'guard', 'run', 'deflect')) else 'dagger'
+        for half in range(0, move['end'] * 2 + 1):
+            f = rig.fist(rig.keyed(move, half / 2), model)
+            off = float(np.hypot(f[0], f[2]) + abs(f[1] + .08)) * .85
+            if off > worst[0]: worst = (off, f'{name} t{half / 2}')
+            if off > offs.get(name, (0, 0))[0]: offs[name] = (off, half / 2)
+    for name in sorted(offs, key=lambda n: -offs[n][0])[:6]: print(f'  handle {name:18} worst {offs[name][0]:.3f} at t{offs[name][1]}')
+    assert worst[0] < .065, f'the handle leaves the fist by {worst[0]:.3f} at {worst[1]}'
+    print(f'handle in the fist through every move: worst {worst[0]:.3f} blocks off, at {worst[1]}')
     for name, swing in blade_moves.SWINGS.items():
         move = resolved[name]
         model, length = ('deceiver', 1.55) if 'sword' in name else ('dagger', .80)

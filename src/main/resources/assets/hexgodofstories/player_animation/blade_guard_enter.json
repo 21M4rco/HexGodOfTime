@@ -1,131 +1,94 @@
 {
  "version": 3,
- "name": "blade_guard",
+ "name": "blade_guard_enter",
  "author": "HexGodOfStories",
  "description": "A blade move (tools/blade_moves.py): the whole body, never locking the player in place.",
  "emote": {
   "beginTick": 0,
-  "endTick": 44,
-  "stopTick": 44,
-  "isLoop": true,
-  "returnTick": 4,
+  "endTick": 12,
+  "stopTick": 12,
+  "isLoop": false,
+  "returnTick": 12,
   "degrees": true,
   "easeBeforeKeyframe": true,
   "moves": [
    {
     "tick": 0,
-    "easing": "inoutsine",
+    "easing": "linear",
     "body": {
      "x": 0,
      "y": 0,
      "z": 0,
      "pitch": 0,
-     "yaw": -8,
+     "yaw": 0,
      "roll": 0
     },
     "head": {
      "pitch": 0,
-     "yaw": -8,
+     "yaw": 0,
      "roll": 0
     },
     "leftArm": {
-     "pitch": 4,
+     "pitch": 0,
      "yaw": 0,
-     "roll": -6,
-     "bend": -8
+     "roll": 0,
+     "bend": 0
     },
     "rightArm": {
-     "pitch": 9.1,
-     "yaw": 33.0,
-     "roll": 7.8,
-     "bend": -17.5
+     "pitch": -0.8,
+     "yaw": 3.4,
+     "roll": -5.9,
+     "bend": -52.4
     },
     "rightItem": {
-     "pitch": -33.2,
-     "roll": -23.0,
+     "pitch": -11.5,
+     "roll": 6.7,
      "yaw": 0,
-     "x": 0.333,
-     "y": -1.216,
-     "z": -0.85
+     "x": -0.194,
+     "y": -0.351,
+     "z": -0.369
     }
    },
    {
     "tick": 4,
-    "easing": "inoutsine",
+    "easing": "outquad",
     "body": {
      "x": 0,
-     "y": 0,
+     "y": -0.02,
      "z": 0,
-     "pitch": 0,
-     "yaw": -8,
+     "pitch": 2,
+     "yaw": -14,
      "roll": 0
     },
     "head": {
      "pitch": 0,
-     "yaw": -8,
+     "yaw": -12,
      "roll": 0
     },
     "leftArm": {
-     "pitch": 4,
+     "pitch": -12,
      "yaw": 0,
-     "roll": -6,
-     "bend": -8
+     "roll": -14,
+     "bend": -10
     },
     "rightArm": {
-     "pitch": 15.7,
-     "yaw": 33.3,
-     "roll": 8.6,
-     "bend": -29.2
+     "pitch": -18.7,
+     "yaw": 40.4,
+     "roll": -1.4,
+     "bend": -81.8
     },
     "rightItem": {
-     "pitch": -39.3,
-     "roll": -24.4,
+     "pitch": -33.7,
+     "roll": -22.0,
      "yaw": 0,
-     "x": 0.247,
-     "y": -1.456,
-     "z": -0.928
+     "x": 0.312,
+     "y": -1.229,
+     "z": -0.858
     }
    },
    {
-    "tick": 24,
-    "easing": "inoutsine",
-    "body": {
-     "x": 0,
-     "y": -0.008,
-     "z": 0,
-     "pitch": 0,
-     "yaw": -9,
-     "roll": 0
-    },
-    "head": {
-     "pitch": -2,
-     "yaw": -9,
-     "roll": 0
-    },
-    "leftArm": {
-     "pitch": 5,
-     "yaw": 0,
-     "roll": -7,
-     "bend": -9
-    },
-    "rightArm": {
-     "pitch": 17.1,
-     "yaw": 34.1,
-     "roll": 7.6,
-     "bend": -35.8
-    },
-    "rightItem": {
-     "pitch": -44.8,
-     "roll": -28.5,
-     "yaw": 0,
-     "x": 0.173,
-     "y": -1.682,
-     "z": -0.974
-    }
-   },
-   {
-    "tick": 44,
-    "easing": "inoutsine",
+    "tick": 9,
+    "easing": "outback",
     "body": {
      "x": 0,
      "y": 0,
@@ -147,17 +110,54 @@
     },
     "rightArm": {
      "pitch": 18.8,
-     "yaw": 34.0,
+     "yaw": 39.6,
+     "roll": 8.2,
+     "bend": -38.2
+    },
+    "rightItem": {
+     "pitch": -45.4,
+     "roll": -19.5,
+     "yaw": 0,
+     "x": 0.112,
+     "y": -1.683,
+     "z": -0.977
+    }
+   },
+   {
+    "tick": 12,
+    "easing": "inoutsine",
+    "body": {
+     "x": 0,
+     "y": 0,
+     "z": 0,
+     "pitch": 0,
+     "yaw": -8,
+     "roll": 0
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": -8,
+     "roll": 0
+    },
+    "leftArm": {
+     "pitch": 4,
+     "yaw": 0,
+     "roll": -6,
+     "bend": -8
+    },
+    "rightArm": {
+     "pitch": 18.4,
+     "yaw": 37.7,
      "roll": 8.6,
      "bend": -35.9
     },
     "rightItem": {
-     "pitch": -42.9,
-     "roll": -25.5,
+     "pitch": -43.8,
+     "roll": -20.9,
      "yaw": 0,
-     "x": 0.191,
-     "y": -1.599,
-     "z": -0.96
+     "x": 0.145,
+     "y": -1.621,
+     "z": -0.967
     }
    }
   ]

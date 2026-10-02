@@ -64,12 +64,12 @@ public final class BladeCombo {
     // The flip into an icepick backhand across the throat, the hammer stab down at the collarbone, the flip back into
     // a lunging thrust, the low spinning cut, and the push kick.
     private static final Move[] FLURRY = {
-        new Move(0, "blade_dagger_0", 3, 1.5f, 1, 0, 0),
-        new Move(8, "blade_dagger_1", 3, 1.5f, 0, -.8, .6),
-        new Move(16, "blade_dagger_2", 4, 1.5f, 0, 0, 1),
-        new Move(25, "blade_dagger_3", 6, 1.5f, 1, 0, 0),
+        new Move(0, "blade_dagger_0", 4, 1.5f, 1, 0, 0),
+        new Move(9, "blade_dagger_1", 3, 1.5f, 0, -.8, .6),
+        new Move(17, "blade_dagger_2", 5, 1.5f, 0, 0, 1),
+        new Move(28, "blade_dagger_3", 6, 1.5f, 1, 0, 0),
         // The kick: no edge, so no blood of its own; the bleeding it leaves is the cuts'.
-        new Move(36, "blade_dagger_kick", 5, 2f, 0, 0, 0)};
+        new Move(39, "blade_dagger_kick", 5, 2f, 0, 0, 0)};
     // The stepping Zornhau, a spinning Zwerchhau out of a full turn, the thrust out of the plough in a deep lunge, and
     // the launcher rising from a crouch.
     private static final Move[] MASTER_CUTS = {

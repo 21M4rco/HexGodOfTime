@@ -42,7 +42,7 @@ public final class BladeClient {
         com.hexgodofstories.network.HexNetwork.send(want?com.hexgodofstories.server.HexServer.GUARD_BEGIN:com.hexgodofstories.server.HexServer.GUARD_END,0);
     }
     /** The world went away: nothing to tell anyone. */
-    public static void forget() {guardDown=false;STANCES.clear();}
+    public static void forget() {guardDown=false;STANCES.clear();GUARD_SINCE.clear();}
 
     /** Whether this player stands in The Deceiver's guard: this client's own key, or what the server says of anyone else. */
     public static boolean guarding(AbstractClientPlayer p) {
@@ -52,6 +52,9 @@ public final class BladeClient {
 
     /** The stance each player is shown in, by id: the guard, walking in it, or the charge, under any move it makes. */
     private static final java.util.Map<Integer,String> STANCES=new java.util.HashMap<>();
+    /** When each player raised the guard: its first ticks are the wind-up into it (blade_guard_enter), not the stance. */
+    private static final java.util.Map<Integer,Long> GUARD_SINCE=new java.util.HashMap<>();
+    private static final int GUARD_ENTER=11;
 
     /**
      * Every client tick, for everyone in sight holding The Deceiver: the guard (or its walk) while the use key is held,
@@ -67,15 +70,20 @@ public final class BladeClient {
             if(p.getMainHandItem().is(HexGodOfStories.DECEIVER.get())&&!p.isSpectator()&&!ClientState.hidden(p)) {
                 double dx=p.getX()-p.xo,dz=p.getZ()-p.zo;
                 boolean moving=dx*dx+dz*dz>4e-4;
-                if(guarding(p))want=moving?"blade_guard_walk":"blade_guard";
+                if(guarding(p)) {
+                    long since=GUARD_SINCE.computeIfAbsent(p.getId(),id->ClientState.now());
+                    want=ClientState.now()-since<GUARD_ENTER?"blade_guard_enter":moving?"blade_guard_walk":"blade_guard";
+                }
                 else if(p.isSprinting()&&moving)want="blade_run";
             }
+            if(want==null||!want.startsWith("blade_guard"))GUARD_SINCE.remove(p.getId());
             String now=STANCES.get(p.getId());
             if(java.util.Objects.equals(want,now))continue;
             if(want==null)STANCES.remove(p.getId());else STANCES.put(p.getId(),want);
             HexAnimations.stance(p,want);
         }
         STANCES.keySet().removeIf(id->mc.level.getEntity(id)==null);
+        GUARD_SINCE.keySet().removeIf(id->mc.level.getEntity(id)==null);
     }
 
     /** The blade in this player's hand that is not really there, or empty when there is none to draw. */

@@ -4,17 +4,21 @@
   Player Animator's body, legs, head and elbows, not one arm: weight shifts and dips, steps and lunges, full spins,
   the head keeping its eyes on the target, and the dagger flipping between a forward and an icepick grip. Each was
   checked on a model of the game's own render chain before it shipped (`tools/preview_blades.py` draws them,
-  `tools/generate_blades.py` holds every cut's point to the side its blood flies). The grips were rebuilt round the
+  `tools/generate_blades.py` holds every cut's point to the side its blood flies, and the handle to the fist at every
+  half tick of every move: Player Animator turns a held item about a point off the fist, so every turn of the wrist is
+  pivoted back onto it). The grips were rebuilt round the
   fist, so the hand closes on the handle with handle showing either side and the pommel below, and both blades are
   bigger: the dagger about a block long in the hand, The Deceiver about a block and two thirds.
 - **The Flurry** after the Winter Soldier's knife work: the knife flips into an icepick grip for a backhand across the
   throat, a hammer stab drives down at the collarbone, it flips back for a lunging thrust, a low spinning cut, and a push
   kick, then a twirl of the knife as the hand drops.
-- **The Master Cuts** (Vinland Saga, the longsword masters): a stepping Zornhau from over the shoulder, a Zwerchhau out
-  of a full turn, a deep lunging thrust from the plough guard, and the launcher: down into a crouch and exploding
-  upward with a rising cut that lifts the body.
-- **The Deceiver's guard: hold use.** Malenia's stance: upright and easy, the sword arm loose and the long blade angled
-  down and out, its point near the ground ahead, walking freely in it. Any shot from the front is slapped back the way
+- **The Master Cuts** (Vinland Saga), one-handed, the free arm working for balance: a stepping cut from over the
+  shoulder with the free hand pointing the way in, a cut out of a full turn with the arm out wide, a fencer's lunge
+  with the free arm thrown up behind, and the launcher: down into a crouch and exploding upward with a rising cut that
+  lifts the body.
+- **The Deceiver's guard: hold use.** A sweep of the sword up and out, then down into Malenia's stance: upright and
+  easy, the sword arm loose and the long blade angled down and out to the side, walking freely in it. Turning a shot or
+  a blow aside is a violent full-stretch slap of the whole arm toward it, the body twisting into it. Any shot from the front is slapped back the way
   it came and becomes yours; any blow from the front is parried in a burst of sparks and a ring of steel, its striker
   thrown back a step. 1.5 energy a shot, 2.5 a blow. Sprinting with the sword drops into a charge, the blade trailing
   low behind. Its attacks are new too, each landing heavy: crit sparks, a deeper sound, a shove, and your own view

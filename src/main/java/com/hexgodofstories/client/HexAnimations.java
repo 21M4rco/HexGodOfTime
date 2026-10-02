@@ -84,10 +84,9 @@ public final class HexAnimations {
             boolean manifest=name.startsWith("scepter_manifest")||name.startsWith("scepter_fire");
             // Gotcha!'s pointing arm, and the arm held out toward whatever telekinesis holds: seen in first person too.
             boolean pointing=name.equals("gotcha")||name.equals("telekinesis");
-            // The blades' moves (tools/blade_moves.py): the sword arm is seen in first person, blade and all, and with
-            // The Deceiver's two-handed cuts the other hand on its grip too.
+            // The blades' moves (tools/blade_moves.py): the sword arm is seen in first person, blade and all. Both
+            // blades are one-handed; the free arm works for balance and stays out of the view.
             boolean blade=name.startsWith("blade_");
-            boolean twoHands=name.startsWith("blade_sword_")||name.startsWith("blade_m_sword_");
             ResourceLocation resourcelocation = HexGodOfStories.id(name);
             KeyframeAnimation keyframeanimation = PlayerAnimationRegistry.getAnimation(resourcelocation);
             if (keyframeanimation == null) {
@@ -97,7 +96,7 @@ public final class HexAnimations {
                KeyframeAnimationPlayer keyframeanimationplayer = new KeyframeAnimationPlayer(keyframeanimation)
                   .setFirstPersonMode(flag ? FirstPersonMode.NONE : FirstPersonMode.THIRD_PERSON_MODEL)
                   .setFirstPersonConfiguration(
-                     new FirstPersonConfiguration().setShowRightArm(manifest&&!left||pointing||blade).setShowLeftArm(manifest&&left||twoHands).setShowRightItem(true).setShowLeftItem(true)
+                     new FirstPersonConfiguration().setShowRightArm(manifest&&!left||pointing||blade).setShowLeftArm(manifest&&left).setShowRightItem(true).setShowLeftItem(true)
                   );
                // Shots cut straight in so the kick lands on the tick it fires; raising to aim eases in.
                // A combo's moves follow each other within a few ticks: each cuts in almost at once, or the wind-up is lost in the blend.

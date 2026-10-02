@@ -219,21 +219,32 @@ def fist(frame, model):
     return (np.linalg.inv(item_matrix(frame, model)) @ (lower @ np.array([-1 / 16, 8.5 / 16, 0, 1])))[:3]
 
 
+EASES = {'inquad': lambda u: u * u, 'outquad': lambda u: 1 - (1 - u) ** 2, 'inexpo': lambda u: 0 if u == 0 else 2 ** (10 * u - 10),
+         'outback': lambda u: 1 + 2.70158 * (u - 1) ** 3 + 1.70158 * (u - 1) ** 2, 'linear': lambda u: u,
+         'inoutsine': lambda u: -(math.cos(math.pi * u) - 1) / 2}
+
+
 def keyed(move, t):
-    """A move's pose at tick t: each key's easing as Player Animator applies it on the way into that key."""
-    keys = move['keys']
-    if t <= keys[0][0]: return keys[0][2]
-    for (t0, _, a), (t1, ease, b) in zip(keys, keys[1:]):
-        if t0 <= t <= t1:
-            u = (t - t0) / (t1 - t0)
-            u = {'inquad': u * u, 'outquad': 1 - (1 - u) ** 2, 'inexpo': 0 if u == 0 else 2 ** (10 * u - 10),
-                 'outback': 1 + 2.70158 * (u - 1) ** 3 + 1.70158 * (u - 1) ** 2, 'linear': u}.get(ease, u * u * (3 - 2 * u))
-            out = {}
-            for name in set(a) | set(b):
-                A, B = a.get(name, {}), b.get(name, {})
-                out[name] = {k: A.get(k, 0) + (B.get(k, 0) - A.get(k, 0)) * u for k in set(A) | set(B)}
-            return out
-    return keys[-1][2]
+    """
+    A move's pose at tick t, as Player Animator plays it: every part's every axis keyed on its own (a key may carry
+    only some parts), each eased on the way into its next key.
+    """
+    tracks = {}
+    for tick, ease, pose in move['keys']:
+        for part, values in pose.items():
+            for axis, v in values.items():
+                tracks.setdefault((part, axis), []).append((tick, ease, v))
+    out = {}
+    for (part, axis), keys in tracks.items():
+        v = keys[-1][2]
+        if t <= keys[0][0]: v = keys[0][2]
+        for (t0, _, a), (t1, ease, b) in zip(keys, keys[1:]):
+            if t0 <= t <= t1:
+                u = (t - t0) / (t1 - t0) if t1 > t0 else 1
+                v = a + (b - a) * EASES.get(ease, lambda x: x * x * (3 - 2 * x))(u)
+                break
+        out.setdefault(part, {})[axis] = v
+    return out
 
 
 # ------------------------------------------------------------------ solving the arm and wrist for a grip and a point
@@ -277,7 +288,8 @@ def solve_right(frame, model, length, grip, direction, guess=(-70, 0, 0, -30, 0,
     def build(x):
         f = {k: dict(v) for k, v in frame.items()}
         f['rightArm'] = dict(f.get('rightArm', {}), pitch=x[0], yaw=x[1], roll=x[2], bend=x[3])
-        f['rightItem'] = dict(f.get('rightItem', {}), pitch=x[4], roll=x[5], yaw=0)
+        # Turned about the fist, as it will be drawn (pivot_on_fist): the handle never leaves the hand to reach a target.
+        f['rightItem'] = compensate({'pitch': x[4], 'roll': x[5], 'yaw': 0})
         return f
 
     def cost(x):
@@ -360,7 +372,10 @@ def resolve_move(item):
         if aim:
             body = pose.get('body', {})
             grip = to_world(body, aim['grip']); d = to_world(body, aim['dir'], False)
-            pose, miss = solve_right(pose, model, length, grip, d, right)
+            start = right
+            if aim.get('rev') and abs(((right[4] + 180) % 360) - 180) < 90:
+                start = (right[0], right[1], right[2], right[3], 180, right[5])
+            pose, miss = solve_right(pose, model, length, grip, d, start)
             worst = max(worst, miss)
             a, it = pose['rightArm'], pose['rightItem']
             right = (a['pitch'], a['yaw'], a['roll'], a['bend'], it['pitch'], it['roll'])
@@ -372,7 +387,58 @@ def resolve_move(item):
             if aim['spin']:
                 pose['rightItem']['pitch'] = round(pose['rightItem']['pitch'] + 360 * aim['spin'], 1)
         out.append((tick, ease, pose))
-    return name, {**move, 'keys': out}, worst
+    return name, {**move, 'keys': pivot_on_fist(out)}, worst
+
+
+def item_rotation(it):
+    return Rz(it.get('roll', 0)) @ Ry(it.get('yaw', 0)) @ Rx(it.get('pitch', 0))
+
+
+def _fist_in_item_frame():
+    """The fist's middle in the frame Player Animator turns the held item about (fixed to the forearm, whatever the pose)."""
+    f = {}
+    A = root(f) @ partm(f, 'rightArm')
+    F = A @ Rx(-90) @ Ry(180) @ T(1 / 16, .125, -.625)
+    return (np.linalg.inv(F) @ (A @ np.array([-1 / 16, 8.5 / 16, 0, 1])))[:3]
+
+
+FIST = _fist_in_item_frame()
+#: Most the wrist may turn between two keys before an extra key is put between them (each sub-step's chord
+#: then stays within a hair of the circle the grip should follow).
+STEP = 45
+
+
+def compensate(it):
+    """The held item's offset that makes its turn pivot on the fist rather than on Player Animator's point (pixels)."""
+    R = item_rotation(it)[:3, :3]
+    d = (FIST - R @ FIST) * 16
+    return {**it, 'x': round(float(d[0]), 3), 'y': round(float(d[1]), 3), 'z': round(float(d[2]), 3)}
+
+
+def pivot_on_fist(keys):
+    """
+    Every key's held item turned about the fist, and an extra item-only key wherever the wrist turns further than STEP
+    between two keys, so the handle stays in the hand all the way through a flip or a twirl.
+    """
+    out = []
+    for i, (tick, ease, pose) in enumerate(keys):
+        if i:
+            t0, _, prev = keys[i - 1]
+            a, b = prev.get('rightItem'), pose.get('rightItem')
+            if a and b:
+                turn = max(abs(b.get(k, 0) - a.get(k, 0)) for k in ('pitch', 'yaw', 'roll'))
+                f = EASES.get(ease, lambda x: x * x * (3 - 2 * x))
+                # A big turn gets a key on every tick between (eased as the move eases), each pivoted on the fist.
+                for tm in (range(t0 + 1, tick) if turn > STEP else ()):
+                    if any(k[0] == tm for k in out): continue
+                    u = f((tm - t0) / (tick - t0))
+                    mid = {k: a.get(k, 0) + (b.get(k, 0) - a.get(k, 0)) * u for k in ('pitch', 'yaw', 'roll')}
+                    out.append((tm, 'linear', {'rightItem': compensate(mid)}))
+        pose = {k: dict(v) for k, v in pose.items()}
+        if 'rightItem' in pose:
+            pose['rightItem'] = compensate(pose['rightItem'])
+        out.append((tick, ease, pose))
+    return sorted(out, key=lambda k: k[0])
 
 
 def resolve(moves, report=None):
