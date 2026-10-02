@@ -408,9 +408,10 @@ def resolve_move(item):
             worst = max(worst, miss)
             a, it = pose['rightArm'], pose['rightItem']
             right = (a['pitch'], a['yaw'], a['roll'], a['bend'], it['pitch'], it['roll'])
-            if aim['two']:
+            if aim['two'] or aim.get('lhand'):
                 dn = np.array(d) / np.linalg.norm(d)
-                pose, lmiss = solve_left(pose, np.array(grip) - dn * .17, left)
+                target = np.array(to_world(body, aim['lhand'])) if aim.get('lhand') else np.array(grip) - dn * .17
+                pose, lmiss = solve_left(pose, target, left)
                 worst = max(worst, lmiss)
                 l = pose['leftArm']; left = (l['pitch'], l['yaw'], l['roll'], l['bend'])
             if aim['spin']:

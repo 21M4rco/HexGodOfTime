@@ -47,6 +47,8 @@ public final class BladeClient {
     /** Whether this player stands in The Deceiver's guard: this client's own key, or what the server says of anyone else. */
     public static boolean guarding(AbstractClientPlayer p) {
         if(!p.getMainHandItem().is(HexGodOfStories.DECEIVER.get()))return false;
+        // A burning blade has no guard: its use key looses its fire (FlameStream).
+        if(DeceiverFlame.lit(p.getId()))return false;
         return p==Minecraft.getInstance().player?guardDown:ClientState.data(p.getId()).getBoolean(com.hexgodofstories.server.SwordGuard.GUARD);
     }
 

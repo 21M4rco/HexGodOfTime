@@ -94,7 +94,7 @@ public final class HexAnimations {
             boolean blade=name.startsWith("blade_");
             // The charge's slam takes the sword in both hands, and Gravity Grasp's stab holds the body by the shoulder
             // with the free one: both arms come into view.
-            boolean twoHanded=name.equals("blade_sword_dash")||name.equals("blade_grasp_stab");
+            boolean twoHanded=name.equals("blade_sword_dash")||name.equals("blade_grasp_stab")||name.equals("blade_sword_ignite");
             ResourceLocation resourcelocation = HexGodOfStories.id(name);
             KeyframeAnimation keyframeanimation = PlayerAnimationRegistry.getAnimation(resourcelocation);
             if (keyframeanimation == null) {
@@ -109,10 +109,24 @@ public final class HexAnimations {
                // Shots cut straight in so the kick lands on the tick it fires; raising to aim eases in.
                // A combo's moves follow each other within a few ticks: each cuts in almost at once, or the wind-up is lost in the blend.
                int fade=name.startsWith("scepter_fire")||name.startsWith("scepter_shot")?0:name.startsWith("scepter_aim")||blade?(blade?1:2):Math.max(0,fadeTicks);
-               modifierlayer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(fade, Ease.INOUTQUAD), keyframeanimationplayer);
+               // The burning Deceiver's fire: the sword arm follows the look up and down, so the blade (and the jet out of
+               // its point) goes where the bearer looks.
+               IAnimation played=name.equals("blade_sword_flame")?new ModifierLayer<>(keyframeanimationplayer,new FollowLook(abstractclientplayer)):keyframeanimationplayer;
+               modifierlayer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(fade, Ease.INOUTQUAD), played);
             }
          }
       }
+   }
+
+   /** Turns the sword arm by the player's look pitch: an arm keyed straight out points where they look. */
+   private static final class FollowLook extends dev.kosmx.playerAnim.api.layered.modifier.AdjustmentModifier {
+      FollowLook(AbstractClientPlayer player) {
+         super(part -> part.equals("rightArm")
+            ? java.util.Optional.of(new PartModifier(new dev.kosmx.playerAnim.core.util.Vec3f((float)Math.toRadians(player.getXRot()),0,0),dev.kosmx.playerAnim.core.util.Vec3f.ZERO))
+            : java.util.Optional.empty());
+      }
+      // Whole from the first frame (its own fade-in divides by the animation's begin tick, which is 0).
+      @Override protected float getFadeIn(float delta) {return 1;}
    }
 
    @EventBusSubscriber(

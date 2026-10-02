@@ -26,7 +26,7 @@ guard, Malenia: upright and easy, the sword arm hanging loose, the long blade an
 # blade in the hand (end over end) on the way into the key.
 
 def P(body=(0, 0, 0, 0, 0, 0), head=(0, 0, 0), la=(0, 0, 0, 0), rl=None, ll=None, aim=None, two=False, spin=0, ra=None, item=None, rev=False,
-      hint=None):
+      hint=None, lhand=None):
     """body (x, y, z, pitch, yaw, roll); head (pitch, yaw, roll); arms and legs (pitch, yaw, roll, bend)."""
     f = {'body': dict(zip(('x', 'y', 'z', 'pitch', 'yaw', 'roll'), body)),
          'leftArm': dict(zip(('pitch', 'yaw', 'roll', 'bend'), la))}
@@ -39,7 +39,9 @@ def P(body=(0, 0, 0, 0, 0, 0), head=(0, 0, 0), la=(0, 0, 0, 0), rl=None, ll=None
     # rev: the knife turned over in the fist (the icepick grip), so the wrist is solved from a reversed hold.
     # hint: the arm (pitch, yaw, roll, bend) the solve starts from, where the last key's would let it settle on a
     # reach no body makes (the sword arm swung up and back over the shoulder to point the blade across).
-    if aim is not None: f['aim'] = {'grip': aim[0], 'dir': aim[1], 'two': two, 'spin': spin, 'rev': rev, 'hint': hint}
+    # lhand: where the free hand goes (right, up, forward in the body's frame), its arm solved to reach it: a palm laid on
+    # the blade, say.
+    if aim is not None: f['aim'] = {'grip': aim[0], 'dir': aim[1], 'two': two, 'spin': spin, 'rev': rev, 'hint': hint, 'lhand': lhand}
     return f
 
 
@@ -368,6 +370,35 @@ move('blade_grasp_stab', 40, [
     (30, 'outquad', P(body=(0, -.03, -.04, -2, -28, 0), head=(0, -16, 0), la=(-30, 14, 0, -50), rl=(18, 0, 0, 14), ll=(-22, 0, 0, 22),
                       rev=True, aim=((.85, 1.45, .12), (.75, -.25, -.6)))),
     (40, 'inoutsine', P(ra=(0, 0, 0, 0), item=(180, 0, 0), rl=(0, 0, 0, 0), ll=(0, 0, 0, 0)))])
+
+# --- The burning Deceiver (transformed). Drawn: the fire is lit by hand, a palm run up the flat of the blade as it is
+#     held upright before the face, the flame chasing the hand to the point; the hand flung away, and the sword whipped
+#     down and out, back up over the shoulder and down again in a figure of eight, shaking the fire out along it, into
+#     a wide low hold. The head is the player's own throughout, and the legs are left to walk.
+SALUTE = ((.04, 1.02, .46), (-.04, 1, .1))
+move('blade_sword_ignite', 44, [
+    (0, 'linear', SWORD_REST),
+    (4, 'outquad', P(body=(0, 0, 0, 2, -8, 0), head=None, aim=SALUTE, lhand=(-.02, 1.36, .55))),
+    (9, 'inoutsine', P(body=(0, 0, 0, 3, -8, 0), head=None, aim=SALUTE, lhand=(-.03, 1.66, .56))),
+    (13, 'inoutsine', P(body=(0, .01, 0, 5, -8, 0), head=None, aim=SALUTE, lhand=(-.04, 1.95, .56))),
+    (15, 'outquad', P(body=(0, .01, 0, 4, -6, 0), head=None, la=(-125, -20, -75, -10), aim=SALUTE)),
+    (19, 'inexpo', P(body=(0, -.04, -.02, -4, -22, 0), head=None, la=(-20, 0, -60, -20), aim=((.7, 1.15, .32), (.75, -.55, .35)))),
+    (24, 'outquad', P(body=(0, -.02, 0, 2, 18, 0), head=None, la=(10, 0, -50, -20), aim=((-.15, 1.65, .32), (-.7, .55, .35)),
+                     hint=(-120, -30, 0, -40))),
+    (28, 'inexpo', P(body=(0, -.08, -.06, -8, -12, 0), head=None, la=(0, 0, -55, -20), aim=((.55, .9, .5), (.45, -.75, .5)))),
+    (33, 'outquad', P(body=(0, -.02, 0, -2, -8, 2), head=None, la=(10, 0, -25, -20), aim=((.55, .85, .05), (.75, -.45, -.3)))),
+    (44, 'inoutsine', SWORD_REST)])
+# Its fire loosed (the use key held): the sword arm thrust straight out, the blade along it, and a stream of fire out of
+# the point. Played with the arm turned to the player's look up and down (client HexAnimations), so the blade goes
+# wherever they look; the body is kept square to the look, and the free arm braced back. A shiver in it as it pours.
+AIMED = ((.3, 1.38, .66), (-.06, 0, 1))
+move('blade_sword_flame', 25, [
+    (0, 'linear', SWORD_REST),
+    (3, 'outquad', P(body=(0, 0, 0, -4, 0, 0), head=None, la=(-20, 0, -25, -35), aim=AIMED, hint=(-90, 0, 0, 0))),
+    (5, 'inoutsine', P(body=(0, 0, 0, -4, 0, 0), head=None, la=(-20, 0, -25, -35), aim=AIMED, hint=(-90, 0, 0, 0))),
+    (15, 'inoutsine', P(body=(0, 0, .01, -3, 0, 0), head=None, la=(-22, 0, -26, -38), aim=((.3, 1.39, .63), (-.06, .01, 1)),
+                        hint=(-90, 0, 0, 0))),
+    (25, 'inoutsine', P(body=(0, 0, 0, -4, 0, 0), head=None, la=(-20, 0, -25, -35), aim=AIMED, hint=(-90, 0, 0, 0)))], loop=5)
 
 # ------------------------------------------------------------------ what the server must agree with
 # The tick of each cut's contact, and where its blood goes (the caster's right, up, forward). server/BladeCombo and

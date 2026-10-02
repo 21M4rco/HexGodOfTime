@@ -20,7 +20,7 @@ public final class BladeFire {
     private BladeFire() {}
 
     /** As the client's: how long the blade takes to catch, and how far in it is caught enough to burn. */
-    static final int IGNITE = 50, CAUGHT = 15;
+    static final int IGNITE = 32, CAUGHT = 15;
     /** Half a second of fire, and the harm it stands for. */
     static final int BURN = 10;
     static final float SCORCH = 1;
@@ -29,9 +29,17 @@ public final class BladeFire {
 
     /** Every tick of a player's: lit while transformed with The Deceiver in the main hand, out the moment either stops. */
     public static void tick(ServerPlayer p) {
-        if (alight(p)) LIT.putIfAbsent(p.getUUID(), HexData.now(p));
-        else LIT.remove(p.getUUID());
+        if (!alight(p)) {LIT.remove(p.getUUID()); return;}
+        if (LIT.putIfAbsent(p.getUUID(), HexData.now(p)) != null) return;
+        // Drawn burning: the fire lit by hand along the flat of the blade, and the sword shaken out (blade_sword_ignite),
+        // unless a combo has the arm.
+        if (!BladeCombo.running(p)) com.hexgodofstories.network.HexNetwork.animate(p, "blade_sword_ignite");
+        p.serverLevel().playSound(null, p.blockPosition(), net.minecraft.sounds.SoundEvents.FIRECHARGE_USE, net.minecraft.sounds.SoundSource.PLAYERS, 1, .6f);
+        p.serverLevel().playSound(null, p.blockPosition(), net.minecraft.sounds.SoundEvents.BLAZE_SHOOT, net.minecraft.sounds.SoundSource.PLAYERS, .6f, .7f);
     }
+
+    /** Whether this player's blade is alight at all, caught or still catching: its use key looses fire, not the guard. */
+    public static boolean lit(ServerPlayer p) {return LIT.containsKey(p.getUUID()) && alight(p);}
 
     public static void forget(ServerPlayer p) {LIT.remove(p.getUUID());}
     public static void reset() {LIT.clear();}

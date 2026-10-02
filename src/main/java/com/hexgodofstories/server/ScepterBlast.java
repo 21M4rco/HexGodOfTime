@@ -325,7 +325,7 @@ public final class ScepterBlast {
      * faster: the same fracturing surface, dust and threads, run inside vanilla's twenty-tick death so
      * the last fragment goes as the body does. Bosses keep their own deaths.
      */
-    private static void dissolve(LivingEntity victim, Vec3 direction, float power) {
+    static void dissolve(LivingEntity victim, Vec3 direction, float power) {
         if (victim.getType().is(net.minecraftforge.common.Tags.EntityTypes.BOSSES)) return;
         CompoundTag n = new CompoundTag();
         n.putDouble("dx", direction.x);

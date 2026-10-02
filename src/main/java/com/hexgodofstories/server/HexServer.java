@@ -457,7 +457,7 @@ public final class HexServer {
         // The Scepter's right click is a hold, carried by SCEPTER_PRESS and SCEPTER_RELEASE. The Deceiver is never thrown.
         if(w.kind==1||secondary&&w.kind==3)return;
         // A combo starter in progress owns the blade arm until it ends; so does the guard while it is held.
-        if(BladeCombo.running(p)||SwordGuard.guarding(p))return;
+        if(BladeCombo.running(p)||SwordGuard.guarding(p)||FlameStream.pouring(p))return;
         long now=HexData.now(p);Strike prior=STRIKES.get(p.getUUID());
         if(prior!=null&&prior.end>now)return;
         int combo=prior==null||now-prior.end>18?0:(prior.combo+1)%4;
@@ -543,6 +543,7 @@ public final class HexServer {
         BladeCombo.tick(p);
         SwordGuard.tick(p);
         BladeFire.tick(p);
+        FlameStream.tick(p);
         Strike strike=STRIKES.get(p.getUUID());
         if(strike!=null&&strike.contact==now) {
             boolean sword=strike.weapon==3,slam=strike.slam;
@@ -778,7 +779,7 @@ public final class HexServer {
         GravityGrasp.forget(p);
         Glorious.forget(p);
         BladeCombo.forget(p);
-        SwordGuard.forget(p);BladeFire.forget(p);
+        SwordGuard.forget(p);BladeFire.forget(p);FlameStream.forget(p);
         HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());ScepterBlast.forget(p);INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         HexData.clearTransient(p,death);
     }
@@ -788,6 +789,6 @@ public final class HexServer {
         Warping.reset();
         Telekinesis.reset();Architecture.reset();Bleed.reset();Frostbite.reset();ScepterBlast.reset();PocketRealm.reset();TemporalEngine.reset();
         Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();Arsenal.reset();GravityGrasp.reset();
-        Delusion.reset();Glorious.reset();BladeCombo.reset();SwordGuard.reset();BladeFire.reset();
+        Delusion.reset();Glorious.reset();BladeCombo.reset();SwordGuard.reset();BladeFire.reset();FlameStream.reset();
     }
 }

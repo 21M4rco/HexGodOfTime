@@ -1,7 +1,21 @@
 ## The Deceiver on fire
 
+- **Drawing it burning.** Transformed, drawing The Deceiver lights it by hand: the blade held upright before your
+  face, a palm run up its flat with the fire chasing it to the point, the hand flung away, and the sword whipped down
+  and out, back over the shoulder and down again in a figure of eight, shaking the fire out along it, into a wide low
+  hold. Your head stays your own and you can walk through it.
+- **Its use key pours fire** (after Surtur's sword). While it burns there is no guard: hold use and the sword arm is
+  thrust out along your look (it follows you up and down) and a jet of fire pours from the point to whatever you look
+  at, sixteen blocks at most. A white-hot thread inside a thick, ragged column of fire that widens as it goes and
+  streams outward; licks tearing off its sides and drifting on, cooling from gold to red; a blue-white flare where it
+  leaves the steel; and where it strikes, a churning fireball rolling up and out off the surface, smoke lifting off
+  it. Sweep it and its fire hangs and rolls behind. Everything in it, or round where it strikes, burns: fire damage
+  (fire-proof things take none) and set alight, never more than forty hearts to any one body from one pour. It draws
+  Temporal Energy all the while it pours. Whatever it kills comes apart the way Time Branch Unleashing unmakes a body,
+  only fast. All of it is drawn by the mod itself, no vanilla particles.
+
 - **Transformed, The Deceiver burns.** Hold it in the full transformation and the blade slowly catches, the fire
-  creeping up from the guard to the point over two and a half seconds, and it burns for as long as it stays in your
+  creeping up from the guard to the point over a second and a half, and it burns for as long as it stays in your
   hand: switch away, drop it, dismiss it or let the transformation end and it goes out. The fire is after Beric
   Dondarrion's sword: the whole blade engulfed, tongues of flame rooted under the steel and rising round it the way
   the world's up is, whatever angle you hold it at, licking up, tearing away and fading as the next rises under it,

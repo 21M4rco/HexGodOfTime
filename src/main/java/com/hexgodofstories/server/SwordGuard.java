@@ -39,17 +39,25 @@ public final class SwordGuard {
     private static final Set<UUID> GUARDS = new HashSet<>();
 
     public static void begin(ServerPlayer p) {
+        // Burning (transformed), the key looses the blade's fire instead: no guard while it burns.
+        if (BladeFire.lit(p)) {FlameStream.begin(p); return;}
         if (!armed(p) || BladeCombo.running(p)) return;
         if (GUARDS.add(p.getUUID())) {HexData.get(p).putBoolean(GUARD, true); HexNetwork.sync(p);}
     }
 
+    /** The use key let go: the guard drops, and so does a burning blade's fire. */
     public static void end(ServerPlayer p) {
+        FlameStream.end(p);
+        lower(p);
+    }
+
+    private static void lower(ServerPlayer p) {
         if (GUARDS.remove(p.getUUID())) {HexData.get(p).remove(GUARD); HexNetwork.sync(p);}
     }
 
     /** Every tick of a bearer's: the guard drops with the sword. */
     public static void tick(ServerPlayer p) {
-        if (GUARDS.contains(p.getUUID()) && !armed(p)) end(p);
+        if (GUARDS.contains(p.getUUID()) && (!armed(p) || BladeFire.lit(p))) lower(p);
     }
 
     public static void forget(ServerPlayer p) {GUARDS.remove(p.getUUID()); HexData.get(p).remove(GUARD);}

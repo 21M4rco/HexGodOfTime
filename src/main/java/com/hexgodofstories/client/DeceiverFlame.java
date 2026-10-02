@@ -3,14 +3,11 @@ package com.hexgodofstories.client;
 import com.hexgodofstories.HexGodOfStories;
 import com.hexgodofstories.entity.ConjuredWeapon;
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.particles.ParticleTypes;
@@ -45,7 +42,7 @@ public final class DeceiverFlame {
     private DeceiverFlame() {}
 
     /** How long the blade takes to catch, guard to point. */
-    static final int IGNITE = 50;
+    static final int IGNITE = 32;
     /** Where the blade runs, in weapon space (tools/generate_blades.py: the guard to the point). */
     private static final float FOOT = .28f, POINT = 1.52f;
     private static final int TONGUES = 40, LICKS = 14;
@@ -57,8 +54,20 @@ public final class DeceiverFlame {
     private record Drawn(Vec3 foot, Vec3 point, long tick) {}
     private static final Map<Integer, Drawn> DRAWN = new HashMap<>();
     private static final Map<Integer, Long> CRACKLE = new HashMap<>();
+    /** Where each burning blade's point was drawn in the world, and its tick: where its stream leaves from (FireStream). */
+    private record Tip(Vec3 at, long tick) {}
+    private static final Map<Integer, Tip> TIPS = new HashMap<>();
 
-    public static void clear() {LIT.clear(); DRAWN.clear(); CRACKLE.clear();}
+    public static void clear() {LIT.clear(); DRAWN.clear(); CRACKLE.clear(); TIPS.clear();}
+
+    /** Whether this player's blade is alight at all (it no longer guards: its use key looses its fire instead). */
+    public static boolean lit(int id) {return LIT.containsKey(id);}
+
+    /** The point of this player's burning blade as last drawn in the world, if it was drawn within the last tick or two. */
+    static Vec3 tip(int id) {
+        Tip tip = TIPS.get(id);
+        return tip == null || ClientState.now() - tip.tick > 2 ? null : tip.at;
+    }
 
     /** Whether this player's Deceiver burns: transformed, with it in the main hand. */
     private static boolean alight(Player p) {
@@ -100,6 +109,8 @@ public final class DeceiverFlame {
         if (third) {
             Vec3 foot = ScepterFx.world(m, 0, FOOT, 0), point = ScepterFx.world(m, 0, FOOT + (POINT - FOOT) * caught, 0);
             if (foot != null) DRAWN.put(holder.getId(), new Drawn(foot, point, ClientState.now()));
+            Vec3 tip = ScepterFx.world(m, 0, POINT, 0);
+            if (tip != null) TIPS.put(holder.getId(), new Tip(tip, ClientState.now()));
         }
         float front = FOOT + (POINT - FOOT) * caught;
         // The tongues, spread unevenly along the blade and overlapping into one body of fire. Each is rooted under the
@@ -127,11 +138,11 @@ public final class DeceiverFlame {
         // Their red edges and orange bodies are colour laid over what is behind (fire is orange against a bright
         // sky, not white); the blue at the steel, the white-hot cores and the steel's glow are light added to it. All of
         // the colour first, then all of the light: each kind is drawn as its own batch, in that order.
-        VertexConsumer veil = buffers.getBuffer(Types.veil(flameSheet()));
+        VertexConsumer veil = buffers.getBuffer(FireTypes.veil(flameSheet()));
         for (int k = 0; k < count; k++) tongue(veil, pose, eye, rise, FEET[k], TALL[k], TALL[k] * WIDE[k], SWAY[k], RED, .5f * FADE[k]);
         for (int k = 0; k < count; k++)
             tongue(veil, pose, eye, rise, FEET[k], TALL[k] * .8f, TALL[k] * WIDE[k] * .62f, SWAY[k] * .8f, ORANGE, .55f * FADE[k]);
-        VertexConsumer out = buffers.getBuffer(Types.light(flameSheet()));
+        VertexConsumer out = buffers.getBuffer(FireTypes.light(flameSheet()));
         // Blue licks hugging the steel, low and quick, strongest toward the guard.
         for (int i = 0; i < LICKS; i++) {
             float along = (i + .5f) / LICKS, y = FOOT + (POINT - FOOT) * along;
@@ -146,7 +157,7 @@ public final class DeceiverFlame {
             tongue(out, pose, eye, rise, new Vector3f(FEET[k]).add(new Vector3f(rise).mul(.05f)), TALL[k] * .55f, TALL[k] * WIDE[k] * .3f,
                 SWAY[k] * .5f, CORE, .5f * FADE[k]);
         // The steel itself glowing with it, along what has caught.
-        VertexConsumer glow = buffers.getBuffer(Types.light(glowSheet()));
+        VertexConsumer glow = buffers.getBuffer(FireTypes.light(glowSheet()));
         Vector3f axis = new Vector3f(0, 1, 0), mid = new Vector3f(0, (FOOT + front) / 2, 0);
         Vector3f toward = new Vector3f(eye).sub(mid);
         Vector3f side = new Vector3f(axis).cross(toward);
@@ -201,7 +212,9 @@ public final class DeceiverFlame {
         var random = mc.level.random;
         for (Player p : mc.level.players()) {
             int id = p.getId();
-            if (!alight(p)) {LIT.remove(id); DRAWN.remove(id); continue;}
+            if (!alight(p)) {LIT.remove(id); DRAWN.remove(id); TIPS.remove(id); continue;}
+            // Pouring fire: the body square to the look, so the arm the look turns (HexAnimations) points the way it looks.
+            if (FireStream.pouring(p)) p.yBodyRot = p.getYHeadRot();
             if (!LIT.containsKey(id)) {
                 LIT.put(id, now);
                 mc.level.playLocalSound(p.getX(), p.getEyeY(), p.getZ(), SoundEvents.FIRECHARGE_USE, SoundSource.PLAYERS, .55f, .7f, false);
@@ -236,6 +249,7 @@ public final class DeceiverFlame {
             LIT.keySet().removeIf(id -> mc.level.getEntity(id) == null);
             DRAWN.keySet().removeIf(id -> mc.level.getEntity(id) == null);
             CRACKLE.keySet().removeIf(id -> mc.level.getEntity(id) == null);
+            TIPS.keySet().removeIf(id -> mc.level.getEntity(id) == null);
         }
     }
 
@@ -277,42 +291,5 @@ public final class DeceiverFlame {
                 image.setPixelRGBA(x, y, alpha << 24 | 0x00ffffff);
             }
         return Minecraft.getInstance().getTextureManager().register(name, new DynamicTexture(image));
-    }
-
-    /** The fire's two kinds of drawing: colour laid over, and light added. */
-    private static final class Types extends RenderType {
-        private Types(String name, VertexFormat format, VertexFormat.Mode mode, int size, boolean crumbling, boolean sorted, Runnable setup, Runnable clear) {
-            super(name, format, mode, size, crumbling, sorted, setup, clear);
-        }
-
-        private static final Map<ResourceLocation, RenderType> LIGHT = new HashMap<>();
-
-        private static final Map<ResourceLocation, RenderType> VEIL = new HashMap<>();
-
-        /** Laid over what is behind it, by the sheet's alpha; hidden by what is in front, hiding nothing itself. */
-        static RenderType veil(ResourceLocation texture) {
-            return VEIL.computeIfAbsent(texture, t -> create("hexgodofstories_deceiver_flame_veil", DefaultVertexFormat.NEW_ENTITY,
-                VertexFormat.Mode.QUADS, 1 << 14, false, false,
-                CompositeState.builder()
-                    .setShaderState(RENDERTYPE_EYES_SHADER)
-                    .setTextureState(new TextureStateShard(t, false, false))
-                    .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
-                    .setCullState(NO_CULL)
-                    .setWriteMaskState(COLOR_WRITE)
-                    .createCompositeState(false)));
-        }
-
-        /** Added to what is behind it, weighted by the sheet's alpha; hidden by what is in front, hiding nothing itself. */
-        static RenderType light(ResourceLocation texture) {
-            return LIGHT.computeIfAbsent(texture, t -> create("hexgodofstories_deceiver_flame", DefaultVertexFormat.NEW_ENTITY,
-                VertexFormat.Mode.QUADS, 1 << 14, false, false,
-                CompositeState.builder()
-                    .setShaderState(RENDERTYPE_EYES_SHADER)
-                    .setTextureState(new TextureStateShard(t, false, false))
-                    .setTransparencyState(LIGHTNING_TRANSPARENCY)
-                    .setCullState(NO_CULL)
-                    .setWriteMaskState(COLOR_WRITE)
-                    .createCompositeState(false)));
-        }
     }
 }

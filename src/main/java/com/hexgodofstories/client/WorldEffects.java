@@ -46,7 +46,7 @@ public final class WorldEffects {
     public static void clear() {
         ECHOES.clear();PROJECTIONS.clear();FIELDS.clear();BLEEDING.clear();GripRenderer.clear();
         POSED.clear();REFORMING.clear();SLIPPING.clear();
-        Vfx.clear();Blood.clear();DeceiverFlame.clear();TimeBranchRenderer.clear();ErasureRenderer.clear();ScepterFx.clear();
+        Vfx.clear();Blood.clear();DeceiverFlame.clear();FireStream.clear();TimeBranchRenderer.clear();ErasureRenderer.clear();ScepterFx.clear();
     }
 
     public static void add(int entity,CompoundTag n) {
@@ -166,6 +166,7 @@ public final class WorldEffects {
         Vec3 eye=mc.player.getEyePosition();
         GripRenderer.tick(now);
         GraspRenderer.tick();
+        FireStream.tick();
         DeceiverFlame.tick();
         // Small emerald motes mark the actual ten-block freeze edge. These are particles,
         // not the large textured cloud used by Cosmic Flight and slow fields.
@@ -525,6 +526,7 @@ public final class WorldEffects {
         CosmicNebula.render(pose,buffers,partial);
 
         GraspRenderer.render(pose,buffers,partial);
+        FireStream.render(pose,buffers,partial);
         TimeBranchRenderer.render(pose,buffers,partial);
         ErasureRenderer.render(pose,buffers,partial);
         pose.popPose();
