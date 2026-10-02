@@ -46,7 +46,9 @@ public final class Telekinesis {
     private record Slam(Entity entity,UUID owner,double power,long expires) {}
     private static final Map<UUID,Grip> GRIPS=new HashMap<>();
     private static final List<Slam> SLAMS=new ArrayList<>();
-    private static final double MIN_DISTANCE=1.9,LIFT=.42;
+    private static final double MIN_DISTANCE=1.9,LIFT=.5;
+    /** How much harder a throw goes than its power alone: a touch further and higher, the landing's harm unchanged. */
+    private static final double HURL=1.15;
     /** The furthest a body is stepped in one tick, so a long reel-in is fast but never a teleport. */
     private static final double STEP=1.15;
 
@@ -163,12 +165,12 @@ public final class Telekinesis {
     public static void release(ServerPlayer p,boolean thrown) {
         Grip grip=GRIPS.remove(p.getUUID());
         if(grip==null)return;
-        // A throw, not a cannon: about a block and a half a tick at first, under three at full mastery.
+        // A throw, not a cannon: about a block and two thirds a tick at first, a little over three at full mastery.
         double power=1.4+HexData.mastery(p,Discipline.SORCERY)*.0014;
         for(Held h:grip.held) {
             restore(h);
             if(thrown) {
-                Vec3 shove=grip.aim.scale(power).add(0,LIFT,0);
+                Vec3 shove=grip.aim.scale(power*HURL).add(0,LIFT,0);
                 h.entity.setDeltaMovement(shove);
                 h.entity.hurtMarked=true;
                 if(h.entity instanceof ServerPlayer target)target.connection.send(new ClientboundSetEntityMotionPacket(target));

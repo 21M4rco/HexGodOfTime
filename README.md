@@ -8,6 +8,8 @@
   white-hot core and blue where it touches the steel, the tallest plume over the point; the steel glows with it.
   Embers and smoke rise off it, it spits the odd flame, and you hear it crackle. It is drawn on the blade itself, so
   it is there in first person, in third, and through every move, stance and combo.
+- **Telekinesis throws a touch harder.** About 15% faster off the hand and a little higher; where it lands hurts
+  the same as before.
 - **Its blows burn.** Once it has caught, every hit of it (attacks, the slam, the Master Cuts) sets what it strikes
   alight for half a second, with half a heart of burn dealt in the blow.
 
