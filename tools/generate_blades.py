@@ -177,87 +177,93 @@ def thickness(y, y0, y1, base, tip):
     return base + (tip - base) * t ** 1.2
 
 
+# Where the fist closes on a held blade, measured through the game's own chain (tools/blade_rig.py, fist()): its
+# middle sits 0.08 below the mesh origin along the blade, and at the hand's size it covers about 0.3 of it. Each grip
+# is centred there and made longer than the fist, so handle shows above and below the hand, and the pommel beneath.
+FIST = -.08
+
+
 def dagger():
     """
     A fighting dagger rather than a leaf: a long double-edged blade with a slight swell a third of the way up and a
     clean taper to the point, a fullered flat with runes in it, horned gold quillons sweeping toward the blade, a
-    gold ecusson set with an emerald, a waisted green leather grip bound in gold wire, and a faceted gold pommel
-    capped with a second stone. About a fifth longer than the old one.
+    gold ecusson set with an emerald, a waisted green leather grip bound in gold wire, long enough to show either side
+    of the fist, and a faceted gold pommel capped with a second stone. About a block long in the hand.
     """
     m = Mesh()
-    y0, y1 = .100, .660
+    y0, y1 = .200, .800
     rings = []
     for i in range(15):
         t = i / 14
         y = y0 + (y1 - y0) * t
-        swell = .040 + .007 * math.sin(min(1, t / .45) * math.pi / 2) - .047 * max(0, t - .3) ** 1.35 / .7 ** 1.35
-        w = max(.0015, swell if t < 1 else .0015)
-        rings.append((y, w, thickness(y, y0, y1, .0135, .0025), .5, 0.))
+        swell = .050 + .008 * math.sin(min(1, t / .45) * math.pi / 2) - .058 * max(0, t - .3) ** 1.35 / .7 ** 1.35
+        rings.append((y, max(.0018, swell if t < 1 else .0018), thickness(y, y0, y1, .016, .003), .5, 0.))
     m.blade(rings)
     # The ricasso: the unsharpened square shoulder between guard and edge.
-    m.blade([(.072, .034, .015, .2, 0), (.100, .040, .0135, .5, 0)], 'ricasso', BEVEL_OUT)
-    m.strip([(y, .0068 * (1 - (y - .13) / .45 * .55)) for y in [.13 + .45 * i / 8 for i in range(9)]],
-            lambda y: thickness(y, y0, y1, .0135, .0025) + .0009, 'glow', RUNES, (.06, .74))
+    m.blade([(.165, .042, .018, .2, 0), (.200, .050, .016, .5, 0)], 'ricasso', BEVEL_OUT)
+    m.strip([(y, .0085 * (1 - (y - .24) / .46 * .55)) for y in [.24 + .46 * i / 8 for i in range(9)]],
+            lambda y: thickness(y, y0, y1, .016, .003) + .0009, 'glow', RUNES, (.06, .74))
     # Guard: the ecusson, and two quillons that sweep out and curl up toward the blade like a pair of horns.
-    m.lathe([(.040, .010), (.046, .030), (.058, .033), (.070, .026), (.074, .012)], GOLD, 'guard', 10, (1.5, .8))
+    m.lathe([(.128, .012), (.134, .036), (.148, .040), (.162, .031), (.168, .014)], GOLD, 'guard', 10, (1.5, .8))
     for side in (-1, 1):
         path, radii = [], []
         for i in range(13):
             t = i / 12
-            path.append((side * (.02 + .115 * t), .056 + .07 * t ** 2.2, .004 * math.sin(t * math.pi)))
-            radii.append(.0135 * (1 - t) ** .7 + .0035)
+            path.append((side * (.024 + .14 * t), .146 + .085 * t ** 2.2, .005 * math.sin(t * math.pi)))
+            radii.append(.016 * (1 - t) ** .7 + .0042)
         m.tube(path, radii, GOLD, 'guard', 8)
-        m.orb((side * .137, .128, 0), .0085, DARK_GOLD, 'guard')
+        m.orb((side * .167, .233, 0), .0105, DARK_GOLD, 'guard')
     for face in (1, -1):
-        m.orb((0, .058, face * .026), .0095, EMERALD, 'glow', (0, 0, face), .5)
-    # Grip: ferrules, a waisted oval leather grip and a gold wire wound round it.
-    m.lathe([(.022, .025), (.028, .028), (.040, .025)], GOLD, 'guard', 12, (1.15, .95))
-    grip = [(-.150, .024), (-.120, .026), (-.065, .022), (-.010, .025), (.026, .024)]
+        m.orb((0, .148, face * .031), .0115, EMERALD, 'glow', (0, 0, face), .5)
+    # Grip: ferrules, a waisted oval leather grip centred on the fist, and a gold wire wound round it.
+    grip = [(-.290, .031), (-.240, .034), (-.090, .029), (.060, .033), (.118, .031)]
+    m.lathe([(.108, .032), (.116, .036), (.130, .032)], GOLD, 'guard', 12, (1.15, .95))
     m.lathe(grip, LEATHER, 'grip', 12, (1.15, .92))
-    m.helix(-.140, .018, grip, 6.5, .0028, GOLD, 'wire', (1.15, .92))
-    m.lathe([(-.162, .021), (-.155, .028), (-.146, .026)], GOLD, 'guard', 12, (1.15, .95))
+    m.helix(-.280, .108, grip, 9, .0034, GOLD, 'wire', (1.15, .92))
+    m.lathe([(-.305, .028), (-.297, .036), (-.286, .034)], GOLD, 'guard', 12, (1.15, .95))
     # Pommel: a faceted gold knob, and its stone set in the end.
-    m.lathe([(-.205, .012), (-.198, .026), (-.182, .031), (-.170, .028), (-.160, .019)], GOLD, 'pommel', 8)
-    m.orb((0, -.207, 0), .011, EMERALD, 'glow', (0, -1, 0), .55)
+    m.lathe([(-.355, .014), (-.347, .031), (-.330, .038), (-.316, .034), (-.303, .023)], GOLD, 'pommel', 8)
+    m.orb((0, -.358, 0), .013, EMERALD, 'glow', (0, -1, 0), .55)
     return m
 
 
 def deceiver():
     """
-    The Deceiver: a long, thin, fine sword. Not a rapier and nothing swept or caged about the hilt: a slender
-    straight blade, barely wider than a finger, with a long fuller and runes down it, a slim cross guard whose
-    quillons dip and then curl up, a long hand-and-a-half grip bound in gold wire, and a teardrop pommel.
+    The Deceiver: a long, slender, fine sword. Not a rapier and nothing swept or caged about the hilt: a straight
+    blade with a long fuller and runes down it, a cross guard whose quillons dip and then curl up, a long
+    hand-and-a-half grip centred on the fist and bound in gold wire, and a teardrop pommel. Slender beside the dagger,
+    but a real sword's width in the game (about a pixel and a half) and some five feet long in the hand.
     """
     m = Mesh()
-    y0, y1 = .095, 1.050
+    y0, y1 = .270, 1.550
     rings = []
-    for i in range(21):
-        t = i / 20
+    for i in range(23):
+        t = i / 22
         y = y0 + (y1 - y0) * t
-        w = .026 - .009 * t if t < .86 else .0137 * max(0., (1 - t) / .14) ** .8
-        rings.append((y, max(.0012, w), thickness(y, y0, y1, .0095, .0025), .42, 0.))
+        w = .055 - .017 * t if t < .86 else .0404 * max(0., (1 - t) / .14) ** .8
+        rings.append((y, max(.0018, w), thickness(y, y0, y1, .017, .0035), .42, 0.))
     m.blade(rings)
-    m.blade([(.066, .022, .011, .2, 0), (.095, .026, .0095, .42, 0)], 'ricasso', BEVEL_OUT)
-    m.strip([(y, .0046 * (1 - (y - .13) / .72 * .45)) for y in [.13 + .72 * i / 12 for i in range(13)]],
-            lambda y: thickness(y, y0, y1, .0095, .0025) + .0008, 'glow', RUNES, (.05, .80))
-    m.lathe([(.030, .008), (.036, .024), (.050, .026), (.062, .020), (.066, .010)], GOLD, 'guard', 10, (1.6, .75))
+    m.blade([(.225, .046, .019, .2, 0), (.270, .055, .017, .42, 0)], 'ricasso', BEVEL_OUT)
+    m.strip([(y, .009 * (1 - (y - .32) / .92 * .45)) for y in [.32 + .92 * i / 14 for i in range(15)]],
+            lambda y: thickness(y, y0, y1, .017, .0035) + .0010, 'glow', RUNES, (.05, .80))
+    m.lathe([(.180, .013), (.188, .038), (.205, .041), (.220, .032), (.228, .016)], GOLD, 'guard', 10, (1.6, .75))
     for side in (-1, 1):
         path, radii = [], []
         for i in range(17):
             t = i / 16
-            path.append((side * (.02 + .16 * t), .048 - .022 * math.sin(t * math.pi * .8) + .05 * t ** 3, 0))
-            radii.append(.0115 * (1 - t) ** .6 + .003)
+            path.append((side * (.03 + .25 * t), .204 - .032 * math.sin(t * math.pi * .8) + .075 * t ** 3, 0))
+            radii.append(.018 * (1 - t) ** .6 + .0048)
         m.tube(path, radii, GOLD, 'guard', 8)
-        m.orb((side * .182, .078, 0), .0075, DARK_GOLD, 'guard')
+        m.orb((side * .284, .281, 0), .0118, DARK_GOLD, 'guard')
     for face in (1, -1):
-        m.orb((0, .048, face * .0195), .0085, EMERALD, 'glow', (0, 0, face), .5)
-    m.lathe([(.012, .021), (.018, .024), (.030, .021)], GOLD, 'guard', 12, (1.1, .95))
-    grip = [(-.245, .021), (-.200, .023), (-.110, .025), (-.020, .022), (.014, .021)]
+        m.orb((0, .205, face * .030), .0125, EMERALD, 'glow', (0, 0, face), .5)
+    grip = [(-.330, .032), (-.270, .035), (-.080, .038), (.110, .034), (.172, .032)]
+    m.lathe([(.164, .033), (.172, .037), (.186, .033)], GOLD, 'guard', 12, (1.1, .95))
     m.lathe(grip, LEATHER, 'grip', 12, (1.1, .92))
-    m.helix(-.236, .008, grip, 10, .0025, GOLD, 'wire', (1.1, .92))
-    m.lathe([(-.258, .019), (-.251, .025), (-.242, .023)], GOLD, 'guard', 12, (1.1, .95))
-    m.lathe([(-.300, .006), (-.294, .016), (-.282, .024), (-.268, .022), (-.258, .014)], GOLD, 'pommel', 10)
-    m.orb((0, -.300, 0), .0085, EMERALD, 'glow', (0, -1, 0), .55)
+    m.helix(-.320, .164, grip, 13, .0036, GOLD, 'wire', (1.1, .92))
+    m.lathe([(-.346, .029), (-.338, .038), (-.327, .035)], GOLD, 'guard', 12, (1.1, .95))
+    m.lathe([(-.405, .010), (-.396, .026), (-.378, .039), (-.358, .035), (-.344, .022)], GOLD, 'pommel', 10)
+    m.orb((0, -.408, 0), .013, EMERALD, 'glow', (0, -1, 0), .55)
     return m
 
 
@@ -336,146 +342,63 @@ def texture():
 
 
 # -------------------------------------------------------------- animations ---
-# Each move: tick, right arm, left arm, torso (pitch, yaw, roll in degrees), and a right leg for the kick.
-# Positive yaw turns a limb (or the torso) toward the player's right; negative pitch raises a limb forward.
 
-NEUTRAL = (0, 0, 0)
-GUARD_L = (-66, 32, 10)
-
-
-def animation(name, moves, end):
-    out = []
-    for tick, right, left, torso, *leg in moves:
-        move = {'tick': tick, 'easing': 'inoutquad',
-                'rightArm': dict(zip(['pitch', 'yaw', 'roll'], right)),
-                'leftArm': dict(zip(['pitch', 'yaw', 'roll'], left)),
-                'torso': dict(zip(['pitch', 'yaw', 'roll'], torso))}
-        if leg:
-            move['rightLeg'] = dict(zip(['pitch', 'yaw', 'roll'], leg[0]))
-        out.append(move)
-    content = {'version': 3, 'name': name, 'author': 'HexGodOfStories',
-               'description': 'A blade combo starter move: upper body only (the kick takes the right leg for its length); '
-                              'locomotion stays free.',
-               'emote': {'beginTick': 0, 'endTick': end, 'stopTick': end, 'isLoop': False, 'returnTick': end,
-                         'degrees': True, 'moves': out}}
-    (ROOT / f'player_animation/{name}.json').write_text(json.dumps(content, indent=2))
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import blade_moves  # noqa: E402  (the moves themselves, and the contact and blood each cut must agree on)
 
 
-def slash(name, wind, contact, follow, settle, torso, left=None, hit=3, end=14):
-    """wind -> contact on tick `hit` -> follow two ticks later -> settle; left arm in guard unless given."""
-    left = left or (GUARD_L, GUARD_L, GUARD_L, GUARD_L)
-    animation(name, [(0, wind, left[0], torso[0]), (hit - 1, wind, left[0], torso[0]), (hit, contact, left[1], torso[1]),
-                     (hit + 2, follow, left[2], torso[2]), (hit + 5, settle, left[3], torso[3]),
-                     (end, NEUTRAL, NEUTRAL, NEUTRAL)], end)
-
-
-# The poses each move passes through, by name, for the check below and the files above.
-POSES = {
-    # The Flurry: forehand, backhand, a cut down from high on the right, a rising backhand, then the kick.
-    'blade_dagger_0': [(-60, 8, -10), (-60, -22, -10), (-48, -44, -10), (-58, -12, -10)],
-    'blade_dagger_1': [(-54, -42, -10), (-60, -2, -10), (-68, 14, -10), (-60, 0, -10)],
-    'blade_dagger_2': [(-106, -10, -10), (-48, -22, -10), (-28, -42, -10), (-55, -12, -10)],
-    'blade_dagger_3': [(-26, -38, -10), (-70, -14, -30), (-100, -24, -30), (-70, -10, -15)],
-    # The Master Cuts, after Liechtenauer: Zornhau (the wrath cut, from the right shoulder down through the left),
-    # Zwerchhau (the thwart cut, flat across at the head from the left), Zornort (the wrath's point, a thrust out of
-    # the bind) and an Unterhau (a cut rising from below) that lifts the body off its feet.
-    'blade_sword_0': [(-124, 0, -4), (-38, -24, -4), (-12, -34, -4), (-50, -10, -4)],
-    'blade_sword_1': [(-58, -38, 0), (-58, -6, 0), (-72, -6, -72), (-60, -6, -30)],
-    'blade_sword_2': [(-28, -20, 0), (-60, -2, 0), (-60, -2, 0), (-48, -8, 0)],
-    'blade_sword_3': [(2, 0, -40), (-58, -18, -40), (-84, -48, -40), (-70, -30, -20)],
-}
-TORSO = {
-    'blade_dagger_0': [(0, 20, 0), (2, 0, 0), (3, -22, 0), (0, -6, 0)],
-    'blade_dagger_1': [(0, -22, 0), (2, 0, 0), (0, 20, 0), (0, 6, 0)],
-    'blade_dagger_2': [(-5, 16, 0), (4, 0, 0), (6, -18, 0), (2, -6, 0)],
-    'blade_dagger_3': [(6, -18, 0), (0, 0, 0), (-5, 16, 0), (0, 6, 0)],
-    'blade_sword_0': [(-4, 22, 0), (4, 0, 0), (6, -22, 0), (2, -8, 0)],
-    'blade_sword_1': [(-2, -25, 0), (0, 0, 0), (0, 25, 0), (0, 8, 0)],
-    'blade_sword_2': [(0, 18, 0), (16, -8, 0), (16, -8, 0), (4, 0, 0)],
-    'blade_sword_3': [(6, -20, 0), (0, 0, 0), (-6, 18, 0), (-2, 8, 0)],
-}
-# Two hands on the long grip: the left hand as near the right as the arms let it get.
-SWORD_LEFT = {
-    'blade_sword_0': [(-92, 58, 10), (-48, 62, 10), (-44, 82, 10), (-60, 60, 10)],
-    'blade_sword_1': [(-52, 54, 10), (-52, 54, 14), (-74, 46, 14), (-70, 50, 10)],
-    'blade_sword_2': [(-48, 60, 14), (-48, 60, 14), (-48, 60, 14), (-60, 56, 10)],
-    'blade_sword_3': [(-48, 104, -8), (-74, 52, -8), (-106, 46, -8), (-80, 40, 0)],
-}
-# Where each cut sends the blood, in the caster's own right, up and forward; BladeCombo throws it the same way.
-SWINGS = {
-    'blade_dagger_0': (-1, 0, 0), 'blade_dagger_1': (1, .1, 0), 'blade_dagger_2': (-.7, -.7, 0), 'blade_dagger_3': (.7, .7, 0),
-    'blade_sword_0': (-.7, -.7, 0), 'blade_sword_1': (1, 0, 0), 'blade_sword_2': (0, 0, 1), 'blade_sword_3': (.3, 1, 0),
-}
-HITS = {'blade_dagger_0': 3, 'blade_dagger_1': 3, 'blade_dagger_2': 3, 'blade_dagger_3': 3,
-        'blade_sword_0': 5, 'blade_sword_1': 4, 'blade_sword_2': 4, 'blade_sword_3': 5}
-ENDS = {'blade_dagger': 14, 'blade_sword': 18}
-
-
-def animations():
-    animation('blade_draw', [(0, (-15, 0, -5), (-15, 0, 5), NEUTRAL), (3, (-85, 20, -40), (-30, 10, 8), (0, 8, 0)),
-                             (6, (-60, -10, -10), GUARD_L, NEUTRAL), (12, NEUTRAL, NEUTRAL, NEUTRAL)], 12)
-    for name, (wind, contact, follow, settle) in POSES.items():
-        sword = name.startswith('blade_sword')
-        left = SWORD_LEFT[name] if sword else None
-        slash(name, wind, contact, follow, settle, TORSO[name], left, HITS[name], ENDS['blade_sword' if sword else 'blade_dagger'])
-    # The kick: a push kick off the right leg, leaning back from it, blade held back and the left hand up.
-    guard = (-54, -10, -10)
-    animation('blade_dagger_kick', [(0, guard, (-70, 20, 10), NEUTRAL, NEUTRAL),
-                                    (3, guard, (-74, 22, 12), (-8, 0, 0), (-65, 0, 0)),
-                                    (5, (-50, -14, -14), (-76, 24, 12), (-12, 0, 0), (-95, 0, 0)),
-                                    (8, guard, (-70, 20, 10), (-6, 0, 0), (-60, 0, 0)),
-                                    (12, (-40, -5, -8), (-50, 12, 8), (-2, 0, 0), (-10, 0, 0)),
-                                    (16, NEUTRAL, NEUTRAL, NEUTRAL, NEUTRAL)], 16)
+def animations(resolved):
+    """Each move, key by key, every part it poses, with the easing on the way into each key."""
+    for name, m in resolved.items():
+        moves = []
+        for tick, ease, pose in m['keys']:
+            move = {'tick': tick, 'easing': ease}
+            for part, values in pose.items():
+                move[part] = dict(values)
+            moves.append(move)
+        loop = m['loop']
+        content = {'version': 3, 'name': name, 'author': 'HexGodOfStories',
+                   'description': 'A blade move (tools/blade_moves.py): the whole body, never locking the player in place.',
+                   'emote': {'beginTick': 0, 'endTick': m['end'], 'stopTick': m['end'], 'isLoop': loop is not None,
+                             'returnTick': m['end'] if loop is None else loop, 'degrees': True, 'easeBeforeKeyframe': True,
+                             'moves': moves}}
+        (ROOT / f'player_animation/{name}.json').write_text(json.dumps(content, indent=1))
 
 
 # ------------------------------------------------------------------ check ---
-# The held-item chain, as the game runs it, in plain Python (no numpy): enough to find where a blade's point is.
 
-def mat(rows): return [list(r) for r in rows]
-def mm(a, b): return [[sum(a[i][k] * b[k][j] for k in range(4)) for j in range(4)] for i in range(4)]
-def rx(d):
-    c, s = math.cos(math.radians(d)), math.sin(math.radians(d))
-    return mat([(1, 0, 0, 0), (0, c, -s, 0), (0, s, c, 0), (0, 0, 0, 1)])
-def ry(d):
-    c, s = math.cos(math.radians(d)), math.sin(math.radians(d))
-    return mat([(c, 0, s, 0), (0, 1, 0, 0), (-s, 0, c, 0), (0, 0, 0, 1)])
-def rz(d):
-    c, s = math.cos(math.radians(d)), math.sin(math.radians(d))
-    return mat([(c, -s, 0, 0), (s, c, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)])
-def tr(x, y, z): return mat([(1, 0, 0, x), (0, 1, 0, y), (0, 0, 1, z), (0, 0, 0, 1)])
-def sc(k): return mat([(k, 0, 0, 0), (0, k, 0, 0), (0, 0, k, 0), (0, 0, 0, 1)])
-
-
-def point(arm, torso, length):
-    """The blade's point in the caster's (right, up, forward), for a right arm and torso pose."""
-    display = json.loads((ROOT / 'models/item/dagger.json').read_text())['display']['thirdperson_righthand']
-    m = tr(0, 12 / 16, 0)
-    for f in (rz(torso[2]), ry(torso[1]), rx(torso[0]), tr(0, -12 / 16, 0), tr(-5 / 16, 2 / 16, 0),
-              rz(arm[2]), ry(arm[1]), rx(arm[0]), rx(-90), ry(180), tr(1 / 16, .125, -.625),
-              tr(*[v / 16 for v in display['translation']]), rx(display['rotation'][0]), ry(display['rotation'][1]),
-              rz(display['rotation'][2]), sc(display['scale'][0]), tr(-.5, -.5, -.5), tr(.24, .24, .5), rz(-45)):
-        m = mm(m, f)
-    p = [m[i][1] * length + m[i][3] for i in range(3)]
-    return (-p[0], -p[1], -p[2])
-
-
-def check():
-    for name, poses in POSES.items():
-        length = 1.05 if 'sword' in name else .66
-        wind, contact, follow = (point(poses[i], TORSO[name][i], length) for i in range(3))
-        travel = sub(follow, wind)
-        swing = SWINGS[name]
-        lateral = (travel[0], travel[1], 0) if swing[2] == 0 else travel
-        agreement = dot(norm(lateral), norm(swing))
-        assert agreement > .6, f'{name}: the point travels {travel}, the blood is thrown {swing}'
-        assert contact[2] > .7, f'{name}: at the contact the point is only {contact[2]:.2f} in front'
-        print(f'{name:16} point travels ({travel[0]:+.2f} right, {travel[1]:+.2f} up, {travel[2]:+.2f} fwd), '
-              f'agrees {agreement:.2f}; at contact {contact[2]:.2f} in front')
+def check(resolved):
+    """
+    Through the game's own chain (blade_rig): every grip is in the fist, and every cut's point really travels toward
+    the side its blood is thrown to, in front of the body, across its contact.
+    """
+    import numpy as np
+    import blade_rig as rig
+    for model in ('dagger', 'deceiver'):
+        f = rig.fist({}, model)
+        grip = {'dagger': (-.290, .118), 'deceiver': (-.330, .172)}[model]
+        assert grip[0] + .1 < f[1] < grip[1] - .1 and abs(f[0]) < .02 and abs(f[2]) < .02, f'{model}: the fist is at {f}, not on the grip {grip}'
+        print(f'{model:9} fist at {f[1]:+.3f} along the blade: on the grip {grip}, {f[1] - grip[0]:.2f} of handle below it, {grip[1] - f[1]:.2f} above')
+    for name, swing in blade_moves.SWINGS.items():
+        move = resolved[name]
+        model, length = ('deceiver', 1.55) if 'sword' in name else ('dagger', .80)
+        c = blade_moves.CONTACT[name]
+        before, at, after = (rig.tip(rig.keyed(move, t), model, length)[0] for t in (c - 1, c, c + 1))
+        travel = after - before
+        s = np.array(swing, float)
+        flat = travel if s[2] else np.array([travel[0], travel[1], 0])
+        agreement = float(flat @ s / (np.linalg.norm(flat) * np.linalg.norm(s) + 1e-9))
+        assert agreement > .55, f'{name}: the point travels {np.round(travel, 2)}, its blood goes {swing}'
+        assert at[2] > .45, f'{name}: at contact the point is only {at[2]:.2f} in front'
+        print(f'{name:18} contact t{c}: point {np.round(at, 2)} travelling {np.round(travel, 2)}, agrees {agreement:.2f}')
 
 
 if __name__ == '__main__':
     print('dagger faces', dagger().save('dagger'))
     print('deceiver faces', deceiver().save('deceiver'))
     texture()
-    animations()
-    check()
+    import blade_rig
+    resolved = blade_rig.resolve(blade_moves.MOVES, lambda name, miss: print(f'{name:18} solved, worst miss {miss:.3f}'))
+    animations(resolved)
+    check(resolved)

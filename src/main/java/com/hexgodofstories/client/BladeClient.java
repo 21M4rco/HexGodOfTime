@@ -28,6 +28,56 @@ import net.minecraftforge.fml.common.Mod;
 public final class BladeClient {
     private BladeClient() {}
 
+    // ------------------------------------------------------------------ The Deceiver's guard and stances
+
+    /** Whether this client is holding The Deceiver's guard (the use key, the sword in hand). */
+    private static boolean guardDown;
+
+    /** Every client tick: the use key with The Deceiver in hand raises the guard, and letting go drops it. */
+    public static void input(boolean use) {
+        var mc=Minecraft.getInstance();
+        boolean want=use&&mc.player!=null&&mc.screen==null&&HexClient.enabled()&&mc.player.getMainHandItem().is(HexGodOfStories.DECEIVER.get());
+        if(want==guardDown)return;
+        guardDown=want;
+        com.hexgodofstories.network.HexNetwork.send(want?com.hexgodofstories.server.HexServer.GUARD_BEGIN:com.hexgodofstories.server.HexServer.GUARD_END,0);
+    }
+    /** The world went away: nothing to tell anyone. */
+    public static void forget() {guardDown=false;STANCES.clear();}
+
+    /** Whether this player stands in The Deceiver's guard: this client's own key, or what the server says of anyone else. */
+    public static boolean guarding(AbstractClientPlayer p) {
+        if(!p.getMainHandItem().is(HexGodOfStories.DECEIVER.get()))return false;
+        return p==Minecraft.getInstance().player?guardDown:ClientState.data(p.getId()).getBoolean(com.hexgodofstories.server.SwordGuard.GUARD);
+    }
+
+    /** The stance each player is shown in, by id: the guard, walking in it, or the charge, under any move it makes. */
+    private static final java.util.Map<Integer,String> STANCES=new java.util.HashMap<>();
+
+    /**
+     * Every client tick, for everyone in sight holding The Deceiver: the guard (or its walk) while the use key is held,
+     * and the charge while sprinting. A layer under the moves (HexAnimations): a cut or a deflection plays over it and
+     * the stance is there again when it ends.
+     */
+    @SubscribeEvent public static void stances(net.minecraftforge.event.TickEvent.ClientTickEvent e) {
+        if(e.phase!=net.minecraftforge.event.TickEvent.Phase.END)return;
+        var mc=Minecraft.getInstance();
+        if(mc.level==null){STANCES.clear();return;}
+        for(AbstractClientPlayer p:mc.level.players()) {
+            String want=null;
+            if(p.getMainHandItem().is(HexGodOfStories.DECEIVER.get())&&!p.isSpectator()&&!ClientState.hidden(p)) {
+                double dx=p.getX()-p.xo,dz=p.getZ()-p.zo;
+                boolean moving=dx*dx+dz*dz>4e-4;
+                if(guarding(p))want=moving?"blade_guard_walk":"blade_guard";
+                else if(p.isSprinting()&&moving)want="blade_run";
+            }
+            String now=STANCES.get(p.getId());
+            if(java.util.Objects.equals(want,now))continue;
+            if(want==null)STANCES.remove(p.getId());else STANCES.put(p.getId(),want);
+            HexAnimations.stance(p,want);
+        }
+        STANCES.keySet().removeIf(id->mc.level.getEntity(id)==null);
+    }
+
     /** The blade in this player's hand that is not really there, or empty when there is none to draw. */
     public static ItemStack phantom(AbstractClientPlayer p) {
         CompoundTag d=ClientState.data(p.getId());

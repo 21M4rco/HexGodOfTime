@@ -37,7 +37,8 @@ public final class ThrownDagger extends ThrowableProjectile {
     private static final EntityDataAccessor<Float> ENTRY_PITCH=SynchedEntityData.defineId(ThrownDagger.class,EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Integer> PART=SynchedEntityData.defineId(ThrownDagger.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> ILLUSORY=SynchedEntityData.defineId(ThrownDagger.class,EntityDataSerializers.BOOLEAN);
-    public static final int FLYING=0,IN_BLOCK=-1;
+    /** In flight; stuck in terrain (or lying where it fell); dropping from a body that died or vanished. Else the carrier's id. */
+    public static final int FLYING=0,IN_BLOCK=-1,FALLING=-2;
     /** Which piece of the body is carrying the blade; drives how the wound moves as the body animates. */
     public static final int TORSO=0,HEAD=1,RIGHT_ARM=2,LEFT_ARM=3,RIGHT_LEG=4,LEFT_LEG=5;
     private int life=200;
@@ -62,8 +63,14 @@ public final class ThrownDagger extends ThrowableProjectile {
     /** The body this blade is riding, or null while it is in flight or in terrain. */
     public Entity carrier() {
         int state=state();
-        return state==FLYING||state==IN_BLOCK?null:level().getEntity(state);
+        return state==FLYING||state==IN_BLOCK||state==FALLING?null:level().getEntity(state);
     }
+    /**
+     * The way the steel points once it has stopped: the line it flew in on, kept as it was at the moment of impact.
+     * Vanilla's projectile turns a stopped entity's yaw a fifth of the way toward nothing every tick (it reads the
+     * zeroed velocity), which used to swing a stuck blade round sideways; this never moves.
+     */
+    public boolean stopped() {int state=state();return state==IN_BLOCK||state==FALLING;}
 
     public static ThrownDagger throwFrom(ServerPlayer p,Vec3 from,Vec3 aim,boolean illusory) {
         ThrownDagger e=new ThrownDagger(HexGodOfStories.THROWN_DAGGER.get(),p.level());
@@ -88,7 +95,11 @@ public final class ThrownDagger extends ThrowableProjectile {
         int state=state();
         if(state==FLYING) {
             Vec3 velocity=getDeltaMovement();
+            float yaw=getYRot(),pitch=getXRot();
             super.tick();
+            // A blade the server has already stopped (its velocity zeroed before its state arrives here) keeps the
+            // angle it flew at: vanilla would start turning it toward a yaw of nothing.
+            if(getDeltaMovement().lengthSqr()<1e-6){setYRot(yaw);setXRot(pitch);yRotO=yaw;xRotO=pitch;}
             // ThrowableProjectile advances using its pre-hit velocity even after onHit embeds us.
             // Restore the server's contact point immediately, without a one-tick ghost continuation.
             if(!flying()) {
@@ -106,11 +117,37 @@ public final class ThrownDagger extends ThrowableProjectile {
         }
         xo=getX();yo=getY();zo=getZ();
         xOld=getX();yOld=getY();zOld=getZ();
+        if(state==FALLING) {
+            // Dropped by a body that died: it falls, tumbling a little, and lies where it lands until it fades.
+            noPhysics=false;
+            Vec3 v=getDeltaMovement().add(0,-.05,0).scale(.98);
+            move(net.minecraft.world.entity.MoverType.SELF,v);
+            setDeltaMovement(v);
+            if(!level().isClientSide) {
+                entityData.set(ENTRY_PITCH,entityData.get(ENTRY_PITCH)-9);
+                if(onGround()||v.lengthSqr()<1e-6&&tickCount%5==0) {
+                    entityData.set(ENTRY_PITCH,-6f);
+                    entityData.set(STATE,IN_BLOCK);
+                    setDeltaMovement(Vec3.ZERO);
+                    life=Math.min(life,60);
+                    level().playSound(null,blockPosition(),HexGodOfStories.BLADE_EMBED.get(),SoundSource.PLAYERS,.35f,1.4f);
+                }
+                if(--life<=0)dissolve();
+            }
+            return;
+        }
         if(state!=IN_BLOCK) {
             Entity host=level().getEntity(state);
             if(host==null||!host.isAlive()) {
-                // The body carrying the blade is gone; let it hang where it fell and fade out quickly.
-                if(!level().isClientSide){entityData.set(STATE,IN_BLOCK);life=Math.min(life,30);}
+                // The body carrying the blade is gone: the blade comes out of it and drops to the ground, keeping
+                // the angle it was in at (the wound's angle is in the body's frame; the world's is that less its turn).
+                if(!level().isClientSide) {
+                    float bodyYaw=host==null?0:bodyYaw(host);
+                    entityData.set(ENTRY_YAW,Mth.wrapDegrees(entryYaw()-bodyYaw));
+                    entityData.set(STATE,FALLING);
+                    setDeltaMovement(new Vec3(0,-.02,0));
+                    life=Math.min(life,90);
+                }
             } else {
                 Vec3 world=carried(host);
                 setPos(host.getX()+world.x,host.getY()+world.y,host.getZ()+world.z);
@@ -208,6 +245,10 @@ public final class ThrownDagger extends ThrowableProjectile {
         if(level().isClientSide||!flying())return;
         setPos(hit.getLocation().subtract(getDeltaMovement().normalize().scale(.12)));
         embeddedPosition=position();
+        // Point first into the block, held at the line it flew in on (see stopped()).
+        Vec3 heading=getDeltaMovement();
+        entityData.set(ENTRY_YAW,(float)(Mth.atan2(heading.x,heading.z)*Mth.RAD_TO_DEG));
+        entityData.set(ENTRY_PITCH,(float)(Mth.atan2(heading.y,heading.horizontalDistance())*Mth.RAD_TO_DEG));
         entityData.set(STATE,IN_BLOCK);
         setDeltaMovement(Vec3.ZERO);
         life=140;

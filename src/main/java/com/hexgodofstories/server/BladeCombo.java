@@ -61,21 +61,25 @@ public final class BladeCombo {
      */
     private record Move(int at, String animation, int contact, float damage, double right, double up, double forward) { }
 
+    // The flip into an icepick backhand across the throat, the hammer stab down at the collarbone, the flip back into
+    // a lunging thrust, the low spinning cut, and the push kick.
     private static final Move[] FLURRY = {
-        new Move(0, "blade_dagger_0", 3, 1.5f, -1, 0, 0),
-        new Move(6, "blade_dagger_1", 3, 1.5f, 1, .1, 0),
-        new Move(12, "blade_dagger_2", 3, 1.5f, -.7, -.7, 0),
-        new Move(18, "blade_dagger_3", 3, 1.5f, .7, .7, 0),
+        new Move(0, "blade_dagger_0", 3, 1.5f, 1, 0, 0),
+        new Move(8, "blade_dagger_1", 3, 1.5f, 0, -.8, .6),
+        new Move(16, "blade_dagger_2", 4, 1.5f, 0, 0, 1),
+        new Move(25, "blade_dagger_3", 6, 1.5f, 1, 0, 0),
         // The kick: no edge, so no blood of its own; the bleeding it leaves is the cuts'.
-        new Move(25, "blade_dagger_kick", 5, 2f, 0, 0, 0)};
+        new Move(36, "blade_dagger_kick", 5, 2f, 0, 0, 0)};
+    // The stepping Zornhau, a spinning Zwerchhau out of a full turn, the thrust out of the plough in a deep lunge, and
+    // the launcher rising from a crouch.
     private static final Move[] MASTER_CUTS = {
         new Move(0, "blade_sword_0", 5, 2.5f, -.7, -.7, 0),
-        new Move(10, "blade_sword_1", 4, 2.5f, 1, 0, 0),
-        new Move(19, "blade_sword_2", 4, 2.5f, 0, 0, 1),
-        new Move(28, "blade_sword_3", 5, 3f, .3, 1, 0)};
+        new Move(11, "blade_sword_1", 7, 2.5f, 1, 0, 0),
+        new Move(23, "blade_sword_2", 5, 2.5f, 0, 0, 1),
+        new Move(34, "blade_sword_3", 6, 3f, 0, 1, 0)};
 
     /** Eye to the body's middle, less half its width: how far each blade reaches. And how nearly it must be looked at. */
-    private static final double DAGGER_REACH = 3.4, SWORD_REACH = 4.2, LOOK = .62;
+    private static final double DAGGER_REACH = 3.4, SWORD_REACH = 4.6, LOOK = .62;
 
     private static final class Run {
         final int kind;
@@ -119,6 +123,7 @@ public final class BladeCombo {
         int kind = a == Ability.DAGGERS ? 0 : 3;
         if (!HexData.unlocked(p, a)) {HexServer.notice(p, "This chapter of your story is still locked."); return;}
         if (RUNS.containsKey(p.getUUID()) || Arsenal.active(p) || GravityGrasp.holding(p) || ScepterBlast.stunned(p)) return;
+        SwordGuard.end(p);
         if (recovering(p, kind)) {HexServer.notice(p, name(kind) + " is recovering."); return;}
         LivingEntity target = aimed(p, reach(kind));
         if (target == null) {HexServer.notice(p, "Get within reach of a body and look at it."); return;}
@@ -249,6 +254,8 @@ public final class BladeCombo {
         n.putDouble("x", at.x); n.putDouble("y", at.y); n.putDouble("z", at.z);
         n.putDouble("dx", swing.x); n.putDouble("dy", swing.y); n.putDouble("dz", swing.z);
         n.putFloat("power", power);
+        // Who cut: their own view kicks with it (Blood.slash), the harder the heavier the blade.
+        n.putInt("by", p.getId());
         HexNetwork.near(level, at, 64, new HexNetwork.Message(HexNetwork.BLADE, victim.getId(), n));
     }
 

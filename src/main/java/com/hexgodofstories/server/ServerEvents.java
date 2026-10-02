@@ -161,6 +161,8 @@ public final class ServerEvents {
         // the owner's own problem; blinking away from gravity would be nonsense.
         // Administrative death must bypass every mod ward, including erasure and stopped time.
         if(e.getSource().is(DamageTypes.GENERIC_KILL))return;
+        // The Deceiver's guard: a blow from the front is parried and its striker thrown back (SwordGuard).
+        if(e.getEntity() instanceof ServerPlayer guard&&SwordGuard.parry(guard,e.getSource())){e.setCanceled(true);return;}
         var realm=com.hexgodofstories.warping.Destination.from(e.getEntity().level());
         if(realm!=null&&realm!=com.hexgodofstories.warping.Destination.SUN&&com.hexgodofstories.warping.Warping.sovereign(e.getEntity())&&e.getSource().getEntity()==null){e.setCanceled(true);return;}
         if(Erasure.erasing(e.getEntity())){e.setCanceled(true);return;}
@@ -169,6 +171,8 @@ public final class ServerEvents {
     }
     @SubscribeEvent public static void wardProjectile(net.minecraftforge.event.entity.ProjectileImpactEvent e) {
         if(!(e.getRayTraceResult() instanceof net.minecraft.world.phys.EntityHitResult hit))return;
+        // The Deceiver's guard: a shot from the front slapped back the way it came (SwordGuard).
+        if(hit.getEntity() instanceof ServerPlayer guard&&SwordGuard.deflect(guard,e.getProjectile())){e.setCanceled(true);return;}
         // Mirror Ward: turned round in the air and sent back at whoever loosed it.
         if(hit.getEntity() instanceof ServerPlayer warded&&Glorious.mirrored(warded)&&e.getProjectile().getOwner()!=warded){
             Glorious.rebound(warded,e.getProjectile());e.setCanceled(true);return;

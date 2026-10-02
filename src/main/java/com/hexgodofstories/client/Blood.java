@@ -146,6 +146,9 @@ public final class Blood {
         if(swing.lengthSqr()<1e-6)return;
         swing=swing.normalize();
         float power=Math.max(.2f,Math.min(1.5f,n.getFloat("power")));
+        // The one who cut feels it land: a kick of the view, the heavier the blade the harder.
+        if(n.contains("by")&&n.getInt("by")==mc.player.getId())
+            com.hexgodofstories.client.leviathan.LeviathanEffects.scepterRecoil(.22f+.3f*Math.min(1,power));
         var random=mc.level.random;
         // Across the cut, square to the swing: the line the edge opened.
         Vec3 across=swing.cross(new Vec3(0,1,0));

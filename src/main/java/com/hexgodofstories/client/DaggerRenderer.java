@@ -34,6 +34,12 @@ public final class DaggerRenderer extends EntityRenderer<ThrownDagger> {
             Vec3 self=WoundAnchor.lerpPosition(e,partial);
             pose.translate(want.x-self.x,want.y-self.y,want.z-self.z);
             pose.mulPose(WoundAnchor.rotation(e,host,partial));
+        } else if(e.stopped()) {
+            // Stuck in terrain or lying where it fell: the line it flew in on, never the drifting entity yaw.
+            pose.mulPose(Axis.YP.rotationDegrees(e.entryYaw()-90));
+            pose.mulPose(Axis.ZP.rotationDegrees(e.entryPitch()));
+            pose.mulPose(Axis.XP.rotationDegrees(e.roll()));
+            pose.mulPose(Axis.ZP.rotationDegrees(-90));
         } else {
             pose.mulPose(Axis.YP.rotationDegrees(Mth.lerp(partial,e.yRotO,e.getYRot())-90));
             pose.mulPose(Axis.ZP.rotationDegrees(Mth.lerp(partial,e.xRotO,e.getXRot())));
@@ -42,8 +48,8 @@ public final class DaggerRenderer extends EntityRenderer<ThrownDagger> {
             pose.mulPose(Axis.ZP.rotationDegrees(-90));
         }
         pose.scale(SCALE,SCALE,SCALE);
-        // The grip sits at the mesh origin, so shift back along the blade to balance it on the flight line.
-        pose.translate(0,-.2,0);
+        // The blade's middle sits on the flight line: the mesh runs from the pommel at -0.36 to the point at 0.8.
+        pose.translate(0,-.22,0);
         WeaponRenderer.draw(0,pose,buffers,light,e.illusory()?.65f:1);
         pose.popPose();
         super.render(e,yaw,partial,pose,buffers,light);

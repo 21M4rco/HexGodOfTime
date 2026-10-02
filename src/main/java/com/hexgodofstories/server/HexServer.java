@@ -27,12 +27,17 @@ public final class HexServer {
         /** Anchor Being's held alternate, Gravity Grasp: the alternate key pressed, and let go. */
         GRASP_BEGIN=22,GRASP_END=23,
         /** One of the seven bind slots' keys: choose whatever ability that slot holds. */
-        SLOT=24;
+        SLOT=24,
+        /** The Deceiver's guard: the use key held with it in hand, and let go (SwordGuard). */
+        GUARD_BEGIN=25,GUARD_END=26;
     /** Keep rewind's wire value for saved clients; the B/resume action is retired. */
     public static final int TIME_HALT=0,TIME_REWIND=2;
     public record Moment(Vec3 position,float yaw,float pitch,float health) {}
     private record Charm(Mob mob,UUID owner,long end,UUID previous) {}
     private record Strike(int weapon,int combo,long contact,long end) {}
+    /** Where each ordinary attack's blood goes, in the caster's right, up and forward (tools/blade_moves.py, SWINGS). */
+    private static final double[][] DAGGER_SWINGS={{-.7,-.7,0},{1,0,0},{-.7,-.7,0},{0,0,1}},
+        SWORD_SWINGS={{-.7,-.7,0},{.6,.8,0},{-1,0,0},{0,-.8,.6}};
     private static final Map<UUID,ArrayDeque<Moment>> HISTORY=new HashMap<>();
     /** Spells whose alternate key would only cast them again. */
     private static final Set<Ability> NO_ALTERNATE=EnumSet.of(Ability.PUSH,Ability.MIRAGE,Ability.BLINK,Ability.WARD,Ability.MEMORY,Ability.TIME_SLIP);
@@ -96,6 +101,8 @@ public final class HexServer {
         if(action==BRANCH_CANCEL){TimeBranch.cancel(p);return;}
         if(action==BRANCH_END){if(TimeBranch.charging(p))TimeBranch.release(p);return;}
         if(action==GRASP_END){GravityGrasp.release(p);return;}
+        if(action==GUARD_END){SwordGuard.end(p);return;}
+        if(action==GUARD_BEGIN){SwordGuard.begin(p);return;}
         if(TimeBranch.charging(p)){if(action==UTILITY)TimeBranch.cancel(p);return;}
         // Tapped as fast as a finger allows, so it sits ahead of the shared input throttle; the
         // Scepter's own recovery decides how fast it can actually fire.
@@ -396,6 +403,13 @@ public final class HexServer {
         ItemStack item=a==Ability.LAEVATEINN?summonScepter(p):new ItemStack(a==Ability.TWIN_DAGGERS?HexGodOfStories.DECEIVER.get():HexGodOfStories.DAGGER.get());
         item.getOrCreateTag().putUUID("conjurer",p.getUUID());item.getOrCreateTag().putLong("formed",HexData.now(p));
         p.setItemInHand(InteractionHand.MAIN_HAND,item);
+        // One conjured weapon at a time: whatever else this caster had conjured, anywhere on them, is gone the moment
+        // this one forms (the Scepter called back to hand is this very stack, and stays).
+        Inventory inventory=p.getInventory();
+        for(int i=0;i<inventory.getContainerSize();i++) {
+            ItemStack other=inventory.getItem(i);
+            if(other!=item&&other.getItem() instanceof ConjuredWeapon&&ConjuredWeapon.belongsTo(other,p))inventory.setItem(i,ItemStack.EMPTY);
+        }
         gesture(p,a==Ability.LAEVATEINN?"scepter_manifest":"conjure","conjure",HexGodOfStories.CONJURE.get());return true;
     }
     /**
@@ -437,8 +451,8 @@ public final class HexServer {
         if(!ConjuredWeapon.belongsTo(held,p)){p.setItemInHand(hand,ItemStack.EMPTY);return;}
         // The Scepter's right click is a hold, carried by SCEPTER_PRESS and SCEPTER_RELEASE. The Deceiver is never thrown.
         if(w.kind==1||secondary&&w.kind==3)return;
-        // A combo starter in progress owns the blade arm until it ends.
-        if(BladeCombo.running(p))return;
+        // A combo starter in progress owns the blade arm until it ends; so does the guard while it is held.
+        if(BladeCombo.running(p)||SwordGuard.guarding(p))return;
         long now=HexData.now(p);Strike prior=STRIKES.get(p.getUUID());
         if(prior!=null&&prior.end>now)return;
         int combo=prior==null||now-prior.end>18?0:(prior.combo+1)%4;
@@ -455,12 +469,13 @@ public final class HexServer {
             gesture(p,"time_stop","bind",HexGodOfStories.STOP.get());
             STRIKES.put(p.getUUID(),new Strike(2,combo,0,now+40));return;
         }
-        // The Deceiver swings slower and longer than a dagger, and cuts deeper (see tick).
+        // Each its own whole-body move (tools/blade_moves.py): the dagger's land on their fourth tick, the
+        // Deceiver's, slower and heavier, on their sixth.
         boolean sword=w.kind==3;
-        int windup=sword?7:4,recovery=sword?16:10;
         boolean twin=!sword&&p.getOffhandItem().is(HexGodOfStories.DAGGER.get());
+        int windup=sword?6:twin?4:4,recovery=sword?15:10;
         STRIKES.put(p.getUUID(),new Strike(w.kind,combo,now+windup,now+recovery));
-        HexNetwork.animate(p,(sword?"sword_":twin?"twin_":"dagger_")+combo);
+        HexNetwork.animate(p,twin?"twin_"+combo:(sword?"blade_m_sword_":"blade_m_dagger_")+combo);
         HexNetwork.fx(p,"slash");
         p.level().playSound(null,p.blockPosition(),HexGodOfStories.BLADE_SWING.get(),SoundSource.PLAYERS,.85f,1.08f+combo*.04f);
     }
@@ -508,17 +523,24 @@ public final class HexServer {
         Telekinesis.tick(p);
         Architecture.tick(p);
         BladeCombo.tick(p);
+        SwordGuard.tick(p);
         Strike strike=STRIKES.get(p.getUUID());
         if(strike!=null&&strike.contact==now) {
             boolean sword=strike.weapon==3;
-            double reach=sword?3.4:2.8;
+            double reach=sword?3.8:2.9;
             boolean finisher=strike.combo==3;
             for(LivingEntity e:p.level().getEntitiesOfClass(LivingEntity.class,p.getBoundingBox().inflate(reach),e->validTarget(p,e)&&p.hasLineOfSight(e))) {
                 Vec3 direction=e.getEyePosition().subtract(p.getEyePosition()).normalize();
                 if(direction.dot(p.getLookAngle())<.35||p.distanceToSqr(e)>reach*reach)continue;
                 if(!e.hurt(p.damageSources().playerAttack(p),sword?5:4))continue;
-                // The swings alternate: the even ones come through to the right and down, the odd ones to the left.
-                BladeCombo.blood(p,e,strike.combo%2==0?.8:-.8,-.45,0,sword?.9f:.7f);
+                // The blood goes the way this swing's edge went (blade_moves.SWINGS), and a sword's cut lands heavy.
+                double[] swing=(sword?SWORD_SWINGS:DAGGER_SWINGS)[strike.combo&3];
+                BladeCombo.blood(p,e,swing[0],swing[1],swing[2],sword?1.1f:.75f);
+                if(sword) {
+                    e.knockback(.3,p.getX()-e.getX(),p.getZ()-e.getZ());
+                    p.serverLevel().sendParticles(net.minecraft.core.particles.ParticleTypes.CRIT,e.getX(),e.getY()+e.getBbHeight()*.6,e.getZ(),10,.25,.3,.25,.35);
+                    p.level().playSound(null,e.blockPosition(),net.minecraft.sounds.SoundEvents.PLAYER_ATTACK_STRONG,SoundSource.PLAYERS,.9f,.8f+p.getRandom().nextFloat()*.1f);
+                }
                 e.knockback(.25,p.getX()-e.getX(),p.getZ()-e.getZ());
                 if(finisher)Bleed.apply(p,e,1,120);
                 reward(p,Discipline.CONJURATION,55);
@@ -713,6 +735,7 @@ public final class HexServer {
         GravityGrasp.forget(p);
         Glorious.forget(p);
         BladeCombo.forget(p);
+        SwordGuard.forget(p);
         HISTORY.remove(p.getUUID());STRIKES.remove(p.getUUID());ScepterBlast.forget(p);INPUT.remove(p.getUUID());TRAINING.remove(p.getUUID());
         HexData.clearTransient(p,death);
     }
@@ -722,6 +745,6 @@ public final class HexServer {
         Warping.reset();
         Telekinesis.reset();Architecture.reset();Bleed.reset();Frostbite.reset();ScepterBlast.reset();PocketRealm.reset();TemporalEngine.reset();
         Threat.reset();Decoy.reset();TimeBranch.reset();Erasure.reset();Starfall.reset();Arsenal.reset();GravityGrasp.reset();
-        Delusion.reset();Glorious.reset();BladeCombo.reset();
+        Delusion.reset();Glorious.reset();BladeCombo.reset();SwordGuard.reset();
     }
 }

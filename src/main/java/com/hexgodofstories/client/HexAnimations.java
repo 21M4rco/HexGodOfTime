@@ -27,6 +27,8 @@ import org.slf4j.Logger;
 
 public final class HexAnimations {
    private static final ResourceLocation LAYER = HexGodOfStories.id("casting");
+   /** Under the moves: the stances a weapon is carried in (BladeClient), which a move plays over and returns to. */
+   private static final ResourceLocation STANCE = HexGodOfStories.id("stance");
    private static final Set<String> OWN_FIRST_PERSON_ARM = Set.of("branch_punch", "time_stop", "grasp_slash");
    private static final Logger LOGGER = LogUtils.getLogger();
 
@@ -47,6 +49,29 @@ public final class HexAnimations {
       }
    }
 
+   /** A player's stance, or none: faded between over a few ticks, so a guard settles in and a charge eases out. */
+   public static void stance(AbstractClientPlayer player, String name) {
+      PlayerAssociatedAnimationData data = PlayerAnimationAccess.getPlayerAssociatedData(player);
+      ModifierLayer<IAnimation> layer;
+      if (data.get(STANCE) instanceof ModifierLayer<?> existing) {
+         layer = (ModifierLayer<IAnimation>) existing;
+      } else {
+         layer = new ModifierLayer<>();
+         PlayerAnimationAccess.getPlayerAnimLayer(player).addAnimLayer(800, layer);
+         data.set(STANCE, layer);
+      }
+      if (name == null) {layer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(5, Ease.INOUTQUAD), null); return;}
+      KeyframeAnimation animation = PlayerAnimationRegistry.getAnimation(HexGodOfStories.id(name));
+      if (animation == null) {LOGGER.warn("Stance '{}' is not loaded.", name); return;}
+      // The guard is seen in first person too (the arm and the long blade low at the side); the charge is not, so the
+      // sword stays where a held item is while running.
+      boolean seen = !name.equals("blade_run");
+      KeyframeAnimationPlayer player1 = new KeyframeAnimationPlayer(animation)
+         .setFirstPersonMode(seen ? FirstPersonMode.THIRD_PERSON_MODEL : FirstPersonMode.NONE)
+         .setFirstPersonConfiguration(new FirstPersonConfiguration().setShowRightArm(seen).setShowLeftArm(false).setShowRightItem(true).setShowLeftItem(true));
+      layer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(5, Ease.INOUTQUAD), player1);
+   }
+
    public static void playRemote(int entityId, String name, int fadeTicks) {
       Minecraft minecraft = Minecraft.getInstance();
       if (minecraft.level != null && minecraft.level.getEntity(entityId) instanceof AbstractClientPlayer abstractclientplayer) {
@@ -59,8 +84,10 @@ public final class HexAnimations {
             boolean manifest=name.startsWith("scepter_manifest")||name.startsWith("scepter_fire");
             // Gotcha!'s pointing arm, and the arm held out toward whatever telekinesis holds: seen in first person too.
             boolean pointing=name.equals("gotcha")||name.equals("telekinesis");
-            // A blade combo's moves (BladeCombo): the sword arm is seen in first person, blade and all.
+            // The blades' moves (tools/blade_moves.py): the sword arm is seen in first person, blade and all, and with
+            // The Deceiver's two-handed cuts the other hand on its grip too.
             boolean blade=name.startsWith("blade_");
+            boolean twoHands=name.startsWith("blade_sword_")||name.startsWith("blade_m_sword_");
             ResourceLocation resourcelocation = HexGodOfStories.id(name);
             KeyframeAnimation keyframeanimation = PlayerAnimationRegistry.getAnimation(resourcelocation);
             if (keyframeanimation == null) {
@@ -70,7 +97,7 @@ public final class HexAnimations {
                KeyframeAnimationPlayer keyframeanimationplayer = new KeyframeAnimationPlayer(keyframeanimation)
                   .setFirstPersonMode(flag ? FirstPersonMode.NONE : FirstPersonMode.THIRD_PERSON_MODEL)
                   .setFirstPersonConfiguration(
-                     new FirstPersonConfiguration().setShowRightArm(manifest&&!left||pointing||blade&&!left).setShowLeftArm(manifest&&left||blade&&left).setShowRightItem(true).setShowLeftItem(true)
+                     new FirstPersonConfiguration().setShowRightArm(manifest&&!left||pointing||blade).setShowLeftArm(manifest&&left||twoHands).setShowRightItem(true).setShowLeftItem(true)
                   );
                // Shots cut straight in so the kick lands on the tick it fires; raising to aim eases in.
                // A combo's moves follow each other within a few ticks: each cuts in almost at once, or the wind-up is lost in the blend.
@@ -89,7 +116,10 @@ public final class HexAnimations {
    public static final class Init {
       @SubscribeEvent
       public static void clientSetup(FMLClientSetupEvent event) {
-         event.enqueueWork(() -> PlayerAnimationFactory.ANIMATION_DATA_FACTORY.registerFactory(HexAnimations.LAYER, 900, player -> new ModifierLayer()));
+         event.enqueueWork(() -> {
+            PlayerAnimationFactory.ANIMATION_DATA_FACTORY.registerFactory(HexAnimations.LAYER, 900, player -> new ModifierLayer());
+            PlayerAnimationFactory.ANIMATION_DATA_FACTORY.registerFactory(HexAnimations.STANCE, 800, player -> new ModifierLayer());
+         });
       }
    }
 }

@@ -127,12 +127,12 @@ public final class HexClient {
             ClientState.tick();
             clientTicks++;
             Minecraft mc=Minecraft.getInstance();
-            if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;slotsCancel(false);return;}
+            if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;slotsCancel(false);BladeClient.forget();return;}
             if(!enabled()) {
                 // Locked means invisible and inert, not merely server-rejected. Swallow every mod input
                 // and close any mod-only screen immediately when access is revoked.
                 BranchKeyInput.cancel(false);
-                ScepterClient.input(false);
+                ScepterClient.input(false);BladeClient.input(false);
                 primaryLatched=primaryPhysicallyDown();
                 primaryDown=false;repeat=0;
                 slotsCancel(true);
@@ -140,7 +140,7 @@ public final class HexClient {
                 drain();return;
             }
             if(mc.screen!=null) {
-                ScepterClient.input(false);
+                ScepterClient.input(false);BladeClient.input(false);
                 BranchKeyInput.cancel(true);
                 // Ending the hold here means the key is no longer "down" as far as this loop knows,
                 // so a key that is still physically held would read as a brand new press the moment
@@ -155,6 +155,7 @@ public final class HexClient {
             while(MENU.consumeClick())mc.setScreen(new MasteryScreen(false));
             // The Scepter's right click is read from the key itself: its hold is the charge.
             ScepterClient.input(mc.options.keyUse.isDown());
+            BladeClient.input(mc.options.keyUse.isDown());
 
             Ability selected=Ability.at(ClientState.self().getInt("selected"));
             boolean primary=PRIMARY.isDown();

@@ -1,0 +1,211 @@
+{
+ "version": 3,
+ "name": "blade_m_sword_3",
+ "author": "HexGodOfStories",
+ "description": "A blade move (tools/blade_moves.py): the whole body, never locking the player in place.",
+ "emote": {
+  "beginTick": 0,
+  "endTick": 18,
+  "stopTick": 18,
+  "isLoop": false,
+  "returnTick": 18,
+  "degrees": true,
+  "easeBeforeKeyframe": true,
+  "moves": [
+   {
+    "tick": 0,
+    "easing": "linear",
+    "body": {
+     "x": 0,
+     "y": 0,
+     "z": 0,
+     "pitch": 0,
+     "yaw": 0,
+     "roll": 0
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": 0,
+     "roll": 0
+    },
+    "leftArm": {
+     "pitch": 0,
+     "yaw": 0,
+     "roll": 0,
+     "bend": 0
+    },
+    "rightArm": {
+     "pitch": 0,
+     "yaw": 0,
+     "roll": 0,
+     "bend": 0
+    },
+    "rightItem": {
+     "pitch": 0,
+     "yaw": 0,
+     "roll": 0
+    }
+   },
+   {
+    "tick": 4,
+    "easing": "outquad",
+    "body": {
+     "x": 0,
+     "y": -0.01,
+     "z": 0.04,
+     "pitch": 9,
+     "yaw": 0,
+     "roll": 0
+    },
+    "head": {
+     "pitch": -10,
+     "yaw": 0,
+     "roll": 0
+    },
+    "leftArm": {
+     "pitch": -82.0,
+     "yaw": 55.6,
+     "roll": 14.0,
+     "bend": -45.4
+    },
+    "rightArm": {
+     "pitch": -115.5,
+     "yaw": 2.4,
+     "roll": 11.9,
+     "bend": -46.0
+    },
+    "rightItem": {
+     "pitch": -24.6,
+     "roll": -8.9,
+     "yaw": 0
+    }
+   },
+   {
+    "tick": 6,
+    "easing": "inquad",
+    "body": {
+     "x": 0,
+     "y": -0.09,
+     "z": -0.13,
+     "pitch": -15,
+     "yaw": 0,
+     "roll": 0
+    },
+    "head": {
+     "pitch": 8,
+     "yaw": 0,
+     "roll": 0
+    },
+    "leftArm": {
+     "pitch": -80.0,
+     "yaw": 63.8,
+     "roll": 11.7,
+     "bend": -37.4
+    },
+    "rightLeg": {
+     "pitch": 22,
+     "yaw": 0,
+     "roll": 0,
+     "bend": 12
+    },
+    "leftLeg": {
+     "pitch": -34,
+     "yaw": 0,
+     "roll": 0,
+     "bend": 34
+    },
+    "rightArm": {
+     "pitch": -97.1,
+     "yaw": -17.2,
+     "roll": 8.6,
+     "bend": 0.0
+    },
+    "rightItem": {
+     "pitch": -55.7,
+     "roll": -42.9,
+     "yaw": 0
+    }
+   },
+   {
+    "tick": 8,
+    "easing": "outquad",
+    "body": {
+     "x": 0,
+     "y": -0.1,
+     "z": -0.13,
+     "pitch": -18,
+     "yaw": 0,
+     "roll": 0
+    },
+    "head": {
+     "pitch": 10,
+     "yaw": 0,
+     "roll": 0
+    },
+    "leftArm": {
+     "pitch": -68.8,
+     "yaw": 64.5,
+     "roll": 2.2,
+     "bend": -26.7
+    },
+    "rightLeg": {
+     "pitch": 22,
+     "yaw": 0,
+     "roll": 0,
+     "bend": 12
+    },
+    "leftLeg": {
+     "pitch": -34,
+     "yaw": 0,
+     "roll": 0,
+     "bend": 34
+    },
+    "rightArm": {
+     "pitch": -56.5,
+     "yaw": -27.8,
+     "roll": 0.1,
+     "bend": 0.4
+    },
+    "rightItem": {
+     "pitch": -54.4,
+     "roll": -74.4,
+     "yaw": 0
+    }
+   },
+   {
+    "tick": 18,
+    "easing": "inoutsine",
+    "body": {
+     "x": 0,
+     "y": 0,
+     "z": 0,
+     "pitch": 0,
+     "yaw": 0,
+     "roll": 0
+    },
+    "head": {
+     "pitch": 0,
+     "yaw": 0,
+     "roll": 0
+    },
+    "leftArm": {
+     "pitch": 0,
+     "yaw": 0,
+     "roll": 0,
+     "bend": 0
+    },
+    "rightArm": {
+     "pitch": 0,
+     "yaw": 0,
+     "roll": 0,
+     "bend": 0
+    },
+    "rightItem": {
+     "pitch": 0,
+     "yaw": 0,
+     "roll": 0
+    }
+   }
+  ]
+ }
+}
