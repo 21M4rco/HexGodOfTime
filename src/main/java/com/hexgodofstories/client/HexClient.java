@@ -248,7 +248,7 @@ public final class HexClient {
          */
         private static void pressLong(int i) {
             Ability a=slotAbility[i];
-            reselect(i);
+            reselect(i,a);
             HexNetwork.send(a==Ability.ARSENAL?HexServer.HOLD_BEGIN:a==Ability.THREADS?HexServer.GRASP_BEGIN:HexServer.ALTERNATE,0);
             slotState[i]=SLOT_LONG;
         }
@@ -259,7 +259,7 @@ public final class HexClient {
             switch(state) {
                 case SLOT_HOLD -> HexNetwork.send(HexServer.HOLD_END,0);
                 // Tapped: the spell itself, or the Crown's Gotcha!.
-                case SLOT_DECIDING -> {reselect(i);HexNetwork.send(a==Ability.ARSENAL?HexServer.ALTERNATE:HexServer.CAST,0);}
+                case SLOT_DECIDING -> {reselect(i,a);HexNetwork.send(a==Ability.ARSENAL?HexServer.ALTERNATE:HexServer.CAST,0);}
                 case SLOT_LONG -> {
                     if(a==Ability.ARSENAL)HexNetwork.send(HexServer.HOLD_END,0);
                     if(a==Ability.THREADS)HexNetwork.send(HexServer.GRASP_END,0);
@@ -269,10 +269,11 @@ public final class HexClient {
         }
         /**
          * A tap or hold decided late must reach the spell its key began, even if another slot was pressed meanwhile:
-         * the slot is chosen again first (free, and nothing at all when it is still the chosen one).
+         * the slot is chosen again first (free, and nothing at all when it is still the chosen one). Given the ability
+         * itself: by the time a key comes up its slot has already been let go.
          */
-        private static void reselect(int i) {
-            if(i<CAST_KEY&&ClientState.self().getInt("selected")!=slotAbility[i].ordinal())QuickBar.press(i);
+        private static void reselect(int i,Ability a) {
+            if(a!=null&&i<CAST_KEY&&ClientState.self().getInt("selected")!=a.ordinal())QuickBar.press(i);
         }
 
         /** Every casting key let go at once: a screen opening, access taken away, the world gone. */
