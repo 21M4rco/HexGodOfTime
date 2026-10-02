@@ -86,7 +86,7 @@ public final class Architecture {
         HexNetwork.sync(p);
     }
 
-    /** Secondary action: let the standing wall go, for everyone and for the mobs that believed it. */
+    /** The utility key, with the wall chosen: let the standing wall go, for everyone and for the mobs that believed it. */
     public static boolean dismiss(ServerPlayer p) {
         CASTING.remove(p.getUUID());
         if(!IllusoryWalls.dismiss(p.getUUID()))return false;

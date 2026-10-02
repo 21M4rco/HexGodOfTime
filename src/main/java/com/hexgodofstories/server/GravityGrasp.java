@@ -23,7 +23,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Gravity Grasp, Anchor Being's held alternate. The caster stretches an arm out and a small black hole opens in front
+ * Gravity Grasp, Anchor Being's key held rather than tapped. The caster stretches an arm out and a small black hole opens in front
  * of the hand, drawing in every body the caster could harm within {@link #REACH} blocks, harder the longer it is held,
  * for up to {@link #MOST} ticks. Whatever it drags to within arm's reach the caster cuts across the throat, once, with a
  * dagger conjured for the stroke: five hearts, ten seconds' bleeding and a stun.

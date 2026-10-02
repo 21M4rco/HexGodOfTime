@@ -13,8 +13,8 @@ import org.lwjgl.glfw.GLFW;
 /**
  * Where a Warping pool leads. Every destination is a card in two columns, numbered 1 to 0 so the keys pick one without
  * the mouse; the one in use is framed in gold, the Void Sea is marked in red because its danger is a creature, and the
- * card under the mouse (or the one in use) is described in full underneath. Picking closes the screen; so does the
- * alternate key that opened it.
+ * card under the mouse (or the one in use) is described in full underneath. Picking closes the screen; so does G, the
+ * key that opened it.
  */
 public final class WarpScreen extends Screen {
     private static final int CARD_H=26,GAP=4,ALARM=HexUi.RED;

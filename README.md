@@ -1,9 +1,26 @@
 ## Seven keys, a remade mantle, a standing sea
 
 - **Seven bind slots on the bottom row of the keyboard: Z X C V B N M.** Pressing a slot's key casts its
-  ability at once — one press, nothing to choose first (hold it for spells that are held; the Crown is Gotcha! on a
-  tap and the crown on a hold, Anchor Being is the vanishing on a tap and Gravity Grasp on a hold). G does the
-  alternate of the spell you last used, and R casts it again. The slots are drawn
+  ability at once — one press, nothing to choose first (hold it for spells that are held). A spell with a second
+  move makes it on the same key **held** instead of tapped: the Crown is Gotcha! on a tap and the crown on a hold,
+  Anchor Being is the vanishing on a tap and Gravity Grasp on a hold, and the rest are listed below. R casts the
+  last spell again and taps and holds the same way. **There is no alternate key any more**, except for Warping: G
+  picks where the pool leads (or, inside a Warping realm, the way out), whatever spell is chosen.
+
+  | Hold the key of | Second move |
+  |---|---|
+  | Living Projection | Aim at a foe to send every projection at it, or at nothing to dismiss them |
+  | Sleight of Place | Place a projection at your aim |
+  | Masquerade | Take the disguise off |
+  | Emerald Throw | The charged throw that bursts where it lands |
+  | Daggers, Twin Deceivers, Scepter | Dismiss the conjured weapons |
+  | Whispered Allegiance | Direct your charmed creatures at your aim |
+  | Chosen Moment | Spare an ally from your stopped field |
+  | Anchor Being | Gravity Grasp, for as long as you hold |
+  | Crown of Barrels | The crown, for as long as you hold (tapped: Gotcha!) |
+
+  Telekinesis lifts on a tap and **throws on the next tap**; U lets go gently. Borrowed Reality is held to raise
+  the wall; U, with it chosen, takes it down. The slots are drawn
   as a strip over the ability panel, each under its key, with its recovery drawn down over it and the chosen one
   lit. Bind them in the archive (K): click a slot (shown under its key), then click an ability. A layout saved
   with the old eight slots keeps its abilities, in order, in the seven. The keys that used to sit on that row moved,
@@ -22,14 +39,14 @@
   | Borrowed Reality | Reality Made | Grows twice as fast, stands half as long again, and is real to everyone but you: players are shoved back, projectiles are swallowed. |
   | Emerald Throw | Emerald Storm | Five bolts fanned out, each turning after the nearest creature ahead of it. 2 s. |
   | Sovereign Push | Kneel | Everything within twelve blocks is hammered to the ground: three hearts, held three seconds, slowed after. 15 s. |
-  | Telekinesis | Many Hands | Lift everything in a wide cone in front of you, up to twelve, arrows and thrown things in the air included (they become yours to throw back); G throws them all. 6 s. |
+  | Telekinesis | Many Hands | Lift everything in a wide cone in front of you, up to twelve, arrows and thrown things in the air included (they become yours to throw back); cast again to throw them all. 6 s. |
   | Veilstep | Behind You | Step out right behind the creature or player you aim at, facing its back; aimed at nothing, twice as far. 5 s. |
   | Runic Ward | Mirror Ward | Six seconds of the veil, and three quarters of every blow returns to whoever dealt it; projectiles rebound. 15 s. |
   | Whispered Allegiance | Silver Tongue | Charm up to six creatures within ten blocks at once, for twice as long; a player you aim at drops what they hold. 15 s. |
   | Memory Echo | Total Recall | Everything living within forty eight blocks glows through walls for twelve seconds. 20 s. |
   | Personal Rewind | Return to Sender | Rewind as ever, and every blow you took in those ten seconds lands on whoever dealt it. |
   | Warping | Wide Open | No hold: a tap opens the pool at its full size where you look, for the full cost. |
-  | Crown of Barrels | Gotcha! Swarm | G sends four small missiles that hunt the body you looked at (see below). |
+  | Crown of Barrels | Gotcha! Swarm | A tap sends four small missiles that hunt the body you looked at (see below). |
   | Anchor Being | Grand Anchor | The sixty-block blast, as before. |
 
 - **Gotcha! Swarm.** In the transformation, Gotcha! sends four of the Crown's missiles, shrunk to under half the
@@ -61,7 +78,7 @@
   across, no block broken and no shield stopping it. 25 energy; 30 s recovery. **Secret:** cast in the full
   transformation, the blast is sixty blocks across (twenty hearts out to twelve, half at thirty), the ground
   shakes all of it, and a moment before it goes anyone looking at it is blinded white; two minutes' recovery.
-- **Gravity Grasp (hold the alternate key).** Your arm goes out and a small black hole opens in front of your
+- **Gravity Grasp (hold Anchor Being's key).** Your arm goes out and a small black hole opens in front of your
   hand, drawing in everything you could harm within sixteen blocks, harder the longer you hold (ten seconds
   at most); even at first it drags a sprinting player back. Whatever it drags within arm's reach, the hole
   closes and you cut its throat with a dagger conjured for the stroke, the blood thrown out to your right: five
@@ -101,7 +118,7 @@
   each block of ground up and letting it settle (half a block near the crater, a little at the far edge),
   kicking up dust, and whoever is standing on it feels it roll under them. It is drawn only, on each client;
   no block moves.
-- **Gotcha!** Tap the alternate key while looking at a body and a single gun forms without a sound a little
+- **Gotcha!** Tap the Crown's key while looking at a body and a single gun forms without a sound a little
   way behind its back, facing where its head was, then turns onto its head wherever it is now and fires: a
   perfect shot at the upper head, whatever the size of the body, that misses only if a block is in the way
   (and a shield takes it only if raised toward the gun itself). Ten hearts, a hole bigger than a round's
@@ -396,9 +413,9 @@ Install Player Animator **1.0.2-rc1+1.20** (CurseForge file 4587214) on clients.
 | Input | Action |
 |---|---|
 | K | Mastery archive |
-| Z X C V B N M | The seven bind slots: press one to **cast** what is bound to it (hold it for spells that are held). Crown of Barrels: tap for Gotcha!, hold for the crown. Anchor Being: tap to vanish, hold for Gravity Grasp |
-| R | Cast the last spell again; **hold** for abilities that shape while held |
-| G | Alternate contextual action — **Fracture mode selector**, while Fracture is selected and you are inside your sanctum |
+| Z X C V B N M | The seven bind slots: **tap** one to cast what is bound to it, **hold** it for the spell's second move (or for spells that are held). Crown of Barrels: tap for Gotcha!, hold for the crown. Anchor Being: tap to vanish, hold for Gravity Grasp |
+| R | Cast the last spell again, with the same tap and hold |
+| G | **Warping destination** (inside a Warping realm: the way out), whatever spell is chosen. No other spell uses it |
 | H | Glorious Purpose transformation |
 | U | Utility: release held targets / seal your fracture / leave a realm / resume your time fields |
 | I | **Stillness** — suspend the local battlefield; press again to resume |
@@ -415,12 +432,12 @@ The time controls are never bound to a slot. They are permanent commands on thei
 
 ## Notable abilities
 
-- **Living Projection** — a decoy that looks, moves and fights like you, down to the name tag. It hunts hostile creatures and anyone who has attacked you, without being told. Creatures choosing between you and your copies cannot tell which is which: the choice is made on distance, sight and who has been hurting them, and never on which one is breathing. Its secondary sends every projection at whatever you are aiming at, or dismisses them all if you aim at nothing.
+- **Living Projection** — a decoy that looks, moves and fights like you, down to the name tag. It hunts hostile creatures and anyone who has attacked you, without being told. Creatures choosing between you and your copies cannot tell which is which: the choice is made on distance, sight and who has been hurting them, and never on which one is breathing. Holding its key sends every projection at whatever you are aiming at, or dismisses them all if you aim at nothing.
 - **Telekinesis** — aim at a creature or player to lift it in a green glow of motes, your right arm held
-  straight out toward it (first person too). One body at a time: cast again, or press Utility, to let it go.
-  The wheel pulls it closer or pushes it further; the secondary throws it, and whatever you throw takes
+  straight out toward it (first person too). One body at a time: cast again to throw it, or press Utility to let it go.
+  The wheel pulls it closer or pushes it further, and whatever you throw takes
   damage if it hits a wall. Players can be held for three and a half seconds, creatures for fifteen.
-- **Borrowed Reality** — hold the cast key and a wall grows where you aim, through Small, Medium, Big and Massive. No block is ever placed: viewers are handed an origin, a size and a seed and build the courses locally, while the server keeps the same columns in memory so that everything which is not a player treats the wall as masonry — mobs path around it, lose sight of you behind it and are turned back when they walk into it. You walk through your own lie; the alternate key dismisses it.
+- **Borrowed Reality** — hold the cast key and a wall grows where you aim, through Small, Medium, Big and Massive. No block is ever placed: viewers are handed an origin, a size and a seed and build the courses locally, while the server keeps the same columns in memory so that everything which is not a player treats the wall as masonry — mobs path around it, lose sight of you behind it and are turned back when they walk into it. You walk through your own lie; Utility, with the wall chosen, takes it down.
 - **Fracture** — shatters the air where you look. From the outside it leads one place: in, taking anything beside you with it if you hold the key. From inside, where the break leads is chosen in the selector on the alternate key and stays chosen: a named player, whoever is nearest, the Nether, your bed, or the place you left. The break holds for seven seconds, and anything that walks through it follows your destination rather than its own history. Inside your sanctum you cannot be hit, and the island throws falling stars at anyone who tries.
 - **Twin Deceivers** — two daggers, the off hand reversed. Thrown blades fly point-first, bury themselves in what they hit and open bleeding wounds before dissolving.
 - **Masquerade** — wear any living thing in the game, vanilla or modded, keeping that individual creature's variant, colour, size and carried gear rather than its species' default. Creatures read the shape and mostly ignore it, until you attack one.

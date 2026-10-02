@@ -120,7 +120,8 @@ public final class HexServer {
         // player, the point is the one the server's own ray finds, and both are read there.
         if(action==WARP_RECALL){Warping.recall(p);return;}
         if(action==UTILITY&&HexData.selected(p)==Ability.WARPING&&Warping.sovereign(p)){Warping.utility(p);return;}
-        if(action==UTILITY){Telekinesis.release(p,false);Architecture.forget(p);TemporalEngine.clear(p);dismissRift(p);return;}
+        // The wall's dismissal lives here, now that there is no alternate key: with it chosen, letting go takes it down.
+        if(action==UTILITY){Telekinesis.release(p,false);Architecture.forget(p);if(HexData.selected(p)==Ability.ARCHITECTURE)Architecture.dismiss(p);TemporalEngine.clear(p);dismissRift(p);return;}
         if(action==WEAPON){weapon(p,value!=0);return;}
         if(action==FLIGHT){CosmicFlight.toggle(p);return;}
         if(action==TIME){time(p,value);return;}
@@ -130,10 +131,11 @@ public final class HexServer {
         // Returning home must never depend on energy, mastery or the entry spell's recovery. The way
         // out follows whatever the owner's saved mode currently points at.
         if(a==Ability.WARPING&&(action==CAST||action==HOLD_BEGIN)&&Warping.leave(p))return;
-        // Telekinesis cast again while holding lets go, whatever its recovery says: letting go is always free.
-        if(a==Ability.TELEKINESIS&&action==CAST&&Telekinesis.holding(p)){Telekinesis.release(p,false);HexNetwork.sync(p);return;}
+        // Telekinesis cast again while holding throws, whatever its recovery says: the throw is the lift's own end, and
+        // free. (The utility key lets go gently.)
+        if(a==Ability.TELEKINESIS&&action==CAST&&Telekinesis.holding(p)){Telekinesis.release(p,true);HexNetwork.sync(p);return;}
         if(action==ALTERNATE&&secondary(p,a)){HexNetwork.sync(p);return;}
-        // Spells with no second action: the alternate key does nothing at all, rather than casting the plain spell again
+        // Spells with no second move: a stray alternate does nothing at all, rather than casting the plain spell again
         // (which, in the full transformation, quietly cast the untransformed one).
         if(action==ALTERNATE&&NO_ALTERNATE.contains(a))return;
         // Taking the mantle off is always free and always allowed: it drains energy while it is worn, and a
@@ -196,7 +198,7 @@ public final class HexServer {
         if(a==Ability.DAGGERS||a==Ability.TWIN_DAGGERS||a==Ability.LAEVATEINN){dismissWeapons(p);return true;}
         // The ultimate has no alternate action, and says so rather than falling through to the cast path.
         if(a==Ability.TIME_BRANCH){notice(p,"Tap for a charged right fist; hold and release for the torrent.");return true;}
-        // Gotcha!: the crown's tap of this key. It keeps its own recovery, apart from the crown's, and asks nothing else of the caster.
+        // Gotcha!: the crown's key tapped rather than held. It keeps its own recovery, apart from the crown's, and asks nothing else of the caster.
         if(a==Ability.ARSENAL){
             if(!HexData.unlocked(p,a)){notice(p,"This chapter of your story is still locked.");return true;}
             if(Arsenal.gotchaRecovering(p)){notice(p,"Gotcha! is recovering.");return true;}
@@ -286,7 +288,7 @@ public final class HexServer {
             case TIME_STOP -> {if(!TemporalEngine.beginStop(p))return false;return true;}
             case SELECTIVE_STOP -> {if(t==null||!validTarget(p,t)||!TemporalEngine.field(p,true,t,t instanceof Player?40:100))return false;gesture(p,"time_stop","bind",HexGodOfStories.STOP.get());return true;}
             // Anchor Being. Silent on purpose: no gesture, no sound, nothing that says a swap just happened.
-            case THREADS -> {if(secondary){notice(p,"Hold the alternate key for Gravity Grasp.");return false;}return AnchorBeing.cast(p);}
+            case THREADS -> {if(secondary){notice(p,"Hold Anchor Being's key for Gravity Grasp.");return false;}return AnchorBeing.cast(p);}
             // Worn, it is taken off before any cast is paid for (see the action handler); never charged for here.
             case ASCENSION -> {if(HexData.get(p).getBoolean("ascended")){dismissMantle(p);HexNetwork.sync(p);return false;}HexData.get(p).putBoolean("ascended",true);HexData.get(p).putLong("transformStart",now);HexData.energy(p,HexData.maxEnergy(p));Transformation.sustain(p);HexNetwork.fx(p,"ascend");p.level().playSound(null,p.blockPosition(),HexGodOfStories.ASCEND.get(),SoundSource.PLAYERS,.75f,1);return true;}
             default -> {return false;}
@@ -356,7 +358,7 @@ public final class HexServer {
         return false;
     }
 
-    /** Secondary on Living Projection: aim at a foe to set every decoy on it, aim at nothing to dismiss them all. */
+    /** Living Projection's key held: aim at a foe to set every decoy on it, aim at nothing to dismiss them all. */
     private static boolean commandOrDismiss(ServerPlayer p) {
         Entity aimed=target(p,26);
         List<IllusionEntity> mine=illusions(p);

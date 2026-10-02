@@ -210,7 +210,7 @@ public final class MasteryScreen extends Screen {
     private void keys(GuiGraphics g,CompoundTag data,int mx,int my) {
         String hint=pending>=0?"Now click the ability to bind to "+QuickBar.key(pending)+".   (Esc or click the key again to stop.)"
             :picked!=null&&!picked.dedicated&&unlocked(data,picked)?"Click a key below, or press it, to bind "+picked.title+"."
-            :"Pick an ability, then a key — or a key, then an ability. In game, a key casts what is bound to it.";
+            :"Pick an ability, then a key — or a key, then an ability. In game: tap a key to cast, hold it for the second move.";
         g.drawString(font,HexUi.fit(font,hint,w-24),left+12,keysY-12,pending>=0||picked!=null?GOLD:DIM,false);
         long now=ClientState.now();
         for(int i=0;i<HexData.QUICK_SLOTS;i++) {

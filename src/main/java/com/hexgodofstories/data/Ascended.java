@@ -47,14 +47,14 @@ public final class Ascended {
             case ARCHITECTURE -> "The wall grows twice as fast and stands half as long again, and it is real to everyone but you: other players are shoved back from it, and arrows and anything else thrown into it are swallowed.";
             case BOLT -> "Five bolts fanned out at once, each turning after the nearest creature ahead of it. The charged throw is unchanged.";
             case PUSH -> "\"I said... kneel.\" Everything you could harm within twelve blocks is hammered to the ground: three hearts, held there three seconds, and slow to rise.";
-            case TELEKINESIS -> "Everything in a wide cone in front of you is lifted at once, up to twelve, in the green glow: creatures, players, and arrows or anything else thrown that is still in the air, which become yours to throw back. The alternate key throws them all; casting again lets them go.";
+            case TELEKINESIS -> "Everything in a wide cone in front of you is lifted at once, up to twelve, in the green glow: creatures, players, and arrows or anything else thrown that is still in the air, which become yours to throw back. Cast again to throw them all; the utility key lets them go.";
             case BLINK -> "Look at a creature or player within thirty two blocks and step out right behind it, facing its back. Look at nothing and the step goes twice as far.";
             case WARD -> "Six seconds of the veil, and whatever strikes you is struck back: three quarters of each blow returns to whoever dealt it, and projectiles turn round and fly back at whoever loosed them.";
             case ENCHANT -> "Every creature within ten blocks that you could charm is charmed at once, up to six, for twice as long; a player in your look drops what they are holding and reels.";
             case MEMORY -> "Everything living within forty eight blocks glows through walls for twelve seconds, and the one you look at shows its trail as before.";
             case REWIND -> "Rewind as ever, and every blow you took in those ten seconds lands on whoever dealt it.";
             case WARPING -> "No hold: a tap of the cast key opens the pool at once at its full size where you look, for the full cost.";
-            case ARSENAL -> "The alternate key's Gotcha! sends four small missiles instead of a gun. Slow and wandering, they hunt the body you looked at, five hearts and a small blast each, and can be outrun or dodged.";
+            case ARSENAL -> "A tap's Gotcha! sends four small missiles instead of a gun. Slow and wandering, they hunt the body you looked at, five hearts and a small blast each, and can be outrun or dodged.";
             case THREADS -> "The copy's blast is sixty blocks across and whites out the eyes of anyone watching it; two minutes' recovery.";
             default -> "";
         };

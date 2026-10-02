@@ -15,11 +15,11 @@ import net.minecraftforge.fml.common.Mod;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * Seven bind slots along the bottom row of the keyboard, one mastery key, and contextual primary and
- * secondary actions. Pressing a slot's key chooses the ability bound to it, at once; the cast key casts
- * it and the alternate key does its other thing. Abilities that charge are driven by the press and
- * release of the cast key rather than a second binding, so the scheme stays small no matter how much
- * progression adds.
+ * Seven bind slots along the bottom row of the keyboard, one mastery key, and one cast key. Pressing a slot's key
+ * chooses the ability bound to it and casts it, at once; the cast key casts the last one chosen again. A spell with a
+ * second move makes it on the same key held rather than tapped, so there is no alternate key to reach for: G is
+ * Warping's alone, where the pool leads. Abilities that charge are driven by the press and release of their key
+ * rather than a second binding, so the scheme stays small no matter how much progression adds.
  *
  * <p>The time controls are the exception, and deliberately so. Stopping, rewinding and branching are
  * not spells to be chosen — they are commands, and each owns a permanent key that works whatever else
@@ -32,7 +32,7 @@ public final class HexClient {
     public static final KeyMapping MENU=key("mastery",GLFW.GLFW_KEY_K),
         PRIMARY=key("primary",GLFW.GLFW_KEY_R),SECONDARY=key("secondary",GLFW.GLFW_KEY_G),
         TRANSFORM=key("transform",GLFW.GLFW_KEY_H),RELEASE=key("utility",GLFW.GLFW_KEY_U),FLIGHT=key("flight",GLFW.GLFW_KEY_J),
-        /** Warping's other direction: reach into the realm chosen with G and pull its creatures out. */
+        /** Warping's other direction: reach into the realm chosen with G (Warping's own key) and pull its creatures out. */
         RECALL=key("recall",GLFW.GLFW_KEY_Y),
         TIME_STOP=key("halt",GLFW.GLFW_KEY_I),
         TIME_REWIND=key("rewind",GLFW.GLFW_KEY_O),TIME_BRANCH=key("branch",GLFW.GLFW_KEY_LEFT_ALT);
@@ -45,21 +45,21 @@ public final class HexClient {
         for(int i=0;i<SLOTS.length;i++)SLOTS[i]=key("slot_"+(i+1),keys[i]);
     }
     private static KeyMapping key(String name,int key){return new KeyMapping("key.hexgodofstories."+name,InputConstants.Type.KEYSYM,key,"key.categories.hexgodofstories");}
-    private static boolean primaryDown,primaryWasHold,primaryLatched;
+    private static boolean primaryDown,primaryLatched;
     /**
-     * What each slot key is doing while it is down: nothing; a cast already sent; a hold under way; or, for the two
-     * spells that are one thing tapped and another held (the Crown: tap for Gotcha!, hold for the crown; Anchor Being:
-     * tap to vanish, hold for Gravity Grasp), waiting to see which, and then the long one under way.
+     * What each casting key is doing while it is down: nothing; a cast already sent; a hold under way; or, for a spell
+     * that is one thing tapped and another held (see {@link QuickBar#twoWay}), waiting to see which, and then the long
+     * one made or under way.
      */
     private static final int SLOT_IDLE=0,SLOT_CAST=1,SLOT_HOLD=2,SLOT_DECIDING=3,SLOT_LONG=4;
     /** Ticks a key must stay down to count as held rather than tapped: a quarter of a second. */
     private static final int SLOT_TAP=5;
-    private static final int[] slotState=new int[com.hexgodofstories.data.HexData.QUICK_SLOTS];
-    private static final long[] slotSince=new long[com.hexgodofstories.data.HexData.QUICK_SLOTS];
-    private static final Ability[] slotAbility=new Ability[com.hexgodofstories.data.HexData.QUICK_SLOTS];
+    /** The casting keys: the seven slots, then the cast key itself, which follows the same tap and hold. */
+    private static final int CAST_KEY=com.hexgodofstories.data.HexData.QUICK_SLOTS;
+    private static final int[] slotState=new int[CAST_KEY+1];
+    private static final long[] slotSince=new long[CAST_KEY+1];
+    private static final Ability[] slotAbility=new Ability[CAST_KEY+1];
     private static long clientTicks;
-    /** The alternate key held as Gravity Grasp (Anchor Being chosen): its release must always reach the server. */
-    private static boolean graspDown;
     private static int repeat;
     /** The server syncs this flag. Missing/false means this client gets no mod UI or controls at all. */
     public static boolean enabled(){return ClientState.self().getBoolean("abilitiesEnabled");}
@@ -127,15 +127,14 @@ public final class HexClient {
             ClientState.tick();
             clientTicks++;
             Minecraft mc=Minecraft.getInstance();
-            if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;graspDown=false;slotsCancel(false);return;}
+            if(mc.player==null){BranchKeyInput.cancel(false);primaryDown=false;slotsCancel(false);return;}
             if(!enabled()) {
                 // Locked means invisible and inert, not merely server-rejected. Swallow every mod input
                 // and close any mod-only screen immediately when access is revoked.
                 BranchKeyInput.cancel(false);
                 ScepterClient.input(false);
                 primaryLatched=primaryPhysicallyDown();
-                primaryDown=false;primaryWasHold=false;repeat=0;
-                if(graspDown){graspDown=false;HexNetwork.send(HexServer.GRASP_END,0);}
+                primaryDown=false;repeat=0;
                 slotsCancel(true);
                 if(mc.screen instanceof WarpScreen||mc.screen instanceof MasteryScreen||mc.screen instanceof FractureScreen)mc.setScreen(null);
                 drain();return;
@@ -147,17 +146,12 @@ public final class HexClient {
                 // so a key that is still physically held would read as a brand new press the moment
                 // the screen closes. Crossing a dimension puts the terrain screen up mid-hold, which
                 // is exactly how arriving in the sanctum used to open a second break on arrival.
-                if(primaryDown){primaryDown=false;primaryLatched=true;if(primaryWasHold)HexNetwork.send(HexServer.HOLD_END,0);}
-                if(graspDown){graspDown=false;HexNetwork.send(HexServer.GRASP_END,0);}
+                if(primaryDown){primaryDown=false;primaryLatched=true;}
                 slotsCancel(true);
                 drain();return;
             }
             // A tap-or-hold spell still down after a quarter of a second is being held: its long form begins.
-            for(int i=0;i<slotState.length;i++)
-                if(slotState[i]==SLOT_DECIDING&&clientTicks-slotSince[i]>=SLOT_TAP) {
-                    HexNetwork.send(slotAbility[i]==Ability.ARSENAL?HexServer.HOLD_BEGIN:HexServer.GRASP_BEGIN,0);
-                    slotState[i]=SLOT_LONG;
-                }
+            for(int i=0;i<slotState.length;i++)if(slotState[i]==SLOT_DECIDING&&clientTicks-slotSince[i]>=SLOT_TAP)pressLong(i);
             while(MENU.consumeClick())mc.setScreen(new MasteryScreen(false));
             // The Scepter's right click is read from the key itself: its hold is the charge.
             ScepterClient.input(mc.options.keyUse.isDown());
@@ -167,27 +161,21 @@ public final class HexClient {
             // A cast that was interrupted needs a real release before it counts as pressed again.
             if(primaryLatched){if(primaryPhysicallyDown())primary=false;else primaryLatched=false;}
             BranchKeyInput.tick();
-            if(primary&&!primaryDown){primaryWasHold=selected.hold;HexNetwork.send(selected.hold?HexServer.HOLD_BEGIN:HexServer.CAST,0);repeat=0;}
-            // Holding an ordinary spell repeats it; the server's own rate limit and cooldown set the pace.
-            else if(primary&&!selected.hold&&++repeat>=5){repeat=0;HexNetwork.send(HexServer.CAST,0);}
-            if(!primary&&primaryDown&&primaryWasHold)HexNetwork.send(HexServer.HOLD_END,0);
+            if(primary&&!primaryDown){repeat=0;pressBegin(CAST_KEY,selected);}
+            // Holding an ordinary spell repeats it; the server's own rate limit and cooldown set the pace. Not
+            // Telekinesis, whose second cast throws what the first one lifted.
+            else if(primary&&slotState[CAST_KEY]==SLOT_CAST&&slotAbility[CAST_KEY]!=Ability.TELEKINESIS&&++repeat>=5){repeat=0;HexNetwork.send(HexServer.CAST,0);}
+            if(!primary&&primaryDown)pressEnd(CAST_KEY);
             primaryDown=primary;
 
-            // With Anchor Being chosen the alternate key is held, not tapped: Gravity Grasp for as long as it is down.
-            boolean grasp=SECONDARY.isDown()&&selected==Ability.THREADS;
-            if(grasp&&!graspDown)HexNetwork.send(HexServer.GRASP_BEGIN,0);
-            if(!grasp&&graspDown)HexNetwork.send(HexServer.GRASP_END,0);
-            graspDown=grasp;
-            // G chooses a Warping destination in ordinary worlds. Inside any Warping realm
-            // (including the World Tree), it directly opens the World Tree exit selector.
+            // G is Warping's key, whatever is chosen: where the pool leads, in ordinary worlds. Inside any Warping
+            // realm (including the World Tree), it opens the World Tree exit selector instead. No other spell has an
+            // alternate key any more; their second moves are their own keys held.
             while(SECONDARY.consumeClick()) {
-                Ability live=Ability.at(ClientState.self().getInt("selected"));
-                if(live==Ability.THREADS)continue;
-                if(live==Ability.WARPING) {
-                    if(com.hexgodofstories.server.PocketRealm.inside(mc.player.level())
-                        || com.hexgodofstories.warping.Destination.from(mc.player.level())!=null)FractureScreen.open();
-                    else mc.setScreen(new WarpScreen());
-                } else HexNetwork.send(HexServer.ALTERNATE,0);
+                if(!MasteryScreen.unlocked(ClientState.self(),Ability.WARPING))continue;
+                if(com.hexgodofstories.server.PocketRealm.inside(mc.player.level())
+                    || com.hexgodofstories.warping.Destination.from(mc.player.level())!=null)FractureScreen.open();
+                else mc.setScreen(new WarpScreen());
             }
             while(TRANSFORM.consumeClick())HexNetwork.send(HexServer.TRANSFORM,0);
             while(RELEASE.consumeClick())HexNetwork.send(HexServer.UTILITY,0);
@@ -202,6 +190,7 @@ public final class HexClient {
             BranchKeyInput.cancel(false);
             if(primaryDown||primaryPhysicallyDown())primaryLatched=true;
             primaryDown=false;
+            slotState[CAST_KEY]=SLOT_IDLE;slotAbility[CAST_KEY]=null;
         }
         private static boolean primaryPhysicallyDown() {
             InputConstants.Key key=PRIMARY.getKey();
@@ -232,40 +221,67 @@ public final class HexClient {
             for(int i=0;i<SLOTS.length;i++)if(SLOTS[i].matchesMouse(e.getButton())){slotEdge(i,e.getAction()==GLFW.GLFW_PRESS);return;}
         }
 
-        /**
-         * A slot key goes down or comes up. Down, it chooses its ability and casts it at once: a plain spell goes off,
-         * a held one begins and lasts while the key is down. The Crown and Anchor Being wait a quarter of a second to
-         * see whether they are being tapped or held (see tick).
-         */
+        /** A slot key goes down or comes up. Down, it chooses its ability and casts it (see pressBegin). */
         private static void slotEdge(int i,boolean down) {
             if(down) {
                 if(slotState[i]!=SLOT_IDLE)return;
                 Ability a=QuickBar.press(i);
-                if(a==null)return;
-                slotAbility[i]=a;slotSince[i]=clientTicks;
-                if(a==Ability.ARSENAL||a==Ability.THREADS){slotState[i]=SLOT_DECIDING;return;}
-                if(a.hold){HexNetwork.send(HexServer.HOLD_BEGIN,0);slotState[i]=SLOT_HOLD;return;}
-                HexNetwork.send(HexServer.CAST,0);slotState[i]=SLOT_CAST;
+                if(a!=null)pressBegin(i,a);
                 return;
             }
+            pressEnd(i);
+        }
+
+        /**
+         * A casting key goes down: a plain spell goes off at once, a held one begins and lasts while the key is down.
+         * A spell with a second move waits a quarter of a second to see whether it is being tapped or held (see tick).
+         */
+        private static void pressBegin(int i,Ability a) {
+            slotAbility[i]=a;slotSince[i]=clientTicks;
+            if(QuickBar.twoWay(a)){slotState[i]=SLOT_DECIDING;return;}
+            if(a.hold){HexNetwork.send(HexServer.HOLD_BEGIN,0);slotState[i]=SLOT_HOLD;return;}
+            HexNetwork.send(HexServer.CAST,0);slotState[i]=SLOT_CAST;
+        }
+        /**
+         * Held past a tap: the second move. The Crown's and Gravity Grasp's last while the key stays down; the rest are
+         * made once, here, and the key's release then does nothing.
+         */
+        private static void pressLong(int i) {
+            Ability a=slotAbility[i];
+            reselect(i);
+            HexNetwork.send(a==Ability.ARSENAL?HexServer.HOLD_BEGIN:a==Ability.THREADS?HexServer.GRASP_BEGIN:HexServer.ALTERNATE,0);
+            slotState[i]=SLOT_LONG;
+        }
+        private static void pressEnd(int i) {
             Ability a=slotAbility[i];int state=slotState[i];
             slotState[i]=SLOT_IDLE;slotAbility[i]=null;
             if(a==null)return;
             switch(state) {
                 case SLOT_HOLD -> HexNetwork.send(HexServer.HOLD_END,0);
-                // Tapped: the Crown's Gotcha!, or Anchor Being's vanishing.
-                case SLOT_DECIDING -> HexNetwork.send(a==Ability.ARSENAL?HexServer.ALTERNATE:HexServer.CAST,0);
-                case SLOT_LONG -> HexNetwork.send(a==Ability.ARSENAL?HexServer.HOLD_END:HexServer.GRASP_END,0);
+                // Tapped: the spell itself, or the Crown's Gotcha!.
+                case SLOT_DECIDING -> {reselect(i);HexNetwork.send(a==Ability.ARSENAL?HexServer.ALTERNATE:HexServer.CAST,0);}
+                case SLOT_LONG -> {
+                    if(a==Ability.ARSENAL)HexNetwork.send(HexServer.HOLD_END,0);
+                    if(a==Ability.THREADS)HexNetwork.send(HexServer.GRASP_END,0);
+                }
                 default -> {}
             }
         }
+        /**
+         * A tap or hold decided late must reach the spell its key began, even if another slot was pressed meanwhile:
+         * the slot is chosen again first (free, and nothing at all when it is still the chosen one).
+         */
+        private static void reselect(int i) {
+            if(i<CAST_KEY&&ClientState.self().getInt("selected")!=slotAbility[i].ordinal())QuickBar.press(i);
+        }
 
-        /** Every slot key let go at once: a screen opening, access taken away, the world gone. */
+        /** Every casting key let go at once: a screen opening, access taken away, the world gone. */
         private static void slotsCancel(boolean tell) {
             for(int i=0;i<slotState.length;i++) {
-                if(tell&&slotAbility[i]!=null) {
-                    if(slotState[i]==SLOT_HOLD)HexNetwork.send(HexServer.HOLD_END,0);
-                    if(slotState[i]==SLOT_LONG)HexNetwork.send(slotAbility[i]==Ability.ARSENAL?HexServer.HOLD_END:HexServer.GRASP_END,0);
+                Ability a=slotAbility[i];
+                if(tell&&a!=null) {
+                    if(slotState[i]==SLOT_HOLD||slotState[i]==SLOT_LONG&&a==Ability.ARSENAL)HexNetwork.send(HexServer.HOLD_END,0);
+                    if(slotState[i]==SLOT_LONG&&a==Ability.THREADS)HexNetwork.send(HexServer.GRASP_END,0);
                 }
                 slotState[i]=SLOT_IDLE;slotAbility[i]=null;
             }

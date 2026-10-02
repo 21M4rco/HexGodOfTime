@@ -281,7 +281,7 @@ public final class ArsenalLayout {
     // ------------------------------------------------------------------ Gotcha!
 
     /**
-     * Gotcha!, the alternate key tapped with the crown chosen: one gun forms without a sound a little way behind the
+     * Gotcha!, the crown's key tapped rather than held: one gun forms without a sound a little way behind the
      * body the caster looks at, over {@link #SNEAK_FORM} ticks, turned on its back the whole while; it fires once at
      * {@link #SNEAK_FIRE}, and comes apart from {@link #SNEAK_GONE}. It is always an RPK ({@link #SNEAK_TYPE}).
      */

@@ -592,7 +592,7 @@ public final class Arsenal {
     // ------------------------------------------------------------------ Gotcha!
 
     /**
-     * Gotcha!: the alternate key tapped with the crown chosen. A single gun forms, without a sound, a little way
+     * Gotcha!: the crown's key tapped rather than held. A single gun forms, without a sound, a little way
      * behind the body the caster looks at, turned on its back the whole while, and shoots it once in the back: ten
      * hearts, a bigger hole than a round's and five seconds of pouring. It leaves the same recovery as a crown held
      * to its missiles. Nothing happens, and nothing is spent, when there is no body in the look or no room behind it.

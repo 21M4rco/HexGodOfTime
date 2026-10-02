@@ -64,29 +64,37 @@ public final class HexHud {
         String castKey=bound>=0?QuickBar.shortKey(QuickBar.key(bound)):primary;
         var lines=mc.font.split(net.minecraft.network.chat.Component.literal(castKey+"  "+head),WIDTH-14);
         for(int i=0;i<Math.min(2,lines.size());i++)g.drawString(mc.font,lines.get(i),7,32+i*10,variant?0xe8d49c:fracture?0xd8ecdd:0xc9d8ce,false);
-        String hint=!fracture?alternate(a):home?"Choose where the break leads":"";
-        if(a==Ability.WARPING)hint=com.hexgodofstories.warping.Destination.at(d.getInt("warpDestination")).title;
+        // The second line: the spell's second move, on its own key held (the key named first), or G for Warping's
+        // destination, the one spell that still has a key of its own for it.
+        String release=QuickBar.shortKey(HexClient.RELEASE.getTranslatedKeyMessage().getString());
+        String hint=fracture?(home?"Choose where the break leads":""):QuickBar.held(a);
+        String lead=fracture?secondary:hint.isEmpty()?"":"Hold "+castKey;
+        if(a==Ability.WARPING){hint=com.hexgodofstories.warping.Destination.at(d.getInt("warpDestination")).title;lead=secondary;}
+        if(a==Ability.TELEKINESIS){hint="Again: throw  \u00b7  "+release+": let go";lead="";}
+        if(a==Ability.ARCHITECTURE){hint=release+": take the wall down";lead="";}
         if(a==Ability.THREADS) {
             // Gravity Grasp keeps its own recovery, apart from Anchor Being's shown above.
             long grasp=d.getLong(com.hexgodofstories.server.GravityGrasp.READY)-ClientState.now();
             if(grasp>0&&grasp<=com.hexgodofstories.server.GravityGrasp.RECOVERY)hint=String.format(Locale.ROOT,"Gravity Grasp %.1fs",grasp/20f);
         }
         if(a==Ability.ARSENAL) {
-            // Gotcha! keeps its own recovery, apart from the crown's shown above; worn, the mantle makes it a swarm.
-            if(d.getBoolean("ascended"))hint="Gotcha! Swarm";
+            // Gotcha! is the tap, and keeps its own recovery, apart from the crown's shown above; worn, the mantle
+            // makes it a swarm.
+            hint=d.getBoolean("ascended")?"Gotcha! Swarm":"Gotcha!";lead="Tap "+castKey;
             long gotcha=d.getLong(com.hexgodofstories.server.Arsenal.GOTCHA_READY)-ClientState.now();
             if(gotcha>0&&gotcha<=com.hexgodofstories.server.Arsenal.SWARM_RECOVERY)hint=String.format(Locale.ROOT,"%s %.1fs",hint,gotcha/20f);
         }
-        if(a==Ability.TIME_STOP)hint="Press "+HexClient.TIME_STOP.getTranslatedKeyMessage().getString()+" again to resume";
+        if(a==Ability.TIME_STOP){hint="Press "+HexClient.TIME_STOP.getTranslatedKeyMessage().getString()+" again to resume";lead="";}
         if(a==Ability.TIME_BRANCH) {
             long remaining=Math.max(0,d.getLong(BranchFistState.UNTIL)-ClientState.now());
             long fistCd=Math.max(0,d.getLong(BranchFistState.COOLDOWN)-ClientState.now());
             hint=remaining>0?String.format(Locale.ROOT,"Right fist: %.1fs — punch",remaining/20f)
                 :fistCd>0?String.format(Locale.ROOT,"Tap recovery %.1fs",fistCd/20f):"Tap ready | Cost "+BranchFistState.COST;
         }
-        if(!hint.isEmpty())g.drawString(mc.font,(a==Ability.TIME_BRANCH?"":secondary+"  ")+hint,7,54,fracture?0xc0b184:0x9cb6a6,false);
+        if(a==Ability.TIME_BRANCH)lead="";
+        if(!hint.isEmpty())g.drawString(mc.font,HexUi.fit(mc.font,(lead.isEmpty()?"":lead+"  ")+hint,WIDTH-14),7,54,fracture?0xc0b184:0x9cb6a6,false);
         String first=QuickBar.shortKey(QuickBar.key(0)),last=QuickBar.shortKey(QuickBar.key(HexData.QUICK_SLOTS-1));
-        g.drawString(mc.font,first+"\u2013"+last+" cast \u00b7 "+primary+" again \u00b7 "+secondary+" alt",7,67,0x779d87,false);
+        g.drawString(mc.font,HexUi.fit(mc.font,first+"\u2013"+last+" tap: cast \u00b7 hold: more \u00b7 "+primary+" again",WIDTH-14),7,67,0x779d87,false);
         float max=HexData.MAX_ENERGY,energy=d.getFloat("energy");
         String value="Energy "+Math.round(energy)+" / "+Math.round(max);
         g.drawString(mc.font,value,7,82,0xb3cbbd,false);
@@ -140,7 +148,7 @@ public final class HexHud {
             case ARCHITECTURE -> "Hold: raise a wall, Small to Massive.";
             case BOLT -> "Hurl a bolt of emerald seidr.";
             case PUSH -> "Push nearby enemies away.";
-            case TELEKINESIS -> "Grab / let go. Scroll: closer or further.";
+            case TELEKINESIS -> "Grab; again: throw. Scroll: closer/further.";
             case BLINK -> "Teleport toward your aim.";
             case WARD -> "Raise a defensive veil.";
             case DAGGERS -> "Conjure a dagger in an empty hand.";
@@ -157,28 +165,6 @@ public final class HexHud {
             case ASCENSION -> "Toggle your final transformation.";
             case TIME_BRANCH -> "Tap: right fist. Hold/release: beam.";
             case ARSENAL -> "Tap: Gotcha! Hold: the crown (13s: missiles).";
-        };
-    }
-    private static String alternate(Ability a) {
-        return switch(a) {
-            case WARPING -> "Choose dimensional destination";
-            case RIFT -> "Close the break / open the way out";
-            case DUPLICATE -> "Direct / dismiss decoys";
-            case PROJECTION_SWAP -> "Place a decoy at your aim";
-            case MASQUERADE -> "Remove disguise";
-            case ARCHITECTURE -> "Dismiss the wall";
-            case BOLT -> "Charged throw, bursts on impact";
-            case TELEKINESIS -> "Throw held target";
-            case DAGGERS,TWIN_DAGGERS,LAEVATEINN -> "Dismiss weapons";
-            case ENCHANT -> "Direct charmed creatures";
-            case SLOW_FIELD -> "";
-            case TIME_STOP -> "Press again to resume";
-            case SELECTIVE_STOP -> "Exempt an ally";
-            case THREADS -> "Hold: Gravity Grasp";
-            case TIME_BRANCH -> "None — release the cast key to fire";
-            case ARSENAL -> "Gotcha!";
-            // Nothing else to do: the alternate key does nothing for these, and the panel says nothing about it.
-            default -> "";
         };
     }
 }

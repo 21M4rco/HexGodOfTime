@@ -9,7 +9,8 @@ import net.minecraft.nbt.CompoundTag;
 
 /**
  * The seven bind slots, along the bottom row of the keyboard: Z X C V B N M. Pressing a slot's key chooses the
- * ability bound to it on the spot, with nothing to open and nothing to scroll; the cast key then casts it. The slots
+ * ability bound to it on the spot and casts it, with nothing to open and nothing to scroll; holding it instead makes
+ * the spell's second move, if it has one ({@link #held}). The slots
  * are drawn as a strip over the ability panel, each under its own key, so which ability answers to which key is
  * always on screen. Slot contents live in player data, so a layout survives relogging and death.
  */
@@ -110,6 +111,28 @@ public final class QuickBar {
             g.pose().popPose();
         }
     }
+
+    /**
+     * A spell's second move, made by holding its key (a slot's or the cast key) rather than tapping it, or empty when
+     * the spell has none and its key simply casts it. The Crown is the other way round: tapped it is Gotcha!, and the
+     * crown itself is the hold.
+     */
+    public static String held(Ability a) {
+        return switch(a) {
+            case DUPLICATE -> "Direct / dismiss decoys";
+            case PROJECTION_SWAP -> "Place a decoy at your aim";
+            case MASQUERADE -> "Remove disguise";
+            case BOLT -> "Charged throw, bursts on impact";
+            case DAGGERS,TWIN_DAGGERS,LAEVATEINN -> "Dismiss weapons";
+            case ENCHANT -> "Direct charmed creatures";
+            case SELECTIVE_STOP -> "Spare an ally from the field";
+            case THREADS -> "Gravity Grasp";
+            case ARSENAL -> "The crown";
+            default -> "";
+        };
+    }
+    /** Whether a key casting this spell must wait to see a tap from a hold. */
+    public static boolean twoWay(Ability a) {return !held(a).isEmpty();}
 
     /** A slot's few letters: room for a word, never a title. */
     static String tag(Ability a) {
