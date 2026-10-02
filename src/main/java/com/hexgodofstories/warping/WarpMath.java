@@ -51,6 +51,18 @@ public final class WarpMath {
         return .84-.13*s;
     }
 
+    /**
+     * The sink as a body actually feels it: it is oil, not water. It takes hold gently at the surface (half its rate with
+     * the feet just in) and harder as the body goes down, full by the knees. Server and client both sink by this.
+     */
+    public static double viscousSink(double strength,double depth){
+        double grip=.5+.5*Math.min(1,Math.max(0,depth/.7));
+        return sinkRate(strength)*grip;
+    }
+
+    /** Sideways through it: thicker than the old goo, so wading is a heave rather than a walk. */
+    public static double viscousDrag(double strength){return sinkDrag(strength)*.82;}
+
     public static double gooPull(double strength){
         double s=Math.min(1,Math.max(0,strength));
         return .004+.018*s*s;

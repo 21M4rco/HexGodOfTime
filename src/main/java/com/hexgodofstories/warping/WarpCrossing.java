@@ -35,11 +35,12 @@ import java.util.*;
  * a player stands on the pool for ever. {@code CrossingPhysicsMixin} re-asserts it in the gap
  * between that assignment and the movement, and {@link #sinking} is the question it asks.
  *
- * <p><b>The opening is the pool's own outline, not a box around it.</b> Nine points of the body's
- * own footprint are asked whether they are over liquid; over half of them and the middle one must
- * be, so a body standing at the rim with one foot in stays standing on the floor. The floor height
- * is asked of {@link WarpSurface} per column, exactly as the pool is drawn, so liquid lying across a
- * step behaves as the step does.
+ * <p><b>It is a liquid: whatever touches it, it takes.</b> Nine points of the body's own footprint
+ * are asked whether they are over the pool (its middle, and the edges and corners of it a hair
+ * past its width), and any one is enough: a foot at the rim, a corner of the body over a block's
+ * corner of liquid, all of it sinks, drawn slowly in toward the middle as it goes. The floor height
+ * is asked of {@link WarpSurface} where the body touches the liquid, exactly as the pool is drawn, so
+ * liquid lying across a step behaves as the step does.
  *
  * <p><b>Crossing is the head, not the feet.</b> The transfer waits until the eye — the camera, for a
  * player — is under the local plane, so feet, legs and chest go through first and the world changes
@@ -146,6 +147,16 @@ public final class WarpCrossing {
     private static final Map<UUID, Long> SETTLING = new HashMap<>();
 
     public static boolean crossing(Entity e) { return !PASSAGES.isEmpty() && PASSAGES.containsKey(e.getUUID()); }
+
+    /**
+     * Whether this body is anywhere in a pool's keeping: going down through one, rising out of one on the far side, or
+     * just come out of one. None of that is ever a body stuck in the ground: nothing in it suffocates (ServerEvents).
+     */
+    public static boolean held(Entity e) {
+        if (crossing(e) || WarpEmergence.active(e)) return true;
+        Long settling = SETTLING.get(e.getUUID());
+        return settling != null && settling > e.level().getGameTime();
+    }
 
     /**
      * Whether this client is currently honouring a grant, asked of the client rather than of the
@@ -261,6 +272,7 @@ public final class WarpCrossing {
         e.noPhysics = true;
         sink(e, passage);
         phase(e, passage.plane, now, passage.strength, passage.centerX, passage.centerZ);
+        gloop(brk, passage, e, now);
         if (e.getY() + e.getEyeHeight() <= passage.plane - 0.02) cross(brk, passage, e, now);
     }
 
@@ -291,8 +303,8 @@ public final class WarpCrossing {
         double pull=WarpMath.gooPull(passage.strength);
         double px=distance>1.0E-5?dx/distance*pull:0;
         double pz=distance>1.0E-5?dz/distance*pull:0;
-        double drag=WarpMath.sinkDrag(passage.strength);
-        e.setDeltaMovement(v.x*drag+px,-WarpMath.sinkRate(passage.strength)+lift,v.z*drag+pz);
+        double drag=WarpMath.viscousDrag(passage.strength);
+        e.setDeltaMovement(v.x*drag+px,-WarpMath.viscousSink(passage.strength,passage.plane-e.getY())+lift,v.z*drag+pz);
         e.fallDistance=0;
         if(!(e instanceof ServerPlayer))e.hurtMarked=true;
     }
@@ -405,9 +417,13 @@ public final class WarpCrossing {
      * through, and that a hairline carries nobody wider than it is.
      */
     private static boolean open(Break brk, Entity e) {
-        if(WarpPool.footing(brk.shape(), e.getX() - brk.at().x, e.getZ() - brk.at().z,
-            Math.max(0.3, e.getBbWidth())))return true;
-        return verticalContact(brk,e);
+        return contact(brk,e)!=null||verticalContact(brk,e);
+    }
+
+    /** Where (in world x, z) this body touches the pool, or null when it does not (WarpPool#touching). */
+    private static double[] contact(Break brk, Entity e) {
+        double[] at=WarpPool.touching(brk.shape(), e.getX() - brk.at().x, e.getZ() - brk.at().z, Math.max(0.3, e.getBbWidth()));
+        return at==null?null:new double[]{at[0]+brk.at().x,at[1]+brk.at().z};
     }
 
     /**
@@ -431,10 +447,14 @@ public final class WarpCrossing {
         return false;
     }
 
-    /** The floor this body is going through, taken from the column it is actually standing in. */
+    /**
+     * The floor this body is going through: the liquid's own surface where the body touches it (its own column when its
+     * middle is over the pool, the nearest part of the pool under its edge when only that is).
+     */
     private static double plane(Break brk, Entity e) {
-        double dx = e.getX() - brk.at().x, dz = e.getZ() - brk.at().z;
-        return WarpSurface.height(brk.level(),e.getX(),e.getZ(),brk.at().x,brk.at().y,brk.at().z);
+        double[] at=contact(brk,e);
+        double x=at==null?e.getX():at[0],z=at==null?e.getZ():at[1];
+        return WarpSurface.height(brk.level(),x,z,brk.at().x,brk.at().y,brk.at().z);
     }
 
     // ------------------------------------------------------------------ what it looks like
@@ -455,6 +475,27 @@ public final class WarpCrossing {
         n.putDouble("centerZ",centerZ);
         n.putLong("until",now+5);
         HexNetwork.to(p,new HexNetwork.Message(HexNetwork.WARP_PHASE,e.getId(),n));
+    }
+
+    /**
+     * Going down through oil: every few ticks the surface puckers in round the body, a slow ring drawn inward, and it
+     * gives a thick, sucking sound now and then.
+     */
+    private static void gloop(Break brk, Passage passage, Entity e, long now) {
+        long t=now-passage.began;
+        ServerLevel level=brk.level();
+        if(t%6==0){
+            double y=passage.plane+.06,around=Math.max(.45,e.getBbWidth()*.8);
+            for(int i=0;i<6;i++){
+                double a=i*(Math.PI*2/6.0)+level.random.nextDouble()*.6;
+                level.sendParticles(net.minecraft.core.particles.ParticleTypes.SQUID_INK,
+                    e.getX()+Math.cos(a)*around,y,e.getZ()+Math.sin(a)*around,0,-Math.cos(a)*.05,-.02,-Math.sin(a)*.05,1);
+            }
+        }
+        if(t%14==7)level.playSound(null,BlockPos.containing(e.position()),net.minecraft.sounds.SoundEvents.HONEY_BLOCK_SLIDE,
+            SoundSource.PLAYERS,.45f,.45f+level.random.nextFloat()*.12f);
+        if(t%14==0)level.playSound(null,BlockPos.containing(e.position()),net.minecraft.sounds.SoundEvents.MUD_STEP,
+            SoundSource.PLAYERS,.5f,.6f+level.random.nextFloat()*.1f);
     }
 
     /** The surface parting as a body starts into it: a small ring of liquid drawn inward. Once. */

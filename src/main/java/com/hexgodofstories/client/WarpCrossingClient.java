@@ -108,8 +108,8 @@ public final class WarpCrossingClient {
         double pull=WarpMath.gooPull(phase.strength());
         double px=distance>1.0E-5?dx/distance*pull:0;
         double pz=distance>1.0E-5?dz/distance*pull:0;
-        double drag=WarpMath.sinkDrag(phase.strength());
-        player.setDeltaMovement(v.x*drag+px,-WarpMath.sinkRate(phase.strength())+banked,v.z*drag+pz);
+        double drag=WarpMath.viscousDrag(phase.strength());
+        player.setDeltaMovement(v.x*drag+px,-WarpMath.viscousSink(phase.strength(),phase.plane()-player.getY())+banked,v.z*drag+pz);
         player.fallDistance=0;
         banked=0;
     }

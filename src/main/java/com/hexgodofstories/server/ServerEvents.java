@@ -164,6 +164,9 @@ public final class ServerEvents {
         // the owner's own problem; blinking away from gravity would be nonsense.
         // Administrative death must bypass every mod ward, including erasure and stopped time.
         if(e.getSource().is(DamageTypes.GENERIC_KILL))return;
+        // A Warping pool's liquid is not the ground: nothing going down through one, rising out of one or just come out
+        // of one suffocates in the blocks it is passing through.
+        if(e.getSource().is(DamageTypes.IN_WALL)&&com.hexgodofstories.warping.WarpCrossing.held(e.getEntity())){e.setCanceled(true);return;}
         // The Deceiver's guard: a blow from the front is parried and its striker thrown back (SwordGuard).
         if(e.getEntity() instanceof ServerPlayer guard&&SwordGuard.parry(guard,e.getSource())){e.setCanceled(true);return;}
         var realm=com.hexgodofstories.warping.Destination.from(e.getEntity().level());
@@ -271,7 +274,7 @@ public final class ServerEvents {
         LivingEntity wanted=e.getNewTarget();
         if(HexServer.charmedAgainst(mob,wanted)){e.setCanceled(true);return;}
         if(wanted==null)return;
-        // A second after Veilstep, its caster is in no creature's mind: nothing takes them up.
+        // For a moment after Veilstep, its caster is in no creature's mind: nothing takes them up.
         if(wanted instanceof ServerPlayer veiled&&HexServer.veiled(veiled)){e.setCanceled(true);return;}
         if(wanted instanceof ServerPlayer worn&&Masquerade.deceives(mob,worn)){e.setCanceled(true);return;}
         if(wanted instanceof com.hexgodofstories.entity.IllusionEntity){Decoy.observe(mob,wanted);return;}

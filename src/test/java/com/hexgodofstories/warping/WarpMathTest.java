@@ -15,7 +15,7 @@ public final class WarpMathTest {
         spreads();
         spreadsRatherThanScaling();
         sizeIsPaidFor();
-        theEdgeIsAnEdge();
+        anythingTouchingIsTaken();
         quicksand();
         check(WarpMath.pull(10)>WarpMath.pull(40)&&WarpMath.pull(40)>WarpMath.pull(100),"inward pull intensifies");
         check(WarpMath.cellX(1024+200)==1024&&WarpMath.cellX(2048-100)==2048,"separate instances remain separate");
@@ -119,50 +119,41 @@ public final class WarpMathTest {
 
 
     /**
-     * The rim is an edge, not a trigger.
+     * The pool is a liquid: whatever touches it, it takes.
      *
-     * <p>A body now sinks through the pool rather than being teleported by touching it, which makes
-     * {@link WarpPool#footing} the thing that decides where the floor stops. Every property here is
-     * one that, if it stopped holding, would put the invisible square trigger back: a footprint that
-     * goes through dry floor beside the pool, a rule that ignores how wide the body asking is, or an
-     * edge with no band at all — which is what "you may stand with one foot in it" means in numbers.
+     * <p>A body sinks through the pool rather than being teleported by touching it, and {@link WarpPool#touching}
+     * decides what it takes: anything with any part of its footprint over the liquid, its edges and corners included,
+     * and nothing wholly on the floor beside it. Each property here is one that, if it stopped holding, would bring
+     * back a pool you can stand on the edge of, or a trigger reaching wider than the liquid.
      */
-    private static void theEdgeIsAnEdge(){
+    private static void anythingTouchingIsTaken(){
         double reach=WarpMath.reach(WarpMath.FULL_CHARGE);
         for(long seed=1;seed<=12;seed++){
             double[] rim=WarpPool.rim(seed,reach,1);
             double extent=WarpPool.extent(rim);
-            check(WarpPool.footing(rim,0,0,.6),"a body standing in the middle of a pool goes through it");
-            check(!WarpPool.footing(rim,extent+2,0,.6),"floor beside the pool stays floor");
-            int within=0,player=0,wide=0;
-            for(double x=-extent;x<=extent;x+=.12)for(double z=-extent;z<=extent;z+=.12){
+            check(WarpPool.touching(rim,0,0,.6)!=null,"a body standing in the middle of a pool goes through it");
+            check(WarpPool.touching(rim,extent+2,0,.6)==null,"floor well beside the pool stays floor");
+            for(double x=-extent-1;x<=extent+1;x+=.12)for(double z=-extent-1;z<=extent+1;z+=.12){
                 boolean liquid=WarpPool.inside(rim,x,z);
-                boolean small=WarpPool.footing(rim,x,z,.6),large=WarpPool.footing(rim,x,z,2.0);
-                // Both sizes need liquid under their middle. What differs is how much of the rest
-                // of them has to be over it, and on a lobed outline that is not a strict subset
-                // point by point — a wide footprint can reach across a notch that a narrow one sits
-                // in. It is a subset in the aggregate, which is the claim worth making.
-                check(!small||liquid,"nothing narrow goes through where there is no pool");
-                check(!large||liquid,"nothing wide goes through where there is no pool");
-                if(liquid)within++;
-                if(small)player++;
-                if(large)wide++;
+                double[] small=WarpPool.touching(rim,x,z,.6),large=WarpPool.touching(rim,x,z,2.0);
+                check(!liquid||small!=null&&large!=null,"a body over the pool is always taken, whatever its size");
+                // What it touches is a point of the pool, and one under the body.
+                if(small!=null)check(WarpPool.inside(rim,small[0],small[1])&&Math.abs(small[0]-x)<=.37&&Math.abs(small[1]-z)<=.37,
+                    "a body touches the pool under itself");
+                if(large!=null)check(WarpPool.inside(rim,large[0],large[1])&&Math.abs(large[0]-x)<=1.07&&Math.abs(large[1]-z)<=1.07,
+                    "a wide body touches the pool under itself");
+                // Nothing whose whole footprint is clear of the liquid is taken.
+                if(Math.sqrt(x*x+z*z)>extent+.6)check(small==null,"nothing narrow is taken from wholly beside the pool");
             }
-            check(within>0&&player>0,"the pool has somewhere to go through");
-            check(player<=within&&wide<=player,"what carries a body is never more than the pool itself");
-            // Standing at the rim with part of you over the liquid is standing on the floor. This
-            // is the whole of "you may put one foot in", and the thing that stops the outline from
-            // behaving like a trigger a little wider than it looks.
-            int overhanging=0;
-            for(int i=0;i<rim.length;i+=3){
+            // Stepping onto the edge is enough: a body whose middle is just outside the rim, its near side over the
+            // liquid, goes in.
+            int edge=0,taken=0;
+            for(int i=0;i<rim.length;i++){
                 double angle=i*Math.PI*2/rim.length,r=WarpPool.radius(rim,angle);
-                for(double out=.25;out<=.71;out+=.22){
-                    overhanging++;
-                    check(!WarpPool.footing(rim,Math.cos(angle)*(r+out),Math.sin(angle)*(r+out),2.0),
-                        "a body whose middle is outside the rim stands on the floor, however much of it overhangs");
-                }
+                edge++;
+                if(WarpPool.touching(rim,Math.cos(angle)*(r+.12),Math.sin(angle)*(r+.12),.6)!=null)taken++;
             }
-            check(overhanging>0,"the rim was actually walked");
+            check(taken*10>=edge*9,"a body stepping onto the edge of the pool is taken ("+taken+" of "+edge+")");
         }
     }
 

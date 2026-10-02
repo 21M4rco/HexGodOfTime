@@ -15,7 +15,7 @@ public enum Ability {
     BOLT(SORCERY,0,0,20,false,"Emerald Throw","Hurl a fistful of seidr. Hold its key: a charged throw that bursts where it lands."),
     PUSH(SORCERY,70,0,70,false,"Sovereign Push","Repel nearby threats without destroying the landscape."),
     TELEKINESIS(SORCERY,140,0,25,false,"Telekinesis","Aim at a creature or player to lift it in a green glow, your arm held out toward it. Scroll to push it away or pull it closer. Cast again to throw it; the utility key lets it go."),
-    BLINK(SORCERY,220,0,70,false,"Veilstep","Dissolve and reform at a safe position in your sightline, and stay unseen for a second after: invisible to every eye, and gone from the mind of every creature that was hunting you. A moment to open a combo from."),
+    BLINK(SORCERY,220,0,70,false,"Veilstep","Dissolve and reform at a safe position in your sightline, and stay unseen for a second and a half after: invisible to every eye, and gone from the mind of every creature that was hunting you. A moment to open a combo from."),
     WARD(SORCERY,330,0,220,false,"Runic Ward","Raise a brief defensive veil while remaining mobile."),
     // Save-compatible tombstone. Fracture's dimension now lives under Warping; never reorder/remove.
     RIFT(SORCERY,520,0,0,false,true,"Fracture (legacy)","The World Tree is now a Warping destination."),

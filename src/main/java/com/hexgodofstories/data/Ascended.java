@@ -48,7 +48,7 @@ public final class Ascended {
             case BOLT -> "Five bolts fanned out at once, each turning after the nearest creature ahead of it. The charged throw is unchanged.";
             case PUSH -> "\"I said... kneel.\" Everything you could harm within twelve blocks is hammered to the ground: three hearts, held there three seconds, and slow to rise.";
             case TELEKINESIS -> "Everything in a wide cone in front of you is lifted at once, up to twelve, in the green glow: creatures, players, and arrows or anything else thrown that is still in the air, which become yours to throw back. Cast again to throw them all; the utility key lets them go.";
-            case BLINK -> "Look at a creature or player within thirty two blocks and step out right behind it, facing its back. Look at nothing and the step goes twice as far. Unseen and unknown to every creature for a second after, as Veilstep is.";
+            case BLINK -> "Look at a creature or player within thirty two blocks and step out right behind it, facing its back. Look at nothing and the step goes twice as far. Unseen and unknown to every creature for a second and a half after, as Veilstep is.";
             case WARD -> "Six seconds of the veil, and whatever strikes you is struck back: three quarters of each blow returns to whoever dealt it, and projectiles turn round and fly back at whoever loosed them.";
             case ENCHANT -> "Every creature within ten blocks that you could charm is charmed at once, up to six, for twice as long; a player in your look drops what they are holding and reels.";
             case MEMORY -> "Everything living within forty eight blocks glows through walls for twelve seconds, and the one you look at shows its trail as before.";

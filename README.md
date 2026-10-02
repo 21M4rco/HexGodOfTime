@@ -1,8 +1,13 @@
 ## Paradise's price, kept; the fire sword points and burns like its blade
 
-- **Veilstep opens a combo.** For one second after the step (and after its transformed Behind You) you are gone:
+- **Warping pools are oil, not a trapdoor.** Whatever touches the liquid, it takes: a foot over the rim, a corner of
+  you over a block's corner of it, not just a body standing over its middle. It takes hold gently at the surface and
+  harder the deeper you go (full by the knees), sideways movement through it is a heave, you are drawn slowly toward
+  the middle, and the surface puckers in round you with a thick, sucking sound as you go down. Nothing suffocates in
+  it at any point: going down, rising out on the other side, or just come out.
+- **Veilstep opens a combo.** For a second and a half after the step (and after its transformed Behind You) you are gone:
   invisible to every eye (body, armour, what you hold, your name, no swirl of particles), every creature that was
-  hunting you loses you, and none can take you up again until the second is out. No longer than that.
+  hunting you loses you, and none can take you up again until it is out. No longer than that.
 - **What Paradise's candy takes stays taken.** Leaving the realm used to give the limbs back: the server had never
   given them, but the new world's client started the body afresh and was never told otherwise. Now it is told on every
   crossing; the limbs come back only with death.

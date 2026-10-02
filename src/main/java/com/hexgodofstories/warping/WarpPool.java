@@ -136,26 +136,22 @@ public final class WarpPool {
     }
 
     /**
-     * Whether a body of this width, standing here, is over enough pool to go through it.
+     * Where a body of this width standing here touches the pool, or null when no part of it does.
      *
-     * <p>A point is not what stands on a floor. Nine of the footprint's own points are asked — the
-     * middle and eight around it, spread to the body's width — and the middle must be over the pool
-     * with over half the rest. That makes the edge behave like the edge of a pool rather than like a
-     * trigger: stand beside it and nothing happens, put one foot in and nothing happens, and go
-     * through when most of you is over it. It also scales, so something two blocks across needs
-     * genuinely two blocks of liquid and a small creature can use a puddle that would not take a
-     * player.
+     * <p>The pool is a liquid, not a trapdoor: whatever any part of a body is over takes it. Its
+     * middle is asked first, then the eight points round the edge of its footprint (and a hair past
+     * it, so a foot on a block's corner counts), the sides and the corners alike. The point that
+     * touches is returned so the floor height can be read where the liquid actually is.
      */
-    public static boolean footing(double[] rim, double x, double z, double width) {
-        if (!inside(rim, x, z)) return false;
-        double spread = Math.max(0.12, width * 0.45);
-        int open = 1, total = 1;
+    public static double[] touching(double[] rim, double x, double z, double width) {
+        if (inside(rim, x, z)) return new double[]{x, z};
+        double reach = Math.max(0.15, width * 0.5) + 0.06;
         for (int ix = -1; ix <= 1; ix++) for (int iz = -1; iz <= 1; iz++) {
             if (ix == 0 && iz == 0) continue;
-            total++;
-            if (inside(rim, x + ix * spread, z + iz * spread)) open++;
+            double px = x + ix * reach, pz = z + iz * reach;
+            if (inside(rim, px, pz)) return new double[]{px, pz};
         }
-        return open * 2 >= total;
+        return null;
     }
 
     /** How far the pool reaches from its middle, for the volume the server has to look in. */

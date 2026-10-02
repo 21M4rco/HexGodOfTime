@@ -731,12 +731,12 @@ public final class HexServer {
         for(int i=0;i<8;i++){Vec3 v=goal.add(0,i*.5,0);if(safe(p,v))return v;}
         return null;
     }
-    /** How long Veilstep leaves its caster unseen, and unknown to every creature, after the step. */
-    static final int VEIL=20;
+    /** How long Veilstep leaves its caster unseen, and unknown to every creature, after the step: a second and a half. */
+    static final int VEIL=30;
     /**
-     * Veilstep's after-step: for one second the caster is gone from every eye (body, armour, what they hold and their
+     * Veilstep's after-step: for a second and a half the caster is gone from every eye (body, armour, what they hold and their
      * name: the vanish) and from every creature's mind. Whatever was hunting them loses them, and nothing can take them
-     * up again until the second is out (ServerEvents#target). A moment to open a combo from, no more.
+     * up again until it is out (ServerEvents#target). A moment to open a combo from, no more.
      */
     static void veil(ServerPlayer p) {
         long now=HexData.now(p);
