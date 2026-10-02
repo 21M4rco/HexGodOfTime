@@ -27,8 +27,9 @@ public final class HexHud {
         // charge read-out even if their quick bar happens to be empty.
         BranchMeter.render(g,screenWidth,screenHeight);
         if(a==null)return;
+        // Bottom right, clear of the chat (which owns the bottom left) and of the hotbar on any screen wide enough.
         int bottom=screenHeight-(screenWidth<540?54:8);
-        int x=8,y=bottom-(int)(HEIGHT*SCALE);
+        int x=screenWidth-8-(int)(WIDTH*SCALE),y=bottom-(int)(HEIGHT*SCALE);
         g.pose().pushPose();g.pose().translate(x,y,0);g.pose().scale(SCALE,SCALE,1);
         g.fill(0,0,WIDTH,HEIGHT,0xb807110d);
         g.fill(0,0,2,HEIGHT,0xff000000|a.discipline.color);
@@ -37,7 +38,7 @@ public final class HexHud {
         int bound=QuickBar.slotOf(d,a);
         boolean variant=d.getBoolean("ascended")&&Ascended.changes(a);
         if(bound>=0) {
-            String tag="KEY "+QuickBar.key(bound);
+            String tag="KEY "+QuickBar.shortKey(QuickBar.key(bound));
             g.drawString(mc.font,tag,WIDTH-7-mc.font.width(tag),6,0x84a892,false);
         }
         if(variant)title=Ascended.title(a);
@@ -47,7 +48,7 @@ public final class HexHud {
         String status=home?"Return: free":cd>0?String.format(Locale.ROOT,"Recovery %.1fs",cd/20f):d.getFloat("energy")<a.cost?"Low energy":"Ready";
         g.drawString(mc.font,status+"  |  Cost "+(home?0:a.cost),7,18,cd>0&&!home?0xd2b27f:0x93caaa,false);
         int above=-QuickBar.height()-4;
-        if(a==Ability.WARPING){String charge=WarpRenderer.chargeLabel(mc.player.getId());if(!charge.isEmpty())g.drawString(mc.font,charge,3,above+(d.getBoolean("ascended")?-24:-12),0xd7b9f0,false);}
+        if(a==Ability.WARPING){String charge=WarpRenderer.chargeLabel(mc.player.getId());if(!charge.isEmpty())g.drawString(mc.font,mc.font.plainSubstrByWidth(charge,WIDTH-6),3,above+(d.getBoolean("ascended")?-24:-12),0xd7b9f0,false);}
         String primary=HexClient.PRIMARY.getTranslatedKeyMessage().getString();
         String secondary=HexClient.SECONDARY.getTranslatedKeyMessage().getString();
         // Outside the sanctum the Fracture only does one thing — it takes you and whatever is
@@ -81,7 +82,7 @@ public final class HexHud {
                 :fistCd>0?String.format(Locale.ROOT,"Tap recovery %.1fs",fistCd/20f):"Tap ready | Cost "+BranchFistState.COST;
         }
         if(!hint.isEmpty())g.drawString(mc.font,(a==Ability.TIME_BRANCH?"":secondary+"  ")+hint,7,54,fracture?0xc0b184:0x9cb6a6,false);
-        String first=QuickBar.key(0),last=QuickBar.key(HexData.QUICK_SLOTS-1);
+        String first=QuickBar.shortKey(QuickBar.key(0)),last=QuickBar.shortKey(QuickBar.key(HexData.QUICK_SLOTS-1));
         g.drawString(mc.font,first+"\u2013"+last+" choose \u00b7 "+primary+" cast \u00b7 "+secondary+" alt",7,67,0x779d87,false);
         float max=HexData.MAX_ENERGY,energy=d.getFloat("energy");
         String value="Energy "+Math.round(energy)+" / "+Math.round(max);
@@ -93,9 +94,9 @@ public final class HexHud {
         QuickBar.render(g,(WIDTH-QuickBar.width())/2,above);
         if(d.getBoolean("ascended")) {
             boolean flying=d.getBoolean("cosmicFlying"),grounded=mc.level!=null&&mc.level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD);
-            String flight=HexClient.FLIGHT.getTranslatedKeyMessage().getString()+": "+(grounded?"no flight in the Overworld":flying?"flying (Space / crouch)":"flight")
-                +"  |  mantle -"+(flying?com.hexgodofstories.server.Transformation.FLYING_DRAIN:com.hexgodofstories.server.Transformation.DRAIN)+" energy/s";
-            g.drawString(mc.font,flight,3,above-12,0xaadabd,false);
+            String flight=QuickBar.shortKey(HexClient.FLIGHT.getTranslatedKeyMessage().getString())+": "+(grounded?"no flight here":flying?"flying":"flight")
+                +"  \u00b7  mantle -"+(flying?com.hexgodofstories.server.Transformation.FLYING_DRAIN:com.hexgodofstories.server.Transformation.DRAIN)+"/s";
+            g.drawString(mc.font,mc.font.plainSubstrByWidth(flight,WIDTH-6),3,above-12,0xaadabd,false);
         }
         g.pose().popPose();
         if(ClientState.frozen(mc.player.getId()))g.drawCenteredString(mc.font,"BETWEEN MOMENTS",screenWidth/2,15,0xd8d6be);
@@ -117,7 +118,7 @@ public final class HexHud {
             int accent=locked?0xff44443a:cd>0?0xffbb9256:poor?0xff8f6f5a:0xffcf9f56;
             g.fill(x,top+11,x+cell-3,top+24,0xa6091612);
             g.fill(x,top+11,x+1,top+24,accent);
-            String key=HexClient.TIME_KEYS[i].getTranslatedKeyMessage().getString();
+            String key=QuickBar.shortKey(HexClient.TIME_KEYS[i].getTranslatedKeyMessage().getString());
             g.drawString(mc.font,key,x+4,top+14,locked?0x6f6f60:0xe9f3ec,false);
             int nameX=x+5+Math.max(8,mc.font.width(key));
             String label=locked?"Locked":a==Ability.TIME_STOP&&d.getBoolean("timeStopped")?"Resume":mantle?"Mantle":cd>0?String.format(Locale.ROOT,"%.0fs",cd/20f):CONTROL_NAMES[i];
@@ -173,7 +174,8 @@ public final class HexHud {
             case THREADS -> "Hold: Gravity Grasp";
             case TIME_BRANCH -> "None — release the cast key to fire";
             case ARSENAL -> "Gotcha!";
-            default -> "Same action";
+            // Nothing else to do: the alternate key does nothing for these, and the panel says nothing about it.
+            default -> "";
         };
     }
 }

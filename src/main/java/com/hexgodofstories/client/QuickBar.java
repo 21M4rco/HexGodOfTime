@@ -56,6 +56,12 @@ public final class QuickBar {
         return index<0||index>=HexClient.SLOTS.length?"":HexClient.SLOTS[index].getTranslatedKeyMessage().getString();
     }
 
+    /** A key's name short enough for a small cell: "Left Alt" is LAlt, "Right Shift" RShft, and nothing past five letters. */
+    static String shortKey(String name) {
+        String s=name.replace("Left ","L").replace("Right ","R").replace("Shift","Shft").replace("Control","Ctrl").replace(" ","");
+        return s.length()>5?s.substring(0,5):s;
+    }
+
     /** How wide the strip is, in the panel's own units. */
     public static int width() {return HexData.QUICK_SLOTS*(CELL+GAP)-GAP;}
     public static int height() {return TALL;}
@@ -92,8 +98,7 @@ public final class QuickBar {
                 g.fill(left,y,left+1,y+TALL,ring);g.fill(left+CELL-1,y,left+CELL,y+TALL,ring);
                 g.fill(left,y+TALL-1,left+CELL,y+TALL,ring);
             }
-            String key=key(index);
-            if(key.length()>3)key=key.substring(0,3);
+            String key=shortKey(key(index));
             g.drawString(mc.font,key,left+3,y+4,a==null?0x5f7266:0xf2f8f3,false);
             if(a==null)continue;
             int tint=ascended&&Ascended.changes(a)?0xe2c46a:chosen?0xd9eadf:0x8fa898;

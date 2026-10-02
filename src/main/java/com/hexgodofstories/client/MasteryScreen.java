@@ -5,31 +5,49 @@ import com.hexgodofstories.network.HexNetwork;
 import com.hexgodofstories.server.HexServer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.*;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.Mth;
 import java.util.*;
 
 /**
- * The Book of Stories. Choosing an ability selects it; choosing one of the seven bind slots first (each shown under
- * its key, Z X C V B N M) binds the next ability chosen to that key instead, which is the only assignment gesture in
- * the mod. Every ability also says what the full transformation makes of it.
+ * The Book of Stories: every ability, by discipline, and the seven bind slots drawn as the keys they are.
+ *
+ * <p>Binding works either way round. Click an ability and then a key (or just press the key itself, Z to M, while the
+ * archive is open); or click a key and then an ability. A binding shows at once: the archive keeps its own copy of
+ * the slots up to date the moment it asks the server for the change, rather than waiting a round trip to redraw, so
+ * a slot never shows the ability it held before.
+ *
+ * <p>Everything is drawn here, row by row, rather than built out of stock buttons, so nothing overlaps: rows are as
+ * tall as what they say, the ability under the mouse (or the one picked) is described in full in its own column, and
+ * the list scrolls when a small window cannot hold it.
  */
 public final class MasteryScreen extends Screen {
+    private static final int ROW=30,NAV_ROW=24,GOLD=0xd8b86a,INK=0xe6efe8,MUTED=0x86a191,DIM=0x5d6f64,EDGE=0xff2d3f33;
+
     private Discipline chapter=Discipline.MISCHIEF;
-    private final boolean quick;
-    private int left,top,w,h,binding=-1;
-    /** Quick-slot geometry, shared by the widgets and the panel drawn behind them. */
-    private int slotWidth,barLeft,barTop;
+    /** The ability picked in the list: the next key clicked or pressed binds it. */
+    private Ability picked;
+    /** A key clicked first: the next ability clicked is bound to it. */
+    private int pending=-1;
+    /** The slot just bound, and when, for a moment's glow on its key. */
+    private int flashed=-1;
+    private long flashedAt;
+    private double scroll;
+
+    private int left,top,w,h,navW,listX,listY,listW,listH,detailX,detailW,keysY,keyW,keysX;
 
     public MasteryScreen(boolean quick) {
-        super(Component.literal(quick?"Spell selection":"The Book of Stories"));
-        this.quick=quick;
+        super(Component.literal("The Book of Stories"));
         var p=Minecraft.getInstance().player;
         if(p!=null)chapter=Ability.at(ClientState.data(p.getId()).getInt("selected")).discipline;
     }
     @Override public boolean isPauseScreen(){return false;}
+
     private CompoundTag data(){return minecraft==null||minecraft.player==null?new CompoundTag():ClientState.data(minecraft.player.getId());}
     static int mastery(CompoundTag n,Discipline d){return MasteryCurve.levelForXp(n.getLong("xp_"+d.name()));}
     static boolean unlocked(CompoundTag n,Ability a) {
@@ -42,127 +60,262 @@ public final class MasteryScreen extends Screen {
             &&(a.discipline!=Discipline.TEMPORAL||sum>=600)
             &&(a.discipline!=Discipline.PURPOSE||mastery(n,Discipline.TEMPORAL)>=800);
     }
-    private static int quickSlot(CompoundTag n,int index) {
-        int[] slots=n.getIntArray("quick");
-        return slots.length==HexData.QUICK_SLOTS&&index>=0&&index<slots.length?slots[index]:-1;
-    }
-
-    @Override protected void init() {
-        w=Math.min(650,width-24);h=Math.min(392,height-24);
-        left=(width-w)/2;top=(height-h)/2;
-        int nav=Math.max(108,w/4);
-        for(Discipline d:Discipline.values())
-            addRenderableWidget(Button.builder(Component.literal(d.title),b->{chapter=d;rebuildWidgets();})
-                .bounds(left+12,top+69+d.ordinal()*29,nav-20,23).build());
-
-        var list=Arrays.stream(Ability.values()).filter(a->a.discipline==chapter&&a!=Ability.RIFT&&a!=Ability.SLOW_FIELD).toList();
-        int card=cardHeight(list.size());
-        int i=0;
-        for(Ability a:list) {
-            int y=top+70+i++*card;
-            Button button=Button.builder(Component.literal(a.dedicated?a.title+"   \u00b7   "+key(a):a.title),b->choose(a))
-                .bounds(left+nav+14,y,w-nav-30,21).build();
-            // A permanent time command still shows its progress here, but it is fired from its own
-            // key and can never be bound to a quick slot, so it is not selectable.
-            button.active=unlocked(data(),a)&&!a.dedicated;
-            String tip=a.description;
-            if(Ascended.changes(a))tip+="\n\nTransformed \u2014 "+Ascended.title(a)+": "+Ascended.text(a);
-            button.setTooltip(Tooltip.create(Component.literal(tip)));
-            addRenderableWidget(button);
-        }
-
-        // The slots in keyboard order, each under its own key: one row where the archive is wide enough for
-        // every slot to name its ability in words, four and three where it is not.
-        int columns=columns();
-        slotWidth=Math.min(168,(w-36)/columns);
-        barLeft=left+(w-slotWidth*columns)/2;
-        barTop=top+h-(rows()==1?42:66);
-        for(int slot=0;slot<HexData.QUICK_SLOTS;slot++) {
-            final int index=slot;
-            Ability bound=Ability.slot(quickSlot(data(),slot));
-            String name=bound==null?"Empty":bound.title;
-            String key=QuickBar.key(slot);
-            String label=key+"  "+font.plainSubstrByWidth(name,slotWidth-16-font.width(key));
-            Button button=Button.builder(Component.literal(label),b->{binding=binding==index?-1:index;rebuildWidgets();})
-                .bounds(barLeft+slot%columns*slotWidth,barTop+slot/columns*24,slotWidth-4,22).build();
-            button.setTooltip(Tooltip.create(Component.literal(binding==index?"Now pick an ability to bind to "+key+"."
-                :bound==null?key+" \u2014 empty. Click, then pick an ability to bind to it."
-                :key+" \u2014 "+bound.title+". Click, then pick another ability to bind to it instead.")));
-            addRenderableWidget(button);
-        }
-    }
-
-    /** Slots across: every one in a row when there is room for them to name their abilities, else four. */
-    private int columns() {return w>=HexData.QUICK_SLOTS*86+36?HexData.QUICK_SLOTS:4;}
-    private int rows() {int c=columns();return (HexData.QUICK_SLOTS+c-1)/c;}
-
-    /** The ability list gives up whatever the slot rows need. */
-    private int cardHeight(int entries) {return Math.min(48,(h-170)/Math.max(1,entries));}
-
-    /** A coloured edge per slot: its discipline, the slot being bound, and the one selected now. */
-    private void slotAccents(GuiGraphics g) {
-        int columns=columns(),selected=data().getInt("selected");
-        for(int slot=0;slot<HexData.QUICK_SLOTS;slot++) {
-            Ability bound=Ability.slot(quickSlot(data(),slot));
-            int x=barLeft+slot%columns*slotWidth,y=barTop+slot/columns*24;
-            int colour=binding==slot?0xffd8c27a:bound==null?0xff333d36:0xff000000|bound.discipline.color;
-            g.fill(x,y,x+2,y+22,colour);
-            if(bound!=null&&bound.ordinal()==selected)g.fill(x,y+20,x+slotWidth-4,y+22,0xff9fd8b4);
-        }
-    }
-
     /** The permanent key a dedicated command answers to, so the archive can name it. */
     static String key(Ability a) {
         int index=switch(a){case TIME_STOP->0;case REWIND->1;case TIME_BRANCH->2;default->-1;};
-        return index<0?"":HexClient.TIME_KEYS[index].getTranslatedKeyMessage().getString();
+        return index<0?"":QuickBar.shortKey(HexClient.TIME_KEYS[index].getTranslatedKeyMessage().getString());
+    }
+    /** The abilities of a chapter that are shown: never the two retired ones. */
+    private static List<Ability> abilities(Discipline d) {
+        List<Ability> list=new ArrayList<>();
+        for(Ability a:Ability.values())if(a.discipline==d&&a!=Ability.RIFT&&a!=Ability.SLOW_FIELD)list.add(a);
+        return list;
     }
 
-    private void choose(Ability a) {
-        if(a.dedicated)return;
-        if(binding>=0) {
-            QuickBar.assign(binding,a.ordinal());
-            binding=-1;
-            HexNetwork.send(HexServer.SELECT,a.ordinal());
-            rebuildWidgets();
-            return;
-        }
-        HexNetwork.send(HexServer.SELECT,a.ordinal());
-        if(quick)onClose();
+    @Override protected void init() {
+        w=Math.min(680,width-16);h=Math.min(410,height-16);
+        left=(width-w)/2;top=(height-h)/2;
+        navW=Math.max(96,Math.min(136,w/5));
+        detailW=w>=560?Math.min(230,w/3):0;
+        keysY=top+h-58;
+        listX=left+navW+10;listY=top+46;
+        listW=w-navW-20-(detailW>0?detailW+10:0);
+        listH=keysY-18-listY;
+        detailX=listX+listW+10;
+        keyW=Math.min(86,(w-24)/HexData.QUICK_SLOTS);
+        keysX=left+(w-keyW*HexData.QUICK_SLOTS)/2;
+        clampScroll();
     }
+
+    private void clampScroll() {
+        int content=abilities(chapter).size()*ROW;
+        scroll=Mth.clamp(scroll,0,Math.max(0,content-listH));
+    }
+
+    // ------------------------------------------------------------------ drawing
 
     @Override public void render(GuiGraphics g,int mx,int my,float partial) {
-        g.fill(0,0,width,height,0x9905080a);
-        g.fill(left-1,top-1,left+w+1,top+h+1,0xff756447);
-        g.fill(left,top,left+w,top+h,0xff0b1612);
-        for(int y=top+2;y<top+h;y+=4)g.fill(left+1,y,left+w-1,y+1,0x14000000);
-        g.drawString(font,"H E X   G O D   O F   S T O R I E S",left+14,top+12,0xb2a47e,false);
-        g.drawString(font,"THE ARCHIVE",left+14,top+29,0xe4dfc7,false);
-        g.drawString(font,"A story only you can write",left+14,top+44,0x719680,false);
-
-        int nav=Math.max(108,w/4);
-        g.fill(left+nav,top+63,left+nav+1,barTop-20,0xff394537);
-        int master=mastery(data(),chapter);
-        g.drawString(font,chapter.title.toUpperCase(Locale.ROOT)+"  /  "+master+" : 1000",left+nav+14,top+49,chapter.color,false);
-
-        var list=Arrays.stream(Ability.values()).filter(a->a.discipline==chapter&&a!=Ability.SLOW_FIELD).toList();
-        int card=cardHeight(list.size());
-        int i=0;
-        for(Ability a:list) {
-            int y=top+70+i++*card;
-            boolean open=unlocked(data(),a);
-            String text=open
-                ?(a.dedicated?"Key "+key(a)+"  |  ":"")+(a.cost>0?a.cost+" Temporal Energy":"Sorcery")
-                    +"  |  "+a.cooldown/20f+"s recovery"+(a.hold?"  |  hold to shape":"")
-                :"Mastery "+a.level+" required";
-            g.drawString(font,text,left+nav+17,y+25,open?0x87a48b:0x8c8069,false);
-            // What the mantle makes of it, in the mantle's gold.
-            if(open&&Ascended.changes(a))g.drawString(font,"  \u2726 "+Ascended.title(a),left+nav+17+font.width(text),y+25,0xd8b86a,false);
+        g.fill(0,0,width,height,0xa8040807);
+        g.fill(left-1,top-1,left+w+1,top+h+1,0xff6d5e42);
+        g.fill(left,top,left+w,top+h,0xf20b1411);
+        CompoundTag data=data();
+        // The header: whose book this is, and how far into the chapter shown.
+        g.drawString(font,"THE ARCHIVE",left+12,top+10,INK,false);
+        g.drawString(font,"Hex God of Stories",left+12,top+22,DIM,false);
+        int master=mastery(data,chapter);
+        String head=chapter.title.toUpperCase(Locale.ROOT)+"   "+master+" / 1000";
+        g.drawString(font,head,listX,top+16,chapter.color,false);
+        int barX=listX+font.width(head)+10,barEnd=left+w-12;
+        if(barEnd-barX>30) {
+            g.fill(barX,top+19,barEnd,top+21,0xff21302a);
+            g.fill(barX,top+19,barX+(int)((barEnd-barX)*Math.min(1,master/1000f)),top+21,0xff000000|chapter.color);
         }
+        g.fill(left+navW,top+40,left+navW+1,keysY-10,EDGE);
 
-        g.fill(left+14,top+h-16,left+w-14,top+h-14,0xff293a2d);
-        g.fill(left+14,top+h-16,left+14+(int)((w-28)*master/1000f),top+h-14,0xff000000|chapter.color);
-        g.drawString(font,binding>=0?"BINDING "+QuickBar.key(binding)+" \u2014 PICK AN ABILITY":"BIND SLOTS \u2014 PRESS A SLOT'S KEY IN GAME TO CHOOSE IT",left+14,barTop-14,binding>=0?0xd8c27a:0x6d8672,false);
-        slotAccents(g);
-        super.render(g,mx,my,partial);
+        nav(g,data,mx,my);
+        Ability hovered=list(g,data,mx,my);
+        if(detailW>0)detail(g,data,hovered!=null?hovered:picked!=null?picked:Ability.slot(data.getInt("selected")));
+        keys(g,data,mx,my);
+    }
+
+    private void nav(GuiGraphics g,CompoundTag data,int mx,int my) {
+        int y=top+46;
+        for(Discipline d:Discipline.values()) {
+            boolean here=d==chapter,over=inside(mx,my,left+6,y,navW-12,NAV_ROW-3);
+            g.fill(left+6,y,left+navW-6,y+NAV_ROW-3,here?0xff1a2b22:over?0xff142019:0x00000000);
+            g.fill(left+6,y,left+8,y+NAV_ROW-3,here?0xff000000|d.color:0xff26352d);
+            g.drawString(font,font.plainSubstrByWidth(d.title,navW-46),left+13,y+7,here?INK:over?0xbfd0c4:MUTED,false);
+            String m=String.valueOf(mastery(data,d));
+            g.drawString(font,m,left+navW-9-font.width(m),y+7,here?d.color:DIM,false);
+            y+=NAV_ROW;
+        }
+    }
+
+    /** The chapter's abilities, one row each. @return the one under the mouse, if any. */
+    private Ability list(GuiGraphics g,CompoundTag data,int mx,int my) {
+        List<Ability> list=abilities(chapter);
+        Ability hovered=null;
+        int selected=data.getInt("selected");
+        boolean ascended=data.getBoolean("ascended");
+        g.enableScissor(listX,listY,listX+listW,listY+listH);
+        for(int i=0;i<list.size();i++) {
+            Ability a=list.get(i);
+            int y=listY+i*ROW-(int)scroll;
+            if(y+ROW<listY||y>listY+listH)continue;
+            boolean open=unlocked(data,a),over=inside(mx,my,listX,y,listW,ROW-3)&&my>=listY&&my<listY+listH;
+            if(over)hovered=a;
+            boolean isPicked=a==picked,isSelected=a.ordinal()==selected;
+            int back=isPicked?0xff22382a:over?0xff17251e:0xff111c17;
+            g.fill(listX,y,listX+listW,y+ROW-3,back);
+            g.fill(listX,y,listX+2,y+ROW-3,open?0xff000000|a.discipline.color:0xff2b3530);
+            if(isPicked){g.fill(listX,y,listX+listW,y+1,0xff000000|GOLD);g.fill(listX,y+ROW-4,listX+listW,y+ROW-3,0xff000000|GOLD);}
+            String name=ascended&&open&&Ascended.changes(a)?Ascended.title(a):a.title;
+            g.drawString(font,name,listX+8,y+5,open?(ascended&&Ascended.changes(a)?0xf0d58a:INK):DIM,false);
+            String info=!open?"Needs "+a.discipline.title+" "+a.level
+                :(a.cost>0?a.cost+" energy  ·  ":"")+fmt(a.cooldown)+" recovery"+(a.hold?"  ·  hold":"");
+            g.drawString(font,font.plainSubstrByWidth(info,listW-74),listX+8,y+16,open?MUTED:0x6e6a58,false);
+            // On the right: the key it answers to, and whether the mantle changes it.
+            int right=listX+listW-6;
+            String tag=a.dedicated?key(a):boundKey(data,a);
+            if(!tag.isEmpty()) {
+                int tw=font.width(tag)+8;
+                g.fill(right-tw,y+5,right,y+17,a.dedicated?0xff3a3322:0xff26402f);
+                g.drawString(font,tag,right-tw+4,y+7,a.dedicated?GOLD:0xd7f0de,false);
+                right-=tw+4;
+            }
+            if(isSelected&&open)g.drawString(font,"●",right-7,y+7,0x9fd8b4,false);
+            if(open&&Ascended.changes(a))g.drawString(font,"✦",right-7,y+18,GOLD,false);
+        }
+        g.disableScissor();
+        // A thin scroll bar when the chapter does not fit.
+        int content=list.size()*ROW;
+        if(content>listH) {
+            int bar=Math.max(16,listH*listH/content),at=listY+(int)((listH-bar)*(scroll/(content-listH)));
+            g.fill(listX+listW+2,at,listX+listW+4,at+bar,0xff3c5246);
+        }
+        return hovered;
+    }
+
+    /** Everything the archive knows about one ability: what it does, and what the mantle makes of it. */
+    private void detail(GuiGraphics g,CompoundTag data,Ability a) {
+        int x=detailX,y=listY,width=detailW;
+        g.fill(x,y,x+width,keysY-10,0xff0e1814);
+        if(a==null){g.drawString(font,"Point at an ability.",x+8,y+8,DIM,false);return;}
+        boolean open=unlocked(data,a);
+        g.fill(x,y,x+width,y+2,0xff000000|a.discipline.color);
+        y+=8;
+        for(FormattedCharSequence line:font.split(Component.literal(a.title),width-16)){g.drawString(font,line,x+8,y,INK,false);y+=11;}
+        String status=!open?"Locked: "+a.discipline.title+" "+a.level
+            :a.dedicated?"Its own key: "+key(a):boundKey(data,a).isEmpty()?"Not bound to a key":"Bound to "+boundKey(data,a);
+        g.drawString(font,font.plainSubstrByWidth(status,width-16),x+8,y,open?0x9fd8b4:0x8c8069,false);
+        y+=14;
+        int bottom=keysY-14;
+        y=wrap(g,a.description,x+8,y,width-16,bottom,0xb6c8bc);
+        if(Ascended.changes(a)&&y<bottom-20) {
+            y+=5;
+            g.fill(x+8,y,x+width-8,y+1,0x806d5e42);
+            y+=5;
+            g.drawString(font,"✦ TRANSFORMED — "+Ascended.title(a).toUpperCase(Locale.ROOT),x+8,y,GOLD,false);
+            y+=12;
+            wrap(g,Ascended.text(a),x+8,y,width-16,bottom,0xd9c690);
+        }
+    }
+
+    private int wrap(GuiGraphics g,String text,int x,int y,int width,int bottom,int colour) {
+        for(FormattedCharSequence line:font.split(Component.literal(text),width)) {
+            if(y+9>bottom)break;
+            g.drawString(font,line,x,y,colour,false);
+            y+=10;
+        }
+        return y;
+    }
+
+    /** The seven slots, as keys: the letter, what is bound there, and its discipline along the bottom. */
+    private void keys(GuiGraphics g,CompoundTag data,int mx,int my) {
+        String hint=pending>=0?"Now click the ability to bind to "+QuickBar.key(pending)+".   (Esc or click the key again to stop.)"
+            :picked!=null&&!picked.dedicated&&unlocked(data,picked)?"Click a key below, or press it, to bind "+picked.title+"."
+            :"Pick an ability, then a key — or a key, then an ability. Pressing Z–M in game chooses what is bound there.";
+        g.drawString(font,font.plainSubstrByWidth(hint,w-24),left+12,keysY-12,pending>=0||picked!=null?GOLD:DIM,false);
+        long now=ClientState.now();
+        for(int i=0;i<HexData.QUICK_SLOTS;i++) {
+            int x=keysX+i*keyW+3,width=keyW-6,y=keysY+4,tall=44;
+            Ability a=Ability.slot(QuickBar.slot(data,i));
+            boolean over=inside(mx,my,x,y,width,tall),waiting=pending==i;
+            float glow=flashed==i?Math.max(0,1-(now-flashedAt)/14f):0;
+            // A keycap: a lighter top edge, a darker bottom one, the face between.
+            g.fill(x,y,x+width,y+tall,waiting?0xff3b3220:over?0xff22362b:0xff17241d);
+            g.fill(x,y,x+width,y+1,waiting?0xff000000|GOLD:0xff3d5447);
+            g.fill(x,y+tall-3,x+width,y+tall,a==null?0xff26302a:0xff000000|a.discipline.color);
+            if(glow>0)g.fill(x,y,x+width,y+tall,((int)(glow*90)<<24)|0x7dffb0);
+            if(waiting){g.fill(x,y,x+1,y+tall,0xff000000|GOLD);g.fill(x+width-1,y,x+width,y+tall,0xff000000|GOLD);}
+            String key=QuickBar.shortKey(QuickBar.key(i));
+            g.pose().pushPose();
+            g.pose().translate(x+6,y+5,0);
+            g.pose().scale(1.5f,1.5f,1);
+            g.drawString(font,font.plainSubstrByWidth(key,(int)((width-10)/1.5f)),0,0,a==null?DIM:INK,false);
+            g.pose().popPose();
+            String name=a==null?"empty":a.title;
+            g.drawString(font,font.plainSubstrByWidth(name,width-10),x+5,y+tall-15,a==null?DIM:waiting?GOLD:0xbdd6c6,false);
+        }
+    }
+
+    private String boundKey(CompoundTag data,Ability a) {
+        int slot=QuickBar.slotOf(data,a);
+        return slot<0?"":QuickBar.shortKey(QuickBar.key(slot));
+    }
+
+    private static String fmt(int ticks) {return ticks%20==0?ticks/20+"s":String.format(Locale.ROOT,"%.1fs",ticks/20f);}
+    private static boolean inside(double mx,double my,int x,int y,int w,int h) {return mx>=x&&mx<x+w&&my>=y&&my<y+h;}
+
+    // ------------------------------------------------------------------ input
+
+    @Override public boolean mouseClicked(double mx,double my,int button) {
+        if(button!=0)return super.mouseClicked(mx,my,button);
+        CompoundTag data=data();
+        int y=top+46;
+        for(Discipline d:Discipline.values()) {
+            if(inside(mx,my,left+6,y,navW-12,NAV_ROW-3)){if(chapter!=d){chapter=d;scroll=0;clampScroll();}click();return true;}
+            y+=NAV_ROW;
+        }
+        List<Ability> list=abilities(chapter);
+        if(inside(mx,my,listX,listY,listW,listH)) {
+            int index=(int)((my-listY+scroll)/ROW);
+            if(index>=0&&index<list.size()&&(my-listY+scroll)-index*ROW<ROW-3) {
+                Ability a=list.get(index);
+                click();
+                if(!unlocked(data,a)||a.dedicated){picked=a;pending=-1;return true;}
+                if(pending>=0){bind(pending,a);return true;}
+                picked=picked==a?null:a;
+                // It is also the chosen ability, as choosing one from the archive always was.
+                HexNetwork.send(HexServer.SELECT,a.ordinal());
+                data.putInt("selected",a.ordinal());
+                return true;
+            }
+        }
+        for(int i=0;i<HexData.QUICK_SLOTS;i++) {
+            int x=keysX+i*keyW+3;
+            if(!inside(mx,my,x,keysY+4,keyW-6,44))continue;
+            click();
+            if(picked!=null&&!picked.dedicated&&unlocked(data,picked))bind(i,picked);
+            else pending=pending==i?-1:i;
+            return true;
+        }
+        return super.mouseClicked(mx,my,button);
+    }
+
+    @Override public boolean mouseScrolled(double mx,double my,double delta) {
+        if(inside(mx,my,listX,listY,listW+6,listH)){scroll-=delta*ROW;clampScroll();return true;}
+        return super.mouseScrolled(mx,my,delta);
+    }
+
+    @Override public boolean keyPressed(int key,int scan,int modifiers) {
+        // The real key binds: with an ability picked, pressing Z to M puts it there.
+        for(int i=0;i<HexData.QUICK_SLOTS;i++)
+            if(HexClient.SLOTS[i].matches(key,scan)&&picked!=null&&!picked.dedicated&&unlocked(data(),picked)){bind(i,picked);click();return true;}
+        if(key==org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE&&(pending>=0||picked!=null)){pending=-1;picked=null;return true;}
+        if(HexClient.MENU.matches(key,scan)){onClose();return true;}
+        return super.keyPressed(key,scan,modifiers);
+    }
+
+    /**
+     * Binds an ability to a slot, here and on the server. The archive's own copy of the slots changes at once, the way
+     * the server will change its own (an ability lives in one slot only), so the key shows its new ability this frame.
+     */
+    private void bind(int slot,Ability a) {
+        CompoundTag data=data();
+        QuickBar.assign(slot,a.ordinal());
+        int[] slots=data.getIntArray("quick");
+        if(slots.length==HexData.QUICK_SLOTS) {
+            slots=slots.clone();
+            for(int i=0;i<slots.length;i++)if(slots[i]==a.ordinal())slots[i]=-1;
+            slots[slot]=a.ordinal();
+            data.putIntArray("quick",slots);
+        }
+        flashed=slot;flashedAt=ClientState.now();
+        pending=-1;picked=null;
+    }
+
+    private void click() {
+        if(minecraft!=null)minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK,1));
     }
 }

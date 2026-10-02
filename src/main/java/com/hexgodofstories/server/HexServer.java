@@ -34,6 +34,8 @@ public final class HexServer {
     private record Charm(Mob mob,UUID owner,long end,UUID previous) {}
     private record Strike(int weapon,int combo,long contact,long end) {}
     private static final Map<UUID,ArrayDeque<Moment>> HISTORY=new HashMap<>();
+    /** Spells whose alternate key would only cast them again. */
+    private static final Set<Ability> NO_ALTERNATE=EnumSet.of(Ability.PUSH,Ability.MIRAGE,Ability.BLINK,Ability.WARD,Ability.MEMORY,Ability.TIME_SLIP);
     private static final Map<UUID,Charm> CHARMS=new HashMap<>();
     private static final Map<UUID,Strike> STRIKES=new HashMap<>();
     private static final Map<UUID,Long> INPUT=new HashMap<>(),TRAINING=new HashMap<>();
@@ -131,6 +133,9 @@ public final class HexServer {
         // Telekinesis cast again while holding lets go, whatever its recovery says: letting go is always free.
         if(a==Ability.TELEKINESIS&&action==CAST&&Telekinesis.holding(p)){Telekinesis.release(p,false);HexNetwork.sync(p);return;}
         if(action==ALTERNATE&&secondary(p,a)){HexNetwork.sync(p);return;}
+        // Spells with no second action: the alternate key does nothing at all, rather than casting the plain spell again
+        // (which, in the full transformation, quietly cast the untransformed one).
+        if(action==ALTERNATE&&NO_ALTERNATE.contains(a))return;
         // Taking the mantle off is always free and always allowed: it drains energy while it is worn, and a
         // wearer too low to pay for a cast, or still inside its recovery, must never be kept in it.
         if(a==Ability.ASCENSION&&(action==TRANSFORM||action==CAST||action==ALTERNATE)&&HexData.get(p).getBoolean("ascended")){
