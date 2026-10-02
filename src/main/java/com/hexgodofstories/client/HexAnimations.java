@@ -111,7 +111,15 @@ public final class HexAnimations {
                int fade=name.startsWith("scepter_fire")||name.startsWith("scepter_shot")?0:name.startsWith("scepter_aim")||blade?(blade?1:2):Math.max(0,fadeTicks);
                // The burning Deceiver's fire: the sword arm follows the look up and down, so the blade (and the jet out of
                // its point) goes where the bearer looks.
-               IAnimation played=name.equals("blade_sword_flame")?new ModifierLayer<>(keyframeanimationplayer,new FollowLook(abstractclientplayer)):keyframeanimationplayer;
+               IAnimation played=keyframeanimationplayer;
+               if(name.equals("blade_sword_flame")) {
+                  // Linked through addModifierLast and setAnimation: ModifierLayer's constructor that takes modifiers
+                  // only lists them, never hands them the animation, and a modifier with nothing in it plays nothing.
+                  ModifierLayer<IAnimation> follow=new ModifierLayer<>();
+                  follow.addModifierLast(new FollowLook(abstractclientplayer));
+                  follow.setAnimation(keyframeanimationplayer);
+                  played=follow;
+               }
                modifierlayer.replaceAnimationWithFade(AbstractFadeModifier.standardFadeIn(fade, Ease.INOUTQUAD), played);
             }
          }

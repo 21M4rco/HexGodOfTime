@@ -10,20 +10,30 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.event.entity.EntityEvent;
+import net.minecraftforge.event.entity.item.ItemTossEvent;
+import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
 import net.minecraftforge.event.entity.living.LivingEntityUseItemEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.ToIntFunction;
 
 /**
  * Paradise sugar eventually turns limbs into brittle bubblegum.
@@ -32,6 +42,11 @@ import java.util.UUID;
  * (server tick-time) window. Five Paradise consumptions inside that window cost one limb. Fewer than
  * five simply expire when the window ends and the next mouthful starts a fresh five-minute window.
  * The player sees warning action-bar lines, never the actual counter or timer.
+ *
+ * <p>What is lost stays lost, in every dimension, until death. Without legs the body is a stump at waist height (a
+ * shorter box and a lower eye), crawling a few inches at a time and able only to hop; without the off-hand arm nothing
+ * is held or swapped into that hand; without arms at all nothing is held, struck, used, placed, broken, picked up,
+ * dropped or cast.
  */
 @Mod.EventBusSubscriber(modid=HexGodOfStories.ID)
 public final class CandyCorruption {
@@ -44,6 +59,15 @@ public final class CandyCorruption {
         BREAK_START="candyBreakStart",WINDOW_START="candyWindowStart";
 
     private static final UUID LEG_SLOW_UUID=UUID.fromString("e4c0303d-3c50-4c8c-9534-1f8d4a40611e");
+    /** A legless body: the torso and head on the ground, its height and its eye's (a player's less the legs'). */
+    public static final float STUMP=1.1f,STUMP_EYE=.92f;
+    /**
+     * On a client the limbs are what the server last said (CandyCorruptionClient fills this in): the player's own data
+     * there is not the server's, and the client must size and move its own body the way the server does.
+     */
+    public static ToIntFunction<Player> CLIENT_MASK=p->0;
+    /** Whether each player's body was last sized legless: it is sized again when that changes. */
+    private static final Map<UUID,Boolean> SIZED=new HashMap<>();
     private static final String[] WARNINGS={
         "This tastes good... but something feels weird.",
         "Way too sweet. Your skin tingles for a second.",
@@ -102,6 +126,15 @@ public final class CandyCorruption {
 
     public static void tick(ServerPlayer p){
         mobility(p);
+        // Without legs the body stands no higher than its waist; it is sized again whenever that changes.
+        boolean legless=noLegs(p);
+        if(!Boolean.valueOf(legless).equals(SIZED.put(p.getUUID(),legless)))p.refreshDimensions();
+        // Without the arm for it, nothing stays in the off hand: it goes back into the pack (or to the ground if full).
+        if(handMissing(p,InteractionHand.OFF_HAND)&&!p.getOffhandItem().isEmpty()){
+            ItemStack held=p.getOffhandItem().copy();
+            p.setItemInHand(InteractionHand.OFF_HAND,ItemStack.EMPTY);
+            if(!p.getInventory().add(held))p.drop(held,false);
+        }
         CompoundTag d=HexData.get(p);
         long now=p.level().getGameTime();
 
@@ -148,7 +181,8 @@ public final class CandyCorruption {
         AttributeInstance speed=p.getAttribute(Attributes.MOVEMENT_SPEED);
         if(speed==null)return;
         int legs=lostLegs(p);
-        double amount=legs==0?0:legs==1?-.72:-1.0;
+        // One leg: a hobble. None: dragging the body along by inches.
+        double amount=legs==0?0:legs==1?-.72:-.88;
         AttributeModifier old=speed.getModifier(LEG_SLOW_UUID);
         if(amount==0){if(old!=null)speed.removeModifier(LEG_SLOW_UUID);return;}
         if(old!=null&&Math.abs(old.getAmount()-amount)<1.0E-6)return;
@@ -160,14 +194,40 @@ public final class CandyCorruption {
         if(e.getEntity() instanceof ServerPlayer p&&ParadiseWaters.isParadiseWaters(e.getItem()))consume(p,1);
     }
 
+    /** No legs to jump with: a hop off the stump, a little way toward where it faces. One leg: a weak hop. Both sides. */
     @SubscribeEvent public static void jump(LivingEvent.LivingJumpEvent e){
-        if(!(e.getEntity() instanceof ServerPlayer p)||!noLegs(p))return;
+        if(!(e.getEntity() instanceof Player p))return;
+        int legs=lostLegs(p);
+        if(legs==0)return;
         Vec3 v=p.getDeltaMovement();
-        p.setDeltaMovement(v.x,Math.min(0,v.y),v.z);
-        p.setOnGround(true);p.hasImpulse=true;
+        float yaw=p.getYRot()*Mth.DEG_TO_RAD;
+        if(legs==2)p.setDeltaMovement(v.x*.4-Mth.sin(yaw)*.09,.27,v.z*.4+Mth.cos(yaw)*.09);
+        else p.setDeltaMovement(v.x*.7,Math.min(v.y,.34),v.z*.7);
     }
 
-    public static int mask(Player p){return HexData.get(p).getInt(MASK)&15;}
+    /** A legless body is a stump: standing or crouched, it is the torso and head alone. */
+    @SubscribeEvent public static void size(EntityEvent.Size e){
+        if(!(e.getEntity() instanceof Player p)||p.level()==null)return;
+        if(e.getPose()!=Pose.STANDING&&e.getPose()!=Pose.CROUCHING)return;
+        if(!noLegs(p))return;
+        e.setNewSize(EntityDimensions.scalable(.6f,STUMP),false);
+        e.setNewEyeHeight(STUMP_EYE);
+    }
+
+    /** Without arms nothing is picked up. */
+    @SubscribeEvent public static void pickup(EntityItemPickupEvent e){
+        if(noArms(e.getEntity()))e.setCanceled(true);
+    }
+
+    /** Without arms nothing is thrown: it stays in the pack. */
+    @SubscribeEvent public static void toss(ItemTossEvent e){
+        if(e.getPlayer()==null||e.getPlayer().level().isClientSide||!noArms(e.getPlayer()))return;
+        e.setCanceled(true);
+        ItemStack kept=e.getEntity().getItem().copy();
+        if(!e.getPlayer().getInventory().add(kept))e.getPlayer().drop(kept,false);
+    }
+
+    public static int mask(Player p){return (p.level()!=null&&p.level().isClientSide?CLIENT_MASK.applyAsInt(p):HexData.get(p).getInt(MASK))&15;}
     public static boolean missing(Player p,int part){return (mask(p)&1<<part)!=0;}
     public static int breaking(Player p){return HexData.get(p).contains(BREAKING)?HexData.get(p).getInt(BREAKING):-1;}
     public static int lostLegs(Player p){return (missing(p,RIGHT_LEG)?1:0)+(missing(p,LEFT_LEG)?1:0);}
@@ -179,6 +239,8 @@ public final class CandyCorruption {
         HumanoidArm arm=hand==InteractionHand.MAIN_HAND?p.getMainArm():p.getMainArm().getOpposite();
         return missing(p,arm==HumanoidArm.RIGHT?RIGHT_ARM:LEFT_ARM);
     }
+
+    public static void forget(ServerPlayer p){SIZED.remove(p.getUUID());}
 
     public static void reset(ServerPlayer p){
         CompoundTag d=HexData.get(p);

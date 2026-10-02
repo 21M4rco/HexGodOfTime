@@ -63,12 +63,6 @@ public abstract class MovementMixin {
             if(Float.isFinite(yaw)&&Float.isFinite(pitch)){player.setYRot(yaw);player.setXRot(net.minecraft.util.Mth.clamp(pitch,-90,90));}
             clientIsFloating=false;ci.cancel();return;
         }
-        if(com.hexgodofstories.warping.CandyCorruption.noLegs(player)&&!player.isSpectator()) {
-            float yaw=packet.getYRot(player.getYRot()),pitch=packet.getXRot(player.getXRot());
-            if(Float.isFinite(yaw)&&Float.isFinite(pitch)){player.setYRot(yaw);player.setXRot(net.minecraft.util.Mth.clamp(pitch,-90,90));}
-            player.setDeltaMovement(0,player.getDeltaMovement().y,0);
-            clientIsFloating=false;ci.cancel();return;
-        }
         if(com.hexgodofstories.warping.Destination.from(player.level())==com.hexgodofstories.warping.Destination.GRAVITY_WELL&&!player.isSpectator()) {
             float yaw=packet.getYRot(player.getYRot()),pitch=packet.getXRot(player.getXRot());
             if(Float.isFinite(yaw)&&Float.isFinite(pitch)){player.setYRot(yaw);player.setXRot(net.minecraft.util.Mth.clamp(pitch,-90,90));}

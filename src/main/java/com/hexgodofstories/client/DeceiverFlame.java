@@ -261,7 +261,7 @@ public final class DeceiverFlame {
      * One tongue of flame, white with its shape in the alpha: a round foot, widest a little above it, drawn up into a
      * point, solid at the foot and thinning toward the tip, with a few streaks torn into its upper part.
      */
-    private static ResourceLocation flameSheet() {
+    static ResourceLocation flameSheet() {
         if (flame == null) flame = bake("hexgodofstories_deceiver_flame", 64, (u, v) -> {
             double h = (1 - v) / 2;
             double width = .8 * Math.sqrt(Mth.clamp(h / .12, 0, 1)) * Math.pow(Math.max(0, 1 - h), .62);

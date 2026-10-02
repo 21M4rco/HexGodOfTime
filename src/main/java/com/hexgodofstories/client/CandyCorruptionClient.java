@@ -21,12 +21,24 @@ public final class CandyCorruptionClient {
     private record Visibility(boolean ra,boolean ras,boolean la,boolean las,boolean rl,boolean rp,boolean ll,boolean lp){}
     private static final Map<Integer,State> STATES=new HashMap<>();
     private static final Map<Integer,Visibility> HIDDEN=new HashMap<>();
+    /** Players drawn this frame as a legless stump: their pose was moved for it, and is put back after. */
+    private static final Set<Integer> LOWERED=new HashSet<>();
+    /** How far a legless body sits below where its feet would be: the legs' length on the player model. */
+    private static final float LEGS=12/16f*.9375f;
+
+    // The server's word on each body's limbs, for the common code that sizes and moves bodies on this side too.
+    static {CandyCorruption.CLIENT_MASK=p->mask(p.getId());}
+
+    public static int mask(int id){State s=STATES.get(id);return s==null?0:s.mask&15;}
 
     public static void receive(int id,CompoundTag n){
         int mask=n.getInt("mask"),breaking=n.getInt("breaking");
         if(mask==0&&breaking<0)STATES.remove(id);
         else STATES.put(id,new State(mask,breaking,n.getLong("start"),Math.max(1,n.getInt("breakTicks"))));
         if(n.contains("burst"))burst(id,n.getInt("burst"));
+        // Losing (or, after death, having back) the legs changes the body's height: size it again now.
+        var mc=Minecraft.getInstance();
+        if(mc.level!=null&&mc.level.getEntity(id) instanceof net.minecraft.world.entity.player.Player p)p.refreshDimensions();
     }
     public static boolean broken(int id,int part){State s=STATES.get(id);return s!=null&&(s.mask&(1<<part))!=0;}
     public static boolean skinActive(int id){State s=STATES.get(id);return s!=null&&s.breaking>=0;}
@@ -65,9 +77,21 @@ public final class CandyCorruptionClient {
         return -1;
     }
 
-    @SubscribeEvent public static void pre(RenderPlayerEvent.Pre e){
-        if(!(e.getEntity() instanceof AbstractClientPlayer p))return;
+    @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
+    public static void pre(RenderPlayerEvent.Pre e){
+        if(!(e.getEntity() instanceof AbstractClientPlayer p)||e.isCanceled())return;
         State s=STATES.get(p.getId());if(s==null||s.mask==0)return;
+        if((s.mask&(1<<CandyCorruption.RIGHT_LEG|1<<CandyCorruption.LEFT_LEG))==(1<<CandyCorruption.RIGHT_LEG|1<<CandyCorruption.LEFT_LEG)){
+            // No legs: the torso sits on the ground, and rocks from side to side as it drags itself along.
+            var pose=e.getPoseStack();
+            pose.pushPose();
+            LOWERED.add(p.getId());
+            pose.translate(0,-LEGS,0);
+            float partial=e.getPartialTick();
+            float rock=net.minecraft.util.Mth.sin(p.walkAnimation.position(partial)*.9f)*14*Math.min(1,p.walkAnimation.speed(partial)*1.6f);
+            float yaw=net.minecraft.util.Mth.rotLerp(partial,p.yBodyRotO,p.yBodyRot)*net.minecraft.util.Mth.DEG_TO_RAD;
+            pose.mulPose(com.mojang.math.Axis.of(new org.joml.Vector3f(-net.minecraft.util.Mth.sin(yaw),0,net.minecraft.util.Mth.cos(yaw))).rotationDegrees(rock));
+        }
         @SuppressWarnings("unchecked")
         PlayerModel<AbstractClientPlayer> m=(PlayerModel<AbstractClientPlayer>)e.getRenderer().getModel();
         HIDDEN.put(p.getId(),new Visibility(m.rightArm.visible,m.rightSleeve.visible,m.leftArm.visible,m.leftSleeve.visible,m.rightLeg.visible,m.rightPants.visible,m.leftLeg.visible,m.leftPants.visible));
@@ -78,6 +102,7 @@ public final class CandyCorruptionClient {
     }
     @SubscribeEvent public static void post(RenderPlayerEvent.Post e){
         if(!(e.getEntity() instanceof AbstractClientPlayer p))return;
+        if(LOWERED.remove(p.getId()))e.getPoseStack().popPose();
         Visibility v=HIDDEN.remove(p.getId());if(v==null)return;
         @SuppressWarnings("unchecked")
         PlayerModel<AbstractClientPlayer> m=(PlayerModel<AbstractClientPlayer>)e.getRenderer().getModel();
@@ -96,5 +121,34 @@ public final class CandyCorruptionClient {
             at.x+(mc.level.random.nextDouble()-.5)*.18,at.y+(mc.level.random.nextDouble()-.5)*.28,at.z+(mc.level.random.nextDouble()-.5)*.18,
             (mc.level.random.nextDouble()-.5)*.12,.02-mc.level.random.nextDouble()*.12,(mc.level.random.nextDouble()-.5)*.12);
     }
-    public static void clear(){STATES.clear();HIDDEN.clear();}
+    public static void clear(){STATES.clear();HIDDEN.clear();LOWERED.clear();}
+
+    /**
+     * Before the keys are read each tick: with the off-hand arm gone, swapping hands does nothing; with the sword arm gone,
+     * nothing is struck or used with it; with no arms, nothing is struck, used or dropped at all.
+     */
+    @SubscribeEvent public static void keys(net.minecraftforge.event.TickEvent.ClientTickEvent e){
+        if(e.phase!=net.minecraftforge.event.TickEvent.Phase.START)return;
+        var mc=Minecraft.getInstance();
+        if(mc.player==null||mc.player.isSpectator())return;
+        int mask=mask(mc.player.getId());
+        if(mask==0)return;
+        if(CandyCorruption.handMissing(mc.player,net.minecraft.world.InteractionHand.OFF_HAND)||CandyCorruption.noArms(mc.player))
+            while(mc.options.keySwapOffhand.consumeClick()){}
+        if(CandyCorruption.handMissing(mc.player,net.minecraft.world.InteractionHand.MAIN_HAND)){
+            while(mc.options.keyAttack.consumeClick()){}
+            if(CandyCorruption.noArms(mc.player))while(mc.options.keyUse.consumeClick()){}
+        }
+        if(CandyCorruption.noArms(mc.player))while(mc.options.keyDrop.consumeClick()){}
+    }
+
+    /** No arms: no rummaging through the pack. */
+    @SubscribeEvent public static void inventory(net.minecraftforge.client.event.ScreenEvent.Opening e){
+        var mc=Minecraft.getInstance();
+        if(mc.player!=null&&!mc.player.isCreative()&&CandyCorruption.noArms(mc.player)
+            &&e.getNewScreen() instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen){
+            e.setCanceled(true);
+            mc.player.displayClientMessage(net.minecraft.network.chat.Component.literal("You have no arms."),true);
+        }
+    }
 }

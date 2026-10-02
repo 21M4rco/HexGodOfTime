@@ -1,3 +1,24 @@
+## Paradise's price, kept; the fire sword points and burns like its blade
+
+- **What Paradise's candy takes stays taken.** Leaving the realm used to give the limbs back: the server had never
+  given them, but the new world's client started the body afresh and was never told otherwise. Now it is told on every
+  crossing; the limbs come back only with death.
+- **No legs: a stump at the waist.** The body is the torso and head on the ground, a shorter box and a lower eye,
+  rocking from side to side as it drags itself along at a crawl (it used to be frozen in place); it can only hop.
+  One leg is a hobble with a weak hop.
+- **No off-hand arm: no off hand.** Nothing stays in it (whatever was there goes back into the pack) and swapping hands
+  does nothing.
+- **No arms at all: nothing.** Nothing is struck, used, placed, broken, picked up, dropped, looked through in the pack,
+  cast or conjured; you are told you have no arms. Choosing and flying still work. (The right arm is still the last to
+  go.)
+- **The burning Deceiver points.** Its pointing move never played: Player Animator's layer built with its modifiers in
+  the constructor never hands them the animation, so the arm that follows the look held nothing. It is linked properly
+  now: hold use and the arm thrusts the blade out along your look while the fire pours, and nothing else plays under it.
+- **Its fire is the blade's own.** The stream is now made of the same tongues of flame as the burning blade, the same
+  sheet and the same red, orange, white-hot and blue: they leave the point as long streaks running together into a
+  stream, widen and lick as they slow, turn upward with their own heat into a rolling body of fire, and spread and climb
+  where they strike; a white-hot tongue and blue licks at the point, and smoke off the spent fire.
+
 ## The Deceiver on fire
 
 - **Drawing it burning.** Transformed, drawing The Deceiver lights it by hand: the blade held upright before your

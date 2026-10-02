@@ -105,10 +105,12 @@ public final class ServerEvents {
         // A borrowed shape is sent once, not every second, so a new viewer has to be told separately.
         Masquerade.resend(p,q);
     }
-    @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p){PersonalRewind.clear(p);HexServer.clear(p,false);}}
+    @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p){PersonalRewind.clear(p);HexServer.clear(p,false);com.hexgodofstories.warping.CandyCorruption.forget(p);}}
     @SubscribeEvent public static void dimension(PlayerEvent.PlayerChangedDimensionEvent e) {
         if(!(e.getEntity() instanceof ServerPlayer p))return;
         HexServer.clear(p,false);HexNetwork.sync(p);com.hexgodofstories.warping.WarpRealms.greet(p,e.getTo());
+        // The new world's client starts the body afresh: tell it again what candy has taken (it stays taken).
+        com.hexgodofstories.warping.CandyCorruption.sync(p,-1);
         // Out of the realms by any road: whatever time a realm was keeping on them is over.
         if(com.hexgodofstories.warping.Destination.from(p.level())==null)p.getPersistentData().remove(com.hexgodofstories.warping.WarpResidency.TRAP);
     }

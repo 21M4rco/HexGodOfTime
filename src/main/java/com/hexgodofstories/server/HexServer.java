@@ -75,6 +75,12 @@ public final class HexServer {
         if(action==SCEPTER_RELEASE){ScepterBlast.release(p);return;}
         if(!HexData.access(p)){notice(p,"Your powers are locked. An operator must use /hgos unlock "+p.getGameProfile().getName()+" on.");return;}
         if(action==WARP_CHOICE){Warping.choose(p,value);return;}
+        // Paradise's candy took both arms: nothing is cast, conjured or swung. Letting go, choosing and flying still are.
+        if(com.hexgodofstories.warping.CandyCorruption.noArms(p)&&(action==CAST||action==ALTERNATE||action==UTILITY||action==TRANSFORM||action==WEAPON
+            ||action==HOLD_BEGIN||action==TIME||action==BRANCH_TAP||action==BRANCH_BEGIN||action==SCEPTER_PRESS||action==GRASP_BEGIN||action==SLOT
+            ||action==GUARD_BEGIN||action==WARP_RECALL)){
+            notice(p,"You have no arms.");return;
+        }
         if(action==SELECT) {
             if(Warping.charging(p))Warping.cancel(p);
             if(now-INPUT.getOrDefault(p.getUUID(),-100L)<2)return;
