@@ -105,7 +105,12 @@ public final class ServerEvents {
         Masquerade.resend(p,q);
     }
     @SubscribeEvent public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {if(e.getEntity() instanceof ServerPlayer p){PersonalRewind.clear(p);HexServer.clear(p,false);}}
-    @SubscribeEvent public static void dimension(PlayerEvent.PlayerChangedDimensionEvent e) {if(e.getEntity() instanceof ServerPlayer p){HexServer.clear(p,false);HexNetwork.sync(p);com.hexgodofstories.warping.WarpRealms.greet(p,e.getTo());}}
+    @SubscribeEvent public static void dimension(PlayerEvent.PlayerChangedDimensionEvent e) {
+        if(!(e.getEntity() instanceof ServerPlayer p))return;
+        HexServer.clear(p,false);HexNetwork.sync(p);com.hexgodofstories.warping.WarpRealms.greet(p,e.getTo());
+        // Out of the realms by any road: whatever time a realm was keeping on them is over.
+        if(com.hexgodofstories.warping.Destination.from(p.level())==null)p.getPersistentData().remove(com.hexgodofstories.warping.WarpResidency.TRAP);
+    }
     @SubscribeEvent public static void leaving(net.minecraftforge.event.entity.EntityLeaveLevelEvent e){
         if(e.getLevel() instanceof ServerLevel level){
             Frostbite.clear(e.getEntity());
@@ -120,7 +125,11 @@ public final class ServerEvents {
         }
     }
     @SubscribeEvent public static void travelling(net.minecraftforge.event.entity.EntityTravelToDimensionEvent e){
-        if(!e.getEntity().level().isClientSide)com.hexgodofstories.warping.WarpEmergence.cancel(e.getEntity());
+        if(e.getEntity().level().isClientSide)return;
+        com.hexgodofstories.warping.WarpEmergence.cancel(e.getEntity());
+        var server=e.getEntity().getServer();
+        ServerLevel to=server==null?null:server.getLevel(e.getDimension());
+        if(to!=null&&com.hexgodofstories.warping.Destination.from(to)==null)e.getEntity().getPersistentData().remove(com.hexgodofstories.warping.WarpResidency.TRAP);
     }
     @SubscribeEvent public static void death(LivingDeathEvent e) {
         // A kill feeds the Pilgrim's patience back, which is what makes it willing to play again.

@@ -249,20 +249,6 @@ public final class HexClient {
             e.getEntity().setSprinting(false);
         }
         /**
-         * The Void Sea's swell, on the one player whose movement this client owns.
-         *
-         * <p>The server runs exactly the same call on exactly the same formula, from the realm's
-         * own tick, so the two agree without a packet: the server decides what the water is doing
-         * and the client cannot choose differently, while the local copy is what makes being
-         * carried feel like being carried rather than like being corrected.
-         */
-        @SubscribeEvent public static void voidSeaSwell(TickEvent.PlayerTickEvent e) {
-            if(e.phase!=TickEvent.Phase.START)return;
-            Minecraft mc=Minecraft.getInstance();
-            if(mc.level==null||e.player!=mc.player||WarpCrossingClient.phasing(mc.player.getId()))return;
-            com.hexgodofstories.warping.VoidSeaWaves.apply(e.player,mc.level.getGameTime());
-        }
-        /**
          * Sinking into an open Warping pool, on the one player this client owns. Start of the tick,
          * for the same reason Paradise's gravity is: a velocity set after the movement it is meant
          * to cause has a tick of gravity added to it first.
@@ -305,9 +291,6 @@ public final class HexClient {
         @SubscribeEvent public static void world(RenderLevelStageEvent e) {
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);BeamWounds.beginFrame(e);ScepterFx.beginFrame(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES){WarpRenderer.renderRealm(e);BlockWounds.render(e);ArsenalClient.render(e);}
-            // Forge's supported translucent-effects stage, paired with the wave's particles
-            // target so Fabulous composites the swell correctly over the water and entities.
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES)VoidSeaWaveRenderer.render(e);
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES){WorldEffects.render(e);WarpRenderer.render(e);ArsenalClient.renderLight(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL){BeamWounds.endFrame();TemporalScreen.render(e.getPartialTick());}
         }

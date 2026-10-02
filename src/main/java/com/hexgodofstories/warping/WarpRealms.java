@@ -99,10 +99,12 @@ public final class WarpRealms {
         }
         ServerLevel old=(ServerLevel)e.level(),to=old.getServer().getLevel(d.key);if(to==null)return;
         Vec3 pos=d.arrival.add(cell,owner?8:0,0);
+        Vec3 origin=e.position();float facing=e.getYRot();
         if(e instanceof ServerPlayer p){
             if(Destination.from(old)==null)HexData.get(p).put("warpReturn",new FractureAnchor(old.dimension(),p.position(),p.getYRot(),p.getXRot()).save());
             p.stopRiding();p.teleportTo(to,pos.x,pos.y,pos.z,p.getYRot(),p.getXRot());
             WarpResidency.track(p,p.getUUID());
+            if(p.serverLevel()==to)WarpResidency.imprison(p,old,origin,facing);
             if(!com.hexgodofstories.server.CosmicFlight.mantled(p)){
                 com.hexgodofstories.server.CosmicFlight.revoke(p);
                 if(!p.isCreative()&&!p.isSpectator()){p.getAbilities().flying=false;p.onUpdateAbilities();}
@@ -120,7 +122,7 @@ public final class WarpRealms {
                 return copy;
             }
         });
-        if(moved!=null){moved.setDeltaMovement(0,-.30,0);moved.fallDistance=0;moved.hurtMarked=true;WarpResidency.track(moved,original);}
+        if(moved!=null){moved.setDeltaMovement(0,-.30,0);moved.fallDistance=0;moved.hurtMarked=true;WarpResidency.track(moved,original);WarpResidency.imprison(moved,old,origin,facing);}
     }
     /**
      * A crossing that carries its motion with it.
@@ -172,6 +174,9 @@ public final class WarpRealms {
         double spreadZ=net.minecraft.util.Mth.clamp(offset.z,-ENTRY_SPREAD,ENTRY_SPREAD);
         Vec3 pos=landing(to,e,d.arrival.add(cell,owner?8:0,0),spreadX,spreadZ);
         float yaw=e.getYRot(),pitch=e.getXRot();
+        // Where it was taken from, for the realm to let it out again: the floor it stood on, not the point under it
+        // the sink had drawn it down to.
+        Vec3 origin=stood!=null?stood:e.position();
         if(e instanceof ServerPlayer p){
             if(Destination.from(old)==null)HexData.get(p).put("warpReturn",new FractureAnchor(old.dimension(),stood==null?p.position():stood,yaw,pitch).save());
             p.stopRiding();
@@ -189,6 +194,7 @@ public final class WarpRealms {
             p.fallDistance=fall;
             p.hurtMarked=true;
             WarpResidency.track(p,sender);
+            WarpResidency.imprison(p,old,origin,yaw);
             p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(p));
             return true;
         }
@@ -202,6 +208,7 @@ public final class WarpRealms {
         moved.fallDistance=fall;
         moved.hurtMarked=true;
         WarpResidency.track(moved,sender);
+        WarpResidency.imprison(moved,old,origin,yaw);
         return true;
     }
     /** How far from a realm's entry point a crossing may come out, in blocks. */
@@ -304,9 +311,7 @@ public final class WarpRealms {
             // Hexor's behavioural/passive clocks are server-tick clocks, not destination-world
             // time. A playerless custom dimension must not make "thirty seconds" depend on how
             // that level's own gameTime happens to advance.
-            com.hexgodofstories.warping.leviathan.PilgrimWarden.tick(l,l.getServer().getTickCount());
-            // Preserve player prediction; mobs receive the same swell in the existing loop below.
-            VoidSeaWaves.tick(l,now);}
+            com.hexgodofstories.warping.leviathan.PilgrimWarden.tick(l,l.getServer().getTickCount());}
         if(d==Destination.PARADISE){
             // Rebuild even when residents were saved inside Paradise and no new portal is opened.
             if(ledger(l).paradiseLayout<PARADISE_LAYOUT)prepare(l,d,CELL);
@@ -350,7 +355,6 @@ public final class WarpRealms {
             rescue(l,d,e,cell);
             switch(d){
                 case SUN -> solarExposure(l,e,cell,now);
-                case VOID_SEA -> {if(e instanceof Mob)VoidSeaWaves.apply(e,now);}
                 case GRAVITY_WELL -> singularity(l,e,cell,now);
                 case SHATTERED_WORLD -> {
                     // Gravity lets go for thirty five ticks in every twelve seconds, and what is

@@ -35,6 +35,12 @@ import java.util.UUID;
  *
  * <p>The same ledger is the source of truth for Y/release. Recall no longer guesses that everything
  * must still be inside a small square around the original arrival point.
+ *
+ * <p>And no realm is a life sentence. Whatever a break drops into a realm is held there two minutes at most: a body
+ * that is still alive when they are up is let out again where it was first taken, rising out of a black puddle on the
+ * very spot (see {@link Warping#free}). The time and the place travel on the body itself, in its own saved data, so
+ * a player who logs out halfway through comes back to the rest of it, and a restart forgets nothing. The keepers who
+ * open these realms are never held at all: they leave when they like.
  */
 public final class WarpResidency extends SavedData {
     private static final String DATA="warping_residency";
@@ -48,6 +54,10 @@ public final class WarpResidency extends SavedData {
         "hexgodofstories_warp_resident", Comparator.<UUID>naturalOrder()
     );
     private static final Map<UUID,Integer> MISSING=new java.util.HashMap<>();
+    /** Where, and when, a body was first dropped into a realm: kept in its own saved data. */
+    public static final String TRAP="hexgodofstoriesWarpTrap";
+    /** The longest a body is kept in a realm: two minutes. */
+    public static final int SENTENCE=2400;
 
     /**
      * State a living body had when Warping first made it a resident.
@@ -124,6 +134,62 @@ public final class WarpResidency extends SavedData {
         if(old!=null&&old.chunk()!=chunk.toLong())release(level,entity.getUUID(),new ChunkPos(old.chunk()));
         hold(level,entity.getUUID(),chunk);
         data.setDirty();MISSING.remove(entity.getUUID());
+    }
+
+    /**
+     * A body has just been dropped into a realm from the world outside: it is held from now, and let out again here.
+     * Nothing is written for a keeper (they leave when they like), a creative or spectating player, or a body moving
+     * from one realm to another, which keeps the time and the place it was first taken from.
+     */
+    public static void imprison(Entity body,ServerLevel from,net.minecraft.world.phys.Vec3 origin,float yaw){
+        if(!(body instanceof LivingEntity)||from==null||Destination.from(from)!=null||Warping.sovereign(body))return;
+        if(body instanceof net.minecraft.world.entity.player.Player p&&(p.isCreative()||p.isSpectator()))return;
+        CompoundTag trap=new CompoundTag();
+        trap.putString("dim",from.dimension().location().toString());
+        trap.putDouble("x",origin.x);trap.putDouble("y",origin.y);trap.putDouble("z",origin.z);
+        trap.putFloat("yaw",yaw);
+        trap.putLong("at",body.level().getGameTime());
+        body.getPersistentData().put(TRAP,trap);
+        if(body instanceof ServerPlayer p)p.displayClientMessage(net.minecraft.network.chat.Component.literal(
+            "Survive two minutes, and this realm lets you go."),true);
+    }
+
+    /**
+     * Once a second for each realm: whoever has served their two minutes is let out. A player found in a realm with no
+     * record of how they came there (an older save, a command) is still never kept longer than two minutes from
+     * then; a creature with no record has nowhere to be returned to, and stays.
+     */
+    private static void sentence(ServerLevel level,WarpResidency data){
+        long now=level.getGameTime();
+        List<Entity> due=new ArrayList<>();
+        for(UUID id:new ArrayList<>(data.residents.keySet())){
+            ServerPlayer online=level.getServer().getPlayerList().getPlayer(id);
+            Entity body=online!=null&&online.serverLevel()==level?online:level.getEntity(id);
+            if(!(body instanceof LivingEntity living)||!living.isAlive()||Warping.sovereign(body))continue;
+            CompoundTag saved=body.getPersistentData();
+            if(!saved.contains(TRAP)){
+                if(!(body instanceof ServerPlayer))continue;
+                CompoundTag trap=new CompoundTag();trap.putLong("at",now);saved.put(TRAP,trap);
+                continue;
+            }
+            CompoundTag trap=saved.getCompound(TRAP);
+            long since=now-trap.getLong("at");
+            // A world clock that has gone backwards starts the two minutes again rather than never ending them.
+            if(since<0){trap.putLong("at",now);continue;}
+            long left=SENTENCE-since;
+            if(left<=0)due.add(body);
+            else if(body instanceof ServerPlayer p)countdown(p,left);
+        }
+        for(Entity body:due)Warping.free(level,body);
+    }
+
+    /** A trapped player is told how long is left: at a minute, at thirty seconds, and each of the last ten. */
+    private static void countdown(ServerPlayer p,long left){
+        long seconds=(left+19)/20;
+        if(seconds==60||seconds==30||seconds<=10)
+            p.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                seconds==60?"One minute until this realm lets you go.":seconds==30?"Thirty seconds until this realm lets you go."
+                    :"Released in "+seconds+"..."),true);
     }
 
     /** True while this destination contains at least one meaningful inhabitant. */
@@ -278,6 +344,7 @@ public final class WarpResidency extends SavedData {
             }
         }
         if(dirty)data.setDirty();
+        if(level.getGameTime()%20L==0L)sentence(level,data);
     }
 
     private static void hold(ServerLevel level,UUID id,ChunkPos chunk){

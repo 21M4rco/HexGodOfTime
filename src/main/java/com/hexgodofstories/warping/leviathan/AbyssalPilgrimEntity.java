@@ -200,9 +200,11 @@ public class AbyssalPilgrimEntity extends Mob implements GeoEntity {
 
     private void refreshTerrain() {
         if (com.hexgodofstories.warping.Destination.from(level()) == com.hexgodofstories.warping.Destination.VOID_SEA) {
-            // Boats, platforms and player buildings must not redefine the ocean surface or floor.
-            cachedSurface = VoidSea.SURFACE;
+            // Boats, platforms and player buildings must not redefine the ocean surface or floor: the sea's own swell
+            // does, and it is a formula, so it is read every tick, wherever the body has got to.
+            cachedSurface = VoidSea.surface(getX(), getZ());
             cachedFloor = VoidSea.FLOOR;
+            terrainClock = 0;
             return;
         }
         int x = Mth.floor(getX()), z = Mth.floor(getZ());

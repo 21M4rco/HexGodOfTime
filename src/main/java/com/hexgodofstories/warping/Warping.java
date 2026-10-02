@@ -516,6 +516,8 @@ public final class Warping {
         WarpResidency.TransportState transportState=WarpResidency.transportState(source,id);
         int index=++c.arrivals;
         Vec3 spot=footing(level,c,(LivingEntity)waiting,index);
+        // Pulled out early: the time the realm was keeping on it is over.
+        waiting.getPersistentData().remove(WarpResidency.TRAP);
         double spread=index*2.399;
 
         if(waiting instanceof ServerPlayer player){
@@ -543,6 +545,65 @@ public final class Warping {
         if(arrived instanceof Mob mob)mob.setPersistenceRequired();
         WarpResidency.untrack(source,id);
         WarpEmergence.begin(arrived,spot,Vec3.ZERO,false);
+    }
+
+    /**
+     * A body that has served its two minutes in a realm ({@link WarpResidency#SENTENCE}) is let out where it was first
+     * taken: the same dimension and the same spot, lifted clear if that spot has been built over since, rising slowly
+     * out of a black puddle as every Warping arrival does. A player with no record of where they came from (an older
+     * save, a command) goes to their own respawn point, or the world's; a creature with none stays where it is.
+     *
+     * <p>A creature is carried across whole, as the recall carries it: health, gear, name and everything a mod wrote
+     * on it arrive with it, with the gravity and AI it had when it went in.
+     */
+    public static void free(ServerLevel realm,Entity body){
+        if(body==null||body.isRemoved()||!body.isAlive())return;
+        CompoundTag trap=body.getPersistentData().getCompound(WarpResidency.TRAP);
+        body.getPersistentData().remove(WarpResidency.TRAP);
+        net.minecraft.server.MinecraftServer server=realm.getServer();
+        ServerLevel to=null;Vec3 spot=null;float yaw=body.getYRot();
+        if(trap.contains("dim")){
+            net.minecraft.resources.ResourceLocation id=net.minecraft.resources.ResourceLocation.tryParse(trap.getString("dim"));
+            to=id==null?null:server.getLevel(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION,id));
+            if(to!=null&&Destination.from(to)==null){spot=new Vec3(trap.getDouble("x"),trap.getDouble("y"),trap.getDouble("z"));yaw=trap.getFloat("yaw");}
+            else to=null;
+        }
+        if(to==null){
+            if(!(body instanceof ServerPlayer player))return;
+            to=server.getLevel(player.getRespawnDimension());
+            BlockPos bed=player.getRespawnPosition();
+            if(to==null||bed==null||Destination.from(to)!=null){to=server.overworld();bed=to.getSharedSpawnPos();}
+            spot=Vec3.atBottomCenterOf(bed);
+        }
+        // The spot's own chunk, in memory before anything is put in it or asked whether it fits there.
+        to.getChunk(BlockPos.containing(spot).getX()>>4,BlockPos.containing(spot).getZ()>>4);
+        spot=WarpRealms.daylight(to,body,spot);
+        WarpResidency.TransportState state=WarpResidency.transportState(realm,body.getUUID());
+        RECALLING.remove(body.getUUID());
+        WarpResidency.untrack(realm,body.getUUID());
+        final Vec3 at=spot;final float facing=yaw;
+        if(body instanceof ServerPlayer player){
+            player.stopRiding();
+            player.teleportTo(to,at.x,at.y,at.z,facing,player.getXRot());
+            restoreRecallState(player,state);
+            player.setDeltaMovement(Vec3.ZERO);player.hurtMarked=true;player.fallDistance=0;
+            WarpEmergence.begin(player,at,Vec3.ZERO,true);
+            player.displayClientMessage(net.minecraft.network.chat.Component.literal("You survived. The realm lets you go."),true);
+            return;
+        }
+        body.stopRiding();
+        Entity arrived=body.changeDimension(to,new ITeleporter(){
+            public Entity placeEntity(Entity entity,ServerLevel from,ServerLevel dest,float ignored,java.util.function.Function<Boolean,Entity> reposition){
+                Entity moved=reposition.apply(false);
+                if(moved!=null){moved.moveTo(at.x,at.y,at.z,facing,moved.getXRot());moved.setDeltaMovement(Vec3.ZERO);moved.fallDistance=0;}
+                return moved;
+            }
+        });
+        if(arrived==null)return;
+        restoreRecallState(arrived,state);
+        arrived.setDeltaMovement(Vec3.ZERO);arrived.hurtMarked=true;arrived.fallDistance=0;
+        if(arrived instanceof Mob mob)mob.setPersistenceRequired();
+        WarpEmergence.begin(arrived,at,Vec3.ZERO,true);
     }
 
     /**
