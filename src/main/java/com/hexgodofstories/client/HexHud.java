@@ -162,7 +162,7 @@ public final class HexHud {
             case TELEKINESIS -> "Grab; again: throw. Scroll: closer/further.";
             case BLINK -> "Teleport toward your aim.";
             case WARD -> "Raise a defensive veil.";
-            case DAGGERS -> "Conjure a dagger; again: put it away. Hold G, let go: Gravity Grasp.";
+            case DAGGERS -> "Conjure a dagger; again: put it away. Hold G: drag in; let go: yank.";
             case TWIN_DAGGERS -> "Conjure The Deceiver. Hold use: guard and parry. Sprint and attack: running cuts and the slam. G: Complete Evisceration.";
             case LAEVATEINN -> "Conjure/recall the Scepter. Hold right click 1-10s: beam.";
             case ENCHANT -> "Charm a creature to follow you.";

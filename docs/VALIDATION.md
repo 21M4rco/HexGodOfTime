@@ -124,8 +124,10 @@ Everything below needs a recorded in-game session and **has not had one**. Nothi
   pull carries a creature itself rather than handing it a velocity. G no longer falls through to Warping's screen.
 - **Played (second build), and changed after:** the cone was too narrow to read as a pull, and when another move took
   the hand down the bend stayed up. It is now over three blocks across at its far end, its waves scaled with it, and any
-  other move ends the grasp outright. That the pull fires on letting go of G, not while it is held, was not said
-  anywhere; the caster is now told so when the hand goes up.
+  other move ends the grasp outright.
+- **Asked for after the second build:** the pull begins while G is held, not only on letting go. Held, the first body
+  looked at is taken hold of and dragged in, harder the longer it is held; let go, it is thrown forward and yanked the
+  rest of the way; caught the moment it is within reach either way. The arm strains while held.
 - **Not verified in a running game:** that a sinking creature no longer steps or hops out; that the jump key, and no
   longer the game's own jump, is what lifts a player in the liquid; that the palm read from the model lands on the
   first-person hand (if Player Animator draws that hand in a space of its own, the cone falls back to where it would

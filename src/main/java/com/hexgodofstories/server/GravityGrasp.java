@@ -20,41 +20,46 @@ import java.util.UUID;
 
 /**
  * Gravity Grasp: G, held, whatever is in the hand (with The Deceiver in it, G is Complete Evisceration instead). After
- * Pain's Bansho Ten'in. Held, the free hand points out along the look, open, gathering the pull (grasp_point), for as
- * long as the key stays down ({@link #MOST} at most). Let go once it has gathered ({@link #GATHER}), the hand coils back
- * as if hauling the air itself in (grasp_pull), and the one body the caster is looking at that moment is torn off its
- * feet and carried across to them, within {@link #REACH} blocks. Only that body: nothing else near it is touched, and
- * there is no black hole. Within arm's reach it is caught: a dagger forms in the hand already turned over (or the one
- * held is turned over) and is driven down into the side of its neck and left there, the body held stunned on it and
- * leaned on, for a second; then it is torn out across the throat. Six hearts, ten seconds' bleeding, and a second more of
- * the stun after.
+ * Pain's Bansho Ten'in.
  *
- * <p>Its {@link #RECOVERY} starts only when a body is caught. Let go too soon, at nothing, or at a body that is never
- * brought in (too heavy, a wall in the way, gone), and nothing is owed.
+ * <p>Held, the free hand strains out along the look (grasp_point), and the first body the caster looks at, within
+ * {@link #REACH} blocks and in sight, is taken hold of and starts to come: dragged off its feet toward the hand, slowly
+ * at first and harder and faster the longer G stays down ({@link #RAMP}). Let go, the hand is wrenched back to the chest
+ * (grasp_pull) and the pull leaps: the body is yanked the rest of the way, harder still the longer it was held. Whenever
+ * it comes within arm's reach, held or yanked, it is caught: a dagger forms in the hand already turned over (or the one
+ * held is turned over) and is driven down into the side of its neck and left there, the body held stunned on it and
+ * leaned on, for a second; then it is torn out across the throat. Six hearts, ten seconds' bleeding, and a second more
+ * of the stun after. Only that one body is ever moved, and there is no black hole.
+ *
+ * <p>Its {@link #RECOVERY} starts only when a body is caught. Let go too soon, at nothing, or with a body that is never
+ * brought in (too heavy, a wall in the way, gone), and nothing is owed. Any other move ends it (interrupted).
  *
  * <p>Everything here is the server's: who is pulled, how hard, who is caught and when the blade goes in and comes out.
- * Clients are told only that the caster is pointing or pulling (player data, {@code graspStart}); the blade during the
- * stab is the combo starters' (BladeCombo's keys, so a dagger thrown away meanwhile is still drawn in the hand) and the
- * move is blade_grasp_stab (tools/blade_moves.py). Bounded: one body, and one world query, on the letting go.
+ * Clients are told only that the caster is pulling, which body, and since when it was yanked (player data); the blade
+ * during the stab is the combo starters' (BladeCombo's keys) and the move is blade_grasp_stab (tools/blade_moves.py).
+ * Bounded: one body, and one world query a tick only until it has one.
  */
 public final class GravityGrasp {
     private GravityGrasp() { }
 
     /**
-     * How long the hand must point before letting go pulls (a tap does nothing), how much longer it gathers after that
-     * before the pull is at its strongest, the longest it can be held out before it drops of itself, and the longest the
-     * pull is given to bring the body in.
+     * How long G must be held before letting go yanks (a tap does nothing), how long a hold takes to reach its strongest
+     * drag and its strongest yank, the longest it can be held before the hand drops of itself, and how long the yank is
+     * given to bring the body in.
      */
-    public static final int GATHER = 10, RAMP = 100, MOST = 200;
+    public static final int GATHER = 10, RAMP = 60, MOST = 200;
     static final int HAUL = 40;
-    /**
-     * The reach, and how nearly the body must be looked at when the look itself passes by it (1 - cosine). The pull, in
-     * blocks a tick added each tick, from the least (already strong: nothing short of a boss stays on the ground) to the
-     * most, gathered over {@link #RAMP}: the longer the hand points, the harder and faster the body comes, and the
-     * heavier the body it can bring.
-     */
+    /** The reach, and how nearly the body must be looked at when the look itself passes by it (1 - cosine). */
     static final double REACH = 22, AIM = .012, KEPT = .88;
-    static final double PULL_LEAST = .5, PULL_MOST = 1.3, FASTEST_LEAST = 2.4, FASTEST_MOST = 3.4, LIFT_LEAST = .14, LIFT_MOST = .3;
+    /**
+     * The drag while G is held, in blocks a tick added each tick and blocks a tick at most, from the moment of taking
+     * hold to {@link #RAMP} ticks in: a body is coming from the first tick, and coming fast by the end of it.
+     */
+    static final double DRAG_LEAST = .1, DRAG_MOST = .45, DRAG_FASTEST_LEAST = .45, DRAG_FASTEST_MOST = 1.3, DRAG_LIFT = .1;
+    /** The yank on letting go, from the least to the most, gathered over the whole hold: far beyond the drag. */
+    static final double PULL_LEAST = .6, PULL_MOST = 1.4, FASTEST_LEAST = 2.6, FASTEST_MOST = 3.6, LIFT_LEAST = .14, LIFT_MOST = .3;
+    /** What the yank throws the body forward with the moment the hand is wrenched back, least to most. */
+    static final double JERK_LEAST = .6, JERK_MOST = 1.3;
     /** Where the body is hauled to, straight out in front of the eye; and how close it must come to be caught. */
     static final double PALM = 1.25, DOWN = .38, MELEE = 2.7;
     /** The stab: in on {@link #STAB_IN}, torn out on {@link #STAB_OUT}, the blade gone by {@link #STAB_END}. */
@@ -73,16 +78,17 @@ public final class GravityGrasp {
     /** Recovery, from the catch, and where it lives. */
     public static final int RECOVERY = 100;
     public static final String READY = "graspReady", HOLDING = "graspStart", STABBING = "graspStab";
-    /** Synced while a body is being hauled in: since when, and which (clients draw the air bending toward the hand). */
+    /** Synced: the body taken hold of (while held and yanked), and since when it was yanked (clients draw the air bending). */
     public static final String HAULING = "graspHaul", TARGET = "graspTarget";
 
-    /** How much of the pull's growth a hand pointed this many ticks has gathered, nought to one. */
-    public static double gathered(long pointed) {return Math.max(0, Math.min(1, (pointed - GATHER) / (double) RAMP));}
+    /** How much of the pull's growth G held this many ticks has gathered, nought to one. */
+    public static double gathered(long held) {return Math.max(0, Math.min(1, held / (double) RAMP));}
 
     private static final class Hold {
         final long start;
-        /** The body being hauled in, from the letting go; null while the hand is still pointing. */
+        /** The body taken hold of: the first looked at while G is held, or at the letting go. */
         LivingEntity target;
+        /** When G was let go (the yank), or 0 while it is still held. */
         long hauledAt;
         /** How much the pull had gathered when it was let go (gathered). */
         double power;
@@ -119,44 +125,50 @@ public final class GravityGrasp {
         HexData.get(p).putLong(HOLDING, now);
         HexNetwork.animate(p, "grasp_point");
         p.level().playSound(null, p.blockPosition(), HexGodOfStories.GRIP_HOLD.get(), SoundSource.PLAYERS, .9f, .45f);
-        // The pull is the letting go, and nothing says so but this.
-        HexServer.notice(p, "Let go of G to pull.");
+        HexServer.notice(p, "Hold to drag it in; let go to yank it to you.");
         HexNetwork.sync(p);
         return true;
     }
 
     /**
-     * G let go. Pointed long enough, the hand is hauled back and whatever the caster looks at now is pulled in; too soon,
-     * or {@code haul} false (a screen opened, the key was taken away), the hand simply drops. A pull or a stab already
-     * under way is seen through.
+     * G let go. Held long enough, the hand is wrenched back and the body (the one already taken hold of, or else the
+     * one looked at now) is yanked the rest of the way; too soon, or {@code haul} false (a screen opened, the keys were
+     * taken away), the hand simply drops. A yank or a stab already under way is seen through.
      */
     public static void release(ServerPlayer p, boolean haul) {
         Hold hold = HOLDS.get(p.getUUID());
-        if (hold == null || hold.target != null || hold.caught != null) return;
+        if (hold == null || hold.hauledAt != 0 || hold.caught != null) return;
         long now = HexData.now(p);
         if (!haul || now - hold.start < GATHER) {
-            if (haul) HexServer.notice(p, "Hold G a moment to gather the pull, then let go.");
+            if (haul) HexServer.notice(p, "Hold G a moment, then let go.");
             drop(p);
             return;
         }
-        LivingEntity target = aimed(p);
+        if (hold.target == null || !holdable(p, hold.target)) hold.target = aimed(p);
         // The hand comes back whether or not anything comes with it.
         HexNetwork.animate(p, "grasp_pull");
-        p.level().playSound(null, p.blockPosition(), net.minecraft.sounds.SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, .8f, .55f);
-        if (target == null) {
+        p.level().playSound(null, p.blockPosition(), net.minecraft.sounds.SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, .9f, .5f);
+        if (hold.target == null) {
             HOLDS.remove(p.getUUID());
             unmark(p);
             HexServer.notice(p, "Nothing in your sight to pull.");
             HexNetwork.sync(p);
             return;
         }
-        hold.target = target;
+        LivingEntity body = hold.target;
         hold.hauledAt = now;
         hold.power = gathered(now - hold.start);
+        // The wrench of the hand throws it forward at once, before the yank's own pull takes over.
+        Vec3 toward = palm(p).subtract(body.getBoundingBox().getCenter());
+        if (toward.lengthSqr() > 1e-6) {
+            Vec3 jerk = toward.normalize().scale((JERK_LEAST + (JERK_MOST - JERK_LEAST) * hold.power) / mass(body));
+            if (body instanceof ServerPlayer) body.setDeltaMovement(body.getDeltaMovement().add(jerk));
+            else hold.carried = hold.carried.add(jerk);
+        }
         CompoundTag d = HexData.get(p);
         d.putLong(HAULING, now);
-        d.putInt(TARGET, target.getId());
-        p.level().playSound(null, target.getX(), target.getY(), target.getZ(), HexGodOfStories.GRIP_HOLD.get(), SoundSource.PLAYERS, 1, .35f);
+        d.putInt(TARGET, body.getId());
+        p.level().playSound(null, body.getX(), body.getY(), body.getZ(), HexGodOfStories.GRIP_HOLD.get(), SoundSource.PLAYERS, 1, .35f);
         HexNetwork.sync(p);
     }
 
@@ -212,25 +224,59 @@ public final class GravityGrasp {
         long now = HexData.now(p), held = now - hold.start;
         if (hold.caught != null) {stab(p, hold, now); return;}
         if (!p.isAlive() || TemporalEngine.frozen(p) || ScepterBlast.stunned(p)) {drop(p); return;}
+        if (hold.hauledAt == 0) {
+            // Held: held out as long as it can be, the hand drops of itself.
+            if (held >= MOST) {drop(p); return;}
+            // Not yet holding anything, or what it held got away: the first body looked at is taken hold of.
+            if (hold.target == null || !holdable(p, hold.target)) {
+                LivingEntity found = aimed(p);
+                if (found != hold.target) {
+                    hold.target = found;
+                    hold.carried = Vec3.ZERO;
+                    CompoundTag d = HexData.get(p);
+                    if (found == null) d.remove(TARGET); else d.putInt(TARGET, found.getId());
+                    HexNetwork.sync(p);
+                }
+                if (found == null) return;
+            }
+            LivingEntity body = hold.target;
+            if (reached(p, body)) {seize(p, hold, body, now); return;}
+            double ramp = gathered(held);
+            pull(p, hold, body, DRAG_LEAST + (DRAG_MOST - DRAG_LEAST) * ramp, DRAG_FASTEST_LEAST + (DRAG_FASTEST_MOST - DRAG_FASTEST_LEAST) * ramp, DRAG_LIFT);
+            return;
+        }
+        // Yanked: the rest of the way, or nothing owed once the yank is spent or the body gone.
         LivingEntity body = hold.target;
-        // Still pointing: nothing moves yet. Held out as long as it can be, the hand drops of itself.
-        if (body == null) {if (held >= MOST) drop(p); return;}
-        if (now - hold.hauledAt >= HAUL || !body.isAlive() || body.isRemoved() || body.level() != p.level()
-            || !HexServer.validTarget(p, body) || BodyFlags.kaguneHolds(body) || p.distanceTo(body) > REACH + 6) {drop(p); return;}
-        if (p.distanceTo(body) - body.getBbWidth() / 2 <= MELEE) {seize(p, hold, body, now); return;}
+        if (now - hold.hauledAt >= HAUL || !holdable(p, body)) {drop(p); return;}
+        if (reached(p, body)) {seize(p, hold, body, now); return;}
+        pull(p, hold, body, PULL_LEAST + (PULL_MOST - PULL_LEAST) * hold.power, FASTEST_LEAST + (FASTEST_MOST - FASTEST_LEAST) * hold.power,
+            LIFT_LEAST + (LIFT_MOST - LIFT_LEAST) * hold.power);
+    }
+
+    /** Still a body the grasp can hold: alive, here, within reach, and not in a Kagune's tendril (HexKagunes). */
+    private static boolean holdable(ServerPlayer p, LivingEntity body) {
+        return body.isAlive() && !body.isRemoved() && body.level() == p.level() && HexServer.validTarget(p, body)
+            && !BodyFlags.kaguneHolds(body) && p.distanceTo(body) <= REACH + 6;
+    }
+
+    /** Within arm's reach: caught. */
+    private static boolean reached(ServerPlayer p, LivingEntity body) {return p.distanceTo(body) - body.getBbWidth() / 2 <= MELEE;}
+
+    /** The bigger the body, the harder it is to drag. */
+    private static double mass(LivingEntity body) {return Math.max(1, body.getBbWidth() * body.getBbWidth() * body.getBbHeight() / 1.2);}
+
+    /**
+     * One tick of the body coming: drawn toward the hand by {@code accel}, never faster than {@code fastest}, torn off
+     * the ground by {@code lift}, and held at the hand rather than overshooting it.
+     */
+    private static void pull(ServerPlayer p, Hold hold, LivingEntity body, double accel, double fastest, double lift) {
         Vec3 palm = palm(p);
         Vec3 middle = body.getBoundingBox().getCenter(), to = palm.subtract(middle);
-        double distance = to.length();
-        // The bigger the body, the harder it is to drag; right at the hand it is held there rather than overshooting it.
-        // Whatever stands on the ground is torn off it, or the ground's grip would hold it back. The longer the hand
-        // pointed, the harder all of it.
-        double mass = Math.max(1, body.getBbWidth() * body.getBbWidth() * body.getBbHeight() / 1.2);
-        double pull = PULL_LEAST + (PULL_MOST - PULL_LEAST) * hold.power, lift = LIFT_LEAST + (LIFT_MOST - LIFT_LEAST) * hold.power;
-        double fastest = FASTEST_LEAST + (FASTEST_MOST - FASTEST_LEAST) * hold.power;
+        double distance = to.length(), heavy = mass(body);
         boolean player = body instanceof ServerPlayer;
         Vec3 velocity = (player ? body.getDeltaMovement() : hold.carried).scale(distance < 1.2 ? .4 : KEPT);
-        if (distance > .6) velocity = velocity.add(to.scale(pull / mass / distance));
-        if (body.onGround() && distance > 2) velocity = velocity.add(0, lift / mass, 0);
+        if (distance > .6) velocity = velocity.add(to.scale(accel / heavy / distance));
+        if (body.onGround() && distance > 2) velocity = velocity.add(0, lift / heavy, 0);
         double speed = velocity.length();
         if (speed > fastest) velocity = velocity.scale(fastest / speed);
         body.fallDistance = 0;

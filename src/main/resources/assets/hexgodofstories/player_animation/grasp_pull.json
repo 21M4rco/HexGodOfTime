@@ -2,7 +2,7 @@
   "version": 3,
   "name": "grasp_pull",
   "author": "HexGodOfStories",
-  "description": "Gravity Grasp let go: the pointing hand closes on the air with a last push, then is hauled back to the chest, the elbow driven behind the body and the left shoulder twisting back with it, as if dragging the air itself in; it holds there while the body comes, then settles. The dagger hand is left to the player; a body caught cuts in with blade_grasp_stab.",
+  "description": "Gravity Grasp let go: the straining hand closes on the air with a last push and is wrenched back to the chest, the elbow driven behind the body and the body thrown back with it, as if tearing whatever it held across the gap; it holds there while the body comes, then settles. The dagger hand is left to the player; a body caught cuts in with blade_grasp_stab.",
   "emote": {
     "beginTick": 0,
     "endTick": 26,
@@ -16,13 +16,13 @@
         "tick": 0,
         "easing": "linear",
         "leftArm": {
-          "pitch": -88,
+          "pitch": -90,
           "yaw": 3.5,
           "roll": 0,
           "bend": 0
         },
         "torso": {
-          "pitch": 0,
+          "pitch": 2,
           "yaw": 0,
           "roll": 0
         }
@@ -31,43 +31,43 @@
         "tick": 2,
         "easing": "outquad",
         "leftArm": {
-          "pitch": -93,
-          "yaw": 3.5,
+          "pitch": -94,
+          "yaw": 3,
           "roll": 0,
-          "bend": -6
+          "bend": -8
         },
         "torso": {
-          "pitch": -1,
+          "pitch": 0,
           "yaw": 0,
           "roll": 0
         }
       },
       {
-        "tick": 6,
+        "tick": 4,
         "easing": "inexpo",
         "leftArm": {
-          "pitch": 18,
-          "yaw": 6,
+          "pitch": 20,
+          "yaw": 4,
           "roll": 8,
-          "bend": -118
+          "bend": -120
         },
         "torso": {
-          "pitch": 4,
+          "pitch": 8,
           "yaw": 0,
           "roll": 0
         }
       },
       {
-        "tick": 9,
+        "tick": 7,
         "easing": "outquad",
         "leftArm": {
-          "pitch": 12,
-          "yaw": 6,
+          "pitch": 13,
+          "yaw": 4,
           "roll": 6,
           "bend": -112
         },
         "torso": {
-          "pitch": 3,
+          "pitch": 5,
           "yaw": 0,
           "roll": 0
         }
@@ -76,13 +76,13 @@
         "tick": 16,
         "easing": "inoutsine",
         "leftArm": {
-          "pitch": 14,
-          "yaw": 5,
+          "pitch": 15,
+          "yaw": 3,
           "roll": 7,
           "bend": -114
         },
         "torso": {
-          "pitch": 3,
+          "pitch": 5,
           "yaw": 0,
           "roll": 0
         }

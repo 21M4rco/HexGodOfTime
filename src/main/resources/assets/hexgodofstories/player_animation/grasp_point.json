@@ -2,13 +2,13 @@
   "version": 3,
   "name": "grasp_point",
   "author": "HexGodOfStories",
-  "description": "Gravity Grasp, held (the dagger's G): the free left arm alone rises and points straight out, open, at whatever is looked at, the left shoulder brought forward, and holds there with the faint tremor of a hand gathering the pull. It follows the look up and down (HexAnimations). The dagger hand is left to the player.",
+  "description": "Gravity Grasp, held (G): the free left arm alone thrusts straight out at whatever is looked at, open, and strains there as if dragging something heavy against its will: the arm trembling, the elbow half giving and forced straight again, the body leaning back into the pull. It follows the look up and down (HexAnimations). The dagger hand is left to the player.",
   "emote": {
     "beginTick": 0,
-    "endTick": 21,
-    "stopTick": 21,
+    "endTick": 30,
+    "stopTick": 30,
     "isLoop": true,
-    "returnTick": 5,
+    "returnTick": 6,
     "degrees": true,
     "easeBeforeKeyframe": true,
     "moves": [
@@ -28,76 +28,166 @@
         }
       },
       {
-        "tick": 5,
+        "tick": 6,
         "easing": "outquad",
         "leftArm": {
-          "pitch": -88,
+          "pitch": -90,
           "yaw": 3.5,
           "roll": 0,
           "bend": 0
         },
         "torso": {
-          "pitch": 0,
+          "pitch": 2,
           "yaw": 0,
           "roll": 0
         }
       },
       {
-        "tick": 9,
+        "tick": 8,
         "easing": "inoutsine",
         "leftArm": {
-          "pitch": -90,
-          "yaw": 3.8,
-          "roll": 1,
-          "bend": -3
+          "pitch": -86,
+          "yaw": 5,
+          "roll": 2,
+          "bend": -12
         },
         "torso": {
-          "pitch": 0,
+          "pitch": 4,
           "yaw": 0,
-          "roll": 0
+          "roll": 1
+        }
+      },
+      {
+        "tick": 10,
+        "easing": "inoutsine",
+        "leftArm": {
+          "pitch": -91,
+          "yaw": 2.5,
+          "roll": -2,
+          "bend": -6
+        },
+        "torso": {
+          "pitch": 3,
+          "yaw": 0,
+          "roll": -1
         }
       },
       {
         "tick": 13,
         "easing": "inoutsine",
         "leftArm": {
-          "pitch": -87,
-          "yaw": 3.1,
-          "roll": -1,
-          "bend": -1
+          "pitch": -85,
+          "yaw": 4.5,
+          "roll": 2,
+          "bend": -16
         },
         "torso": {
-          "pitch": 1,
+          "pitch": 6,
           "yaw": 0,
-          "roll": 0
+          "roll": 1
         }
       },
       {
-        "tick": 17,
+        "tick": 15,
+        "easing": "inoutsine",
+        "leftArm": {
+          "pitch": -90,
+          "yaw": 3,
+          "roll": -1,
+          "bend": -8
+        },
+        "torso": {
+          "pitch": 4,
+          "yaw": 0,
+          "roll": -1
+        }
+      },
+      {
+        "tick": 18,
+        "easing": "inoutsine",
+        "leftArm": {
+          "pitch": -84,
+          "yaw": 5,
+          "roll": 2,
+          "bend": -18
+        },
+        "torso": {
+          "pitch": 7,
+          "yaw": 0,
+          "roll": 1.5
+        }
+      },
+      {
+        "tick": 20,
         "easing": "inoutsine",
         "leftArm": {
           "pitch": -89,
-          "yaw": 3.5,
-          "roll": 1,
-          "bend": -4
+          "yaw": 2.5,
+          "roll": -2,
+          "bend": -9
         },
         "torso": {
-          "pitch": 0,
+          "pitch": 5,
           "yaw": 0,
-          "roll": 0
+          "roll": -1
         }
       },
       {
-        "tick": 21,
+        "tick": 23,
         "easing": "inoutsine",
         "leftArm": {
-          "pitch": -88,
+          "pitch": -86,
+          "yaw": 4.5,
+          "roll": 1.5,
+          "bend": -14
+        },
+        "torso": {
+          "pitch": 6,
+          "yaw": 0,
+          "roll": 1
+        }
+      },
+      {
+        "tick": 25,
+        "easing": "inoutsine",
+        "leftArm": {
+          "pitch": -91,
+          "yaw": 3,
+          "roll": -1.5,
+          "bend": -5
+        },
+        "torso": {
+          "pitch": 3,
+          "yaw": 0,
+          "roll": -1
+        }
+      },
+      {
+        "tick": 28,
+        "easing": "inoutsine",
+        "leftArm": {
+          "pitch": -87,
+          "yaw": 4,
+          "roll": 1,
+          "bend": -11
+        },
+        "torso": {
+          "pitch": 5,
+          "yaw": 0,
+          "roll": 0.5
+        }
+      },
+      {
+        "tick": 30,
+        "easing": "inoutsine",
+        "leftArm": {
+          "pitch": -90,
           "yaw": 3.5,
           "roll": 0,
           "bend": 0
         },
         "torso": {
-          "pitch": 0,
+          "pitch": 2,
           "yaw": 0,
           "roll": 0
         }

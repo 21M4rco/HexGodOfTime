@@ -180,19 +180,28 @@ public final class GraspLens {
         Hand hand = HANDS.get(p.getId());
         Vec3 palm = hand != null && frame - hand.frame() <= 1 ? hand.palm() : palm(mc, p, eye, look, partial);
         long hauled = d.getLong(GravityGrasp.HAULING);
-        Entity body = hauled > 0 ? mc.level.getEntity(d.getInt(GravityGrasp.TARGET)) : null;
+        // The body taken hold of: dragged while G is held, yanked once it is let go.
+        Entity body = d.contains(GravityGrasp.TARGET) ? mc.level.getEntity(d.getInt(GravityGrasp.TARGET)) : null;
         Vec3 source;
         float radius, strength, haul;
+        double pointed = time - start;
         if (body != null) {
             source = body.getPosition(partial).add(0, body.getBbHeight() * .5, 0);
-            double since = time - hauled, power = GravityGrasp.gathered(hauled - start);
-            strength = (float) ((.75 + .25 * power) * Mth.clamp(.5 + since / 4, 0, 1));
             radius = (float) Math.max(2.2, body.getBbWidth() * 1.5 + 1.5);
-            haul = 1;
+            if (hauled > 0) {
+                double since = time - hauled, power = GravityGrasp.gathered(hauled - start);
+                strength = (float) ((.75 + .25 * power) * Mth.clamp(.6 + since / 3, 0, 1));
+                haul = 1;
+            } else {
+                // Dragging: the waves already roll in to the hand, harder the longer it is held.
+                double ramp = GravityGrasp.gathered((long) pointed);
+                strength = (float) (Mth.clamp(pointed / 4, 0, 1) * (.6 + .4 * ramp));
+                haul = (float) (.35 + .3 * ramp);
+            }
         } else {
             source = mc.level.clip(new ClipContext(eye, eye.add(look.scale(POINTING)), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, p)).getLocation();
-            double pointed = time - start, gathered = GravityGrasp.gathered((long) pointed);
-            // Faint the moment the hand is out, and gathering from there: the longer it is held, the harder and wider.
+            double gathered = GravityGrasp.gathered((long) pointed);
+            // Nothing held yet: faint the moment the hand is out, and gathering from there, harder and wider.
             strength = (float) (Mth.clamp(pointed / 4, 0, 1) * (.55 + .45 * gathered));
             radius = (float) (1.6 + 1.8 * gathered);
             haul = 0;

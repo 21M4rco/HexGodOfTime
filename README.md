@@ -10,16 +10,16 @@
   A pool opened at full charge, which is every pool the mantle opens (Wide Open), is still the point of no return.
 - **Gravity Grasp is G, held, whatever is in your hand.** (With The Deceiver in hand G is still Complete Evisceration.)
   Anchor Being's key no longer holds anything: tapped or held, it vanishes you as ever. **Hold G**: your free left hand
-  points out wherever you look, open, and the air in front of it starts to bend in toward the palm, more the longer you
-  hold. **Let go** (after at least half a second; a tap does nothing) and the hand is hauled back to your chest, and the
-  one body you are looking at that moment (within twenty-two blocks, in sight) is torn off its feet and carried to you,
-  dead ahead. Only that body; nothing else near it moves. It is gripped, not pushed: a creature is held still and moved
-  by the pull itself every tick, so nothing (another hold, a stun, a creature with no AI of its own, a realm's own
-  physics) can leave it where it stands. The longer you held, the harder and faster it comes (from already strong to
-  over two and a half times as strong, gathered over five more seconds), and the heavier the body it can bring. Within
-  reach it is seized: a dagger forms in your hand already turned over (or the one you hold is turned over), is driven
-  into the side of its neck, held there a second, and torn out across the throat. Six hearts, ten seconds' bleeding, a
-  second's more stun. Gravity Grasp opens with Conjure Daggers.
+  strains out wherever you look, trembling, the elbow half giving, the body leaning back, and the first body you look at
+  (within twenty-two blocks, in sight) is taken hold of and **starts coming at once**: dragged off its feet toward you,
+  slowly at first and harder and faster the longer you hold (full after three seconds). **Let go** (after at least half
+  a second; a tap does nothing) and the hand is wrenched back to your chest, and the pull leaps: the body is thrown
+  forward and yanked the rest of the way, harder still the longer you held. Only that body; nothing else near it moves.
+  It is gripped, not pushed: a creature is held still and moved by the pull itself every tick, so nothing (another
+  hold, a stun, a creature with no AI of its own, a realm's own physics) can leave it where it stands. **The moment it
+  comes within arm's reach, held or yanked, it is seized**: a dagger forms in your hand already turned over (or the one
+  you hold is turned over), is driven into the side of its neck, held there a second, and torn out across the throat.
+  Six hearts, ten seconds' bleeding, a second's more stun. Gravity Grasp opens with Conjure Daggers.
 - **G never opens Warping's destinations any more.** They moved to **Y held** (Y tapped is still Warping's reach); inside
   a Warping realm, Y held opens the way-out selector that G used to.
 - **No black hole: a wide cone of bent air on the palm.** The pull is seen as the air itself: a cone with its point fixed
@@ -705,7 +705,7 @@ Install Player Animator **1.0.2-rc1+1.20** (CurseForge file 4587214) on clients.
 | K | Mastery archive |
 | Z X C V B N M | The seven bind slots: **tap** one to cast what is bound to it, **hold** it for the spell's second move (or for spells that are held). Crown of Barrels: tap for Gotcha!, hold for the crown |
 | R | Cast the last spell again, with the same tap and hold |
-| G | **Gravity Grasp**: hold to point, let go to pull. With The Deceiver in hand: Complete Evisceration |
+| G | **Gravity Grasp**: hold to drag what you look at in, let go to yank it. With The Deceiver in hand: Complete Evisceration |
 | Y | Warping's reach (tap); **Warping destination** (hold; inside a Warping realm: the way out) |
 | H | Glorious Purpose transformation |
 | U | Utility: release held targets / seal your fracture / leave a realm / resume your time fields |
