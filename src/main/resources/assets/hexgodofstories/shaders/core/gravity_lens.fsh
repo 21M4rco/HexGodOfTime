@@ -50,20 +50,23 @@ void main() {
 
     // Swells of air rolling in to the palm: a crest at u*K + Time*V moves toward the palm as time goes on.
     float speed = mix(5.0, 14.0, Haul);
-    float wave = sin(u * 9.0 + Time * speed);
-    float wave2 = sin(u * 3.7 + Time * speed * .55 + 1.3);
+    float wave = sin(u * 5.5 + Time * speed);
+    float wave2 = sin(u * 2.3 + Time * speed * .55 + 1.3);
     // Close to the eye the same bend in the world is a far bigger one on the screen: a hand's length from the camera it
     // is kept to a third, so the palm in first person draws the air in without tearing the view open.
     float power = Strength * mix(1.0, 1.7, Haul) * mix(.33, 1.0, smoothstep(.6, 3.5, s));
+    // A wide cone is a wide pull: the bend grows with the cone's girth where the ray crosses it, so its far end rolls in
+    // great waves rather than a ripple.
+    float girth = .5 + .35 * clamp(radius, .5, 3.6);
     // Dragged in toward the palm: what is drawn here is what lies further out along the cone.
-    vec3 bend = Axis * soft * (.15 + .11 * wave + .05 * wave2) * power;
+    vec3 bend = Axis * soft * (.15 + .13 * wave + .06 * wave2) * power * girth;
     // Squeezed in toward the axis: what is drawn here lies further off it.
     vec3 off = p - q;
     bend += off * soft * (.40 + .16 * wave) * power;
     // The palm: the space round it pinched in, drawn from further out, nothing at the palm itself and most a hand's
     // breadth off it, so it closes smoothly on the hand rather than bursting out of a point.
     vec3 fromPalm = p - Apex;
-    float pinch = exp(-dot(fromPalm, fromPalm) / .3) * soft;
+    float pinch = exp(-dot(fromPalm, fromPalm) / .5) * soft;
     bend += fromPalm * pinch * .45 * power;
 
     vec2 delta = screenOf(p + bend) - screenOf(p);
@@ -77,7 +80,7 @@ void main() {
     // edge of the bend just visible as heat haze is.
     float gray = dot(rgb, vec3(.2126, .7152, .0722));
     rgb = mix(rgb, vec3(gray) * .9, soft * soft * Strength * .2);
-    rgb *= 1.0 + max(0.0, wave) * soft * Strength * .09;
+    rgb *= 1.0 + max(0.0, wave) * soft * Strength * .13;
     float rim = smoothstep(.0, .25, inside) * (1.0 - smoothstep(.25, .55, inside));
     rgb += vec3(.035, .03, .045) * rim * Strength;
     fragColor = vec4(rgb, 1.0);

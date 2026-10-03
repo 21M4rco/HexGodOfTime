@@ -119,6 +119,8 @@ public final class GravityGrasp {
         HexData.get(p).putLong(HOLDING, now);
         HexNetwork.animate(p, "grasp_point");
         p.level().playSound(null, p.blockPosition(), HexGodOfStories.GRIP_HOLD.get(), SoundSource.PLAYERS, .9f, .45f);
+        // The pull is the letting go, and nothing says so but this.
+        HexServer.notice(p, "Let go of G to pull.");
         HexNetwork.sync(p);
         return true;
     }
@@ -163,6 +165,20 @@ public final class GravityGrasp {
         HOLDS.remove(p.getUUID());
         unmark(p);
         HexNetwork.animate(p, "__clear__");
+        HexNetwork.sync(p);
+    }
+
+    /**
+     * Another move played on the caster (a cut, a cast, anything) takes the hand down: a grasp still pointing or hauling
+     * ends there, nothing owed, and the air stops bending with it. Its own moves, and the stab once a body is caught,
+     * are left alone.
+     */
+    public static void interrupted(ServerPlayer p, String animation) {
+        if (animation.startsWith("grasp_") || animation.equals("blade_grasp_stab") || animation.equals("__clear__")) return;
+        Hold hold = HOLDS.get(p.getUUID());
+        if (hold == null || hold.caught != null) return;
+        HOLDS.remove(p.getUUID());
+        unmark(p);
         HexNetwork.sync(p);
     }
 

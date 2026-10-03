@@ -65,7 +65,7 @@ public final class GraspLens {
     private static final int MOST = 4;
     /** The cone's shell: rings along it and quads round each. */
     private static final int RINGS = 16, SIDES = 28;
-    private static final float PALM_RADIUS = .16f;
+    private static final float PALM_RADIUS = .3f;
 
     private static ShaderInstance shader;
     private static TextureTarget scene;
@@ -187,14 +187,14 @@ public final class GraspLens {
             source = body.getPosition(partial).add(0, body.getBbHeight() * .5, 0);
             double since = time - hauled, power = GravityGrasp.gathered(hauled - start);
             strength = (float) ((.75 + .25 * power) * Mth.clamp(.5 + since / 4, 0, 1));
-            radius = (float) Math.max(.9, body.getBbWidth() * .8 + .5);
+            radius = (float) Math.max(2.2, body.getBbWidth() * 1.5 + 1.5);
             haul = 1;
         } else {
             source = mc.level.clip(new ClipContext(eye, eye.add(look.scale(POINTING)), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, p)).getLocation();
             double pointed = time - start, gathered = GravityGrasp.gathered((long) pointed);
             // Faint the moment the hand is out, and gathering from there: the longer it is held, the harder and wider.
-            strength = (float) (Mth.clamp(pointed / 4, 0, 1) * (.5 + .5 * gathered));
-            radius = (float) (.7 + .9 * gathered);
+            strength = (float) (Mth.clamp(pointed / 4, 0, 1) * (.55 + .45 * gathered));
+            radius = (float) (1.6 + 1.8 * gathered);
             haul = 0;
         }
         Vec3 axis = source.subtract(palm);

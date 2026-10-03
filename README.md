@@ -22,11 +22,13 @@
   second's more stun. Gravity Grasp opens with Conjure Daggers.
 - **G never opens Warping's destinations any more.** They moved to **Y held** (Y tapped is still Warping's reach); inside
   a Warping realm, Y held opens the way-out selector that G used to.
-- **No black hole: a cone of bent air on the palm.** The pull is seen as the air itself: a cone with its point fixed on
-  your palm, where your hand is really drawn (first person and third alike), opening out to whatever you point at, and
-  once let go running from the body to your hand. Everything seen through it is bent toward the palm, swells of air
+- **No black hole: a wide cone of bent air on the palm.** The pull is seen as the air itself: a cone with its point fixed
+  on your palm, where your hand is really drawn (first person and third alike), opening out wide (over three blocks
+  across at its far end once gathered) to whatever you point at, and once let go running from the body to your hand. Everything seen through it is bent toward the palm, swells of air
   rolling in to the hand, the space round the palm itself pinched into it, colour split a hair as through thick glass.
   It is a real cone in the world, so walls and bodies in front of it hide it. No particle and nothing solid.
+- **Anything else ends it.** A cut, a cast, any other move takes the hand down, and the grasp (and the bending air) ends
+  with it, nothing owed. While the hand is up you are told to let go of G to pull.
 - **Its recovery is five seconds, and only owed when a body is brought in.** Let go too soon, at nothing, or at a body
   that is never brought in (too heavy, a wall in the way, gone) and nothing is owed. Held ten seconds without letting
   go, the hand drops by itself.

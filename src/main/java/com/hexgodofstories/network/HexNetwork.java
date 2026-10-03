@@ -98,7 +98,11 @@ public final class HexNetwork {
         if(copy.contains("disguise"))copy.getCompound("disguise").remove("nbt");
         return copy;
     }
-    public static void animate(ServerPlayer p,String name) {CompoundTag d=new CompoundTag();d.putString("animation",name);tracking(p,new Message(ANIMATE,p.getId(),d));}
+    public static void animate(ServerPlayer p,String name) {
+        // Any other move takes Gravity Grasp's hand down, and the grasp (and the air bending toward it) ends with it.
+        com.hexgodofstories.server.GravityGrasp.interrupted(p,name);
+        CompoundTag d=new CompoundTag();d.putString("animation",name);tracking(p,new Message(ANIMATE,p.getId(),d));
+    }
     /** Arrival has no RiftEntity. Nearby viewers receive the nebula even before tracking starts. */
     public static void arrival(Entity entity) {
         if(!(entity.level() instanceof net.minecraft.server.level.ServerLevel level))return;
