@@ -1,0 +1,38 @@
+name: Release HexGodOfStories
+
+# Pushing a version tag (v0.7.0) builds the mod from that commit and publishes it as a GitHub release, with
+# release-notes/<tag>.md as its description. The tag must match the version in build.gradle.
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.8'
+      - name: Generate screen-accurate Scepter assets
+        run: python3 scripts/generate_scepter.py
+      - name: Build
+        run: gradle --no-daemon build
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          notes="release-notes/${TAG}.md"
+          jar="build/libs/hexgodofstories-${version}.jar"
+          sources="build/libs/hexgodofstories-${version}-sources.jar"
+          test -f "$notes" || { echo "Missing $notes"; exit 1; }
+          test -f "$jar" || { echo "The build made no $jar: the tag and the version in build.gradle disagree"; ls build/libs; exit 1; }
+          gh release create "$TAG" "$jar" "$sources" --verify-tag --title "HexGodOfStories ${version}" --notes-file "$notes"
