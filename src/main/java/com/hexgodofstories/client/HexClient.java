@@ -18,7 +18,8 @@ import org.lwjgl.glfw.GLFW;
  * Seven bind slots along the bottom row of the keyboard, one mastery key, and one cast key. Pressing a slot's key
  * chooses the ability bound to it and casts it, at once; the cast key casts the last one chosen again. A spell with a
  * second move makes it on the same key held rather than tapped, so there is no alternate key to reach for: G is
- * Warping's, where the pool leads, except with The Deceiver in hand, where it is Complete Evisceration. Abilities that
+ * Warping's, where the pool leads, except with The Deceiver in hand, where it is Complete Evisceration, and with the
+ * dagger in hand, where it is Gravity Grasp, held to point and let go to pull. Abilities that
  * charge are driven by the press and release of their key
  * rather than a second binding, so the scheme stays small no matter how much progression adds.
  *
@@ -47,6 +48,8 @@ public final class HexClient {
     }
     private static KeyMapping key(String name,int key){return new KeyMapping("key.hexgodofstories."+name,InputConstants.Type.KEYSYM,key,"key.categories.hexgodofstories");}
     private static boolean primaryDown,primaryLatched;
+    /** G is down for Gravity Grasp (the dagger in hand): its letting go is the pull. */
+    private static boolean graspDown;
     /**
      * What each casting key is doing while it is down: nothing; a cast already sent; a hold under way; or, for a spell
      * that is one thing tapped and another held (see {@link QuickBar#twoWay}), waiting to see which, and then the long
@@ -106,7 +109,7 @@ public final class HexClient {
             e.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)r->{
                 WarpRenderer.clear();HexLayer.clear();WeaponRenderer.clear();RiftRenderer.clear();RealmSky.clear();CosmicNebula.clear();
                 BranchVfx.clear();TimeBranchRenderer.clear();ErasureRenderer.clear();Halving.clear();BranchAudio.clear();MeteorAudio.clear();
-                DisguiseRenderer.clear();DisguiseRenderer.forgive();Blood.clear();WoundAnchor.clear();TemporalScreen.close();
+                DisguiseRenderer.clear();DisguiseRenderer.forgive();Blood.clear();WoundAnchor.clear();TemporalScreen.close();GraspLens.close();
             });
         }
     }
@@ -186,15 +189,21 @@ public final class HexClient {
 
             // G is Warping's key, whatever is chosen: where the pool leads, in ordinary worlds. Inside any Warping
             // realm (including the World Tree), it opens the World Tree exit selector instead. No other spell has an
-            // alternate key any more; their second moves are their own keys held. The one exception is The Deceiver
-            // in hand: G is then its Complete Evisceration, and nothing of Warping's.
+            // alternate key any more; their second moves are their own keys held. The exceptions are the blades in
+            // hand: with The Deceiver G is its Complete Evisceration, and with the dagger it is Gravity Grasp, held to
+            // point and let go to pull; nothing of Warping's either way.
             while(SECONDARY.consumeClick()) {
                 if(BladeClient.deceiverInHand(mc.player)){if(!ClientState.frozen(mc.player.getId()))HexNetwork.send(HexServer.EVISCERATE,0);continue;}
+                if(BladeClient.daggerInHand(mc.player)){
+                    if(!graspDown&&!ClientState.frozen(mc.player.getId())){HexNetwork.send(HexServer.GRASP_BEGIN,0);graspDown=true;}
+                    continue;
+                }
                 if(!MasteryScreen.unlocked(ClientState.self(),Ability.WARPING))continue;
                 if(com.hexgodofstories.server.PocketRealm.inside(mc.player.level())
                     || com.hexgodofstories.warping.Destination.from(mc.player.level())!=null)FractureScreen.open();
                 else mc.setScreen(new WarpScreen());
             }
+            if(graspDown&&!SECONDARY.isDown()){graspDown=false;HexNetwork.send(HexServer.GRASP_END,0);}
             while(TRANSFORM.consumeClick())HexNetwork.send(HexServer.TRANSFORM,0);
             while(RELEASE.consumeClick())HexNetwork.send(HexServer.UTILITY,0);
             while(RECALL.consumeClick())HexNetwork.send(HexServer.WARP_RECALL,0);
@@ -207,7 +216,7 @@ public final class HexClient {
         static void releaseHeldCast() {
             BranchKeyInput.cancel(false);
             if(primaryDown||primaryPhysicallyDown())primaryLatched=true;
-            primaryDown=false;
+            primaryDown=false;graspDown=false;
             slotState[CAST_KEY]=SLOT_IDLE;slotAbility[CAST_KEY]=null;
         }
         private static boolean primaryPhysicallyDown() {
@@ -262,13 +271,13 @@ public final class HexClient {
             HexNetwork.send(HexServer.CAST,0);slotState[i]=SLOT_CAST;
         }
         /**
-         * Held past a tap: the second move. The Crown's and Gravity Grasp's last while the key stays down; the rest are
-         * made once, here, and the key's release then does nothing.
+         * Held past a tap: the second move. The Crown's lasts while the key stays down; the rest are made once, here, and
+         * the key's release then does nothing.
          */
         private static void pressLong(int i) {
             Ability a=slotAbility[i];
             reselect(i,a);
-            HexNetwork.send(a==Ability.ARSENAL?HexServer.HOLD_BEGIN:a==Ability.THREADS?HexServer.GRASP_BEGIN:HexServer.ALTERNATE,0);
+            HexNetwork.send(a==Ability.ARSENAL?HexServer.HOLD_BEGIN:HexServer.ALTERNATE,0);
             slotState[i]=SLOT_LONG;
         }
         private static void pressEnd(int i) {
@@ -281,7 +290,6 @@ public final class HexClient {
                 case SLOT_DECIDING -> {reselect(i,a);HexNetwork.send(a==Ability.ARSENAL?HexServer.ALTERNATE:HexServer.CAST,0);}
                 case SLOT_LONG -> {
                     if(a==Ability.ARSENAL)HexNetwork.send(HexServer.HOLD_END,0);
-                    if(a==Ability.THREADS)HexNetwork.send(HexServer.GRASP_END,0);
                 }
                 default -> {}
             }
@@ -301,10 +309,11 @@ public final class HexClient {
                 Ability a=slotAbility[i];
                 if(tell&&a!=null) {
                     if(slotState[i]==SLOT_HOLD||slotState[i]==SLOT_LONG&&a==Ability.ARSENAL)HexNetwork.send(HexServer.HOLD_END,0);
-                    if(slotState[i]==SLOT_LONG&&a==Ability.THREADS)HexNetwork.send(HexServer.GRASP_END,0);
                 }
                 slotState[i]=SLOT_IDLE;slotAbility[i]=null;
             }
+            // A pointing hand is lowered, never let go into a pull, by anything that takes the keys away.
+            if(graspDown){graspDown=false;if(tell)HexNetwork.send(HexServer.GRASP_END,1);}
         }
 
         @SubscribeEvent public static void scroll(InputEvent.MouseScrollingEvent e) {
@@ -400,7 +409,7 @@ public final class HexClient {
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS)BloodStains.render(e);
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES){WarpRenderer.renderRealm(e);BlockWounds.render(e);ArsenalClient.render(e);Halving.render(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES){WorldEffects.render(e);WarpRenderer.render(e);ArsenalClient.renderLight(e);}
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL){BeamWounds.endFrame();TemporalScreen.render(e.getPartialTick());}
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL){BeamWounds.endFrame();GraspLens.render(e);TemporalScreen.render(e.getPartialTick());}
         }
         @SubscribeEvent public static void player(RenderPlayerEvent.Pre e) {
             // Checked before anything pushes a pose: a cancelled pre-event never gets its post-event, so

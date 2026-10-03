@@ -1,0 +1,107 @@
+{
+  "version": 3,
+  "name": "grasp_point",
+  "author": "HexGodOfStories",
+  "description": "Gravity Grasp, held (the dagger's G): the free left arm alone rises and points straight out, open, at whatever is looked at, the left shoulder brought forward, and holds there with the faint tremor of a hand gathering the pull. It follows the look up and down (HexAnimations). The dagger hand is left to the player.",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 21,
+    "stopTick": 21,
+    "isLoop": true,
+    "returnTick": 5,
+    "degrees": true,
+    "easeBeforeKeyframe": true,
+    "moves": [
+      {
+        "tick": 0,
+        "easing": "linear",
+        "leftArm": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0,
+          "bend": 0
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 5,
+        "easing": "outquad",
+        "leftArm": {
+          "pitch": -88,
+          "yaw": 10,
+          "roll": 0,
+          "bend": 0
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 9,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 9,
+        "easing": "inoutsine",
+        "leftArm": {
+          "pitch": -90,
+          "yaw": 11,
+          "roll": 1,
+          "bend": -3
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 10,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 13,
+        "easing": "inoutsine",
+        "leftArm": {
+          "pitch": -87,
+          "yaw": 9,
+          "roll": -1,
+          "bend": -1
+        },
+        "torso": {
+          "pitch": 1,
+          "yaw": 8,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 17,
+        "easing": "inoutsine",
+        "leftArm": {
+          "pitch": -89,
+          "yaw": 10,
+          "roll": 1,
+          "bend": -4
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 10,
+          "roll": 0
+        }
+      },
+      {
+        "tick": 21,
+        "easing": "inoutsine",
+        "leftArm": {
+          "pitch": -88,
+          "yaw": 10,
+          "roll": 0,
+          "bend": 0
+        },
+        "torso": {
+          "pitch": 0,
+          "yaw": 9,
+          "roll": 0
+        }
+      }
+    ]
+  }
+}

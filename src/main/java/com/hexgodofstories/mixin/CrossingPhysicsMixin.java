@@ -2,6 +2,7 @@ package com.hexgodofstories.mixin;
 
 import com.hexgodofstories.warping.WarpCrossing;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -32,6 +33,16 @@ public abstract class CrossingPhysicsMixin {
     @Inject(method = "aiStep", at = @At("HEAD"))
     private void hgos$sinking(CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
-        if (WarpCrossing.sinking(self)) self.noPhysics = true;
+        if (!WarpCrossing.sinking(self)) return;
+        self.noPhysics = true;
+        // A creature going down has no say in where it goes: nothing it meant to do last tick (a step toward the rim,
+        // a hop at the next node of its path) is carried into this one. Its own AI is not run meanwhile
+        // (CrossingMobMixin), so the pool's movement is the only movement it makes.
+        if (self instanceof Mob && !self.level().isClientSide && WarpCrossing.crossing(self)) {
+            self.xxa = 0;
+            self.yya = 0;
+            self.zza = 0;
+            self.setJumping(false);
+        }
     }
 }

@@ -36,7 +36,12 @@ public final class WarpMath {
     public static final double MAX_SINK_RATE=.052;
     /** Compatibility floor; live portal physics uses sinkDrag(strength). */
     public static final double SINK_DRAG=.84;
-    public static final double STRUGGLE_LIFT=.14;
+    /**
+     * Lift one press of the jump key buys, before the charge takes its share of it. Set so the pool holds rather than
+     * lets go: at the surface of the smallest pool eight presses a second only keep a body where it is, and once it is in
+     * past the knees it takes sixteen. Faster than that climbs; anything slower goes down.
+     */
+    public static final double STRUGGLE_LIFT=.059;
 
     public static double gooStrength(int held){return charge(held);}
 
@@ -67,6 +72,12 @@ public final class WarpMath {
         double s=Math.min(1,Math.max(0,strength));
         return .004+.018*s*s;
     }
+
+    /**
+     * The draw toward the middle on a creature: three times a player's. A creature cannot fight its way out (it is held
+     * still in the liquid, WarpCrossing), so all this decides is how surely it is taken in from the rim.
+     */
+    public static double mobPull(double strength){return gooPull(strength)*3;}
 
     public static double struggleLift(double strength){
         double s=Math.min(1,Math.max(0,strength));

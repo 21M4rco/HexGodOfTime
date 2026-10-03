@@ -82,10 +82,11 @@ of the mechanic exists to serve.
   player's eye is 1.62 blocks up, so going under takes a little under two seconds, which is long
   enough to watch the other world rise around you and long enough to regret it.
 - **And it can be fought.** Hammering the jump key lifts a body, and the arithmetic is set from the
-  sink rate rather than guessed: six presses a second exactly cancels it, so anything slower loses
-  ground and anything faster climbs. Six a second is fast — fast enough to be a thing done in a
-  panic rather than casually — and the deeper somebody already is, the longer they have to keep it
-  up. Presses are spent on the tick they arrive rather than saved, so there is no banking your way
+  sink rate rather than guessed: at the surface of the smallest pool eight presses a second only
+  hold a body where it is, and past the knees it takes sixteen, so anything slower loses ground and
+  anything faster climbs. That is spamming the key as fast as a finger goes, and the deeper somebody
+  already is, the longer they have to keep it up. A creature cannot fight it at all: once taken it
+  is held still in the liquid, drawn toward the middle three times as hard, and kept. Presses are spent on the tick they arrive rather than saved, so there is no banking your way
   out. Rising back above the rim, by thrashing or by wading, gives the floor back and stands the
   body on top of it. Because a body with no collision is never on the ground, the client reads the
   key directly and sends its own press — and that one message is deliberately exempt from the input

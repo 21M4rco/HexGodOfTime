@@ -2,6 +2,7 @@ package com.hexgodofstories.server;
 
 import com.hexgodofstories.HexGodOfStories;
 import com.hexgodofstories.data.HexData;
+import com.hexgodofstories.entity.ConjuredWeapon;
 import com.hexgodofstories.network.HexNetwork;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
@@ -10,44 +11,54 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * Gravity Grasp, Anchor Being's key held rather than tapped. The caster stretches an arm out and a small black hole opens
- * on the palm, tearing every body the caster could harm within {@link #REACH} blocks off its feet and in, harder the
- * longer it is held, for up to {@link #MOST} ticks. The first it drags within arm's reach is caught: the hole closes,
- * a dagger forms in the hand already turned over, and it is driven down into the side of the neck and left there, the
- * body held stunned on it and leaned on, for a second; then it is torn out across the throat. Six hearts, ten seconds'
- * bleeding, and a second more of the stun after.
+ * Gravity Grasp, the dagger's G, held: with the conjured dagger in hand (Warping's key otherwise, as with The Deceiver's
+ * Complete Evisceration). After Pain's Bansho Ten'in. Held, the free hand points out along the look, open, gathering the
+ * pull (grasp_point), for as long as the key stays down ({@link #MOST} at most). Let go once it has gathered
+ * ({@link #GATHER}), the hand coils back as if hauling the air itself in (grasp_pull), and the one body the caster is
+ * looking at that moment is torn off its feet and yanked across to them, within {@link #REACH} blocks. Only that body:
+ * nothing else near it is touched, and there is no black hole. Within arm's reach it is caught, and the dagger already in
+ * the hand is turned over and driven down into the side of its neck and left there, the body held stunned on it and
+ * leaned on, for a second; then it is torn out across the throat. Six hearts, ten seconds' bleeding, and a second more of
+ * the stun after.
+ *
+ * <p>Its {@link #RECOVERY} starts only when a body is caught. Let go too soon, at nothing, or at a body that is never
+ * brought in (too heavy, a wall in the way, gone), and nothing is owed.
  *
  * <p>Everything here is the server's: who is pulled, how hard, who is caught and when the blade goes in and comes out.
- * Clients are told only that the caster is holding it (player data, {@code graspStart}); the dagger is the combo
- * starters' phantom blade (BladeCombo's keys) and the move is blade_grasp_stab (tools/blade_moves.py). Bounded:
- * {@link #MOST_HELD} bodies at most, one bounded query a tick for each caster holding it.
+ * Clients are told only that the caster is pointing or pulling (player data, {@code graspStart}); the blade during the
+ * stab is the combo starters' (BladeCombo's keys, so a dagger thrown away meanwhile is still drawn in the hand) and the
+ * move is blade_grasp_stab (tools/blade_moves.py). Bounded: one body, and one world query, on the letting go.
  */
 public final class GravityGrasp {
     private GravityGrasp() { }
 
     /**
-     * The longest hold, the reach of the pull, and its least and greatest strength, in blocks a tick added each tick,
-     * reached {@link #RAMP} ticks in. Even the least yanks a sprinting player off their feet; at the most nothing short
-     * of a boss stays on the ground.
+     * How long the hand must point before letting go pulls (a tap does nothing), how much longer it gathers after that
+     * before the pull is at its strongest, the longest it can be held out before it drops of itself, and the longest the
+     * pull is given to bring the body in.
      */
-    public static final int MOST = 200;
-    static final int RAMP = 60;
-    static final double REACH = 22, PULL_LEAST = .16, PULL_MOST = .5, KEPT = .88, FASTEST = 2.4, LIFT = .14;
-    /** Where the hole hangs, out from the eye on the outstretched palm; and how close a body must come to be caught. */
-    static final double HOLE = 1.25, ASIDE = .3, DOWN = .38, MELEE = 2.7;
+    public static final int GATHER = 20, RAMP = 100, MOST = 200;
+    static final int HAUL = 40;
+    /**
+     * The reach, and how nearly the body must be looked at when the look itself passes by it (1 - cosine). The pull, in
+     * blocks a tick added each tick, from the least (already strong: nothing short of a boss stays on the ground) to the
+     * most, gathered over {@link #RAMP}: the longer the hand points, the harder and faster the body comes, and the
+     * heavier the body it can bring.
+     */
+    static final double REACH = 22, AIM = .012, KEPT = .88;
+    static final double PULL_LEAST = .5, PULL_MOST = 1.3, FASTEST_LEAST = 2.4, FASTEST_MOST = 3.4, LIFT_LEAST = .14, LIFT_MOST = .3;
+    /** Where the body is hauled to, out from the eye toward the coiling hand; and how close it must come to be caught. */
+    static final double PALM = 1.25, ASIDE = .3, DOWN = .38, MELEE = 2.7;
     /** The stab: in on {@link #STAB_IN}, torn out on {@link #STAB_OUT}, the blade gone by {@link #STAB_END}. */
     static final int STAB_IN = 6, STAB_OUT = 27, AFTER_STUN = 20;
     public static final int STAB_END = 34;
@@ -61,13 +72,22 @@ public final class GravityGrasp {
      * there, and one too short to have its neck at that height is held up on the blade until it does.
      */
     static final double PIN = .85, NECK = 1.45;
-    /** Recovery once let go, and where it lives; bodies pulled at once, at most. */
-    public static final int RECOVERY = 240;
+    /** Recovery, from the catch, and where it lives. */
+    public static final int RECOVERY = 100;
     public static final String READY = "graspReady", HOLDING = "graspStart", STABBING = "graspStab";
-    static final int MOST_HELD = 12;
+    /** Synced while a body is being hauled in: since when, and which (clients draw the air bending toward the hand). */
+    public static final String HAULING = "graspHaul", TARGET = "graspTarget";
+
+    /** How much of the pull's growth a hand pointed this many ticks has gathered, nought to one. */
+    public static double gathered(long pointed) {return Math.max(0, Math.min(1, (pointed - GATHER) / (double) RAMP));}
 
     private static final class Hold {
         final long start;
+        /** The body being hauled in, from the letting go; null while the hand is still pointing. */
+        LivingEntity target;
+        long hauledAt;
+        /** How much the pull had gathered when it was let go (gathered). */
+        double power;
         LivingEntity caught;
         long caughtAt;
 
@@ -78,7 +98,7 @@ public final class GravityGrasp {
 
     public static boolean holding(ServerPlayer p) {return HOLDS.containsKey(p.getUUID());}
 
-    /** Whether this body is caught in somebody's hole, on the blade (api.KaguneLink). */
+    /** Whether this body is caught by somebody's grasp, on the blade (api.KaguneLink). */
     public static boolean caught(net.minecraft.world.entity.Entity e) {
         for (Hold hold : HOLDS.values()) if (hold.caught == e) return true;
         return false;
@@ -90,45 +110,86 @@ public final class GravityGrasp {
         return left > 0 && left <= RECOVERY;
     }
 
+    /** G pressed, with the dagger in hand: the free hand goes out along the look and points. */
     public static boolean begin(ServerPlayer p) {
-        if (holding(p) || recovering(p) || p.isSpectator() || !p.isAlive()) return false;
+        if (!daggerInHand(p) || holding(p) || recovering(p) || p.isSpectator() || !p.isAlive()) return false;
+        if (BladeCombo.running(p) || Evisceration.running(p) || ScepterBlast.stunned(p)) return false;
         long now = HexData.now(p);
         HOLDS.put(p.getUUID(), new Hold(now));
         HexData.get(p).putLong(HOLDING, now);
-        HexNetwork.animate(p, "telekinesis");
+        HexNetwork.animate(p, "grasp_point");
         p.level().playSound(null, p.blockPosition(), HexGodOfStories.GRIP_HOLD.get(), SoundSource.PLAYERS, .9f, .45f);
         HexNetwork.sync(p);
         return true;
     }
 
-    /** Let go: the hole closes, and the recovery starts. A stab under way is seen through: letting go does not end it. */
-    public static void release(ServerPlayer p) {
+    /**
+     * G let go. Pointed long enough, the hand is hauled back and whatever the caster looks at now is pulled in; too soon,
+     * or {@code haul} false (a screen opened, the key was taken away), the hand simply drops. A pull or a stab already
+     * under way is seen through.
+     */
+    public static void release(ServerPlayer p, boolean haul) {
         Hold hold = HOLDS.get(p.getUUID());
-        if (hold == null || hold.caught != null) return;
-        HOLDS.remove(p.getUUID());
+        if (hold == null || hold.target != null || hold.caught != null) return;
+        long now = HexData.now(p);
+        if (!haul || now - hold.start < GATHER) {
+            if (haul) HexServer.notice(p, "Hold G a moment to gather the pull, then let go.");
+            drop(p);
+            return;
+        }
+        LivingEntity target = aimed(p);
+        // The hand comes back whether or not anything comes with it.
+        HexNetwork.animate(p, "grasp_pull");
+        p.level().playSound(null, p.blockPosition(), net.minecraft.sounds.SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, .8f, .55f);
+        if (target == null) {
+            HOLDS.remove(p.getUUID());
+            unmark(p);
+            HexServer.notice(p, "Nothing in your sight to pull.");
+            HexNetwork.sync(p);
+            return;
+        }
+        hold.target = target;
+        hold.hauledAt = now;
+        hold.power = gathered(now - hold.start);
         CompoundTag d = HexData.get(p);
-        d.remove(HOLDING);
-        d.putLong(READY, HexData.now(p) + RECOVERY);
+        d.putLong(HAULING, now);
+        d.putInt(TARGET, target.getId());
+        p.level().playSound(null, target.getX(), target.getY(), target.getZ(), HexGodOfStories.GRIP_HOLD.get(), SoundSource.PLAYERS, 1, .35f);
+        HexNetwork.sync(p);
+    }
+
+    /** The hand dropped, or the pull given up (its body gone, or never brought in): nothing caught, and nothing owed. */
+    private static void drop(ServerPlayer p) {
+        HOLDS.remove(p.getUUID());
+        unmark(p);
         HexNetwork.animate(p, "__clear__");
         HexNetwork.sync(p);
     }
 
-    /** A death, a logout or a crossing: dropped without a recovery being owed for it. */
+    /** A death, a logout or a crossing: dropped where it stands. */
     public static void forget(ServerPlayer p) {
         Hold hold = HOLDS.remove(p.getUUID());
         if (hold == null) return;
-        HexData.get(p).remove(HOLDING);
+        unmark(p);
         if (hold.caught != null) sheathe(p);
+    }
+
+    /** No longer pointing or hauling. */
+    private static void unmark(ServerPlayer p) {
+        CompoundTag d = HexData.get(p);
+        d.remove(HOLDING);
+        d.remove(HAULING);
+        d.remove(TARGET);
     }
 
     public static void reset() {HOLDS.clear();}
 
-    /** The hole's place in the world: on the palm of the outstretched right hand. */
-    public static Vec3 hole(ServerPlayer p) {
+    /** Where the body is hauled to: just out in front, toward the free (left) hand coiling back with it. */
+    public static Vec3 palm(ServerPlayer p) {
         Vec3 look = p.getLookAngle();
         Vec3 flat = new Vec3(look.x, 0, look.z);
         Vec3 right = flat.lengthSqr() < 1e-6 ? Vec3.ZERO : new Vec3(-flat.z, 0, flat.x).normalize();
-        return p.getEyePosition().add(look.scale(HOLE)).add(right.scale(ASIDE)).add(0, -DOWN, 0);
+        return p.getEyePosition().add(look.scale(PALM)).add(right.scale(-ASIDE)).add(0, -DOWN, 0);
     }
 
     /** Every tick of a caster's. */
@@ -137,42 +198,40 @@ public final class GravityGrasp {
         if (hold == null) return;
         long now = HexData.now(p), held = now - hold.start;
         if (hold.caught != null) {stab(p, hold, now); return;}
-        if (!p.isAlive() || TemporalEngine.frozen(p) || ScepterBlast.stunned(p) || held >= MOST) {release(p); return;}
-        Vec3 hole = hole(p);
-        double strength = PULL_LEAST + (PULL_MOST - PULL_LEAST) * Math.min(1, held / (double) RAMP);
-        // A body a Kagune's tendril is holding (HexKagunes) is held still in the air: it would only be dragged back and forth.
-        List<Entity> near = p.level().getEntities(p, new AABB(hole, hole).inflate(REACH), e -> e instanceof LivingEntity && HexServer.validTarget(p, e) && !BodyFlags.kaguneHolds(e));
-        near.sort(Comparator.comparingDouble(e -> e.distanceToSqr(hole)));
-        for (int i = 0; i < Math.min(MOST_HELD, near.size()); i++) {
-            LivingEntity body = (LivingEntity) near.get(i);
-            Vec3 middle = body.getBoundingBox().getCenter(), to = hole.subtract(middle);
-            double distance = to.length();
-            if (distance > REACH) continue;
-            if (p.distanceTo(body) - body.getBbWidth() / 2 <= MELEE) {seize(p, hold, body, now); return;}
-            // The bigger the body, the harder it is to drag; right at the hole it is held there rather than overshooting
-            // it. Whatever stands on the ground is torn off it, or the ground's grip would hold it back.
-            double mass = Math.max(1, body.getBbWidth() * body.getBbWidth() * body.getBbHeight() / 1.2);
-            Vec3 velocity = body.getDeltaMovement().scale(distance < 1.2 ? .4 : KEPT);
-            if (distance > .6) velocity = velocity.add(to.scale(strength / mass / distance));
-            if (body.onGround() && distance > 2) velocity = velocity.add(0, LIFT / mass, 0);
-            double speed = velocity.length();
-            if (speed > FASTEST) velocity = velocity.scale(FASTEST / speed);
-            body.setDeltaMovement(velocity);
-            body.fallDistance = 0;
-            body.hurtMarked = true;
-            if (body instanceof ServerPlayer target) target.connection.send(new ClientboundSetEntityMotionPacket(target));
-        }
+        if (!p.isAlive() || TemporalEngine.frozen(p) || ScepterBlast.stunned(p) || !daggerInHand(p)) {drop(p); return;}
+        LivingEntity body = hold.target;
+        // Still pointing: nothing moves yet. Held out as long as it can be, the hand drops of itself.
+        if (body == null) {if (held >= MOST) drop(p); return;}
+        if (now - hold.hauledAt >= HAUL || !body.isAlive() || body.isRemoved() || body.level() != p.level()
+            || !HexServer.validTarget(p, body) || BodyFlags.kaguneHolds(body) || p.distanceTo(body) > REACH + 6) {drop(p); return;}
+        if (p.distanceTo(body) - body.getBbWidth() / 2 <= MELEE) {seize(p, hold, body, now); return;}
+        Vec3 palm = palm(p);
+        Vec3 middle = body.getBoundingBox().getCenter(), to = palm.subtract(middle);
+        double distance = to.length();
+        // The bigger the body, the harder it is to drag; right at the hand it is held there rather than overshooting it.
+        // Whatever stands on the ground is torn off it, or the ground's grip would hold it back. The longer the hand
+        // pointed, the harder all of it.
+        double mass = Math.max(1, body.getBbWidth() * body.getBbWidth() * body.getBbHeight() / 1.2);
+        double pull = PULL_LEAST + (PULL_MOST - PULL_LEAST) * hold.power, lift = LIFT_LEAST + (LIFT_MOST - LIFT_LEAST) * hold.power;
+        double fastest = FASTEST_LEAST + (FASTEST_MOST - FASTEST_LEAST) * hold.power;
+        Vec3 velocity = body.getDeltaMovement().scale(distance < 1.2 ? .4 : KEPT);
+        if (distance > .6) velocity = velocity.add(to.scale(pull / mass / distance));
+        if (body.onGround() && distance > 2) velocity = velocity.add(0, lift / mass, 0);
+        double speed = velocity.length();
+        if (speed > fastest) velocity = velocity.scale(fastest / speed);
+        body.setDeltaMovement(velocity);
+        body.fallDistance = 0;
+        body.hurtMarked = true;
+        if (body instanceof ServerPlayer target) target.connection.send(new ClientboundSetEntityMotionPacket(target));
     }
 
-    /**
-     * Drawn within arm's reach: the hole closes on it, the body is seized and stunned, and a dagger forms in the hand,
-     * already turned over for the stab.
-     */
+    /** Hauled within arm's reach: the body is seized and stunned, and the dagger turned over in the hand for the stab. */
     private static void seize(ServerPlayer p, Hold hold, LivingEntity body, long now) {
         hold.caught = body;
         hold.caughtAt = now;
+        unmark(p);
         CompoundTag d = HexData.get(p);
-        d.remove(HOLDING);
+        // Brought in: only now is the recovery owed.
         d.putLong(READY, now + RECOVERY);
         d.putLong(STABBING, now);
         d.putLong(BladeCombo.HELD, now + STAB_END);
@@ -295,6 +354,35 @@ public final class GravityGrasp {
     /** Where the blade goes in: the near side of the neck. */
     private static Vec3 neck(ServerPlayer p, LivingEntity body) {
         return new Vec3(body.getX(), body.getY() + body.getBbHeight() * .82, body.getZ()).subtract(inward(p).scale(body.getBbWidth() * .45));
+    }
+
+    /** Whether the caster's own conjured dagger is in their main hand: G is then Gravity Grasp's. */
+    static boolean daggerInHand(ServerPlayer p) {
+        ItemStack held = p.getMainHandItem();
+        return held.getItem() instanceof ConjuredWeapon w && w.kind == 0 && ConjuredWeapon.belongsTo(held, p);
+    }
+
+    /**
+     * The one body meant: the one the look passes through, or failing that the one nearest the line of the look, well
+     * inside it. Never more than one.
+     */
+    private static LivingEntity aimed(ServerPlayer p) {
+        if (HexServer.target(p, REACH) instanceof LivingEntity looked && pullable(p, looked)) return looked;
+        LivingEntity best = null;
+        double nearest = AIM;
+        Vec3 eye = p.getEyePosition(), look = p.getLookAngle();
+        for (LivingEntity e : p.level().getEntitiesOfClass(LivingEntity.class, p.getBoundingBox().inflate(REACH), e -> pullable(p, e))) {
+            Vec3 to = e.getBoundingBox().getCenter().subtract(eye);
+            if (to.lengthSqr() > REACH * REACH) continue;
+            double off = 1 - to.normalize().dot(look);
+            if (off <= nearest) {nearest = off; best = e;}
+        }
+        return best;
+    }
+
+    /** Something the caster could harm, in sight, and not already held in the air by a Kagune's tendril (HexKagunes). */
+    private static boolean pullable(ServerPlayer p, LivingEntity e) {
+        return e.isAlive() && !e.isRemoved() && e.level() == p.level() && HexServer.foe(p, e) && p.hasLineOfSight(e) && !BodyFlags.kaguneHolds(e);
     }
 
     /** The caster's forward, level with the ground. */

@@ -95,6 +95,9 @@ public final class WarpCrossingClient {
         Phase phase=player==null?null:PHASES.get(player.getId());
         if(player==null||phase==null){jumpHeld=false;banked=0;return;}
         player.noPhysics=true;
+        // With no collision nothing would ever take the ground out from under the body it caught standing, and Minecraft's
+        // own jump (a whole 0.42 a hop) would carry it out over the struggle. In the liquid there is no ground to push off.
+        player.setOnGround(false);
         boolean jump=Minecraft.getInstance().options.keyJump.isDown();
         double lift=WarpMath.struggleLift(phase.strength());
         if(jump&&!jumpHeld&&lift>0){

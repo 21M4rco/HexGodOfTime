@@ -105,6 +105,12 @@ public final class BladeClient {
         return held.is(HexGodOfStories.DECEIVER.get())&&com.hexgodofstories.entity.ConjuredWeapon.belongsTo(held,p);
     }
 
+    /** Whether this player holds their own conjured dagger in the main hand: G is then Gravity Grasp's. */
+    public static boolean daggerInHand(net.minecraft.world.entity.player.Player p) {
+        ItemStack held=p.getMainHandItem();
+        return held.is(HexGodOfStories.DAGGER.get())&&com.hexgodofstories.entity.ConjuredWeapon.belongsTo(held,p);
+    }
+
     /** The blade in this player's hand that is not really there, or empty when there is none to draw. */
     public static ItemStack phantom(AbstractClientPlayer p) {
         CompoundTag d=ClientState.data(p.getId());

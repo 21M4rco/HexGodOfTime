@@ -24,7 +24,7 @@ public final class HexServer {
     public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12,BRANCH_TAP=13,WARP_CHOICE=14,WARP_RECALL=15,WARP_STRUGGLE=16,BRANCH_BEGIN=17,BRANCH_END=18,BRANCH_CANCEL=19,
         /** The Scepter's right click: held opens a charge, let go fires it. */
         SCEPTER_PRESS=20,SCEPTER_RELEASE=21,
-        /** Anchor Being's held alternate, Gravity Grasp: the alternate key pressed, and let go. */
+        /** G with the dagger in hand, held: Gravity Grasp (GravityGrasp). Let go (value 0) to pull; value 1 only lowers the hand. */
         GRASP_BEGIN=22,GRASP_END=23,
         /** One of the seven bind slots' keys: choose whatever ability that slot holds. */
         SLOT=24,
@@ -74,7 +74,7 @@ public final class HexServer {
         SWORD_SWINGS={{-.7,-.7,0},{.6,.8,0},{-1,0,0},{0,-.8,.6}};
     private static final Map<UUID,ArrayDeque<Moment>> HISTORY=new HashMap<>();
     /** Spells whose alternate key would only cast them again. */
-    private static final Set<Ability> NO_ALTERNATE=EnumSet.of(Ability.PUSH,Ability.MIRAGE,Ability.BLINK,Ability.WARD,Ability.MEMORY,Ability.TIME_SLIP);
+    private static final Set<Ability> NO_ALTERNATE=EnumSet.of(Ability.PUSH,Ability.MIRAGE,Ability.BLINK,Ability.WARD,Ability.MEMORY,Ability.TIME_SLIP,Ability.THREADS);
     private static final Map<UUID,Charm> CHARMS=new HashMap<>();
     private static final Map<UUID,Strike> STRIKES=new HashMap<>();
     private static final Map<UUID,Long> INPUT=new HashMap<>(),TRAINING=new HashMap<>();
@@ -142,7 +142,7 @@ public final class HexServer {
         if(Erasure.erasing(p))return;
         if(action==BRANCH_CANCEL){TimeBranch.cancel(p);return;}
         if(action==BRANCH_END){if(TimeBranch.charging(p))TimeBranch.release(p);return;}
-        if(action==GRASP_END){GravityGrasp.release(p);return;}
+        if(action==GRASP_END){GravityGrasp.release(p,value==0);return;}
         if(action==GUARD_END){SwordGuard.end(p);return;}
         if(action==GUARD_BEGIN){SwordGuard.begin(p);return;}
         if(TimeBranch.charging(p)){if(action==UTILITY)TimeBranch.cancel(p);return;}
@@ -222,10 +222,10 @@ public final class HexServer {
             reward(p,a.discipline,90);HexNetwork.sync(p);
         }
     }
-    /** Gravity Grasp: Anchor Being chosen and unlocked, and its own recovery run out. It costs nothing else. */
+    /** Gravity Grasp: the dagger in hand, Conjure Daggers unlocked, and its own recovery run out. It costs nothing else. */
     private static void graspBegin(ServerPlayer p) {
-        if(HexData.selected(p)!=Ability.THREADS||GravityGrasp.holding(p))return;
-        if(!HexData.unlocked(p,Ability.THREADS)){notice(p,"This chapter of your story is still locked.");return;}
+        if(!GravityGrasp.daggerInHand(p)||GravityGrasp.holding(p))return;
+        if(!HexData.unlocked(p,Ability.DAGGERS)){notice(p,"This chapter of your story is still locked.");return;}
         if(GravityGrasp.recovering(p)){notice(p,"Gravity Grasp is recovering.");return;}
         GravityGrasp.begin(p);
     }
@@ -308,7 +308,7 @@ public final class HexServer {
             case RIFT -> {return false;} // legacy tombstone; Fracture moved into Warping
             case BOLT -> {SpellProjectile.cast(p,p.getEyePosition().add(look.scale(.5)),look,secondary?1:0,false);gesture(p,"bolt","cast",HexGodOfStories.SORCERY.get());return true;}
             case PUSH -> {for(Entity e:p.level().getEntities(p,p.getBoundingBox().inflate(5),e->validTarget(p,e))){Vec3 away=e.position().subtract(p.position()).normalize();e.setDeltaMovement(away.scale(1.1).add(0,.25,0));e.hurtMarked=true;}gesture(p,"push","push",HexGodOfStories.SORCERY.get());return true;}
-            case BLINK -> {Vec3 destination=safeAim(p,8+HexData.mastery(p,Discipline.SORCERY)/90.0);if(destination==null)return false;gesture(p,"blink","depart",HexGodOfStories.TELEPORT.get());teleport(p,destination);HexNetwork.arrival(p);veil(p);return true;}
+            case BLINK -> {Vec3 destination=safeAim(p,8+HexData.mastery(p,Discipline.SORCERY)/90.0);if(destination==null||!mayArrive(p,destination))return false;gesture(p,"blink","depart",HexGodOfStories.TELEPORT.get());teleport(p,destination);HexNetwork.arrival(p);veil(p);return true;}
             case WARD -> {HexData.get(p).putLong("wardUntil",now+100);gesture(p,"ward","ward",HexGodOfStories.SORCERY.get());return true;}
             case TELEKINESIS -> {
                 if(!Telekinesis.grab(p,t))return false;
@@ -317,6 +317,7 @@ public final class HexServer {
             case DAGGERS,TWIN_DAGGERS,LAEVATEINN -> {return conjure(p,a);}
             case ENCHANT -> {
                 if(t instanceof ServerPlayer other&&validTarget(p,t)){other.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.CONFUSION,50,0,false,false));HexNetwork.fx(other,"enchant");gesture(p,"enchant","cast",HexGodOfStories.SORCERY.get());return true;}
+                if(t instanceof Mob guard&&validTarget(p,guard)&&sworn(p,guard)){notice(p,"Their oath holds. They will remember that you tried.");return false;}
                 if(!(t instanceof Mob mob)||!validTarget(p,mob)||mob.getMaxHealth()>30+HexData.mastery(p,Discipline.ENCHANTMENT)*.25)return false;
                 charm(p,mob,240+HexData.mastery(p,Discipline.ENCHANTMENT)/2);
                 gesture(p,"enchant","enchant",HexGodOfStories.ILLUSION_SOUND.get());return true;
@@ -338,9 +339,9 @@ public final class HexServer {
                 HexNetwork.fx(p,"slip");return true;
             }
             case TIME_STOP -> {if(!TemporalEngine.beginStop(p))return false;return true;}
-            case SELECTIVE_STOP -> {if(t==null||!validTarget(p,t)||!TemporalEngine.field(p,true,t,t instanceof Player?40:100))return false;gesture(p,"time_stop","bind",HexGodOfStories.STOP.get());return true;}
+            case SELECTIVE_STOP -> {if(t==null||!validTarget(p,t)||!TemporalEngine.field(p,true,t,t instanceof Player||TemporalEngine.anchored(t)?40:100))return false;gesture(p,"time_stop","bind",HexGodOfStories.STOP.get());return true;}
             // Anchor Being. Silent on purpose: no gesture, no sound, nothing that says a swap just happened.
-            case THREADS -> {if(secondary){notice(p,"Hold Anchor Being's key for Gravity Grasp.");return false;}return AnchorBeing.cast(p);}
+            case THREADS -> {return AnchorBeing.cast(p);}
             // Worn, it is taken off before any cast is paid for (see the action handler); never charged for here.
             case ASCENSION -> {if(HexData.get(p).getBoolean("ascended")){dismissMantle(p);HexNetwork.sync(p);return false;}HexData.get(p).putBoolean("ascended",true);HexData.get(p).putLong("transformStart",now);HexData.energy(p,HexData.maxEnergy(p));Transformation.sustain(p);HexNetwork.fx(p,"ascend");p.level().playSound(null,p.blockPosition(),HexGodOfStories.ASCEND.get(),SoundSource.PLAYERS,.75f,1);return true;}
             default -> {return false;}
@@ -712,6 +713,15 @@ public final class HexServer {
         mob.setTarget(null);HexNetwork.fx(mob,"enchant");
     }
     static boolean charmed(Mob mob) {return CHARMS.containsKey(mob.getUUID());}
+    /**
+     * A sworn guard or a crown (Hex Kingdoms' anchored creatures) will not be turned, and remembers who tried: the
+     * caster is left on it as LokiCharmedBy, which Hex Kingdoms reads to ring its village's bell.
+     */
+    static boolean sworn(ServerPlayer p,Mob mob) {
+        if(!TemporalEngine.anchored(mob))return false;
+        mob.getPersistentData().putUUID("LokiCharmedBy",p.getUUID());
+        return true;
+    }
     /** Memory Echo's trail of a body's recent steps, for the caster's eyes only. False when none has gathered yet. */
     static boolean memoryTrail(ServerPlayer p,Entity t) {
         ArrayDeque<Vec3> path=WATCHED.get(t.getUUID());
@@ -786,7 +796,7 @@ public final class HexServer {
     }
     private static boolean swap(ServerPlayer p) {
         IllusionEntity e=illusions(p).stream().filter(q->p.distanceToSqr(q)<900&&safe(p,q.position())).min(Comparator.comparingDouble(p::distanceToSqr)).orElse(null);
-        if(e==null)return false;
+        if(e==null||!mayArrive(p,e.position()))return false;
         Vec3 old=p.position();
         gesture(p,"blink","depart",HexGodOfStories.TELEPORT.get());
         teleport(p,e.position());e.setPos(old);
@@ -829,6 +839,10 @@ public final class HexServer {
     /** Whether Veilstep has this player out of every creature's mind just now. */
     public static boolean veiled(ServerPlayer p) {return HexData.get(p).getLong("veiledUntil")>HexData.now(p);}
 
+    /** Asks Forge first, so a warded place (a Hex Kingdoms keep, say) can refuse the arrival. */
+    static boolean mayArrive(ServerPlayer p,Vec3 v) {
+        return !net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new net.minecraftforge.event.entity.EntityTeleportEvent(p,v.x,v.y,v.z));
+    }
     static void teleport(ServerPlayer p,Vec3 v) {
         Telekinesis.release(p,false);p.stopRiding();
         p.connection.teleport(v.x,v.y,v.z,p.getYRot(),p.getXRot());

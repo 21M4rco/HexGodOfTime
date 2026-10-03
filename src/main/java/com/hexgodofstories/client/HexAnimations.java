@@ -89,6 +89,8 @@ public final class HexAnimations {
             boolean manifest=name.startsWith("scepter_manifest")||name.startsWith("scepter_fire");
             // Gotcha!'s pointing arm, and the arm held out toward whatever telekinesis holds: seen in first person too.
             boolean pointing=name.equals("gotcha")||name.equals("telekinesis");
+            // Gravity Grasp's free hand, pointed out along the look and hauled back: the left arm, seen in first person.
+            boolean grasp=name.equals("grasp_point")||name.equals("grasp_pull");
             // The blades' moves (tools/blade_moves.py): the sword arm is seen in first person, blade and all. Both
             // blades are one-handed; the free arm works for balance and stays out of the view.
             boolean blade=name.startsWith("blade_");
@@ -104,7 +106,7 @@ public final class HexAnimations {
                KeyframeAnimationPlayer keyframeanimationplayer = new KeyframeAnimationPlayer(keyframeanimation)
                   .setFirstPersonMode(flag ? FirstPersonMode.NONE : FirstPersonMode.THIRD_PERSON_MODEL)
                   .setFirstPersonConfiguration(
-                     new FirstPersonConfiguration().setShowRightArm(manifest&&!left||pointing||blade).setShowLeftArm(manifest&&left||twoHanded).setShowRightItem(true).setShowLeftItem(true)
+                     new FirstPersonConfiguration().setShowRightArm(manifest&&!left||pointing||blade).setShowLeftArm(manifest&&left||twoHanded||grasp).setShowRightItem(true).setShowLeftItem(true)
                   );
                // Shots cut straight in so the kick lands on the tick it fires; raising to aim eases in.
                // A combo's moves follow each other within a few ticks: each cuts in almost at once, or the wind-up is lost in the blend.
@@ -118,7 +120,14 @@ public final class HexAnimations {
                   // Linked through addModifierLast and setAnimation: ModifierLayer's constructor that takes modifiers
                   // only lists them, never hands them the animation, and a modifier with nothing in it plays nothing.
                   ModifierLayer<IAnimation> follow=new ModifierLayer<>();
-                  follow.addModifierLast(new FollowLook(abstractclientplayer));
+                  follow.addModifierLast(new FollowLook(abstractclientplayer,"rightArm"));
+                  follow.setAnimation(keyframeanimationplayer);
+                  played=follow;
+               }
+               // Gravity Grasp's free hand points where the caster looks, up and down, and is hauled back from there.
+               if(grasp) {
+                  ModifierLayer<IAnimation> follow=new ModifierLayer<>();
+                  follow.addModifierLast(new FollowLook(abstractclientplayer,"leftArm"));
                   follow.setAnimation(keyframeanimationplayer);
                   played=follow;
                }
@@ -128,10 +137,10 @@ public final class HexAnimations {
       }
    }
 
-   /** Turns the sword arm by the player's look pitch: an arm keyed straight out points where they look. */
+   /** Turns an arm by the player's look pitch: an arm keyed straight out points where they look. */
    private static final class FollowLook extends dev.kosmx.playerAnim.api.layered.modifier.AdjustmentModifier {
-      FollowLook(AbstractClientPlayer player) {
-         super(part -> part.equals("rightArm")
+      FollowLook(AbstractClientPlayer player,String arm) {
+         super(part -> part.equals(arm)
             ? java.util.Optional.of(new PartModifier(new dev.kosmx.playerAnim.core.util.Vec3f((float)Math.toRadians(player.getXRot()),0,0),dev.kosmx.playerAnim.core.util.Vec3f.ZERO))
             : java.util.Optional.empty());
       }

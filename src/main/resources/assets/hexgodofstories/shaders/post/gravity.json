@@ -1,0 +1,17 @@
+{
+  "targets": [
+    "hexgodofstories_lens"
+  ],
+  "passes": [
+    {
+      "name": "hexgodofstories:gravity",
+      "intarget": "minecraft:main",
+      "outtarget": "hexgodofstories_lens"
+    },
+    {
+      "name": "blit",
+      "intarget": "hexgodofstories_lens",
+      "outtarget": "minecraft:main"
+    }
+  ]
+}

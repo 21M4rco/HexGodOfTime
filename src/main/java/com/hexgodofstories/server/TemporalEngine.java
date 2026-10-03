@@ -59,6 +59,10 @@ public final class TemporalEngine {
     public static final int RAMP=7;
     /** The longest a timed hold keeps a player, once held: five seconds (Temporal Threads' whole hold). */
     public static final int PLAYER_HOLD=100;
+    /** Scoreboard tag another mod (Hex Kingdoms) puts on creatures that time may only hold as briefly as a player. */
+    public static final String ANCHOR_TAG="hexkingdoms_anchored";
+    /** Players, and anything tagged as anchored: a timed hold keeps them {@link #PLAYER_HOLD} at most, then five seconds free. */
+    public static boolean anchored(Entity e) {return e instanceof ServerPlayer||e.getTags().contains(ANCHOR_TAG);}
     /** How much of normal time a dilated body experiences. */
     private static final double DILATION=.32;
     /** The rate a body resumes at the instant a hold lets go, before the ramp brings it back to one. */
@@ -256,8 +260,8 @@ public final class TemporalEngine {
         while(it.hasNext()) {
             var entry=it.next();Frozen s=entry.getValue();
             if(s.entity.level()!=level)continue;
-            if(!desired.containsKey(entry.getKey())||s.entity.isRemoved()||s.entity instanceof ServerPlayer&&now>=s.expires) {
-                if(s.entity instanceof ServerPlayer&&s.expires!=Long.MAX_VALUE){PLAYER_GRACE.put(entry.getKey(),now+100);desired.remove(entry.getKey());}
+            if(!desired.containsKey(entry.getKey())||s.entity.isRemoved()||anchored(s.entity)&&now>=s.expires) {
+                if(anchored(s.entity)&&s.expires!=Long.MAX_VALUE){PLAYER_GRACE.put(entry.getKey(),now+100);desired.remove(entry.getKey());}
                 it.remove();releasing.add(s);
             }
         }
@@ -288,7 +292,7 @@ public final class TemporalEngine {
             Frozen s=FROZEN.get(entry.getKey());
             if(s==null) {
                 rate(e,1);
-                s=new Frozen(e,e.position(),e.getDeltaMovement(),e.getYRot(),e.getXRot(),e instanceof ServerPlayer&&entry.getValue()!=Long.MAX_VALUE?Math.min(entry.getValue(),now+PLAYER_HOLD):entry.getValue());
+                s=new Frozen(e,e.position(),e.getDeltaMovement(),e.getYRot(),e.getXRot(),anchored(e)&&entry.getValue()!=Long.MAX_VALUE?Math.min(entry.getValue(),now+PLAYER_HOLD):entry.getValue());
                 FROZEN.put(entry.getKey(),s);sync(s,true);
             }
             hold(e,s,now);

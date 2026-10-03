@@ -92,6 +92,7 @@ public final class Glorious {
             HexServer.notice(p, "There is no room for the exchange.");
             return false;
         }
+        if (!HexServer.mayArrive(p, theirs)) return false;
         float away = yaw(mine.subtract(theirs));
         HexServer.gesture(p, "blink", "depart", HexGodOfStories.TELEPORT.get());
         HexNetwork.fx(body, "depart");
@@ -257,7 +258,7 @@ public final class Glorious {
                 for (double lift : new double[]{0, .5, 1}) {
                     Vec3 dir = facing.yRot((float) Math.toRadians(turn));
                     Vec3 spot = body.position().subtract(dir.scale(back)).add(0, lift, 0);
-                    if (!HexServer.safe(p, spot)) continue;
+                    if (!HexServer.safe(p, spot) || !HexServer.mayArrive(p, spot)) continue;
                     HexServer.gesture(p, "blink", "depart", HexGodOfStories.TELEPORT.get());
                     Vec3 toward = body.getEyePosition().subtract(spot.add(0, p.getEyeHeight(), 0));
                     float pitch = (float) (-Mth.atan2(toward.y, Math.sqrt(toward.x * toward.x + toward.z * toward.z)) * Mth.RAD_TO_DEG);
@@ -274,7 +275,7 @@ public final class Glorious {
             return false;
         }
         Vec3 destination = HexServer.safeAim(p, 2 * (8 + HexData.mastery(p, Discipline.SORCERY) / 90.0));
-        if (destination == null) return false;
+        if (destination == null || !HexServer.mayArrive(p, destination)) return false;
         HexServer.gesture(p, "blink", "depart", HexGodOfStories.TELEPORT.get());
         HexServer.teleport(p, destination);
         HexNetwork.arrival(p);
@@ -335,8 +336,10 @@ public final class Glorious {
             any = true;
         }
         double limit = 2 * (30 + HexData.mastery(p, Discipline.ENCHANTMENT) * .25);
+        // A sworn guard or a crown (HexServer.sworn) is never among them, and remembers who tried.
         List<Mob> mobs = p.serverLevel().getEntitiesOfClass(Mob.class, p.getBoundingBox().inflate(10),
-            m -> HexServer.foe(p, m) && m.getMaxHealth() <= limit && !(m instanceof IllusionEntity) && !huge(m) && !HexServer.charmed(m));
+            m -> HexServer.foe(p, m) && m.getMaxHealth() <= limit && !(m instanceof IllusionEntity) && !huge(m) && !HexServer.charmed(m)
+                && !HexServer.sworn(p, m));
         mobs.sort(Comparator.comparingDouble(p::distanceToSqr));
         int ticks = 2 * (240 + HexData.mastery(p, Discipline.ENCHANTMENT) / 2);
         for (int i = 0; i < Math.min(6, mobs.size()); i++) {

@@ -128,19 +128,19 @@ public final class HexData {
      * What only a session in progress can mean (a blade in the hand for a combo, the guard up, a grasp open or a stab
      * under way, and graspDagger, which no version reads any more): never true of a player just joining. A clean logout
      * clears them; a server stopped hard, or a save from an older version, can still carry them, and they would show
-     * that player in the guard, pouring fire, or with a black hole on their palm, for good. Cleared again on joining.
+     * that player in the guard, pouring fire, or with a hand out bending the air, for good. Cleared again on joining.
      */
     public static void clearSessionOnly(Player p) {
         CompoundTag d=get(p);
         d.remove("bladeHeld");d.remove("bladeKind");d.remove("bladeFormed");d.remove("swordGuard");
-        d.remove("graspStart");d.remove("graspStab");d.remove("graspDagger");d.remove("flameStream");
+        d.remove("graspStart");d.remove("graspStab");d.remove("graspDagger");d.remove("graspHaul");d.remove("graspTarget");d.remove("flameStream");
     }
 
     public static void clearTransient(Player p,boolean death) {
         CompoundTag d=get(p);d.remove("disguise");d.remove("vanishUntil");d.remove("veiledUntil");d.remove("wardUntil");d.remove("mirrorUntil");d.remove("held");d.remove("transformStart");d.remove("grip");d.remove("stopWindup");d.remove("timeStopped");
         d.remove("arsenalStart");d.remove("arsenalEnd");d.remove("arsenalEnding");
         d.remove("bladeHeld");d.remove("bladeKind");d.remove("bladeFormed");d.remove("swordGuard");
-        d.remove("graspStart");d.remove("graspStab");d.remove("graspDagger");d.remove("flameStream");
+        d.remove("graspStart");d.remove("graspStab");d.remove("graspDagger");d.remove("graspHaul");d.remove("graspTarget");d.remove("flameStream");
         d.remove(BranchFistState.UNTIL);d.remove(BranchFistState.START);d.remove(BranchFistState.IMPACT);
         if(death){
             d.putBoolean("ascended",false);

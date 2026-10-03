@@ -107,6 +107,22 @@ Everything below needs a recorded in-game session and **has not had one**. Nothi
   is legible against the realm's sky during the fifty block fall has not been seen.
 - **Flight removal in play.** That no dimension but the fracture world grants flight is enforced in one place and exercised by the server regression for the Void Sea. Whether the Sun and the Crushing Realm are now fair without it has not been played.
 
+## 0.7.1 — Pool grip, Gravity Grasp on the dagger, Hex Kingdoms
+
+- **Verified offline:** `verifyWarping` (WarpMathTest) passes on the new struggle arithmetic, run locally with javac and
+  in the Build Action: past the knees a small pool takes 14 to 18 presses a second to hold (16), at its surface 7 to 9
+  (8), frantic thrashing still climbs out of a small pool, full charge still cannot be jump-spammed out of, and the
+  pool's draw on creatures is over twice a player's.
+- **Verified offline:** `shaders/program/gravity.fsh` compiles and links (every uniform live) as GLSL ES 3.00 in headless
+  Chromium's WebGL2, with `temporal.fsh` passing the same check as a control, and was drawn over a test scene at
+  pointing and hauling strengths to judge the bend.
+- **Compiled by the Build Action only:** the Java changes (no Minecraft/Forge jars are reachable from the working
+  environment).
+- **Not verified in a running game:** that a sinking creature no longer steps or hops out; that the jump key, and no
+  longer the game's own jump, is what lifts a player in the liquid; how the pointing and hauling arm moves read, in
+  first and third person; how the lens looks over real terrain, at what distances, with shader packs or Fabulous
+  graphics; the pull's feel at each hold length; and the Hex Kingdoms hooks against Hex Kingdoms itself.
+
 ## Known limitations
 
 - Illusory walls re-render their blocks each frame rather than baking a buffer. A Massive wall is under 200 blocks and they are drawn within 80 blocks of the camera; that is a deliberate trade for a short-lived effect, not a finished optimisation.

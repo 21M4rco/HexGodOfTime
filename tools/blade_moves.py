@@ -448,7 +448,7 @@ move('blade_sword_idle', 54, [
     (34, 'inoutsine', IDLE_BREATH),
     (54, 'inoutsine', IDLE)], loop=14)
 
-# --- Gravity Grasp's stab (Anchor Being's key held, the black hole's catch): the dagger forms in the outstretched hand
+# --- Gravity Grasp's stab (the dagger's G held and let go, the body hauled in): the dagger turns over in the hand
 #     already in an icepick grip, and the arm goes up with it; the free hand seizes the body by the shoulder; then the
 #     knife is driven down into the side of its neck and left there, leaned on, pushed deeper, for a second, before it
 #     is torn out across the throat and away. GravityGrasp's timings: in on the sixth tick, out on the twenty-seventh.

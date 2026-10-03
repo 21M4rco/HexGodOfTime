@@ -128,7 +128,6 @@ public final class QuickBar {
             case LAEVATEINN -> "Dismiss the Scepter";
             case ENCHANT -> "Direct charmed creatures";
             case SELECTIVE_STOP -> "Spare an ally from the field";
-            case THREADS -> "Gravity Grasp";
             case ARSENAL -> "The crown";
             default -> "";
         };

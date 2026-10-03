@@ -533,7 +533,6 @@ public final class WorldEffects {
         CapeRenderer.renderAll(pose,buffers,partial);
         CosmicNebula.render(pose,buffers,partial);
 
-        GraspRenderer.render(pose,buffers,partial);
         FireStream.render(pose,buffers,partial);
         TimeBranchRenderer.render(pose,buffers,partial);
         ErasureRenderer.render(pose,buffers,partial);

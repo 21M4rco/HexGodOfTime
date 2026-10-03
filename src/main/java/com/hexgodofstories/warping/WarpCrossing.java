@@ -8,6 +8,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import java.util.*;
@@ -53,10 +54,13 @@ import java.util.*;
  * going down. A player's eye is 1.62 blocks up, so going under takes a little under two seconds,
  * which is long enough to watch the other world rise around you.
  *
- * <p><b>And it can be fought.</b> Thrashing lifts a body, and the arithmetic is set so that six
- * presses a second exactly cancels the sink: slower loses ground, faster climbs, and the deeper
- * somebody already is the longer they have to keep it up. Wading to the rim works too, slowly.
- * Rising back above the rim by either route gives the floor back and stands the body on it.
+ * <p><b>And it can be fought, barely.</b> Thrashing lifts a body, and the arithmetic is set so that
+ * at the surface of the smallest pool eight presses a second only hold a body where it is, and past
+ * the knees it takes sixteen: slower loses ground, faster climbs, and the deeper somebody already is
+ * the longer they have to keep it up. Wading to the rim works too, slowly. Rising back above the rim
+ * by either route gives the floor back and stands the body on it. A creature cannot fight it at all:
+ * once the liquid has it, it is held still in it (no step, no hop, no path out), drawn toward the
+ * middle three times as hard, and kept to the end.
  *
  * <p><b>Heading is never reset.</b> Yaw, pitch and whatever sideways movement survived the drag
  * cross untouched, and the body arrives at the destination offset from the realm's own entry point
@@ -255,8 +259,9 @@ public final class WarpCrossing {
         double plane = plane(brk, e);
         if (!Double.isNaN(plane)) passage.plane = plane;
         // Climbed back out, or waded off the side of the opening while still above it. Both are a
-        // body that has changed its mind, and both give the floor back.
-        boolean locked=WarpMath.inescapable(passage.strength);
+        // body that has changed its mind, and both give the floor back. A creature has no mind to
+        // change: once taken it is held still in the liquid (CrossingMobMixin), and the pool keeps it.
+        boolean locked=WarpMath.inescapable(passage.strength)||e instanceof Mob;
         if (e.getY() > passage.plane + ESCAPE || (!locked && !open(brk, e))) { abort(e, passage, true); return; }
         // Not moving at all is not the same as fighting: a body being sunk shifts every tick, so
         // anything that has genuinely stood still for three seconds is a client that never let go
@@ -300,7 +305,7 @@ public final class WarpCrossing {
         Vec3 v=e.getDeltaMovement();
         double dx=passage.centerX-e.getX(),dz=passage.centerZ-e.getZ();
         double distance=Math.sqrt(dx*dx+dz*dz);
-        double pull=WarpMath.gooPull(passage.strength);
+        double pull=e instanceof Mob?WarpMath.mobPull(passage.strength):WarpMath.gooPull(passage.strength);
         double px=distance>1.0E-5?dx/distance*pull:0;
         double pz=distance>1.0E-5?dz/distance*pull:0;
         double drag=WarpMath.viscousDrag(passage.strength);
@@ -313,8 +318,8 @@ public final class WarpCrossing {
      * Somebody is trying very hard to get out.
      *
      * <p>One press, one measure of lift, and the arithmetic of whether that is enough is set in
-     * {@link WarpMath}: six presses a second exactly cancels the sink, so slower than that loses
-     * ground and faster than that climbs. Nothing here decides whether they escape — they escape by
+     * {@link WarpMath}: eight presses a second only hold a body at the surface of the smallest pool
+     * and sixteen past the knees, so slower than that loses ground and faster than that climbs. Nothing here decides whether they escape — they escape by
      * actually rising back above the rim, which the ordinary abort above notices — so a client that
      * lies about pressing the key gains lift it then has to spend on a climb the server can see.
      */

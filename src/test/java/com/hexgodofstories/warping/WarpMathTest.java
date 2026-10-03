@@ -184,7 +184,10 @@ public final class WarpMathTest {
         check(WarpMath.gooPull(full)>WarpMath.gooPull(min),"more charge pulls harder toward the middle");
 
         double rate=WarpMath.struggleRate(WarpMath.MIN_CHARGE);
-        check(rate>5&&rate<8,"small pools are a frantic but possible escape ("+rate+" presses/s)");
+        check(rate>14&&rate<18,"past the knees, even a small pool takes a press as fast as a finger goes ("+rate+" presses/s)");
+        double surface=WarpMath.viscousSink(min,0)/WarpMath.struggleLift(min)*20;
+        check(surface>7&&surface<9,"at the surface of a small pool, only fast spamming holds a body up ("+surface+" presses/s)");
+        check(WarpMath.mobPull(min)>WarpMath.gooPull(min)*2,"the pool draws creatures in far harder than players");
         check(!Double.isFinite(WarpMath.struggleRate(WarpMath.FULL_CHARGE)),
             "max charge cannot be jump-spammed out of");
         check(WarpMath.inescapable(full)&&WarpMath.struggleLift(full)==0,

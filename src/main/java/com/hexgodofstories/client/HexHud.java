@@ -78,15 +78,14 @@ public final class HexHud {
             long combo=d.getLong(dagger?com.hexgodofstories.server.BladeCombo.FLURRY_READY:com.hexgodofstories.server.BladeCombo.CUTS_READY)-ClientState.now();
             int whole=dagger?com.hexgodofstories.server.BladeCombo.FLURRY_RECOVERY:com.hexgodofstories.server.BladeCombo.CUTS_RECOVERY;
             if(combo>0&&combo<=whole)hint=String.format(Locale.ROOT,"%s %.1fs",dagger?"Flurry":"Master Cuts",combo/20f);
+            // The dagger's G, Gravity Grasp, keeps its own recovery too.
+            long grasp=dagger?d.getLong(com.hexgodofstories.server.GravityGrasp.READY)-ClientState.now():0;
+            if(grasp>0&&grasp<=com.hexgodofstories.server.GravityGrasp.RECOVERY)
+                hint=(combo>0&&combo<=whole?hint+"  \u00b7  ":"")+String.format(Locale.ROOT,"Gravity Grasp %.1fs",grasp/20f);
             // The Deceiver's G, Complete Evisceration, keeps its own recovery too.
             long evis=dagger?0:d.getLong(com.hexgodofstories.server.Evisceration.READY)-ClientState.now();
             if(evis>0&&evis<=com.hexgodofstories.server.Evisceration.RECOVERY)
                 hint=(combo>0&&combo<=whole?hint+"  \u00b7  ":"")+String.format(Locale.ROOT,"Evisceration %.1fs",evis/20f);
-        }
-        if(a==Ability.THREADS) {
-            // Gravity Grasp keeps its own recovery, apart from Anchor Being's shown above.
-            long grasp=d.getLong(com.hexgodofstories.server.GravityGrasp.READY)-ClientState.now();
-            if(grasp>0&&grasp<=com.hexgodofstories.server.GravityGrasp.RECOVERY)hint=String.format(Locale.ROOT,"Gravity Grasp %.1fs",grasp/20f);
         }
         if(a==Ability.ARSENAL) {
             // Gotcha! is the tap, and keeps its own recovery, apart from the crown's shown above; worn, the mantle
@@ -162,7 +161,7 @@ public final class HexHud {
             case TELEKINESIS -> "Grab; again: throw. Scroll: closer/further.";
             case BLINK -> "Teleport toward your aim.";
             case WARD -> "Raise a defensive veil.";
-            case DAGGERS -> "Conjure a dagger; again: put it away.";
+            case DAGGERS -> "Conjure a dagger; again: put it away. Hold G: Gravity Grasp.";
             case TWIN_DAGGERS -> "Conjure The Deceiver. Hold use: guard and parry. Sprint and attack: running cuts and the slam. G: Complete Evisceration.";
             case LAEVATEINN -> "Conjure/recall the Scepter. Hold right click 1-10s: beam.";
             case ENCHANT -> "Charm a creature to follow you.";
@@ -172,7 +171,7 @@ public final class HexHud {
             case SLOW_FIELD -> "";
             case TIME_STOP -> "Freeze the local battlefield.";
             case SELECTIVE_STOP -> "Freeze the target in your aim.";
-            case THREADS -> "Tap: vanish. Hold: Gravity Grasp.";
+            case THREADS -> "Vanish, and leave a double to burst.";
             case ASCENSION -> "Toggle your final transformation.";
             case TIME_BRANCH -> "Tap: right fist. Hold/release: beam.";
             case ARSENAL -> "Tap: Gotcha! Hold: the crown (13s: missiles).";
