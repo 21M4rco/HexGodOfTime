@@ -139,21 +139,6 @@ def smoke_paint(u, v):
     return (clamp8(24 + 54 * density), clamp8(44 + 86 * density), clamp8(38 + 66 * density), clamp8(214 * density))
 
 
-def pool_paint(u, v):
-    """Ground blood: an irregular blob with a darker rim, drawn as a decal quad rather than a block."""
-    d = math.hypot(u, v)
-    wobble = .62 + .30 * fbm(u * 2.1 + 13, v * 2.1 - 7, 4, 131)
-    if d >= wobble:
-        return None
-    edge = 1 - d / wobble
-    a = min(1.0, edge ** .68 * 1.25)
-    rim = math.exp(-((edge - .12) / .16) ** 2) * .55
-    r = 96 - 52 * rim
-    g = 12 + 6 * edge
-    b = 14 + 8 * edge
-    return (clamp8(r), clamp8(g), clamp8(b), clamp8(232 * a))
-
-
 
 def dust_paint(u, v):
     """Erasure residue. A hot square-ish core with a soft halo: it has to read as a fragment of
@@ -265,8 +250,6 @@ sprite('spectral', 16, spectral_paint)
 sprite('meteor_fire', 32, flame_paint)
 sprite('cinder', 16, cinder_paint)
 sprite('ash', 32, ash_paint)
-# Decals are drawn by hand in world space, so they need no particle definition.
-sprite('blood_pool', 32, pool_paint, register=False)
 
 print('Wrote nebula, veil, star, smoke, temporal_dust, branch_thread, spectral, meteor_fire, cinder\n'
-      'and ash particle sheets, the blood_pool decal and the Nothingness block texture.')
+      'and ash particle sheets and the Nothingness block texture (blood is generate_blood.py\'s).')

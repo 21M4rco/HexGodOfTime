@@ -37,7 +37,8 @@ GRAVITY, MOST_SPIN, POUR = .075, .5, 200
 RAW, RAW_RIM = (.72, .03, .03), (.48, .015, .015)
 # Halving.Kind: how far each limb goes over as it goes limp (radians): the low and high of its pitch, and its roll either way.
 LIMBS = {'head': (.3, .9, .5), 'rightArm': (-1.5, .6, .9), 'leftArm': (-1.5, .6, .9), 'rightLeg': (-.6, .6, .4), 'leftLeg': (-.6, .6, .4)}
-# The blood particle (HexParticles.Drip): gravity .75 of vanilla's .04, drag .98, life 26 to 43 ticks.
+# The blood particle (HexParticles.Drip): gravity .75 of vanilla's .04, drag .98, life 40 to 61 ticks (it is gone
+# where it lands, leaving its mark there).
 DRIP_FALL, DRIP_DRAG = .03, .98
 
 BODIES = {
@@ -260,7 +261,7 @@ class Blood:
         self.p = np.vstack([self.p, at])
         self.v = np.vstack([self.v, vel])
         self.age = np.concatenate([self.age, np.zeros(len(at))])
-        self.life = np.concatenate([self.life, 26 + self.rng.integers(0, 18, len(at))])
+        self.life = np.concatenate([self.life, 40 + self.rng.integers(0, 22, len(at))])
         self.size = np.concatenate([self.size, .09 + self.rng.random(len(at)) * .06])
 
     def pool(self, at, size, now, spread=18):
@@ -379,7 +380,7 @@ def raster(camera, polygons, blood, pools, now):
         s = camera.project(blood.p)
         px = np.clip((blood.size * camera.focal / np.maximum(s[:, 2], .1)).astype(int), 1, max(2, H // 50))
         alpha = np.minimum(1, (blood.age + 1) / 2) * (1 - blood.age / blood.life * .8)
-        red = np.array([.62, .09, .11])
+        red = np.array([.86, .024, .033])
         for (x, y, z), size, a in zip(s, px, alpha):
             xi, yi = int(x), int(y)
             if z < 2.5 or not (0 <= xi < W and 0 <= yi < H) or z > depth[yi, xi] + .08: continue

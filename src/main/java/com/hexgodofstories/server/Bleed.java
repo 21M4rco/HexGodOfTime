@@ -14,6 +14,9 @@ import java.util.*;
  * <p>A bleeding body is also badly hampered, whatever opened the wound: slowness V (three quarters of its speed gone),
  * nausea, and no jumping at all, for as long as it bleeds and {@link #LINGER} ticks after. None of it shows a single
  * particle: the blood is all there is to see.
+ *
+ * <p>HexKagunes' bleeding (its centipede's wounds), when that mod is installed, is drawn the same way, with the same
+ * blood and stains ({@link #foreign}): only drawn, since it hampers nothing and its own effect deals its harm.
  */
 public final class Bleed {
     /** True only while a bleed tick's damage is being dealt, so that it knocks nobody back (see ServerEvents). */
@@ -36,6 +39,9 @@ public final class Bleed {
     private static final int LINGER=40,RENEW=10,SLOWNESS=4,NAUSEA_LEAST=100;
     /** Bodies that may not jump, until when: bleeding, and a moment after. */
     private static final Map<UUID,Long> GROUNDED=new HashMap<>();
+    /** HexKagunes' bleeding effect, and the bodies bleeding from it, with how heavily it is drawn (in stacks). */
+    private static final net.minecraft.resources.ResourceLocation FOREIGN_BLEEDING=new net.minecraft.resources.ResourceLocation("hexkagune","bleeding");
+    private static final Map<UUID,Integer> FOREIGN=new HashMap<>();
 
     /** Whether this body is still too hurt to jump. */
     public static boolean grounded(LivingEntity e) {
@@ -84,7 +90,7 @@ public final class Bleed {
             wound.expires=Math.max(wound.expires,now+duration);
         }
         hamper(victim,wound,now);
-        notifyClients(victim,wound,now);
+        notifyClients(victim,now);
     }
 
     /**
@@ -105,7 +111,21 @@ public final class Bleed {
         wound.flowing=Math.max(wound.flowing,now+duration+1);
         wound.flowOwner=owner.getUUID();
         hamper(victim,wound,now);
-        notifyClients(victim,wound,now);
+        notifyClients(victim,now);
+    }
+
+    /** An effect taken on: if it is HexKagunes' bleeding, the body bleeds to look at, as heavily as the effect is strong. */
+    public static void foreign(LivingEntity victim,net.minecraft.world.effect.MobEffectInstance effect) {
+        if(victim.level().isClientSide||effect==null||!FOREIGN_BLEEDING.equals(net.minecraftforge.registries.ForgeRegistries.MOB_EFFECTS.getKey(effect.getEffect())))return;
+        if(!victim.isAlive()||!FOREIGN.containsKey(victim.getUUID())&&FOREIGN.size()>=MAX_TRACKED)return;
+        FOREIGN.put(victim.getUUID(),Math.min(MAX_STACKS,2+effect.getAmplifier()));
+        notifyClients(victim,victim.level().getGameTime());
+    }
+
+    /** An effect run out or taken off: if it was HexKagunes' bleeding, that blood stops. */
+    public static void foreignEnded(LivingEntity victim,net.minecraft.world.effect.MobEffect effect) {
+        if(victim.level().isClientSide||effect==null||!FOREIGN_BLEEDING.equals(net.minecraftforge.registries.ForgeRegistries.MOB_EFFECTS.getKey(effect)))return;
+        if(FOREIGN.remove(victim.getUUID())!=null)notifyClients(victim,victim.level().getGameTime());
     }
 
     public static void tick(ServerLevel level) {
@@ -117,13 +137,13 @@ public final class Bleed {
             Wound wound=WOUNDS.get(id);
             if(wound==null)continue;
             if(!(level.getEntity(id) instanceof LivingEntity victim))continue;
-            if(!victim.isAlive()||now>=wound.expires&&now>=wound.flowing){WOUNDS.remove(id);notifyClients(victim,0,false);continue;}
+            if(!victim.isAlive()||now>=wound.expires&&now>=wound.flowing){WOUNDS.remove(id);notifyClients(victim,now);continue;}
             if((now+victim.getId())%RENEW==0)hamper(victim,wound,now);
             if(now<wound.next)continue;
             wound.next=now+INTERVAL;
             boolean flowing=now<wound.flowing;
             // The blades have closed; a beam's hole goes on pouring by itself.
-            if(now>=wound.expires&&wound.stacks>0){wound.stacks=0;notifyClients(victim,wound,now);}
+            if(now>=wound.expires&&wound.stacks>0){wound.stacks=0;notifyClients(victim,now);}
             // A body on its last breath bleeds without losing more: how long it stands is LastMoments' clock.
             if(LastMoments.held(victim))continue;
             float amount=PER_STACK*wound.stacks+(flowing?FLOW:0);
@@ -142,7 +162,15 @@ public final class Bleed {
             dealing=true;
             try{victim.hurt(source,amount);}finally{dealing=false;}
             if(owner!=null)HexServer.reward(owner,Discipline.CONJURATION,20);
-            if(WOUNDS.containsKey(id))notifyClients(victim,wound,now);
+            if(WOUNDS.containsKey(id))notifyClients(victim,now);
+        }
+        // HexKagunes' bleeding: told again once a second (for anyone who has come near since), and stopped when it is over.
+        if(FOREIGN.isEmpty())return;
+        for(UUID id:new ArrayList<>(FOREIGN.keySet())) {
+            if(!(level.getEntity(id) instanceof LivingEntity victim)||(now+victim.getId())%20!=0)continue;
+            var effect=net.minecraftforge.registries.ForgeRegistries.MOB_EFFECTS.getValue(FOREIGN_BLEEDING);
+            if(!victim.isAlive()||effect==null||!victim.hasEffect(effect))FOREIGN.remove(id);
+            notifyClients(victim,now);
         }
     }
 
@@ -151,15 +179,27 @@ public final class Bleed {
         return Math.max(now<wound.expires?wound.stacks:0,now<wound.flowing?FLOW_SHOWN:0);
     }
 
-    private static void notifyClients(LivingEntity victim,Wound wound,long now) {notifyClients(victim,shown(wound,now),now<wound.flowing);}
-
-    /** Also whether a beam's hole is what is pouring: clients draw that far heavier than a blade's wound. */
-    private static void notifyClients(LivingEntity victim,int stacks,boolean pouring) {
-        CompoundTag n=new CompoundTag();n.putInt("stacks",stacks);n.putBoolean("pouring",pouring);
+    /**
+     * How a body bleeds to look at, in stacks: its wounds here or HexKagunes' bleeding, whichever is heavier; also
+     * whether a beam's hole is what is pouring (clients draw that far heavier than a blade's wound), and whether the
+     * bleeding hampers it (only a wound here does: a client keeps its own player off their feet for that alone).
+     */
+    private static void notifyClients(LivingEntity victim,long now) {
+        Wound wound=WOUNDS.get(victim.getUUID());
+        int ours=wound==null?0:shown(wound,now);
+        boolean pouring=wound!=null&&now<wound.flowing;
+        CompoundTag n=new CompoundTag();
+        n.putInt("stacks",Math.max(ours,FOREIGN.getOrDefault(victim.getUUID(),0)));
+        n.putBoolean("pouring",pouring);
+        n.putBoolean("hampers",ours>0||pouring);
         HexNetwork.tracking(victim,new HexNetwork.Message(HexNetwork.BLEED,victim.getId(),n));
     }
-    public static void clear(LivingEntity e) {GROUNDED.remove(e.getUUID());if(WOUNDS.remove(e.getUUID())!=null)notifyClients(e,0,false);}
-    public static void reset() {WOUNDS.clear();GROUNDED.clear();}
+    public static void clear(LivingEntity e) {
+        GROUNDED.remove(e.getUUID());
+        boolean bled=WOUNDS.remove(e.getUUID())!=null;
+        if(FOREIGN.remove(e.getUUID())!=null||bled)notifyClients(e,e.level().getGameTime());
+    }
+    public static void reset() {WOUNDS.clear();GROUNDED.clear();FOREIGN.clear();}
 
     /** Once a second or so: forget the bodies that may jump again (or are gone). */
     public static void forgetGrounded(long now) {GROUNDED.values().removeIf(until->until<=now);}

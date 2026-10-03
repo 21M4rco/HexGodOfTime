@@ -2,11 +2,7 @@ package com.hexgodofstories.client;
 
 import com.hexgodofstories.HexGodOfStories;
 import com.hexgodofstories.entity.ThrownDagger;
-import com.mojang.blaze3d.vertex.*;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.*;
-import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ClipContext;
@@ -26,18 +22,18 @@ import java.util.*;
  * <p>A Scepter beam's hole bleeds far harder than any blade: it pours from the hole itself in a steady
  * stream, spurts with every heartbeat, and pools under the body into a spreading puddle that lies there
  * long after, a red trail behind anything that walks on with it.
+ *
+ * <p>What lies on the ground is {@link BloodStains}': puddles fed by every wound here (one under a body that bleeds
+ * where it stands, widening as it goes on), and the marks the drops themselves leave where they come down
+ * (HexParticles.Drip calls {@link #landed}), so the spatter on the ground follows the sprays in the air.
  */
 public final class Blood {
     private Blood() {}
 
-    public static final ResourceLocation POOL=HexGodOfStories.id("textures/blood_pool.png");
-    /** A pool: where, turned how far, how wide at the most, since when, for how long, and over how many ticks it spreads. */
-    private record Splat(Vec3 at,float yaw,double size,long start,int life,int spread) {}
-    private static final List<Splat> SPLATS=new ArrayList<>();
     private static final Map<Integer,Vec3> LAST=new HashMap<>();
-    /** Pools at once; how long a wound's pool lies, and a beam hole's puddle. */
-    private static final int MAX_SPLATS=640,LIFE=600,PUDDLE_LIFE=900;
-    private static final double RANGE=1024,SPREAD=.55;
+    /** How long a drop's mark and a small pool lie, and a puddle, after blood last ran into it. */
+    private static final int LIFE=600,PUDDLE_LIFE=1200;
+    private static final double RANGE=1024;
     /** Ticks between the spurts of a beam's hole: a racing heart. */
     private static final int BEAT=18;
 
@@ -52,7 +48,7 @@ public final class Blood {
     /** Bodies a partial Scepter beam left on their last breath, by id, with the tick they fall. */
     private static final Map<Integer,Long> STANDING=new HashMap<>();
 
-    public static void clear() {SPLATS.clear();LAST.clear();STANDING.clear();POURING.clear();}
+    public static void clear() {BloodStains.clear();LAST.clear();STANDING.clear();POURING.clear();}
 
     public static void lastMoments(int entity,long until) {
         if(until>ClientState.now()){if(STANDING.size()<128)STANDING.put(entity,until);}
@@ -66,7 +62,7 @@ public final class Blood {
     public static void tick(Minecraft mc,Map<Integer,Integer> bleeding,Map<Integer,List<ThrownDagger>> wounds) {
         if(mc.level==null||mc.player==null)return;
         long now=ClientState.now();
-        SPLATS.removeIf(s->now-s.start>s.life);
+        BloodStains.tick(mc.level);
         standing(mc,now);
         POURING.retainAll(bleeding.keySet());
         if(bleeding.isEmpty()){LAST.clear();return;}
@@ -93,10 +89,12 @@ public final class Blood {
             if(previous==null)continue;
             boolean moving=previous.distanceToSqr(e.position())>.0016;
             if(POURING.contains(entry.getKey())){pour(mc,e,now,moving);continue;}
-            // A still body drips; a running one leaves a trail.
-            int odds=moving?Math.max(2,7-stacks):14;
+            // A still body pools where it stands, the one puddle widening; a running one leaves a trail of small ones
+            // behind it (the drops falling from the wound leave their own marks as they land).
+            int odds=moving?Math.max(2,7-stacks):10;
             if(random.nextInt(odds)!=0)continue;
-            drop(mc,e,null,random.nextDouble()*.3+.25,LIFE,14);
+            if(moving)drop(mc,e,null,random.nextDouble()*.12+.1,LIFE,10);
+            else drop(mc,e,null,random.nextDouble()*.2+.22,PUDDLE_LIFE,30);
         }
         LAST.keySet().retainAll(seen);
     }
@@ -345,44 +343,27 @@ public final class Blood {
     }
 
     /**
-     * Lays one pool on the surface below {@code over} (anywhere under the body when null), following steps and
-     * slabs rather than assuming flat. Each lies a hair above or below the next, so where pools overlap into a
-     * puddle one is always drawn over the other rather than both flickering.
+     * A drop come down on the ground (HexParticles.Drip): its mark, stretched the way it was going, or into the
+     * puddle it fell in. Called for a share of the drops; a burst of hundreds lands as a spray of marks, not a carpet.
+     */
+    public static void landed(net.minecraft.world.level.Level level,double x,double y,double z,double vx,double vz,float size) {
+        var mc=Minecraft.getInstance();
+        if(mc.player==null||mc.player.distanceToSqr(x,y,z)>RANGE)return;
+        BloodStains.mark(level,new Vec3(x,y,z),vx,vz,size*(1.3+level.random.nextFloat()*.9),LIFE);
+    }
+
+    /**
+     * Blood run onto the surface below {@code over} (anywhere under the body when null), following steps and slabs
+     * rather than assuming flat: into the puddle already there, which widens, or a new one spreading out over about
+     * {@code spread} ticks (BloodStains).
      */
     private static void drop(Minecraft mc,Entity e,Vec3 over,double size,int life,int spread) {
-        if(SPLATS.size()>=MAX_SPLATS)SPLATS.remove(0);
         var random=mc.level.random;
         Vec3 from=over==null?e.position().add((random.nextDouble()-.5)*e.getBbWidth()*.8,.1,(random.nextDouble()-.5)*e.getBbWidth()*.8)
             :new Vec3(over.x,Math.min(over.y,e.getY()+.1),over.z);
         var hit=mc.level.clip(new ClipContext(from,from.add(0,-3,0),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,e));
         // Nothing below within reach, or the pool would start inside a wall a spurt was thrown against.
-        if(hit.getType()==HitResult.Type.MISS||hit.isInside())return;
-        SPLATS.add(new Splat(hit.getLocation().add(0,.01+random.nextDouble()*.01,0),random.nextFloat()*360,size,ClientState.now(),life,spread));
+        if(hit.getType()==HitResult.Type.MISS||hit.isInside()||hit.getDirection()!=net.minecraft.core.Direction.UP)return;
+        BloodStains.pool(mc.level,hit.getLocation(),size,life,spread);
     }
-
-    public static void render(PoseStack pose,MultiBufferSource buffers,float partial) {
-        if(SPLATS.isEmpty())return;
-        Minecraft mc=Minecraft.getInstance();
-        if(mc.level==null)return;
-        double now=ClientState.time(partial);
-        VertexConsumer out=buffers.getBuffer(RenderType.entityTranslucent(POOL));
-        for(Splat splat:SPLATS) {
-            double age=now-splat.start;
-            if(age<0)continue;
-            float life=Mth.clamp((float)(age/splat.life),0,1);
-            // Spreading wet, then drying: the pool opens over its first ticks and thins away over its whole life.
-            double size=splat.size*(SPREAD+(1-SPREAD)*Math.min(1,age/splat.spread));
-            float alpha=Mth.clamp((float)Math.min(1,age/4.0)*(1-life*life),0,1)*.85f;
-            if(alpha<=.01f)continue;
-            int light=LevelRenderer.getLightColor(mc.level,BlockPos.containing(splat.at.add(0,.1,0)));
-            double cos=Math.cos(Math.toRadians(splat.yaw))*size,sin=Math.sin(Math.toRadians(splat.yaw))*size;
-            Vec3 a=splat.at.add(-cos+sin,0,-sin-cos);
-            Vec3 b=splat.at.add(cos+sin,0,sin-cos);
-            Vec3 c=splat.at.add(cos-sin,0,sin+cos);
-            Vec3 d=splat.at.add(-cos-sin,0,-sin+cos);
-            float[][] quad={vec(a),vec(b),vec(c),vec(d)};
-            WorldEffects.quad(pose,out,quad,new float[][]{{0,0},{1,0},{1,1},{0,1}},light,0xffffff,alpha);
-        }
-    }
-    private static float[] vec(Vec3 v) {return new float[]{(float)v.x,(float)v.y,(float)v.z};}
 }

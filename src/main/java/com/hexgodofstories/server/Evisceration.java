@@ -96,6 +96,12 @@ public final class Evisceration {
 
     public static boolean running(ServerPlayer p) {return RUNS.containsKey(p.getUUID());}
 
+    /** Whether this body is on a blade right now: run through, held on it, or being cut (api.KaguneLink). */
+    public static boolean impaled(net.minecraft.world.entity.Entity e) {
+        for (Run run : RUNS.values()) if (run.target == e && run.phase != Phase.DASH) return true;
+        return false;
+    }
+
     /** Whether it is still recovering. A tick further off than its recovery could reach counts as ready. */
     public static boolean recovering(ServerPlayer p) {
         long left = HexData.get(p).getLong(READY) - HexData.now(p);

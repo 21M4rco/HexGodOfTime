@@ -78,6 +78,12 @@ public final class GravityGrasp {
 
     public static boolean holding(ServerPlayer p) {return HOLDS.containsKey(p.getUUID());}
 
+    /** Whether this body is caught in somebody's hole, on the blade (api.KaguneLink). */
+    public static boolean caught(net.minecraft.world.entity.Entity e) {
+        for (Hold hold : HOLDS.values()) if (hold.caught == e) return true;
+        return false;
+    }
+
     /** Whether it is still recovering. A tick further off than its recovery could reach (a moved world clock) counts as ready. */
     public static boolean recovering(ServerPlayer p) {
         long left = HexData.get(p).getLong(READY) - HexData.now(p);

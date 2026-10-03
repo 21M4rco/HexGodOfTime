@@ -213,6 +213,12 @@ public final class ServerEvents {
      * Bleeding takes health over time and nothing else: no knockback from any tick of it. Nor from a blade combo's own
      * cuts, which must leave the body where the next one will find it (BladeCombo throws it itself at the end).
      */
+    /** HexKagunes' bleeding, drawn with this mod's blood while it lasts (Bleed.foreign). */
+    @SubscribeEvent public static void effectTaken(net.minecraftforge.event.entity.living.MobEffectEvent.Added e) {Bleed.foreign(e.getEntity(),e.getEffectInstance());}
+    @SubscribeEvent public static void effectRunOut(net.minecraftforge.event.entity.living.MobEffectEvent.Expired e) {
+        if(e.getEffectInstance()!=null)Bleed.foreignEnded(e.getEntity(),e.getEffectInstance().getEffect());
+    }
+    @SubscribeEvent public static void effectTakenOff(net.minecraftforge.event.entity.living.MobEffectEvent.Remove e) {Bleed.foreignEnded(e.getEntity(),e.getEffect());}
     @SubscribeEvent public static void bleedKnockback(LivingKnockBackEvent e) {if(Bleed.dealing()||BladeCombo.dealing()||Evisceration.dealing())e.setCanceled(true);}
 
     /**

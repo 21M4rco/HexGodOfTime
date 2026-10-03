@@ -44,7 +44,7 @@ public final class WorldEffects {
     private static MultiBufferSource.BufferSource masonry;
 
     public static void clear() {
-        ECHOES.clear();PROJECTIONS.clear();FIELDS.clear();BLEEDING.clear();GripRenderer.clear();
+        ECHOES.clear();PROJECTIONS.clear();FIELDS.clear();BLEEDING.clear();HAMPERED.clear();GripRenderer.clear();
         POSED.clear();REFORMING.clear();SLIPPING.clear();
         Vfx.clear();Blood.clear();DeceiverFlame.clear();FireStream.clear();TimeBranchRenderer.clear();ErasureRenderer.clear();Halving.clear();ScepterFx.clear();
     }
@@ -125,16 +125,25 @@ public final class WorldEffects {
         return false;
     }
 
-    public static void bleeding(int entity,int stacks,boolean pouring) {
-        if(stacks<=0){if(BLEEDING.remove(entity)!=null)GROUNDED.put(entity,ClientState.now()+40);}
-        else{BLEEDING.put(entity,stacks);GROUNDED.remove(entity);}
+    /**
+     * A body bleeding ({@code stacks} heavy, to look at), or no longer. {@code hampers}: from a wound of this mod's, which
+     * keeps it off its feet; HexKagunes' bleeding is only drawn.
+     */
+    public static void bleeding(int entity,int stacks,boolean pouring,boolean hampers) {
+        boolean was=HAMPERED.remove(entity);
+        if(stacks<=0)BLEEDING.remove(entity);
+        else BLEEDING.put(entity,stacks);
+        if(stacks>0&&hampers){HAMPERED.add(entity);GROUNDED.remove(entity);}
+        else if(was)GROUNDED.put(entity,ClientState.now()+40);
         Blood.pouring(entity,stacks>0&&pouring);
     }
+    /** Bodies a wound of this mod's is bleeding, and so keeping off their feet (Bleed). */
+    private static final Set<Integer> HAMPERED=new HashSet<>();
     /** Bodies that stopped bleeding a moment ago and may not jump yet (Bleed's linger), by id, until when. */
     private static final Map<Integer,Long> GROUNDED=new HashMap<>();
 
-    /** Whether this body is bleeding, or stopped only a moment ago: too hurt to jump (Bleed). */
-    public static boolean grounded(int entity) {return BLEEDING.containsKey(entity)||GROUNDED.getOrDefault(entity,0L)>ClientState.now();}
+    /** Whether this body is bleeding from a wound here, or stopped only a moment ago: too hurt to jump (Bleed). */
+    public static boolean grounded(int entity) {return HAMPERED.contains(entity)||GROUNDED.getOrDefault(entity,0L)>ClientState.now();}
     public static void memory(int entity,CompoundTag n) {
         int count=Math.min(24,n.getInt("count"));
         for(int i=0;i<count;i+=2) {
@@ -521,7 +530,6 @@ public final class WorldEffects {
             pose.popPose();
         }
 
-        Blood.render(pose,buffers,partial);
         CapeRenderer.renderAll(pose,buffers,partial);
         CosmicNebula.render(pose,buffers,partial);
 
@@ -531,7 +539,6 @@ public final class WorldEffects {
         ErasureRenderer.render(pose,buffers,partial);
         pose.popPose();
         buffers.endBatch(RenderType.entityTranslucent(WHITE));
-        buffers.endBatch(RenderType.entityTranslucent(Blood.POOL));
         buffers.endBatch(RenderType.entityCutoutNoCull(HexLayer.CLOTH));
     }
 

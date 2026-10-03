@@ -266,20 +266,39 @@ public final class HexParticles {
         }
     }
 
-    /** A wound's spatter: small, dark and subject to gravity, so bleeding reads as physical. */
+    /**
+     * A drop of blood: red (a deep, clean red, not a brown or a pink), solid until it lands, and subject to gravity,
+     * so bleeding reads as physical. Where it comes down it leaves its mark, stretched the way it was going
+     * (client Blood.landed, BloodStains), and is gone: a share of them, so a burst of hundreds spatters the ground
+     * rather than carpeting it.
+     */
     public static final class Drip extends TextureSheetParticle {
+        /** How many of the drops that land leave a mark. */
+        private static final float MARKS=.45f;
         Drip(ClientLevel level,double x,double y,double z,double vx,double vy,double vz,SpriteSet sprites) {
             super(level,x,y,z);
             xd=vx;yd=vy;zd=vz;
-            rCol=.62f;gCol=.09f;bCol=.11f;
+            // Some drops a touch darker than others, all of them red.
+            float shade=.84f+random.nextFloat()*.16f;
+            rCol=.92f*shade;gCol=.025f*shade;bCol=.035f*shade;
             hasPhysics=true;friction=.98f;gravity=.75f;
-            lifetime=26+random.nextInt(18);
-            quadSize=.045f+random.nextFloat()*.03f;
+            lifetime=40+random.nextInt(22);
+            quadSize=.042f+random.nextFloat()*.034f;
             alpha=0;
             pickSprite(sprites);
         }
         @Override public ParticleRenderType getRenderType() {return ParticleRenderType.PARTICLE_SHEET_TRANSLUCENT;}
-        @Override public void tick() {super.tick();alpha=bloom(age,0,2)*(1-age/(float)lifetime*.8f);}
+        @Override public void tick() {
+            double vx=xd,vz=zd;
+            super.tick();
+            if(removed)return;
+            if(onGround) {
+                if(random.nextFloat()<MARKS)com.hexgodofstories.client.Blood.landed(level,x,y,z,vx,vz,quadSize);
+                remove();
+                return;
+            }
+            alpha=bloom(age,0,2)*Math.min(1,(lifetime-age)/6f);
+        }
         record Provider(SpriteSet sprites) implements ParticleProvider<SimpleParticleType> {
             @Override public Particle createParticle(SimpleParticleType type,ClientLevel level,double x,double y,double z,double vx,double vy,double vz) {
                 return new Drip(level,x,y,z,vx,vy,vz,sprites);

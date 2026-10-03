@@ -1,7 +1,7 @@
 """Reproducible authored meshes, textures, particle sprites, animations and recorded-Foley mappings.
 
-The nebula-family sprites and the ground-blood decal live in `generate_vfx_sprites.py` instead, which
-needs no third-party imaging library; this module needs Pillow.
+The nebula-family sprites live in `generate_vfx_sprites.py` instead, which needs no third-party imaging
+library; this module needs Pillow. Blood (its drops and its stains on the ground) is `generate_blood.py`'s.
 
 Requires Pillow. Audio references samples from the installed Minecraft assets; no audio
 is redistributed or synthesized.
@@ -224,7 +224,7 @@ def soft(colour, power=2.4, core=1.0):
 sprite('ember', 16, soft((60, 220, 130), 2.2, 1.1))
 sprite('gold_ember', 16, soft((235, 185, 92), 2.2, 1.1))
 sprite('mote', 8, soft((205, 240, 215), 1.5, 1.4))
-sprite('blood', 8, soft((150, 26, 30), 1.9, .5))
+# The blood drops (blood_0..3) and the ground stains are generate_blood.py's.
 
 
 def rune_paint(u, v):

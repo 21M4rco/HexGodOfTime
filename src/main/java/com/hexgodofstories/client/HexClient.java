@@ -396,6 +396,8 @@ public final class HexClient {
         }
         @SubscribeEvent public static void world(RenderLevelStageEvent e) {
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);BeamWounds.beginFrame(e);ScepterFx.beginFrame(e);}
+            // Blood on the ground goes down with the ground: after the opaque terrain, before anything stands in it.
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS)BloodStains.render(e);
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES){WarpRenderer.renderRealm(e);BlockWounds.render(e);ArsenalClient.render(e);Halving.render(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES){WorldEffects.render(e);WarpRenderer.render(e);ArsenalClient.renderLight(e);}
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL){BeamWounds.endFrame();TemporalScreen.render(e.getPartialTick());}

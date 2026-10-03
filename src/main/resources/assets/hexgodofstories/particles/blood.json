@@ -1,5 +1,8 @@
 {
   "textures": [
-    "hexgodofstories:blood"
+    "hexgodofstories:blood_0",
+    "hexgodofstories:blood_1",
+    "hexgodofstories:blood_2",
+    "hexgodofstories:blood_3"
   ]
 }
