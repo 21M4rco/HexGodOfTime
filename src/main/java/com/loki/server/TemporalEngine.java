@@ -20,6 +20,10 @@ public final class TemporalEngine {
     private static final Map<UUID,Entity> SLOWED=new HashMap<>();
     private static final UUID DILATION_SPEED=UUID.fromString("65b293d4-1384-446d-902c-7a261ca31cf2");
     private static final int MAX_FIELDS=64,MAX_ENTITIES_PER_FIELD=192;
+    /** Scoreboard tag another mod (Hex Kingdoms) puts on creatures that time may only hold as briefly as a player. */
+    public static final String ANCHOR_TAG="hexkingdoms_anchored";
+    /** Players, and anything tagged as anchored: held at most three seconds, then five seconds free. */
+    public static boolean anchored(Entity e) {return e instanceof ServerPlayer||e.getTags().contains(ANCHOR_TAG);}
     public static boolean frozen(Entity e) {return FROZEN.containsKey(e.getUUID());}
     public static boolean skipTick(Entity e) {return frozen(e)||(SLOWED.containsKey(e.getUUID())&&Math.floorMod(e.level().getGameTime()+e.getId(),5)!=0);}
     public static boolean slowed(Entity e) {return SLOWED.containsKey(e.getUUID());}
@@ -55,12 +59,12 @@ public final class TemporalEngine {
         for(var e:desiredSlow.entrySet())if(!SLOWED.containsKey(e.getKey())){SLOWED.put(e.getKey(),e.getValue());slowSync(e.getValue(),true);}
         Iterator<Map.Entry<UUID,Frozen>> it=FROZEN.entrySet().iterator();
         while(it.hasNext()) {var entry=it.next();Frozen s=entry.getValue();if(s.entity.level()!=level)continue;
-            if(!desired.containsKey(entry.getKey())||s.entity.isRemoved()||s.entity instanceof ServerPlayer && now>=s.expires) {if(s.entity instanceof ServerPlayer){PLAYER_GRACE.put(entry.getKey(),now+100);desired.remove(entry.getKey());}restore(s);it.remove();}
+            if(!desired.containsKey(entry.getKey())||s.entity.isRemoved()||anchored(s.entity) && now>=s.expires) {if(anchored(s.entity)){PLAYER_GRACE.put(entry.getKey(),now+100);desired.remove(entry.getKey());}restore(s);it.remove();}
         }
         for(var entry:desired.entrySet()) {
             Entity e=entities.get(entry.getKey());
             Frozen s=FROZEN.get(entry.getKey());
-            if(s==null) {s=new Frozen(e,e.position(),e.getDeltaMovement(),e.getYRot(),e.getXRot(),e instanceof ServerPlayer?Math.min(entry.getValue(),now+60):entry.getValue());FROZEN.put(entry.getKey(),s);sync(s,true);}
+            if(s==null) {s=new Frozen(e,e.position(),e.getDeltaMovement(),e.getYRot(),e.getXRot(),anchored(e)?Math.min(entry.getValue(),now+60):entry.getValue());FROZEN.put(entry.getKey(),s);sync(s,true);}
             e.setPos(s.position);e.setYRot(s.yaw);e.setXRot(s.pitch);e.setDeltaMovement(Vec3.ZERO);e.hurtMarked=true;
             if(e instanceof LivingEntity l){l.setYHeadRot(s.yaw);l.yBodyRot=s.yaw;}
             if(e instanceof ServerPlayer p&&now%5==0)p.connection.teleport(s.position.x,s.position.y,s.position.z,s.yaw,s.pitch);

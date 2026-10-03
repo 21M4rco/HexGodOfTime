@@ -90,7 +90,7 @@ public final class LokiServer {
             }
             case BOLT -> {SpellProjectile.cast(p,p.getEyePosition().add(look.scale(.5)),look,secondary?1:0,false);gesture(p,"bolt","cast",Loki.SORCERY.get());return true;}
             case PUSH -> {for(Entity e:p.level().getEntities(p,p.getBoundingBox().inflate(5),e->validTarget(p,e))) {Vec3 away=e.position().subtract(p.position()).normalize();e.setDeltaMovement(away.scale(1.1).add(0,.25,0));e.hurtMarked=true;}gesture(p,"push","push",Loki.SORCERY.get());return true;}
-            case BLINK -> {Vec3 destination=safeAim(p,8+LokiData.mastery(p,Discipline.SORCERY)/90.0);if(destination==null)return false;gesture(p,"blink","depart",Loki.TELEPORT.get());teleport(p,destination);LokiNetwork.fx(p,"arrive");return true;}
+            case BLINK -> {Vec3 destination=safeAim(p,8+LokiData.mastery(p,Discipline.SORCERY)/90.0);if(destination==null||!mayArrive(p,destination))return false;gesture(p,"blink","depart",Loki.TELEPORT.get());teleport(p,destination);LokiNetwork.fx(p,"arrive");return true;}
             case WARD -> {LokiData.get(p).putLong("wardUntil",now+100);gesture(p,"ward","ward",Loki.SORCERY.get());return true;}
             case TELEKINESIS -> {
                 if(HELD.containsKey(p.getUUID())){release(p,false);return true;}
@@ -101,6 +101,10 @@ public final class LokiServer {
             case DAGGERS,TWIN_DAGGERS,LAEVATEINN -> {return conjure(p,a);}
             case ENCHANT -> {
                 if(t instanceof ServerPlayer other&&validTarget(p,t)){other.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.CONFUSION,50,0,false,false));LokiNetwork.fx(other,"enchant");gesture(p,"enchant","cast",Loki.SORCERY.get());return true;}
+                if(t instanceof Mob sworn&&validTarget(p,sworn)&&TemporalEngine.anchored(sworn)){
+                    // A sworn guard or a crown will not be turned, and remembers who tried.
+                    sworn.getPersistentData().putUUID("LokiCharmedBy",p.getUUID());notice(p,"Their oath holds. They will remember that you tried.");return false;
+                }
                 if(!(t instanceof Mob mob)||!validTarget(p,mob)||mob.getMaxHealth()>30+LokiData.mastery(p,Discipline.ENCHANTMENT)*.25)return false;
                 CHARMS.put(mob.getUUID(),new Charm(mob,p.getUUID(),now+240+LokiData.mastery(p,Discipline.ENCHANTMENT)/2,mob.getTarget()==null?null:mob.getTarget().getUUID()));mob.setTarget(null);gesture(p,"enchant","enchant",Loki.ILLUSION_SOUND.get());LokiNetwork.fx(mob,"enchant");return true;
             }
@@ -115,8 +119,8 @@ public final class LokiServer {
                 LokiNetwork.fx(p,"slip");return true;
             }
             case SLOW_FIELD,TIME_STOP -> {boolean stop=a==Ability.TIME_STOP;if(!TemporalEngine.field(p,stop,null,stop?120:180))return false;gesture(p,"time_stop",stop?"stop":"dilate",Loki.STOP.get());return true;}
-            case SELECTIVE_STOP -> {if(t==null||!validTarget(p,t)||!TemporalEngine.field(p,true,t,t instanceof Player?40:100))return false;gesture(p,"time_stop","bind",Loki.STOP.get());return true;}
-            case THREADS -> {if(t==null||!validTarget(p,t))return false;if(secondary)hold(p,t);else if(!TemporalEngine.field(p,true,t,t instanceof Player?40:140))return false;CompoundTag n=new CompoundTag();n.putInt("target",t.getId());n.putLong("until",now+100);LokiNetwork.tracking(p,new LokiNetwork.Message(6,p.getId(),n));gesture(p,"threads","bind",Loki.SORCERY.get());return true;}
+            case SELECTIVE_STOP -> {if(t==null||!validTarget(p,t)||!TemporalEngine.field(p,true,t,t instanceof Player||TemporalEngine.anchored(t)?40:100))return false;gesture(p,"time_stop","bind",Loki.STOP.get());return true;}
+            case THREADS -> {if(t==null||!validTarget(p,t))return false;if(secondary)hold(p,t);else if(!TemporalEngine.field(p,true,t,t instanceof Player||TemporalEngine.anchored(t)?40:140))return false;CompoundTag n=new CompoundTag();n.putInt("target",t.getId());n.putLong("until",now+100);LokiNetwork.tracking(p,new LokiNetwork.Message(6,p.getId(),n));gesture(p,"threads","bind",Loki.SORCERY.get());return true;}
             case ASCENSION -> {boolean on=!LokiData.get(p).getBoolean("ascended");LokiData.get(p).putBoolean("ascended",on);LokiData.get(p).putLong("transformStart",now);gesture(p,"ascend",on?"ascend":"dismiss",Loki.ASCEND.get());return true;}
         }return false;
     }
@@ -189,10 +193,12 @@ public final class LokiServer {
             IllusionEntity e=new IllusionEntity(Loki.ILLUSION.get(),p.level());e.setPos(pos);e.configure(p,new IllusionEntity.Spec(240+LokiData.mastery(p,Discipline.MISCHIEF)/2,IllusionEntity.Behavior.values()[(i+existing.size()+p.getRandom().nextInt(7))%7],true,false,true));p.level().addFreshEntity(e);ILLUSIONS.get(p.getUUID()).add(e.getUUID());spawned++;}
         if(spawned>0)gesture(p,"illusion","cast",Loki.ILLUSION_SOUND.get());return spawned>0;
     }
-    private static boolean swap(ServerPlayer p) {IllusionEntity e=illusions(p).stream().filter(q->p.distanceToSqr(q)<900&&safe(p,q.position())).min(Comparator.comparingDouble(q->p.distanceToSqr(q))).orElse(null);if(e==null)return false;Vec3 old=p.position();gesture(p,"blink","depart",Loki.TELEPORT.get());teleport(p,e.position());e.setPos(old);LokiNetwork.fx(p,"arrive");return true;}
+    private static boolean swap(ServerPlayer p) {IllusionEntity e=illusions(p).stream().filter(q->p.distanceToSqr(q)<900&&safe(p,q.position())).min(Comparator.comparingDouble(q->p.distanceToSqr(q))).orElse(null);if(e==null||!mayArrive(p,e.position()))return false;Vec3 old=p.position();gesture(p,"blink","depart",Loki.TELEPORT.get());teleport(p,e.position());e.setPos(old);LokiNetwork.fx(p,"arrive");return true;}
     public static void clearIllusions(ServerPlayer p) {illusions(p).forEach(IllusionEntity::dispel);ILLUSIONS.remove(p.getUUID());}
     public static boolean safe(ServerPlayer p,Vec3 pos) {return p.level().hasChunkAt(BlockPos.containing(pos))&&p.level().getWorldBorder().isWithinBounds(BlockPos.containing(pos))&&p.level().noCollision(p,p.getBoundingBox().move(pos.subtract(p.position())))&&!p.level().containsAnyLiquid(p.getBoundingBox().move(pos.subtract(p.position())));}
     private static Vec3 safeAim(ServerPlayer p,double range) {Vec3 from=p.getEyePosition();BlockHitResult hit=p.level().clip(new ClipContext(from,from.add(p.getLookAngle().scale(range)),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,p));Vec3 goal=hit.getLocation().subtract(p.getLookAngle().scale(.8)).add(0,-.5,0);for(int i=0;i<8;i++){Vec3 v=goal.add(0,i*.5,0);if(safe(p,v))return v;}return null;}
+    /** Asks Forge first, so a warded place (a Hex Kingdoms keep, say) can refuse the arrival. */
+    private static boolean mayArrive(ServerPlayer p,Vec3 v) {return !net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new net.minecraftforge.event.entity.EntityTeleportEvent(p,v.x,v.y,v.z));}
     private static void teleport(ServerPlayer p,Vec3 v) {release(p,false);p.stopRiding();p.connection.teleport(v.x,v.y,v.z,p.getYRot(),p.getXRot());p.setDeltaMovement(Vec3.ZERO);p.fallDistance=0;}
     public static void reward(ServerPlayer p,Discipline d,int xp) {long now=LokiData.now(p);if(now-TRAINING.getOrDefault(p.getUUID(),-100L)<20)return;TRAINING.put(p.getUUID(),now);LokiData.train(p,d,xp);if(d==Discipline.TEMPORAL&&LokiData.mastery(p,d)>=800)LokiData.train(p,Discipline.PURPOSE,xp/2);}
     private static void gesture(ServerPlayer p,String animation,String fx,SoundEvent sound) {LokiNetwork.animate(p,animation);LokiNetwork.fx(p,fx);p.level().playSound(null,p.blockPosition(),sound,SoundSource.PLAYERS,.75f,1);}

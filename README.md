@@ -33,6 +33,22 @@ All commands require operator permission level 2 and use `/loki <player> ...`:
 
 Example: `/loki @s unlock all`, then `/loki @s transform true`.
 
+## With Hex Kingdoms
+
+Hex Kingdoms tags its villages' guards and crowned king and queen with the
+scoreboard tag `hexkingdoms_anchored`. Time treats an anchored creature the way
+it treats a player:
+
+- Stillness and Dilation hold it for three seconds at most, then it is free of
+  time fields for five.
+- Chosen Moment and Temporal Threads bind it for two seconds, not five or seven.
+- Whispered Allegiance does not charm it. It remembers who tried, and Hex
+  Kingdoms rings that village's bell.
+
+Veilstep and Sleight of Place post Forge's `EntityTeleportEvent` before moving
+the caster, so a mod can refuse the arrival. Hex Kingdoms refuses arrivals
+inside a keep from anybody the keep would not let in by its door.
+
 ## Architecture
 
 The server owns mastery, cooldowns, spells, held targets, projection navigation, weapon hit timing, temporal fields and transformation state. Client presentation includes layered Player Animator gestures, composited player skins, independently simulated cloth, authored quad meshes and a dedicated post-processing chain.
