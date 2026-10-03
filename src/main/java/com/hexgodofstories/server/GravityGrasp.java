@@ -348,8 +348,10 @@ public final class GravityGrasp {
             // The recording of a blade going into a body, from the tick it goes in, alone: nothing laid over it. No play is
             // heard above full scale (a volume over one only carries it further), so it is played twice at once, the two
             // adding in the mix, and carried twice as far.
+            // One of the three stab recordings, never the one before (StabSound), the same one both times.
+            net.minecraft.sounds.SoundEvent pierce = StabSound.next(level.random);
             for (int i = 0; i < 2; i++)
-                level.playSound(null, body.getX(), body.getEyeY(), body.getZ(), HexGodOfStories.BLADE_PIERCE.get(), SoundSource.PLAYERS, 2, 1);
+                level.playSound(null, body.getX(), body.getEyeY(), body.getZ(), pierce, SoundSource.PLAYERS, 2, 1);
         } else if (t == 19) {
             // Leaned on, pushed deeper. (The first push, on the ninth, is the loudest moment of the recording itself.)
             level.playSound(null, body.getX(), body.getY(), body.getZ(), SoundEvents.HONEY_BLOCK_SLIDE, SoundSource.PLAYERS, .9f, .5f);

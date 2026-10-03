@@ -1,8 +1,11 @@
 """Prepare the blades' recorded sounds from the recordings supplied for them.
 
 Sources, as supplied (tools/audio_sources/blade/):
-* pierce.mp3 (supplied as universfield-blade-piercing-body-352462.mp3): a blade driven into a body. Gravity Grasp's
-  stab plays it on the tick the knife goes into the neck (server/GravityGrasp, STAB_IN).
+* pierce.mp3 (supplied as universfield-blade-piercing-body-352462.mp3): a blade driven into a body.
+* stab_flesh.mp3 (supplied as olivia_parker-sword-stab-flesh-demo-310504.mp3): a blade into flesh, and the wet pull.
+* rips_apart.mp3 (supplied as ragecore29-htf-head-or-body-rips-apart-481466.mp3): a body torn open.
+Every stab (Gravity Grasp's into the neck, Complete Evisceration's through the gut) plays one of the three, never the
+same twice running (server/StabSound).
 
 Prepared for Minecraft as tools/import_scepter_audio.py does: mono (OpenAL only positions mono sources), leading
 silence trimmed so it sounds on the tick the blade goes in, the silent tail cut, a 12 ms tail fade, and Ogg Vorbis, the
@@ -33,7 +36,7 @@ SOURCES = ROOT / "tools/audio_sources/blade"
 OUT = ROOT / "src/main/resources/assets/hexgodofstories/sounds/blade"
 
 # output name -> source file
-FILES = {"pierce": "pierce.mp3"}
+FILES = {"pierce": "pierce.mp3", "pierce_2": "stab_flesh.mp3", "pierce_3": "rips_apart.mp3"}
 # The loudest momentary loudness the stab is brought up to, in LUFS. The Scepter's blast and impacts reach about -13.
 PIERCE_LOUDNESS = -10.5
 # The ceiling its peaks are held under, and how soon before a peak and how long after it the limiter acts: slow enough

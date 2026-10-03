@@ -72,7 +72,7 @@ public final class HexGodOfStories {
     public static final RegistryObject<SoundEvent> SORCERY = sound("sorcery"), ILLUSION_SOUND = sound("illusion"), TELEPORT = sound("teleport"),
         SLIP = sound("time_slip"), STOP = sound("time_stop"), RESUME = sound("time_resume"), ASCEND = sound("ascend"), CONJURE = sound("conjure"),
         BLADE_SWING = sound("blade_swing"), BLADE_HIT = sound("blade_hit"), BLADE_THROW = sound("blade_throw"), BLADE_EMBED = sound("blade_embed"),
-        BLADE_PIERCE = sound("blade_pierce"),
+        BLADE_PIERCE = sound("blade_pierce"), BLADE_PIERCE_2 = sound("blade_pierce_2"), BLADE_PIERCE_3 = sound("blade_pierce_3"),
         RIFT_OPEN = sound("rift_open"), RIFT_CLOSE = sound("rift_close");
     /**
      * Hexor's ambient vocalisation. One long, loud, atmospheric clip that stands in for every

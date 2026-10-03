@@ -47,3 +47,8 @@ limiter, a 12 ms tail fade, and Ogg Vorbis.
 | Mod sound | Source file | Author | Note |
 |---|---|---|---|
 | `blade/pierce` | `pierce.mp3` | supplied by the mod's author | 1.51 s, played alone (twice at once) as the stab goes in |
+| `blade/pierce_2` | `stab_flesh.mp3` (supplied as `olivia_parker-sword-stab-flesh-demo-310504.mp3`) | supplied by the mod's author | 3.35 s, brought up 12.6 dB to -10.7 LUFS |
+| `blade/pierce_3` | `rips_apart.mp3` (supplied as `ragecore29-htf-head-or-body-rips-apart-481466.mp3`) | supplied by the mod's author | 1.94 s, brought up 2.9 dB to -10.7 LUFS |
+
+Every stab (Gravity Grasp's into the neck, Complete Evisceration's through the gut and its cut) plays one of the three,
+never the same one twice running (server/StabSound), prepared the same way as the first.

@@ -209,9 +209,10 @@ public final class Evisceration {
         BladeCombo.spray(level, target, back.add(0, .12, 0), f.scale(.5).add(0, 1, 0).normalize(), BLOOD, null);
         BladeCombo.spray(level, target, back.add(0, -.12, 0), f.scale(.4).add(0, -1, 0).normalize(), BLOOD, null);
         skewered(level, target, front, back, PULL + (run.doomed ? 0 : 2));
-        // The same recording as Gravity Grasp's stab, played as that is: twice at once, carried twice as far.
+        // One of Gravity Grasp's three stab recordings (StabSound), played as that is: twice at once, carried twice as far.
+        net.minecraft.sounds.SoundEvent pierce = StabSound.next(level.random);
         for (int i = 0; i < 2; i++)
-            level.playSound(null, target.getX(), gut.y, target.getZ(), HexGodOfStories.BLADE_PIERCE.get(), SoundSource.PLAYERS, 2, .94f);
+            level.playSound(null, target.getX(), gut.y, target.getZ(), pierce, SoundSource.PLAYERS, 2, .94f);
         HexServer.reward(p, Discipline.CONJURATION, 90);
         if (run.doomed) {ScepterBlast.stun(target, DOOMED_HOLD + CUT_HIT + 4); return;}
         Bleed.apply(p, target, BLEED_STACKS, BLEED);
@@ -297,8 +298,9 @@ public final class Evisceration {
         BladeCombo.spray(level, target, gut.subtract(r.scale(target.getBbWidth() * .3)), r.scale(-1).add(0, .3, 0).normalize(), BLOOD, null);
         level.playSound(null, target.blockPosition(), SoundEvents.HONEY_BLOCK_BREAK, SoundSource.PLAYERS, 1.4f, .4f);
         level.playSound(null, target.blockPosition(), HexGodOfStories.SCEPTER_BURN.get(), SoundSource.PLAYERS, 1.2f, .7f);
+        net.minecraft.sounds.SoundEvent tear = StabSound.next(level.random);
         for (int i = 0; i < 2; i++)
-            level.playSound(null, target.getX(), gut.y, target.getZ(), HexGodOfStories.BLADE_PIERCE.get(), SoundSource.PLAYERS, 2, 1.25f);
+            level.playSound(null, target.getX(), gut.y, target.getZ(), tear, SoundSource.PLAYERS, 2, 1.25f);
         HexServer.reward(p, Discipline.CONJURATION, 120);
         // A creature's own death is over at once, its loot and experience already dropped: no fall, no red flash, no puff
         // of smoke. Its halves are all that is left of it (the blood above is sent first, while the body is still there to

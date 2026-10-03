@@ -716,5 +716,21 @@
         "pitch": 0.72
       }
     ]
+  },
+  "blade_pierce_2": {
+    "subtitle": "subtitles.hexgodofstories.blade_pierce",
+    "sounds": [
+      {
+        "name": "hexgodofstories:blade/pierce_2"
+      }
+    ]
+  },
+  "blade_pierce_3": {
+    "subtitle": "subtitles.hexgodofstories.blade_pierce",
+    "sounds": [
+      {
+        "name": "hexgodofstories:blade/pierce_3"
+      }
+    ]
   }
 }
