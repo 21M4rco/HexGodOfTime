@@ -1,4 +1,4 @@
-## 0.7.1 — The pool keeps what it takes, Gravity Grasp moves to the dagger, and Hex Kingdoms
+## 0.7.1 — The pool keeps what it takes, Gravity Grasp on G, and Hex Kingdoms
 
 - **Warping pools hold on.** A creature the liquid takes no longer walks, steps or hops back out of it: from the moment
   it is taken it thinks nothing (no path, no step toward the rim, no jump at the next node), it is drawn toward the
@@ -8,19 +8,25 @@
   How fast you sink is unchanged. The game's own jump no longer fires in the liquid (with no collision, nothing ever
   took the ground out from under a body caught standing, so one hop of 0.42 could carry it out over the struggle).
   A pool opened at full charge, which is every pool the mantle opens (Wide Open), is still the point of no return.
-- **Gravity Grasp is the dagger's G now, held.** Anchor Being's key no longer holds anything: tapped or held, it vanishes
-  you as ever. With the conjured dagger in hand, **hold G**: your free left hand points out wherever you look, open,
-  and the air in front of it starts to bend in toward the palm, more the longer you hold. **Let go** (after at least a
-  second) and the hand is hauled back to your chest, and the one body you are looking at that moment (within
-  twenty-two blocks, in sight) is torn off its feet and yanked to you. Only that body; nothing else near it moves. The
-  longer you held, the harder and faster it comes (from already strong to over two and a half times as strong, gathered
-  over five more seconds), and the heavier the body it can bring. Within reach it is seized and stabbed exactly as
-  before: the dagger turned over in your hand and driven into the side of its neck, held there a second, torn out across
-  the throat. Six hearts, ten seconds' bleeding, a second's more stun.
-- **No black hole.** The pull is seen as the air itself: a corridor of bent, refracting air between the body and your
-  palm, swells of it rolling in to the hand, the space round the palm pinched into it and, once a body is hauled, the
-  space round that body rippling in after it, colour split a hair at the edges like light through thick glass. No
-  particle and nothing solid. It is its own post effect, so a stopped world or a Time Branch charge never replaces it.
+- **Gravity Grasp is G, held, whatever is in your hand.** (With The Deceiver in hand G is still Complete Evisceration.)
+  Anchor Being's key no longer holds anything: tapped or held, it vanishes you as ever. **Hold G**: your free left hand
+  points out wherever you look, open, and the air in front of it starts to bend in toward the palm, more the longer you
+  hold. **Let go** (after at least half a second; a tap does nothing) and the hand is hauled back to your chest, and the
+  one body you are looking at that moment (within twenty-two blocks, in sight) is torn off its feet and carried to you,
+  dead ahead. Only that body; nothing else near it moves. It is gripped, not pushed: a creature is held still and moved
+  by the pull itself every tick, so nothing (another hold, a stun, a creature with no AI of its own, a realm's own
+  physics) can leave it where it stands. The longer you held, the harder and faster it comes (from already strong to
+  over two and a half times as strong, gathered over five more seconds), and the heavier the body it can bring. Within
+  reach it is seized: a dagger forms in your hand already turned over (or the one you hold is turned over), is driven
+  into the side of its neck, held there a second, and torn out across the throat. Six hearts, ten seconds' bleeding, a
+  second's more stun. Gravity Grasp opens with Conjure Daggers.
+- **G never opens Warping's destinations any more.** They moved to **Y held** (Y tapped is still Warping's reach); inside
+  a Warping realm, Y held opens the way-out selector that G used to.
+- **No black hole: a cone of bent air on the palm.** The pull is seen as the air itself: a cone with its point fixed on
+  your palm, where your hand is really drawn (first person and third alike), opening out to whatever you point at, and
+  once let go running from the body to your hand. Everything seen through it is bent toward the palm, swells of air
+  rolling in to the hand, the space round the palm itself pinched into it, colour split a hair as through thick glass.
+  It is a real cone in the world, so walls and bodies in front of it hide it. No particle and nothing solid.
 - **Its recovery is five seconds, and only owed when a body is brought in.** Let go too soon, at nothing, or at a body
   that is never brought in (too heavy, a wall in the way, gone) and nothing is owed. Held ten seconds without letting
   go, the hand drops by itself.
@@ -358,8 +364,8 @@ reads, when HexKagunes is installed, which bodies its tendrils are holding.
   across, no block broken and no shield stopping it. 25 energy; 30 s recovery. **Secret:** cast in the full
   transformation, the blast is sixty blocks across (twenty hearts out to twelve, half at thirty), the ground
   shakes all of it, and a moment before it goes anyone looking at it is blinded white; two minutes' recovery.
-- **Gravity Grasp (hold Anchor Being's key).** *(0.7.1: moved to the dagger's G, held, with no black hole; see the top
-  of this file.)* Your arm goes out and a small black hole opens on your palm (the
+- **Gravity Grasp (hold Anchor Being's key).** *(0.7.1: moved to G, held, with no black hole; see the top of this
+  file.)* Your arm goes out and a small black hole opens on your palm (the
   Gravity Well's in miniature), tearing everything you could harm within twenty-two blocks off its feet and
   dragging it in, harder the longer you hold (ten seconds at most). The first body it brings within arm's reach is
   seized: the hole closes, a dagger forms reversed in your hand, and you drive it down into the side of the neck
@@ -697,7 +703,8 @@ Install Player Animator **1.0.2-rc1+1.20** (CurseForge file 4587214) on clients.
 | K | Mastery archive |
 | Z X C V B N M | The seven bind slots: **tap** one to cast what is bound to it, **hold** it for the spell's second move (or for spells that are held). Crown of Barrels: tap for Gotcha!, hold for the crown |
 | R | Cast the last spell again, with the same tap and hold |
-| G | **Warping destination** (inside a Warping realm: the way out), whatever spell is chosen. With The Deceiver in hand: Complete Evisceration. With the dagger in hand: **Gravity Grasp**, held to point and let go to pull |
+| G | **Gravity Grasp**: hold to point, let go to pull. With The Deceiver in hand: Complete Evisceration |
+| Y | Warping's reach (tap); **Warping destination** (hold; inside a Warping realm: the way out) |
 | H | Glorious Purpose transformation |
 | U | Utility: release held targets / seal your fracture / leave a realm / resume your time fields |
 | I | **Stillness** — suspend the local battlefield; press again to resume |

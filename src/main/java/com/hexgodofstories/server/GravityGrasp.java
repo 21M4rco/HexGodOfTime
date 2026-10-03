@@ -2,7 +2,6 @@ package com.hexgodofstories.server;
 
 import com.hexgodofstories.HexGodOfStories;
 import com.hexgodofstories.data.HexData;
-import com.hexgodofstories.entity.ConjuredWeapon;
 import com.hexgodofstories.network.HexNetwork;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
@@ -13,7 +12,6 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.HashMap;
@@ -21,13 +19,13 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Gravity Grasp, the dagger's G, held: with the conjured dagger in hand (Warping's key otherwise, as with The Deceiver's
- * Complete Evisceration). After Pain's Bansho Ten'in. Held, the free hand points out along the look, open, gathering the
- * pull (grasp_point), for as long as the key stays down ({@link #MOST} at most). Let go once it has gathered
- * ({@link #GATHER}), the hand coils back as if hauling the air itself in (grasp_pull), and the one body the caster is
- * looking at that moment is torn off its feet and yanked across to them, within {@link #REACH} blocks. Only that body:
- * nothing else near it is touched, and there is no black hole. Within arm's reach it is caught, and the dagger already in
- * the hand is turned over and driven down into the side of its neck and left there, the body held stunned on it and
+ * Gravity Grasp: G, held, whatever is in the hand (with The Deceiver in it, G is Complete Evisceration instead). After
+ * Pain's Bansho Ten'in. Held, the free hand points out along the look, open, gathering the pull (grasp_point), for as
+ * long as the key stays down ({@link #MOST} at most). Let go once it has gathered ({@link #GATHER}), the hand coils back
+ * as if hauling the air itself in (grasp_pull), and the one body the caster is looking at that moment is torn off its
+ * feet and carried across to them, within {@link #REACH} blocks. Only that body: nothing else near it is touched, and
+ * there is no black hole. Within arm's reach it is caught: a dagger forms in the hand already turned over (or the one
+ * held is turned over) and is driven down into the side of its neck and left there, the body held stunned on it and
  * leaned on, for a second; then it is torn out across the throat. Six hearts, ten seconds' bleeding, and a second more of
  * the stun after.
  *
@@ -47,7 +45,7 @@ public final class GravityGrasp {
      * before the pull is at its strongest, the longest it can be held out before it drops of itself, and the longest the
      * pull is given to bring the body in.
      */
-    public static final int GATHER = 20, RAMP = 100, MOST = 200;
+    public static final int GATHER = 10, RAMP = 100, MOST = 200;
     static final int HAUL = 40;
     /**
      * The reach, and how nearly the body must be looked at when the look itself passes by it (1 - cosine). The pull, in
@@ -57,8 +55,8 @@ public final class GravityGrasp {
      */
     static final double REACH = 22, AIM = .012, KEPT = .88;
     static final double PULL_LEAST = .5, PULL_MOST = 1.3, FASTEST_LEAST = 2.4, FASTEST_MOST = 3.4, LIFT_LEAST = .14, LIFT_MOST = .3;
-    /** Where the body is hauled to, out from the eye toward the coiling hand; and how close it must come to be caught. */
-    static final double PALM = 1.25, ASIDE = .3, DOWN = .38, MELEE = 2.7;
+    /** Where the body is hauled to, straight out in front of the eye; and how close it must come to be caught. */
+    static final double PALM = 1.25, DOWN = .38, MELEE = 2.7;
     /** The stab: in on {@link #STAB_IN}, torn out on {@link #STAB_OUT}, the blade gone by {@link #STAB_END}. */
     static final int STAB_IN = 6, STAB_OUT = 27, AFTER_STUN = 20;
     public static final int STAB_END = 34;
@@ -88,6 +86,8 @@ public final class GravityGrasp {
         long hauledAt;
         /** How much the pull had gathered when it was let go (gathered). */
         double power;
+        /** How far a creature being carried in moved last tick: its momentum, kept here since it has none of its own. */
+        Vec3 carried = Vec3.ZERO;
         LivingEntity caught;
         long caughtAt;
 
@@ -110,9 +110,9 @@ public final class GravityGrasp {
         return left > 0 && left <= RECOVERY;
     }
 
-    /** G pressed, with the dagger in hand: the free hand goes out along the look and points. */
+    /** G pressed: the free hand goes out along the look and points. */
     public static boolean begin(ServerPlayer p) {
-        if (!daggerInHand(p) || holding(p) || recovering(p) || p.isSpectator() || !p.isAlive()) return false;
+        if (holding(p) || recovering(p) || p.isSpectator() || !p.isAlive()) return false;
         if (BladeCombo.running(p) || Evisceration.running(p) || ScepterBlast.stunned(p)) return false;
         long now = HexData.now(p);
         HOLDS.put(p.getUUID(), new Hold(now));
@@ -184,12 +184,9 @@ public final class GravityGrasp {
 
     public static void reset() {HOLDS.clear();}
 
-    /** Where the body is hauled to: just out in front, toward the free (left) hand coiling back with it. */
+    /** Where the body is hauled to: straight out in front of the caster, where the hand closes on it. */
     public static Vec3 palm(ServerPlayer p) {
-        Vec3 look = p.getLookAngle();
-        Vec3 flat = new Vec3(look.x, 0, look.z);
-        Vec3 right = flat.lengthSqr() < 1e-6 ? Vec3.ZERO : new Vec3(-flat.z, 0, flat.x).normalize();
-        return p.getEyePosition().add(look.scale(PALM)).add(right.scale(-ASIDE)).add(0, -DOWN, 0);
+        return p.getEyePosition().add(p.getLookAngle().scale(PALM)).add(0, -DOWN, 0);
     }
 
     /** Every tick of a caster's. */
@@ -198,7 +195,7 @@ public final class GravityGrasp {
         if (hold == null) return;
         long now = HexData.now(p), held = now - hold.start;
         if (hold.caught != null) {stab(p, hold, now); return;}
-        if (!p.isAlive() || TemporalEngine.frozen(p) || ScepterBlast.stunned(p) || !daggerInHand(p)) {drop(p); return;}
+        if (!p.isAlive() || TemporalEngine.frozen(p) || ScepterBlast.stunned(p)) {drop(p); return;}
         LivingEntity body = hold.target;
         // Still pointing: nothing moves yet. Held out as long as it can be, the hand drops of itself.
         if (body == null) {if (held >= MOST) drop(p); return;}
@@ -214,15 +211,30 @@ public final class GravityGrasp {
         double mass = Math.max(1, body.getBbWidth() * body.getBbWidth() * body.getBbHeight() / 1.2);
         double pull = PULL_LEAST + (PULL_MOST - PULL_LEAST) * hold.power, lift = LIFT_LEAST + (LIFT_MOST - LIFT_LEAST) * hold.power;
         double fastest = FASTEST_LEAST + (FASTEST_MOST - FASTEST_LEAST) * hold.power;
-        Vec3 velocity = body.getDeltaMovement().scale(distance < 1.2 ? .4 : KEPT);
+        boolean player = body instanceof ServerPlayer;
+        Vec3 velocity = (player ? body.getDeltaMovement() : hold.carried).scale(distance < 1.2 ? .4 : KEPT);
         if (distance > .6) velocity = velocity.add(to.scale(pull / mass / distance));
         if (body.onGround() && distance > 2) velocity = velocity.add(0, lift / mass, 0);
         double speed = velocity.length();
         if (speed > fastest) velocity = velocity.scale(fastest / speed);
-        body.setDeltaMovement(velocity);
         body.fallDistance = 0;
-        body.hurtMarked = true;
-        if (body instanceof ServerPlayer target) target.connection.send(new ClientboundSetEntityMotionPacket(target));
+        if (body instanceof ServerPlayer target) {
+            // A player moves themselves: they are thrown, and their own client carries it out.
+            body.setDeltaMovement(velocity);
+            body.hurtMarked = true;
+            target.connection.send(new ClientboundSetEntityMotionPacket(target));
+            return;
+        }
+        // A creature is gripped by the pull itself and carried, never merely pushed: a velocity is only ever a suggestion
+        // to a body's own physics, and one held still by anything (a stun, another of this mod's holds, a realm's own
+        // physics, a creature with no AI) ignores it entirely. Held as the stab will hold it (no AI, no steps of its own,
+        // no fall), it is moved here every tick, stopped by whatever walls are in the way, and keeps what it moved as
+        // its momentum for the next.
+        ScepterBlast.stun(body, 3);
+        Vec3 before = body.position();
+        body.setDeltaMovement(Vec3.ZERO);
+        body.move(MoverType.SELF, velocity);
+        hold.carried = body.position().subtract(before);
     }
 
     /** Hauled within arm's reach: the body is seized and stunned, and the dagger turned over in the hand for the stab. */
@@ -354,12 +366,6 @@ public final class GravityGrasp {
     /** Where the blade goes in: the near side of the neck. */
     private static Vec3 neck(ServerPlayer p, LivingEntity body) {
         return new Vec3(body.getX(), body.getY() + body.getBbHeight() * .82, body.getZ()).subtract(inward(p).scale(body.getBbWidth() * .45));
-    }
-
-    /** Whether the caster's own conjured dagger is in their main hand: G is then Gravity Grasp's. */
-    static boolean daggerInHand(ServerPlayer p) {
-        ItemStack held = p.getMainHandItem();
-        return held.getItem() instanceof ConjuredWeapon w && w.kind == 0 && ConjuredWeapon.belongsTo(held, p);
     }
 
     /**

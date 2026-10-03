@@ -24,7 +24,7 @@ public final class HexServer {
     public static final int CAST=0,ALTERNATE=1,UTILITY=2,TRANSFORM=3,WEAPON=4,SELECT=5,RESYNC=6,SCROLL=7,HOLD_BEGIN=8,HOLD_END=9,ASSIGN=10,FLIGHT=11,TIME=12,BRANCH_TAP=13,WARP_CHOICE=14,WARP_RECALL=15,WARP_STRUGGLE=16,BRANCH_BEGIN=17,BRANCH_END=18,BRANCH_CANCEL=19,
         /** The Scepter's right click: held opens a charge, let go fires it. */
         SCEPTER_PRESS=20,SCEPTER_RELEASE=21,
-        /** G with the dagger in hand, held: Gravity Grasp (GravityGrasp). Let go (value 0) to pull; value 1 only lowers the hand. */
+        /** G, held: Gravity Grasp (GravityGrasp). Let go (value 0) to pull; value 1 only lowers the hand. */
         GRASP_BEGIN=22,GRASP_END=23,
         /** One of the seven bind slots' keys: choose whatever ability that slot holds. */
         SLOT=24,
@@ -222,9 +222,9 @@ public final class HexServer {
             reward(p,a.discipline,90);HexNetwork.sync(p);
         }
     }
-    /** Gravity Grasp: the dagger in hand, Conjure Daggers unlocked, and its own recovery run out. It costs nothing else. */
+    /** Gravity Grasp: Conjure Daggers unlocked and its own recovery run out; a dagger need not be in hand. It costs nothing else. */
     private static void graspBegin(ServerPlayer p) {
-        if(!GravityGrasp.daggerInHand(p)||GravityGrasp.holding(p))return;
+        if(GravityGrasp.holding(p))return;
         if(!HexData.unlocked(p,Ability.DAGGERS)){notice(p,"This chapter of your story is still locked.");return;}
         if(GravityGrasp.recovering(p)){notice(p,"Gravity Grasp is recovering.");return;}
         GravityGrasp.begin(p);

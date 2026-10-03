@@ -113,15 +113,20 @@ Everything below needs a recorded in-game session and **has not had one**. Nothi
   in the Build Action: past the knees a small pool takes 14 to 18 presses a second to hold (16), at its surface 7 to 9
   (8), frantic thrashing still climbs out of a small pool, full charge still cannot be jump-spammed out of, and the
   pool's draw on creatures is over twice a player's.
-- **Verified offline:** `shaders/program/gravity.fsh` compiles and links (every uniform live) as GLSL ES 3.00 in headless
-  Chromium's WebGL2, with `temporal.fsh` passing the same check as a control, and was drawn over a test scene at
-  pointing and hauling strengths to judge the bend.
+- **Verified offline:** `shaders/core/gravity_lens` (vertex and fragment) compiles and links as GLSL ES 3.00 in headless
+  Chromium's WebGL2, and was drawn with the same cone shell GraspLens builds, over a test scene, in first person
+  (pointing and hauling), in third person from behind, and pointed at the camera, to judge the bend and where it sits.
 - **Compiled by the Build Action only:** the Java changes (no Minecraft/Forge jars are reachable from the working
   environment).
+- **Played (first build), and fixed after:** the bend was drawn on the screen between two projected points, so it sat
+  left of the first-person hand and, in third person, could land on whatever lay behind; and a pull let go at a body
+  did not move it. The bend is now a cone in the world fixed on the palm the model draws (GraspHandLayer), and the
+  pull carries a creature itself rather than handing it a velocity. G no longer falls through to Warping's screen.
 - **Not verified in a running game:** that a sinking creature no longer steps or hops out; that the jump key, and no
-  longer the game's own jump, is what lifts a player in the liquid; how the pointing and hauling arm moves read, in
-  first and third person; how the lens looks over real terrain, at what distances, with shader packs or Fabulous
-  graphics; the pull's feel at each hold length; and the Hex Kingdoms hooks against Hex Kingdoms itself.
+  longer the game's own jump, is what lifts a player in the liquid; that the palm read from the model lands on the
+  first-person hand (if Player Animator draws that hand in a space of its own, the cone falls back to where it would
+  be); how the cone reads over real terrain, at what distances, with shader packs or Fabulous graphics; the pull's feel
+  at each hold length; and the Hex Kingdoms hooks against Hex Kingdoms itself.
 
 ## Known limitations
 

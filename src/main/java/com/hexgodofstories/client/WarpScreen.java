@@ -94,7 +94,7 @@ public final class WarpScreen extends Screen {
     }
 
     @Override public boolean keyPressed(int key,int scan,int modifiers){
-        if(HexClient.SECONDARY.matches(key,scan)){onClose();return true;}
+        if(HexClient.RECALL.matches(key,scan)){onClose();return true;}
         if(key>=GLFW.GLFW_KEY_1&&key<=GLFW.GLFW_KEY_9){int i=key-GLFW.GLFW_KEY_1;if(i<all().length){choose(all()[i]);return true;}}
         if(key==GLFW.GLFW_KEY_0&&all().length>=10){choose(all()[9]);return true;}
         return super.keyPressed(key,scan,modifiers);

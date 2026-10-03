@@ -18,7 +18,7 @@ public enum Destination {
     FROZEN_MOMENT("Frozen Moment", "A catastrophe held still. Press the utility key (U) here to release nearby suspended hazards.",0xa3e5f1,new Vec3(0,132,0)),
     CRUSHING_REALM("Cosmic Prison", "A cratered moon with crushing radial gravity. Walk around every side, even upside down. Escape is pulled back to the surface.",0xbe83ce,new Vec3(0,CosmicPhysics.MOON_Y+CosmicPhysics.MOON_RADIUS+5,0)),
     END_OF_TIME("End of Time", "The exhausted remains of a universe. Living strength fades here.",0x998d9e,new Vec3(0,132,0)),
-    SANCTUM("World Tree", "Your existing Fracture sanctum, now reached through Warping. Inside it, G chooses where R sends you back out.",0x111315,new Vec3(0,65,0),PocketRealm.KEY,false);
+    SANCTUM("World Tree", "Your existing Fracture sanctum, now reached through Warping. Inside it, holding Y chooses where R sends you back out.",0x111315,new Vec3(0,65,0),PocketRealm.KEY,false);
     /** The one destination whose danger is a creature rather than the environment. */
     public boolean lethal(){return this==VOID_SEA;}
     public final String title,description; public final int color; public final Vec3 arrival;

@@ -250,7 +250,7 @@ public final class FractureScreen extends Screen {
     }
 
     /**
-     * Opened directly with G inside any Warping realm, including the World Tree.
+     * Opened directly by holding Y inside any Warping realm, including the World Tree.
      * Choosing an exit configures the eventual World Tree departure; it does not
      * teleport the player or change the selected Warping trap destination.
      */

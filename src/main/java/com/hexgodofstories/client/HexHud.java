@@ -51,7 +51,8 @@ public final class HexHud {
         int above=-QuickBar.height()-4;
         if(a==Ability.WARPING){String charge=WarpRenderer.chargeLabel(mc.player.getId());if(!charge.isEmpty())g.drawString(mc.font,mc.font.plainSubstrByWidth(charge,WIDTH-6),3,above+(d.getBoolean("ascended")?-24:-12),0xd7b9f0,false);}
         String primary=HexClient.PRIMARY.getTranslatedKeyMessage().getString();
-        String secondary=HexClient.SECONDARY.getTranslatedKeyMessage().getString();
+        // Warping's destination (and, inside a realm, the way out) is its reach key held.
+        String secondary="Hold "+QuickBar.shortKey(HexClient.RECALL.getTranslatedKeyMessage().getString());
         // Outside the sanctum the Fracture only does one thing — it takes you and whatever is
         // beside you in — so there is nothing to configure and no selector to offer. Inside, where
         // the break can lead anywhere, the cast key runs whatever the selector last saved.
@@ -64,7 +65,7 @@ public final class HexHud {
         String castKey=bound>=0?QuickBar.shortKey(QuickBar.key(bound)):primary;
         var lines=mc.font.split(net.minecraft.network.chat.Component.literal(castKey+"  "+head),WIDTH-14);
         for(int i=0;i<Math.min(2,lines.size());i++)g.drawString(mc.font,lines.get(i),7,32+i*10,variant?0xe8d49c:fracture?0xd8ecdd:0xc9d8ce,false);
-        // The second line: the spell's second move, on its own key held (the key named first), or G for Warping's
+        // The second line: the spell's second move, on its own key held (the key named first), or Y held for Warping's
         // destination, the one spell that still has a key of its own for it.
         String release=QuickBar.shortKey(HexClient.RELEASE.getTranslatedKeyMessage().getString());
         String hint=fracture?(home?"Choose where the break leads":""):QuickBar.held(a);
@@ -161,7 +162,7 @@ public final class HexHud {
             case TELEKINESIS -> "Grab; again: throw. Scroll: closer/further.";
             case BLINK -> "Teleport toward your aim.";
             case WARD -> "Raise a defensive veil.";
-            case DAGGERS -> "Conjure a dagger; again: put it away. Hold G: Gravity Grasp.";
+            case DAGGERS -> "Conjure a dagger; again: put it away. Hold G, let go: Gravity Grasp.";
             case TWIN_DAGGERS -> "Conjure The Deceiver. Hold use: guard and parry. Sprint and attack: running cuts and the slam. G: Complete Evisceration.";
             case LAEVATEINN -> "Conjure/recall the Scepter. Hold right click 1-10s: beam.";
             case ENCHANT -> "Charm a creature to follow you.";

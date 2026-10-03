@@ -18,8 +18,8 @@ import org.lwjgl.glfw.GLFW;
  * Seven bind slots along the bottom row of the keyboard, one mastery key, and one cast key. Pressing a slot's key
  * chooses the ability bound to it and casts it, at once; the cast key casts the last one chosen again. A spell with a
  * second move makes it on the same key held rather than tapped, so there is no alternate key to reach for: G is
- * Warping's, where the pool leads, except with The Deceiver in hand, where it is Complete Evisceration, and with the
- * dagger in hand, where it is Gravity Grasp, held to point and let go to pull. Abilities that
+ * Gravity Grasp, held to point and let go to pull, whatever is in the hand, except The Deceiver, with which it is
+ * Complete Evisceration. Warping's destination is Y held (Y tapped is its reach). Abilities that
  * charge are driven by the press and release of their key
  * rather than a second binding, so the scheme stays small no matter how much progression adds.
  *
@@ -34,7 +34,7 @@ public final class HexClient {
     public static final KeyMapping MENU=key("mastery",GLFW.GLFW_KEY_K),
         PRIMARY=key("primary",GLFW.GLFW_KEY_R),SECONDARY=key("secondary",GLFW.GLFW_KEY_G),
         TRANSFORM=key("transform",GLFW.GLFW_KEY_H),RELEASE=key("utility",GLFW.GLFW_KEY_U),FLIGHT=key("flight",GLFW.GLFW_KEY_J),
-        /** Warping's other direction: reach into the realm chosen with G (Warping's own key) and pull its creatures out. */
+        /** Warping's other direction, tapped: reach into the realm chosen and pull its creatures out. Held: choose that realm. */
         RECALL=key("recall",GLFW.GLFW_KEY_Y),
         TIME_STOP=key("halt",GLFW.GLFW_KEY_I),
         TIME_REWIND=key("rewind",GLFW.GLFW_KEY_O),TIME_BRANCH=key("branch",GLFW.GLFW_KEY_LEFT_ALT);
@@ -48,8 +48,11 @@ public final class HexClient {
     }
     private static KeyMapping key(String name,int key){return new KeyMapping("key.hexgodofstories."+name,InputConstants.Type.KEYSYM,key,"key.categories.hexgodofstories");}
     private static boolean primaryDown,primaryLatched;
-    /** G is down for Gravity Grasp (the dagger in hand): its letting go is the pull. */
+    /** G is down for Gravity Grasp: its letting go is the pull. */
     private static boolean graspDown;
+    /** Y is down: let go soon it is Warping's reach; held, Warping's destinations open. Since when, and whether they did. */
+    private static boolean recallDown,recallOpened;
+    private static long recallSince;
     /**
      * What each casting key is doing while it is down: nothing; a cast already sent; a hold under way; or, for a spell
      * that is one thing tapped and another held (see {@link QuickBar#twoWay}), waiting to see which, and then the long
@@ -102,7 +105,7 @@ public final class HexClient {
         @SubscribeEvent public static void layers(EntityRenderersEvent.AddLayers e) {
             for(String skin:e.getSkins()) {
                 net.minecraft.client.renderer.entity.player.PlayerRenderer renderer=e.getSkin(skin);
-                if(renderer!=null){renderer.addLayer(new HexLayer(renderer));renderer.addLayer(new BranchFistLayer(renderer));}
+                if(renderer!=null){renderer.addLayer(new HexLayer(renderer));renderer.addLayer(new BranchFistLayer(renderer));renderer.addLayer(new GraspHandLayer(renderer));}
             }
         }
         @SubscribeEvent public static void reload(RegisterClientReloadListenersEvent e) {
@@ -187,26 +190,29 @@ public final class HexClient {
             if(!primary&&primaryDown)pressEnd(CAST_KEY);
             primaryDown=primary;
 
-            // G is Warping's key, whatever is chosen: where the pool leads, in ordinary worlds. Inside any Warping
-            // realm (including the World Tree), it opens the World Tree exit selector instead. No other spell has an
-            // alternate key any more; their second moves are their own keys held. The exceptions are the blades in
-            // hand: with The Deceiver G is its Complete Evisceration, and with the dagger it is Gravity Grasp, held to
-            // point and let go to pull; nothing of Warping's either way.
+            // G is Gravity Grasp, whatever is in the hand: held, the free hand points; let go, it pulls. Nothing of
+            // Warping's is ever on it. The one exception is The Deceiver in hand: G is then its Complete Evisceration.
             while(SECONDARY.consumeClick()) {
                 if(BladeClient.deceiverInHand(mc.player)){if(!ClientState.frozen(mc.player.getId()))HexNetwork.send(HexServer.EVISCERATE,0);continue;}
-                if(BladeClient.daggerInHand(mc.player)){
-                    if(!graspDown&&!ClientState.frozen(mc.player.getId())){HexNetwork.send(HexServer.GRASP_BEGIN,0);graspDown=true;}
-                    continue;
-                }
-                if(!MasteryScreen.unlocked(ClientState.self(),Ability.WARPING))continue;
-                if(com.hexgodofstories.server.PocketRealm.inside(mc.player.level())
-                    || com.hexgodofstories.warping.Destination.from(mc.player.level())!=null)FractureScreen.open();
-                else mc.setScreen(new WarpScreen());
+                if(!graspDown&&!ClientState.frozen(mc.player.getId())){HexNetwork.send(HexServer.GRASP_BEGIN,0);graspDown=true;}
             }
             if(graspDown&&!SECONDARY.isDown()){graspDown=false;HexNetwork.send(HexServer.GRASP_END,0);}
+            // Y: tapped, Warping's reach, as ever. Held, where Warping leads, in ordinary worlds; inside any Warping realm
+            // (including the World Tree), the World Tree exit selector.
+            while(RECALL.consumeClick())if(!recallDown){recallDown=true;recallOpened=false;recallSince=clientTicks;}
+            if(recallDown) {
+                if(!RECALL.isDown()){recallDown=false;if(!recallOpened)HexNetwork.send(HexServer.WARP_RECALL,0);}
+                else if(!recallOpened&&clientTicks-recallSince>=SLOT_TAP) {
+                    recallOpened=true;
+                    if(MasteryScreen.unlocked(ClientState.self(),Ability.WARPING)) {
+                        if(com.hexgodofstories.server.PocketRealm.inside(mc.player.level())
+                            || com.hexgodofstories.warping.Destination.from(mc.player.level())!=null)FractureScreen.open();
+                        else mc.setScreen(new WarpScreen());
+                    }
+                }
+            }
             while(TRANSFORM.consumeClick())HexNetwork.send(HexServer.TRANSFORM,0);
             while(RELEASE.consumeClick())HexNetwork.send(HexServer.UTILITY,0);
-            while(RECALL.consumeClick())HexNetwork.send(HexServer.WARP_RECALL,0);
             while(FLIGHT.consumeClick())HexNetwork.send(HexServer.FLIGHT,0);
             while(TIME_STOP.consumeClick())HexNetwork.send(HexServer.TIME,HexServer.TIME_HALT);
             while(TIME_REWIND.consumeClick())HexNetwork.send(HexServer.TIME,HexServer.TIME_REWIND);
@@ -216,7 +222,7 @@ public final class HexClient {
         static void releaseHeldCast() {
             BranchKeyInput.cancel(false);
             if(primaryDown||primaryPhysicallyDown())primaryLatched=true;
-            primaryDown=false;graspDown=false;
+            primaryDown=false;graspDown=false;recallDown=false;
             slotState[CAST_KEY]=SLOT_IDLE;slotAbility[CAST_KEY]=null;
         }
         private static boolean primaryPhysicallyDown() {
@@ -312,8 +318,10 @@ public final class HexClient {
                 }
                 slotState[i]=SLOT_IDLE;slotAbility[i]=null;
             }
-            // A pointing hand is lowered, never let go into a pull, by anything that takes the keys away.
+            // A pointing hand is lowered, never let go into a pull, by anything that takes the keys away; and a Y held
+            // when they are taken neither reaches nor opens anything when they come back.
             if(graspDown){graspDown=false;if(tell)HexNetwork.send(HexServer.GRASP_END,1);}
+            recallDown=false;
         }
 
         @SubscribeEvent public static void scroll(InputEvent.MouseScrollingEvent e) {
@@ -404,12 +412,12 @@ public final class HexClient {
             if(e.getOverlay().id().equals(net.minecraftforge.client.gui.overlay.VanillaGuiOverlay.HOTBAR.id()))HexHud.render(e.getGuiGraphics());
         }
         @SubscribeEvent public static void world(RenderLevelStageEvent e) {
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);BeamWounds.beginFrame(e);ScepterFx.beginFrame(e);}
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_SKY){CapeRenderer.beginFrame(e);WoundAnchor.beginFrame(e);BeamWounds.beginFrame(e);ScepterFx.beginFrame(e);GraspLens.beginFrame(e);}
             // Blood on the ground goes down with the ground: after the opaque terrain, before anything stands in it.
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS)BloodStains.render(e);
             if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_ENTITIES){WarpRenderer.renderRealm(e);BlockWounds.render(e);ArsenalClient.render(e);Halving.render(e);}
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES){WorldEffects.render(e);WarpRenderer.render(e);ArsenalClient.renderLight(e);}
-            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL){BeamWounds.endFrame();GraspLens.render(e);TemporalScreen.render(e.getPartialTick());}
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_PARTICLES){WorldEffects.render(e);WarpRenderer.render(e);ArsenalClient.renderLight(e);GraspLens.render(e);}
+            if(e.getStage()==RenderLevelStageEvent.Stage.AFTER_LEVEL){BeamWounds.endFrame();TemporalScreen.render(e.getPartialTick());}
         }
         @SubscribeEvent public static void player(RenderPlayerEvent.Pre e) {
             // Checked before anything pushes a pose: a cancelled pre-event never gets its post-event, so

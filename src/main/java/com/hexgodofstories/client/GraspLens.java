@@ -2,181 +2,291 @@ package com.hexgodofstories.client;
 
 import com.hexgodofstories.HexGodOfStories;
 import com.hexgodofstories.server.GravityGrasp;
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.pipeline.TextureTarget;
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexBuffer;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.PostChain;
+import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.RegisterShadersEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import org.joml.Vector4f;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL30;
+import org.slf4j.Logger;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * Gravity Grasp, seen: the air bending toward the hand (shaders/program/gravity.fsh), and nothing else. No particle, no
- * light and nothing solid. While the hand points, the air out along it is drawn in toward the palm, faintly at first and
- * harder the longer it is held; once let go and a body is hauled in, the bend runs from that body to the hand, strong
- * and fast, and the space round the body ripples in after it; caught, it settles out in a few ticks.
+ * Gravity Grasp, seen: a cone of bent air with its point fixed on the palm (shaders/core/gravity_lens), and nothing
+ * else. No particle, no light and nothing solid. While the hand points, the cone opens out along the look to whatever is
+ * there, the air in it drawn in toward the palm, faintly at first and harder the longer it is held; once let go and a
+ * body is hauled in, it runs from that body to the hand, strong and fast; caught, it settles out in a few ticks.
  *
- * <p>Its own post chain, apart from TemporalScreen's, so a stopped world or a Time Branch charge never takes its place.
- * One grasp is drawn at a time: the nearest in sight, within {@link #VISIBLE} blocks.
+ * <p>It is a real cone in the world: a shell drawn against the depth of everything already there (so a wall or a body in
+ * front of it hides it, as it would hide anything else), each pixel of it redrawing the frame behind from a copy taken
+ * just before, bent toward the palm. The palm is where the model's own left hand is drawn this frame (GraspHandLayer),
+ * so the cone sits on the hand in first person and in third alike; where no hand was drawn, where it would be.
  */
 public final class GraspLens {
     private GraspLens() {}
 
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final double VISIBLE = 48;
-    /** How far out along the look the bend reaches while the hand only points, at most. */
-    private static final double POINTING = 10;
-    /** Ticks it takes to settle out once the grasp is over. */
+    /** How far out along the look the cone reaches while the hand only points, at most. */
+    private static final double POINTING = 9;
+    /** Ticks it takes to settle out once the grasp is over; the most drawn at once. */
     private static final float SETTLE = 6;
-    private static PostChain chain;
-    private static int width, height;
+    private static final int MOST = 4;
+    /** The cone's shell: rings along it and quads round each. */
+    private static final int RINGS = 16, SIDES = 28;
+    private static final float PALM_RADIUS = .16f;
+
+    private static ShaderInstance shader;
+    private static TextureTarget scene;
+    private static VertexBuffer shell;
     private static boolean failed;
-    /** The last drawn: who, toward what, how strongly, and since when it has been settling (or -1 while live). */
-    private static int caster = -1;
-    private static Vec3 lastSink, lastSource;
-    private static float lastStrength, lastHaul, settling = -1;
+
+    /** This frame: its count, the camera, and the way from the camera's view back to the world (for GraspHandLayer). */
+    private static int frame;
+    private static Vec3 camera = Vec3.ZERO;
+    private static Matrix4f toWorld = new Matrix4f();
+
+    private record Hand(int frame, Vec3 palm) {}
+    private record Cone(Vec3 apex, Vec3 axis, double length, float radius, float strength, float haul) {
+        Cone fade(float left) {return new Cone(apex, axis, length, radius, strength * left, haul);}
+    }
+    private record Fading(Cone cone, double since) {}
+    private static final Map<Integer, Hand> HANDS = new HashMap<>();
+    private static final Map<Integer, Cone> LAST = new HashMap<>();
+    private static final Map<Integer, Fading> FADING = new HashMap<>();
+
+    @Mod.EventBusSubscriber(modid = HexGodOfStories.ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
+    public static final class Shaders {
+        private Shaders() {}
+
+        @SubscribeEvent public static void register(RegisterShadersEvent e) {
+            try {
+                e.registerShader(new ShaderInstance(e.getResourceProvider(), HexGodOfStories.id("gravity_lens"), DefaultVertexFormat.POSITION), s -> shader = s);
+            } catch (Exception broken) {
+                shader = null;
+                LOGGER.error("Gravity Grasp's lens shader failed to load; the pull will not be seen", broken);
+            }
+        }
+    }
 
     public static void close() {
-        if (chain != null) chain.close();
-        chain = null;
+        if (scene != null) scene.destroyBuffers();
+        if (shell != null) shell.close();
+        scene = null;
+        shell = null;
         failed = false;
-        caster = -1;
-        settling = -1;
+        HANDS.clear();
+        LAST.clear();
+        FADING.clear();
     }
 
+    /** Each frame, before anything is drawn: the camera this frame's hands are read against. */
+    public static void beginFrame(RenderLevelStageEvent e) {
+        frame++;
+        camera = e.getCamera().getPosition();
+        toWorld = new Matrix4f(e.getPoseStack().last().pose()).invert();
+    }
+
+    /** From GraspHandLayer: where this player's left palm was just drawn (view space). */
+    static void hand(AbstractClientPlayer p, Vector4f palm) {
+        Vector4f at = toWorld.transform(new Vector4f(palm));
+        Vec3 world = camera.add(at.x, at.y, at.z);
+        // Anything drawn somewhere other than the world's own pass (a hand drawn in a space of its own) lands nowhere
+        // near the body: it is not taken.
+        if (world.distanceToSqr(p.getEyePosition()) > 2.5 * 2.5) return;
+        HANDS.put(p.getId(), new Hand(frame, world));
+    }
+
+    /** Last in the world's pass: every grasp in sight, drawn into the frame. */
     public static void render(RenderLevelStageEvent e) {
         var mc = Minecraft.getInstance();
-        if (mc.level == null || mc.player == null || failed) return;
+        if (mc.level == null || mc.player == null || failed || shader == null) return;
         float partial = e.getPartialTick();
-        Vec3 camera = e.getCamera().getPosition();
         double time = ClientState.time(partial);
-        Player best = null;
-        double nearest = VISIBLE * VISIBLE;
+        Vec3 eye = e.getCamera().getPosition();
+        List<Cone> cones = new ArrayList<>();
+        Set<Integer> live = new HashSet<>();
         for (Player p : mc.level.players()) {
-            if (p.isSpectator() || ClientState.data(p.getId()).getLong(GravityGrasp.HOLDING) <= 0) continue;
-            double far = p.getEyePosition(partial).distanceToSqr(camera);
-            if (far < nearest) {nearest = far; best = p;}
+            if (p.isSpectator() || p.getEyePosition(partial).distanceToSqr(eye) > VISIBLE * VISIBLE) continue;
+            CompoundTag d = ClientState.data(p.getId());
+            long start = d.getLong(GravityGrasp.HOLDING);
+            if (start <= 0) continue;
+            Cone c = cone(mc, p, d, start, partial, time);
+            live.add(p.getId());
+            LAST.put(p.getId(), c);
+            FADING.remove(p.getId());
+            cones.add(c);
         }
-        Vec3 sink, source;
-        float strength, haul;
-        if (best != null) {
-            CompoundTag d = ClientState.data(best.getId());
-            long start = d.getLong(GravityGrasp.HOLDING), hauled = d.getLong(GravityGrasp.HAULING);
-            sink = palm(best, partial);
-            Entity body = hauled > 0 ? mc.level.getEntity(d.getInt(GravityGrasp.TARGET)) : null;
-            if (body != null) {
-                source = body.getPosition(partial).add(0, body.getBbHeight() * .5, 0);
-                double since = time - hauled, power = GravityGrasp.gathered(hauled - start);
-                strength = (float) ((.62 + .38 * power) * Mth.clamp(.45 + since / 3, 0, 1));
-                haul = 1;
-            } else {
-                Vec3 eye = best.getEyePosition(partial), look = best.getViewVector(partial);
-                HitResult hit = mc.level.clip(new ClipContext(eye, eye.add(look.scale(POINTING)), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, best));
-                source = hit.getLocation();
-                if (source.distanceToSqr(sink) < 1) source = sink.add(look.scale(1.5));
-                double pointed = time - start;
-                // Faint the moment the hand is out, and gathering from there: the longer it is held, the harder the air bends.
-                strength = (float) (Mth.clamp(pointed / 5, 0, 1) * (.22 + .38 * GravityGrasp.gathered((long) pointed)
-                    + .1 * Mth.clamp(pointed / GravityGrasp.GATHER, 0, 1)));
-                haul = 0;
-            }
-            // Someone else's hand behind a wall bends nothing on this side of it.
-            if (best != mc.player && mc.level.clip(new ClipContext(camera, sink, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, mc.player))
-                .getType() != HitResult.Type.MISS) best = null;
-        } else {
-            sink = source = null;
-            strength = haul = 0;
+        // Over (caught, dropped, or out of sight): what was last drawn settles out.
+        for (Iterator<Map.Entry<Integer, Cone>> it = LAST.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<Integer, Cone> last = it.next();
+            if (live.contains(last.getKey())) continue;
+            FADING.put(last.getKey(), new Fading(last.getValue(), time));
+            it.remove();
         }
-        if (best != null) {
-            caster = best.getId();
-            lastSink = sink;
-            lastSource = source;
-            lastStrength = strength;
-            lastHaul = haul;
-            settling = -1;
-        } else if (caster >= 0 && lastSink != null) {
-            // Over (caught, dropped, or out of sight): what was last drawn settles out.
-            if (settling < 0) settling = (float) time;
-            float left = 1 - (float) (time - settling) / SETTLE;
-            if (left <= 0) {caster = -1; settling = -1; return;}
-            sink = lastSink;
-            source = lastSource;
-            strength = lastStrength * left;
-            haul = lastHaul;
-        } else return;
-        if (strength <= .001f) return;
-
-        Matrix4f view = e.getPoseStack().last().pose(), projection = e.getProjectionMatrix();
-        float[] a = screen(view, projection, sink.subtract(camera)), b = screen(view, projection, source.subtract(camera));
-        if (a == null && b == null) return;
-        // An end behind the camera is brought round to the near side along the corridor, so the bend still reads.
-        if (a == null || b == null) {
-            Vec3 front = a == null ? source : sink, back = a == null ? sink : source;
-            var lv = e.getCamera().getLookVector();
-            Vec3 forward = new Vec3(lv.x(), lv.y(), lv.z());
-            double fd = front.subtract(camera).dot(forward), bd = back.subtract(camera).dot(forward);
-            double cut = (fd - .2) / Math.max(1e-4, fd - bd);
-            float[] near = screen(view, projection, front.add(back.subtract(front).scale(Mth.clamp(cut, 0, 1))).subtract(camera));
-            if (near == null) return;
-            if (a == null) a = near; else b = near;
+        for (Iterator<Fading> it = FADING.values().iterator(); it.hasNext(); ) {
+            Fading f = it.next();
+            float left = 1 - (float) ((time - f.since()) / SETTLE);
+            if (left <= 0) {it.remove(); continue;}
+            cones.add(f.cone().fade(left));
         }
-        float sinkWidth = Mth.clamp(a[2] * .35f, .02f, .11f), sourceWidth = Mth.clamp(b[2] * (haul > 0 ? .75f : .9f), .025f, .14f);
+        HANDS.values().removeIf(h -> frame - h.frame() > 2);
+        cones.removeIf(c -> c.strength() <= .001f);
+        if (cones.isEmpty()) return;
+        cones.sort(Comparator.comparingDouble(c -> c.apex().distanceToSqr(eye)));
         try {
-            if (chain == null) {
-                chain = new PostChain(mc.getTextureManager(), mc.getResourceManager(), mc.getMainRenderTarget(), HexGodOfStories.id("shaders/post/gravity.json"));
-                width = 0;
-            }
-            int w = mc.getWindow().getWidth(), h = mc.getWindow().getHeight();
-            if (width != w || height != h) {chain.resize(w, h); width = w; height = h;}
-            for (var pass : ((com.hexgodofstories.mixin.PostChainAccessor) (Object) chain).hgos$passes()) {
-                var fx = pass.getEffect();
-                var u = fx.getUniform("Strength");
-                if (u != null) u.set(Mth.clamp(strength, 0, 1));
-                u = fx.getUniform("Phase");
-                if (u != null) u.set((float) (time / 20 % 1000));
-                u = fx.getUniform("Haul");
-                if (u != null) u.set(haul);
-                u = fx.getUniform("Sink");
-                if (u != null) u.set(a[0], a[1]);
-                u = fx.getUniform("Source");
-                if (u != null) u.set(b[0], b[1]);
-                u = fx.getUniform("Widths");
-                if (u != null) u.set(sinkWidth, sourceWidth);
-            }
-            RenderSystem.disableDepthTest();
-            chain.process(partial);
-            mc.getMainRenderTarget().bindWrite(false);
-            RenderSystem.enableDepthTest();
-        } catch (Exception ex) {
+            draw(mc, e, cones.subList(0, Math.min(MOST, cones.size())), eye, time);
+        } catch (Exception broken) {
             failed = true;
-            if (chain != null) {chain.close(); chain = null;}
-            org.slf4j.LoggerFactory.getLogger("HexGodOfStories").warn("Gravity Grasp's lens unavailable", ex);
+            LOGGER.warn("Gravity Grasp's lens unavailable", broken);
             mc.getMainRenderTarget().bindWrite(false);
         }
     }
 
-    /** Where the hand is: the same place the server hauls toward (GravityGrasp#palm), smoothed for drawing. */
-    private static Vec3 palm(Player p, float partial) {
-        Vec3 look = p.getViewVector(partial), flat = new Vec3(look.x, 0, look.z);
-        Vec3 right = flat.lengthSqr() < 1e-6 ? Vec3.ZERO : new Vec3(-flat.z, 0, flat.x).normalize();
-        return p.getEyePosition(partial).add(look.scale(1.25)).add(right.scale(-.3)).add(0, -.38, 0);
+    /** A grasp's cone this frame: on the palm, toward what it points at or the body it hauls. */
+    private static Cone cone(Minecraft mc, Player p, CompoundTag d, long start, float partial, double time) {
+        Vec3 eye = p.getEyePosition(partial), look = p.getViewVector(partial);
+        Hand hand = HANDS.get(p.getId());
+        Vec3 palm = hand != null && frame - hand.frame() <= 1 ? hand.palm() : palm(mc, p, eye, look, partial);
+        long hauled = d.getLong(GravityGrasp.HAULING);
+        Entity body = hauled > 0 ? mc.level.getEntity(d.getInt(GravityGrasp.TARGET)) : null;
+        Vec3 source;
+        float radius, strength, haul;
+        if (body != null) {
+            source = body.getPosition(partial).add(0, body.getBbHeight() * .5, 0);
+            double since = time - hauled, power = GravityGrasp.gathered(hauled - start);
+            strength = (float) ((.75 + .25 * power) * Mth.clamp(.5 + since / 4, 0, 1));
+            radius = (float) Math.max(.9, body.getBbWidth() * .8 + .5);
+            haul = 1;
+        } else {
+            source = mc.level.clip(new ClipContext(eye, eye.add(look.scale(POINTING)), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, p)).getLocation();
+            double pointed = time - start, gathered = GravityGrasp.gathered((long) pointed);
+            // Faint the moment the hand is out, and gathering from there: the longer it is held, the harder and wider.
+            strength = (float) (Mth.clamp(pointed / 4, 0, 1) * (.5 + .5 * gathered));
+            radius = (float) (.7 + .9 * gathered);
+            haul = 0;
+        }
+        Vec3 axis = source.subtract(palm);
+        double length = axis.length();
+        if (length < 1.2) {axis = look; length = 1.2;}
+        else axis = axis.scale(1 / length);
+        return new Cone(palm, axis, length, radius, strength, haul);
     }
 
-    /**
-     * A camera-relative point on the screen: texture x and y (0 to 1, y up as the frame is sampled) and how tall a block
-     * there stands on it, as a share of the screen's height; null behind the camera.
-     */
-    private static float[] screen(Matrix4f view, Matrix4f projection, Vec3 at) {
-        Vector4f v = new Vector4f((float) at.x, (float) at.y, (float) at.z, 1);
-        view.transform(v);
-        projection.transform(v);
-        if (v.w <= .05f) return null;
-        float x = v.x / v.w, y = v.y / v.w;
-        return new float[]{x * .5f + .5f, y * .5f + .5f, projection.m11() / v.w * .5f};
+    /** Where the left palm is, for a hand no model drew this frame: out in front, low and to the left of the eye. */
+    private static Vec3 palm(Minecraft mc, Player p, Vec3 eye, Vec3 look, float partial) {
+        float yaw = p.getViewYRot(partial) * Mth.DEG_TO_RAD;
+        Vec3 right = new Vec3(-Mth.cos(yaw), 0, -Mth.sin(yaw)), up = right.cross(look).normalize();
+        if (up.y < 0) up = up.scale(-1);
+        return eye.add(look.scale(.75)).add(right.scale(-.32)).add(up.scale(-.3));
+    }
+
+    private static void draw(Minecraft mc, RenderLevelStageEvent e, List<Cone> cones, Vec3 eye, double time) {
+        // The frame as it stands, copied: what every cone bends.
+        RenderTarget main = mc.getMainRenderTarget();
+        if (scene == null) scene = new TextureTarget(main.width, main.height, false, Minecraft.ON_OSX);
+        else if (scene.width != main.width || scene.height != main.height) scene.resize(main.width, main.height, Minecraft.ON_OSX);
+        GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, main.frameBufferId);
+        GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, scene.frameBufferId);
+        GlStateManager._glBlitFrameBuffer(0, 0, main.width, main.height, 0, 0, scene.width, scene.height, GL11.GL_COLOR_BUFFER_BIT, GL11.GL_NEAREST);
+        main.bindWrite(false);
+
+        Matrix4f view = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(e.getPoseStack().last().pose());
+        Matrix4f projection = e.getProjectionMatrix();
+        if (shell == null) shell = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
+        RenderSystem.setShaderTexture(0, scene.getColorTextureId());
+        RenderSystem.enableDepthTest();
+        RenderSystem.depthFunc(GL11.GL_LEQUAL);
+        RenderSystem.depthMask(false);
+        RenderSystem.disableBlend();
+        RenderSystem.disableCull();
+        try {
+            for (Cone c : cones) {
+                BufferBuilder b = Tesselator.getInstance().getBuilder();
+                b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION);
+                shell(b, c, eye);
+                Vec3 at = c.apex().subtract(eye);
+                Vector3f apex = view.transformPosition(new Vector3f((float) at.x, (float) at.y, (float) at.z));
+                Vector3f axis = view.transformDirection(new Vector3f((float) c.axis().x, (float) c.axis().y, (float) c.axis().z)).normalize();
+                shader.safeGetUniform("Apex").set(apex.x, apex.y, apex.z);
+                shader.safeGetUniform("Axis").set(axis.x, axis.y, axis.z);
+                shader.safeGetUniform("Length").set((float) c.length());
+                shader.safeGetUniform("Radii").set(PALM_RADIUS, c.radius());
+                shader.safeGetUniform("Strength").set(Mth.clamp(c.strength(), 0, 1));
+                shader.safeGetUniform("Haul").set(c.haul());
+                shader.safeGetUniform("Time").set((float) (time / 20 % 3600));
+                shell.bind();
+                shell.upload(b.end());
+                shell.drawWithShader(view, projection, shader);
+            }
+        } finally {
+            VertexBuffer.unbind();
+            RenderSystem.enableCull();
+            RenderSystem.depthMask(true);
+        }
+    }
+
+    /** A closed shell just outside the cone, palm to far end: only there to cover every pixel the cone can bend. */
+    private static void shell(BufferBuilder b, Cone c, Vec3 eye) {
+        Vec3 axis = c.axis(), helper = Math.abs(axis.y) > .9 ? new Vec3(1, 0, 0) : new Vec3(0, 1, 0);
+        Vec3 u = axis.cross(helper).normalize(), v = u.cross(axis);
+        Vec3 base = c.apex().subtract(eye);
+        double from = -PALM_RADIUS, span = c.length() - from;
+        Vec3[][] rings = new Vec3[RINGS + 1][SIDES];
+        for (int k = 0; k <= RINGS; k++) {
+            double along = from + span * k / RINGS, t = Math.max(0, along) / c.length();
+            double r = (along <= 0 ? PALM_RADIUS : PALM_RADIUS + (c.radius() - PALM_RADIUS) * Math.pow(t, .85)) * 1.08 + .02;
+            Vec3 middle = base.add(axis.scale(along));
+            for (int j = 0; j < SIDES; j++) {
+                double a = j * Math.PI * 2 / SIDES;
+                rings[k][j] = middle.add(u.scale(Math.cos(a) * r)).add(v.scale(Math.sin(a) * r));
+            }
+        }
+        for (int k = 0; k < RINGS; k++)
+            for (int j = 0; j < SIDES; j++)
+                quad(b, rings[k][j], rings[k][(j + 1) % SIDES], rings[k + 1][(j + 1) % SIDES], rings[k + 1][j]);
+        Vec3 near = base.add(axis.scale(from)), far = base.add(axis.scale(c.length()));
+        for (int j = 0; j < SIDES; j++) {
+            quad(b, near, near, rings[0][j], rings[0][(j + 1) % SIDES]);
+            quad(b, far, far, rings[RINGS][(j + 1) % SIDES], rings[RINGS][j]);
+        }
+    }
+
+    private static void quad(BufferBuilder b, Vec3 a, Vec3 c, Vec3 d, Vec3 e) {
+        b.vertex(a.x, a.y, a.z).endVertex();
+        b.vertex(c.x, c.y, c.z).endVertex();
+        b.vertex(d.x, d.y, d.z).endVertex();
+        b.vertex(e.x, e.y, e.z).endVertex();
     }
 }

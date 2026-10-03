@@ -324,7 +324,7 @@ public final class Warping {
      * Reaching into a realm instead of stepping into it.
      *
      * <p>Warping has only ever been a way out. This is the other direction: the same break, opened
-     * on the same locked point of ground, reaching into whatever the G menu currently names and
+     * on the same locked point of ground, reaching into whatever the destination menu (Y held) currently names and
      * pulling its inhabitants up through the floor of wherever the caster is standing. Nobody
      * travels. The realm comes to them.
      *

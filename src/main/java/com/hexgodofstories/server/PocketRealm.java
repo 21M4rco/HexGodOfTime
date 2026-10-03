@@ -160,7 +160,7 @@ public final class PocketRealm {
         if(!move(p,realm,spawn,180,0))return false;
         p.setDeltaMovement(0,-.22,0);p.fallDistance=0;p.hurtMarked=true;
         p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(p));
-        p.displayClientMessage(Component.literal("Your world tree. G chooses the exit route; R leaves through it."),true);
+        p.displayClientMessage(Component.literal("Your world tree. Hold Y to choose the exit route; R leaves through it."),true);
         return true;
     }
 
